@@ -1,4 +1,4 @@
-lower: Exp(test2,<Exp(?A)>,<Exp(?B)>)===>Exp(666)
-MyInt(test1,<Exp(3)>,<Exp(7)>)
-MyInt(test2,<Exp(3)>,<Exp(7)>)
+lower: test2,<?A>,<?B>===>666
+MyInt(test1,<3>,<7>)
+MyInt(test2,<3>,<7>)
 MyInt(666)

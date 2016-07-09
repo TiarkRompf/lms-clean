@@ -20,7 +20,7 @@ object ir {
     a.tree match {
       case q"def $name[..$t](..$args): $tpe" =>
         val args1 = args map { case ValDef(_,x,_,_) => q"ref($x)" }
-        return c.Expr(q"def $name[..$t](..$args): $tpe = reflect(${name.toString},..$args1)")
+        return c.Expr(q"def $name[..$t](..$args): $tpe = reflect[$tpe](${name.toString},..$args1)")
       case q"def $name[..$t](..$args): $tpe = $body" =>
         // TODO: strip by-name type
         val args0 = args map { case ValDef(_,x,_,_) => q"$x" }
@@ -30,7 +30,7 @@ object ir {
         return c.Expr(q"""
           lower((..$args) => 
             Rewrite[$tpe]($name(..$args0), $name_next(..$args0)))
-          def $name[..$t](..$args): $tpe = reflect(${name.toString},..$args1)
+          def $name[..$t](..$args): $tpe = reflect[$tpe](${name.toString},..$args1)
           def $name_next[..$t](..$args): $tpe = $body
         """)
      // TODO class def
