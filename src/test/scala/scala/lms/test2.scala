@@ -13,22 +13,12 @@ class AutoTest extends TutorialFunSuite {
 
   test("one") {
     val res = utils.captureOut {
-      val IR: Impl = new Impl {}
-      import IR._
+      val IR: DSL with BaseExp = new Impl {}
+      import IR._ // Int means IR.Int
 
-      case class MyInt(s:String)
+      @ir def test1(x: Int, y: => Int): Int
 
-      implicit def intTyp = new Typ[MyInt] {
-        def to(x:MyInt): Exp = Exp(x.s)
-        def from(x:Exp): MyInt = MyInt(x.s)
-      }
-
-      implicit def intX(x:scala.Int) = MyInt(x.toString)
-      
-
-      @ir def test1(x: MyInt, y: => MyInt): MyInt
-
-      @ir def test2(x: MyInt, y: MyInt): MyInt = 666
+      @ir def test2(x: Int, y: Int): Int = 666
 
 
       println(test1(3,7))
