@@ -34,10 +34,8 @@ trait TutorialFunSuite extends LibSuite {
     out.close()
   }
   def checkOut(label: String, suffix: String, thunk: => Unit) = {
-    val output = new ByteArrayOutputStream()
-    scala.Console.setOut(new PrintStream(output))
-    thunk
-    check(label, output.toString(), suffix = suffix)
+    val output = utils.captureOut(thunk)
+    check(label, output, suffix = suffix)
   }
   def check(label: String, raw_code: String, suffix: String = "scala") = {
     val fileprefix = prefix+under+label
@@ -111,7 +109,7 @@ object utils {
   }
   def captureOut(func: => Any): String = {
     val source = new java.io.ByteArrayOutputStream()
-    withOutputFull(new java.io.PrintStream(source))(func)
+    withOutput(new java.io.PrintStream(source))(func)
     source.toString    
   }
   def withOutput[T](out: PrintStream)(f: => Unit): Unit = {

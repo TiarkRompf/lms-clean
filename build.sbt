@@ -26,3 +26,7 @@ libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _ %
 
 addCompilerPlugin("org.scalamacros" % "paradise" % paradiseVersion cross CrossVersion.full)
 
+// --- testing ---
+
+// tests are not thread safe
+parallelExecution in Test := false
