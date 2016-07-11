@@ -8,6 +8,20 @@ import scala.util.matching.Regex
 
 import scala.collection.mutable
 
+/*
+This macro implements the following translations:
+
+  @ir def foo(x1: T1, x2: T2): Tn
+  -------------------------------
+  def foo(x1: T1, x2: T2): Tn = reflect[Tn]("foo",ref(x1),ref(x2))
+
+  @ir def foo(x1: T1, x2: T2): Tn = body
+  --------------------------------------
+  def foo(x1: T1, x2: T2): Tn = reflect[Tn]("foo",ref(x1),ref(x2))
+  def foo_next(x1: T1, x2: T2): Tn = body
+  lower((x1:T1,x2:T2) => Rewrite(foo(x1,x2), foo_next(x1,x2)))
+*/
+
 
 object ir {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
