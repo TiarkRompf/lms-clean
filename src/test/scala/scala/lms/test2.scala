@@ -17,9 +17,14 @@ class AutoTest extends TutorialFunSuite {
       import IR._ // Int means IR.Int
 
       @ir def test1(x: Int, y: => Int): Int
+      // transformed to:
+      // def test1(x: Int, y: => Int): Int = reflect[Int]("test1",ref(x),ref(y))
 
       @ir def test2(x: Int, y: Int): Int = 666
-
+      // transformed to:
+      // def test2(x: Int, y: Int): Int = reflect[Int]("test2",ref(x),ref(y))
+      // def test2_next(x: Int, y: Int): Int = 666
+      // lower((x: Int, y: Int) => Rewrite(test2(x,y),test2_next(x,y))
 
       println(test1(3,7))
 
