@@ -3,8 +3,6 @@ package internal
 
 import java.io._
 
-/*
-
 import scala.tools.nsc._
 import scala.tools.nsc.util._
 import scala.tools.nsc.reporters._
@@ -12,9 +10,9 @@ import scala.tools.nsc.io._
 
 import scala.tools.nsc.interpreter.AbstractFileClassLoader
 
-trait ScalaCompile extends Expressions {
+trait ScalaCompile {
 
-  val codegen: ScalaCodegen { val IR: ScalaCompile.this.type }
+  //val codegen: ScalaCodegen { val IR: ScalaCompile.this.type }
 
   var compiler: Global = _
   var reporter: ConsoleReporter = _
@@ -26,7 +24,7 @@ trait ScalaCompile extends Expressions {
       val writer = new PrintWriter(new OutputStreamWriter(output))
     */
     val settings = new Settings()
-	val pathSeparator = System.getProperty("path.separator")
+    val pathSeparator = System.getProperty("path.separator")
 
     settings.classpath.value = this.getClass.getClassLoader match {
       case ctx: java.net.URLClassLoader => ctx.getURLs.map(_.getPath).mkString(pathSeparator)
@@ -50,27 +48,31 @@ trait ScalaCompile extends Expressions {
   
   var dumpGeneratedCode = false
 
-  def compile[A,B](f: Exp[A] => Exp[B])(implicit mA: Typ[A], mB: Typ[B]): A=>B = {
+  //def compile[A,B](f: Exp[A] => Exp[B])(implicit mA: Typ[A], mB: Typ[B]): A=>B = {
+  def compile[A,B](emitSource: String => String): A=>B = {
     if (this.compiler eq null)
       setupCompiler()
     
     val className = "staged$" + compileCount
     compileCount += 1
     
-    val source = new StringWriter()
-    val writer = new PrintWriter(source)
-    val staticData = codegen.emitSource(f, className, writer)
+    // val source = new StringWriter()
+    // val writer = new PrintWriter(source)
+    // val staticData = codegen.emitSource(f, className, writer)
 
-    codegen.emitDataStructures(writer)
+    val source = emitSource(className)
+    val staticData: List[({val tp: Manifest[Any]},Any)] = Nil
 
-    if (dumpGeneratedCode) println(source)
+    // codegen.emitDataStructures(writer)
+
+    // if (dumpGeneratedCode) println(source)
 
     val compiler = this.compiler
     val run = new compiler.Run
 
     val fileSystem = new VirtualDirectory("<vfs>", None)
     compiler.settings.outputDirs.setSingleOutput(fileSystem)
-  //      compiler.genJVM.outputDir = fileSystem
+    //compiler.genJVM.outputDir = fileSystem
 
     run.compileSources(List(new util.BatchSourceFile("<stdin>", source.toString)))
     reporter.printSummary()
@@ -93,5 +95,3 @@ trait ScalaCompile extends Expressions {
     obj
   }
 }
-
-*/

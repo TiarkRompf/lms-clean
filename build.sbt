@@ -4,25 +4,25 @@ organization := "org.scala-lang.virtualized"
 
 version := "0.0.1-SNAPSHOT"
 
-scalaVersion := "2.11.2"
+scalaVersion := "2.12.4"
 
-scalaOrganization := "org.scala-lang.virtualized" // for now, keep using virtualized
+//scalaOrganization := "org.scala-lang.virtualized" // for now, keep using virtualized
 
-val paradiseVersion = "2.0.1"
+val paradiseVersion = "2.1.0"
 
-crossScalaVersions := Seq("2.11.2")
+//crossScalaVersions := Seq("2.12.1")
 
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 resolvers += Resolver.sonatypeRepo("releases")
 
 libraryDependencies ++= Seq(
-  "org.scalatest" %% "scalatest" % "2.2.2" % "test"
+  "org.scalatest" %% "scalatest" % "3.0.1" % "test"
 )
 
-libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-reflect" % _ % "compile")
+libraryDependencies += ("org.scala-lang" % "scala-reflect" % "2.12.4")
 
-libraryDependencies <+= (scalaVersion)("org.scala-lang" % "scala-compiler" % _ % "compile")
+libraryDependencies += ("org.scala-lang" % "scala-compiler" % "2.12.4" % "compile")
 
 addCompilerPlugin("org.scalamacros" % "paradise" % paradiseVersion cross CrossVersion.full)
 

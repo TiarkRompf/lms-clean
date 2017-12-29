@@ -34,7 +34,7 @@ trait TutorialFunSuite extends LibSuite {
     out.close()
   }
   def checkOut(label: String, suffix: String, thunk: => Unit) = {
-    val output = utils.captureOut(thunk)
+    val output = utils.captureOut(try thunk catch { case e: Throwable => e.printStackTrace })
     check(label, output, suffix = suffix)
   }
   def check(label: String, raw_code: String, suffix: String = "scala") = {

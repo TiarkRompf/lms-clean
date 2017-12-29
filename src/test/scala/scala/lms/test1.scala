@@ -45,7 +45,7 @@ and IR.Int.
 */
   test("one") {
     val IR: DSL = new Impl {}
-    val res = utils.captureOut {
+    @virtualize def code = {
       import IR._
 
       // primitives: Int resolves to IR.Int as opposed to scala.Int (due to import)
@@ -53,6 +53,7 @@ and IR.Int.
       val x: Int = 5
 
       // conditional: 3 and 7 (type scala.Int) are automatically lifted
+      // (would need expected type Int for non-virtualized if)
 
       val y = if (true) 3 + x else 7
 
@@ -68,6 +69,7 @@ and IR.Int.
 
       ys(0) = xs      
     }
+    val res = utils.captureOut(code)
     check("one", res)
   }
 

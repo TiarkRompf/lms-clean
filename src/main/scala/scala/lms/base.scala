@@ -134,7 +134,7 @@ trait Impl extends BaseExp with DSL {
   }
   case class Boolean(e: Exp) extends BooleanOps {
     def &&(y: => Boolean) = reflect[Boolean](e,"&&",y.e)
-    def ||(y: => Boolean) = reflect[Boolean](e,"+",y.e)
+    def ||(y: => Boolean) = reflect[Boolean](e,"||",y.e)
     def unary_! = reflect[Boolean]("!",e)
   }
 
