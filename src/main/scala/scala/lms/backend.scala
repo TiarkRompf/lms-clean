@@ -1,15 +1,7 @@
 package scala.lms
 
 /*
-  LMS in one file.
-  A full compiler back-end.
-
-  What is the goal?
-
-  Questions, new and old:
-  - compound statements (multiple results)?
-  - effect polymorphism for if/else (and lambda?)
-
+  LMS compiler back-end in one file.
 */
 
 import scala.collection.mutable
@@ -215,8 +207,11 @@ abstract class Traverser {
     val (outer1, inner1) = inner.partition(scheduleHere)
 
     withScope(path1, inner1) {
-      outer1.foreach(traverse)
+      traverse(outer1, y)
     }
+  }
+  def traverse(ns: Seq[Node], res: Block): Unit = {
+    ns.foreach(traverse)
   }
   def traverse(n: Node): Unit = n match {
     case n @ Node(f,"λ",List(y:Block)) => 
@@ -255,9 +250,9 @@ class CodeGen extends Traverser {
 
   def emit(s: String) = println(s)
 
-  override def traverse(y: Block, extra: Sym*): Unit = {
+  override def traverse(ns: Seq[Node], y: Block): Unit = {
     emit(s"// in: ${y.in}")
-    super.traverse(y, extra:_*)
+    super.traverse(ns, y)
     emit(y.res.toString)
   }
 
@@ -279,15 +274,14 @@ class ScalaCodeGen extends Traverser {
 
   def emit(s: String) = println(s)
 
-  override def traverse(y: Block, extra: Sym*): Unit = {
-    //emit(s"// ctl: ${y.ctl}")
-    super.traverse(y, extra:_*)
-    emit(quote(y.res))
-  }
-
   def quote(s: Def): String = s match {
     case Sym(n) => s"x$n"
     case Const(x) => x.toString
+  }
+
+  override def traverse(ns: Seq[Node], y: Block): Unit = {
+    super.traverse(ns, y)
+    emit(quote(y.res))
   }
 
   override def traverse(n: Node): Unit = n match {
@@ -299,7 +293,7 @@ class ScalaCodeGen extends Traverser {
       emit(s"}")
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
       emit(s"val $f = if ($c != 0) {")
-      traverse(a) // FIXME: other sym than f for bound var?
+      traverse(a)
       emit(s"} else {")
       traverse(b)
       emit(s"}")
@@ -313,6 +307,119 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)}(${quote(y)})")
     case n @ Node(_,_,_) => 
       emit(s"??? " + n.toString)
+  }
+}
+
+
+class CompactScalaCodeGen extends Traverser {
+
+  def emit(s: String) = println(s)
+
+  override def traverse(ns: Seq[Node], y: Block): Unit = {
+    // how many times a sym is used locally
+    val hm = new mutable.HashMap[Sym,Int]
+    
+    // how many times a sym is used in an inner scope
+    val hmi = new mutable.HashMap[Sym,Int]
+
+    // lookup sym -> node for locally defined nodes
+    val df = new mutable.HashMap[Sym,Node]
+
+    // count how many times a node is used at the current level
+    if (y.res.isInstanceOf[Sym]) hm(y.res.asInstanceOf[Sym]) = 1
+    for (n <- ns) {
+      df(n.n) = n
+      for (s <- syms(n))
+        hm(s) = hm.getOrElse(s,0) + 1
+    }
+
+    // check if a node is used from some inner scope
+    for (n <- inner) {
+      for (s <- syms(n))
+        hmi(s) = hmi.getOrElse(s,0) + 1
+    }
+
+    val save = shouldInline
+
+    // should a definition be inlined or let-inserted?
+    // XXX do we need to do something more special for effects?
+    shouldInline = { (n: Sym) => 
+      if ((df contains n) &&              // locally defined
+          (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
+          (hmi.getOrElse(n, 0) == 0))      // not used in nested scopes
+          Some(df(n))
+      else None }
+
+    // only emit statements if not inlined
+    for (n <- ns) {
+      if (shouldInline(n.n).isEmpty)
+        traverse(n)
+    }
+
+    print(shallow(y.res))
+
+    shouldInline = save
+  }
+
+  var shouldInline: Sym => Option[Node] = (_ => None)
+
+  object InlineSym {
+    def unapply(x: Sym) = shouldInline(x)
+  }
+
+  def quote(s: Def): String = s match {
+    case Sym(n) => s"x$n"
+    case Const(x) => x.toString
+  }
+
+  def shallow(n: Def): String = n match {
+    case InlineSym(n) => shallow(n)
+    case _ => quote(n)
+  }
+
+  // generate string for node's right-hand-size
+  // (either inline or as part of val def)
+  def shallow(n: Node): String = n match {
+    case n @ Node(f,"λ",List(y:Block)) => 
+      val x = y.in.head
+      // XXX what should we do for functions? 
+      // proper inlining will likely work better 
+      // as a separate phase b/c it may trigger
+      // further optimizations
+      s"{ def ${quote(f)}(${quote(x)}: Int): Int = {" +
+      utils.captureOut(traverse(y,f)) +
+      s"}; ${quote(f)} }"
+    case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
+      s"if ($c != 0) {" +
+      utils.captureOut(traverse(a)) +
+      s"} else {" +
+      utils.captureOut(traverse(b)) +
+      s"}"
+    case n @ Node(s,"+",List(x,y)) => 
+      s"${shallow(x)} + ${shallow(y)}"
+    case n @ Node(s,"-",List(x,y)) => 
+      s"${shallow(x)} - ${shallow(y)}"
+    case n @ Node(s,"*",List(x,y)) => 
+      s"${shallow(x)} * ${shallow(y)}"
+    case n @ Node(s,"@",List(x,y,ctl)) => 
+      s"${shallow(x)}(${shallow(y)})"
+    case n @ Node(_,_,_) => 
+      s"??? " + n.toString
+  }
+
+  override def traverse(n: Node): Unit = n match {
+    case n @ Node(f,"λ",List(y:Block)) => 
+      val x = y.in.head
+      emit(s"def ${quote(f)}(${quote(x)}: Int): Int = {")
+      traverse(y, f)
+      emit(s"}")
+    case n @ Node(s,_,_) => 
+      emit(s"val $s = " + shallow(n))
+  }
+
+  override def apply(g: Graph) = {
+    super.apply(g)
+    println
   }
 }
 
@@ -385,6 +492,7 @@ class Example {
     println("// Raw:")
     g.nodes.foreach(println)
 
+    // XXX subsumed by freq computation in Traversal?
     val dce = new DeadCodeElim
 
     g = dce(g)
@@ -398,14 +506,15 @@ class Example {
     println("// Generic Codegen:")
     (new CodeGen)(g)
 
-    val codegen = new ScalaCodeGen {}
-
     println("// Scala Codegen:")
-    codegen(g)
+    (new ScalaCodeGen)(g)
+
+    println("// Compact Scala Codegen:")
+    (new CompactScalaCodeGen)(g)
 
     val sc = new internal.ScalaCompile {}
 
-    val src = utils.captureOut((new ScalaCodeGen)(g))
+    val src = utils.captureOut((new CompactScalaCodeGen)(g))
     val arg = g.block.in.head
 
     val fc = sc.compile[Int,Int] { cn =>
@@ -424,7 +533,7 @@ class Example {
 
     // DONE: cost-based code motion
 
-    // TODO: liveness and compact printer
+    // DONE: local liveness and compact printer
 
     // TODO: mutual recursion
 
@@ -433,8 +542,9 @@ class Example {
     // TODO: lms tutorials & more ...
 
     // TODO: low-level:
-    // - CPS conversion, 
+    // - CPS conversion
     // - closure conversion
+    // - register allocation
     // - x86 assembly
   }
 

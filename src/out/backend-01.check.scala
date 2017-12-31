@@ -38,5 +38,10 @@ def x2(x4: Int): Int = {
 }
 val x12 = x2(x1)
 x12
+// Compact Scala Codegen:
+val x6 = 2 - 1
+def x2(x4: Int): Int = {
+  if (x4 != 0) {x4 * x2(x4 - x6)} else {1}}
+x2(x1)
 compilation: ok
 24
