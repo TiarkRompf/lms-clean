@@ -447,6 +447,10 @@ class FrontEnd {
   def APP(f: Exp, x: INT): INT = 
     INT(g.reflectEffect("@",f,x.x)) // NOTE: control dep!
 
+  def PRINT(x: INT): Unit =
+    g.reflectEffect("P",x.x) // NOTE: control dep!
+
+
   def FUN(f: ((INT=>INT),INT) => INT): INT => INT = {
     val fn = Sym(g.fresh)
     //val xn = Sym(g.fresh)
