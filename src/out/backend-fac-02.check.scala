@@ -44,7 +44,7 @@ def x1(x2: Int): Int = {
   if (x2 != 0) {x2 * x1(x2 - x0)} else {1}}
 x1(x3)
 // Generated code
-class backend_01 extends (Int => Int) {
+class backend_fac_02 extends (Int => Int) {
   def apply(x0: Int): Int = {
     val x1 = 2 - 1
     def x2(x3: Int): Int = {

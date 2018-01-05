@@ -56,10 +56,23 @@ class BackendTest extends TutorialFunSuite {
     }
   }
 
-  testBE("01") { x =>
+  // basic scheduling and code motion tests
+
+  testBE("fac-01") { x =>
     val fac = FUN { (f, n) => 
       IF (n) {
-        n * f(n-((2:INT)-1))
+        n * f(n-1)
+      } {
+        1
+      }
+    }
+    fac(x)
+  }
+
+  testBE("fac-02") { x =>
+    val fac = FUN { (f, n) => 
+      IF (n) {
+        n * f(n-((2:INT)-1)) // extra stm does not depend on n -> hoist out of fac
       } {
         1
       }
