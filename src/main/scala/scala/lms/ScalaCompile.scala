@@ -48,24 +48,26 @@ trait ScalaCompile {
   
   var dumpGeneratedCode = false
 
+  def nextClassName = "staged$" + compileCount
+
+
+  // NOTE: class name must be unique (e.g. use nextClassName)
   //def compile[A,B](f: Exp[A] => Exp[B])(implicit mA: Typ[A], mB: Typ[B]): A=>B = {
-  def compile[A,B](emitSource: String => String): A=>B = {
+  def compile[A,B](className: String, source: String): A=>B = {
     if (this.compiler eq null)
       setupCompiler()
     
-    val className = "staged$" + compileCount
     compileCount += 1
     
     // val source = new StringWriter()
     // val writer = new PrintWriter(source)
     // val staticData = codegen.emitSource(f, className, writer)
 
-    val source = emitSource(className)
     val staticData: List[({val tp: Manifest[Any]},Any)] = Nil
 
     // codegen.emitDataStructures(writer)
 
-    // if (dumpGeneratedCode) println(source)
+    if (dumpGeneratedCode) println(source)
 
     val compiler = this.compiler
     val run = new compiler.Run

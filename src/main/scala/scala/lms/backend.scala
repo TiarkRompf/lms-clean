@@ -313,6 +313,8 @@ class ScalaCodeGen extends Traverser {
 
 class CompactScalaCodeGen extends Traverser {
 
+  val rename = new mutable.HashMap[Sym,String]
+
   def emit(s: String) = println(s)
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
@@ -368,7 +370,7 @@ class CompactScalaCodeGen extends Traverser {
   }
 
   def quote(s: Def): String = s match {
-    case Sym(n) => s"x$n"
+    case s @ Sym(n) => rename.getOrElseUpdate(s, s"x${rename.size}")
     case Const(x) => x.toString
   }
 
@@ -390,7 +392,7 @@ class CompactScalaCodeGen extends Traverser {
       utils.captureOut(traverse(y,f)) +
       s"}; ${quote(f)} }"
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
-      s"if ($c != 0) {" +
+      s"if (${quote(c)} != 0) {" +
       utils.captureOut(traverse(a)) +
       s"} else {" +
       utils.captureOut(traverse(b)) +
@@ -414,7 +416,7 @@ class CompactScalaCodeGen extends Traverser {
       traverse(y, f)
       emit(s"}")
     case n @ Node(s,_,_) => 
-      emit(s"val $s = " + shallow(n))
+      emit(s"val ${quote(s)} = " + shallow(n))
   }
 
   override def apply(g: Graph) = {
@@ -429,7 +431,7 @@ class CompactScalaCodeGen extends Traverser {
 
 class FrontEnd {
 
-  val g = new GraphBuilder
+  var g: GraphBuilder = null
 
   case class INT(x: Exp) {
     def +(y: INT): INT = INT(g.reflect("+",x,y.x))
@@ -458,94 +460,41 @@ class FrontEnd {
 
 
   def program(body: INT => INT): Graph = {
-    val block = g.reify { arg => body(INT(arg)).x }
-    Graph(g.globalDefs, block)
+    assert(g == null)
+    g = new GraphBuilder
+    try {
+      val block = g.reify { arg => body(INT(arg)).x }
+      Graph(g.globalDefs, block)
+    } finally g = null
   }
 
 
 }
 
 
+// Infrastructure TODOs:
+// - proper test cases
+//   - code motion
+//   - mutual recursion: ackermann 
+// - types
+// - compact printer (--> regalloc?)
 
 
+// DONE: cost-based code motion
 
-class Example {
+// DONE: local liveness and compact printer
 
+// DONE: canonicalize names in generated code
 
+// TODO: mutual recursion
 
-  def test(): Unit = {
+// TODO: fine-grained effects
 
-    val f = new FrontEnd
-    import f._
+// TODO: lms tutorials & more ...
 
-    var g = program { x =>
-      val fac = FUN { (f, n) => 
-        IF (n) {
-          n * f(n-((2:INT)-1))
-        } {
-          1
-        }
-      }
-      fac(x)
-    }
+// TODO: low-level:
+// - CPS conversion
+// - closure conversion
+// - register allocation
+// - x86 assembly
 
-    println("// Raw:")
-    g.nodes.foreach(println)
-
-    // XXX subsumed by freq computation in Traversal?
-    val dce = new DeadCodeElim
-
-    g = dce(g)
-
-
-    val flow = new Flow
-
-    g = flow(g)
-
-
-    println("// Generic Codegen:")
-    (new CodeGen)(g)
-
-    println("// Scala Codegen:")
-    (new ScalaCodeGen)(g)
-
-    println("// Compact Scala Codegen:")
-    (new CompactScalaCodeGen)(g)
-
-    val sc = new internal.ScalaCompile {}
-
-    val src = utils.captureOut((new CompactScalaCodeGen)(g))
-    val arg = g.block.in.head
-
-    val fc = sc.compile[Int,Int] { cn =>
-      s"class $cn extends (Int => Int) { def apply($arg: Int): Int = { $src } }"
-    }
-
-    println(fc(4))
-
-    // Infrastructure TODOs:
-    // - proper test cases
-    //   - code motion
-    //   - mutual recursion: ackermann 
-    // - types
-    // - compact printer (--> regalloc?)
-
-
-    // DONE: cost-based code motion
-
-    // DONE: local liveness and compact printer
-
-    // TODO: mutual recursion
-
-    // TODO: fine-grained effects
-
-    // TODO: lms tutorials & more ...
-
-    // TODO: low-level:
-    // - CPS conversion
-    // - closure conversion
-    // - register allocation
-    // - x86 assembly
-  }
-
-}
