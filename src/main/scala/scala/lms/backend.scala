@@ -445,7 +445,7 @@ class FrontEnd {
   }
   
   def APP(f: Exp, x: INT): INT = 
-    INT(g.reflect("@",f,x.x, g.curBlock)) // NOTE: control dep!
+    INT(g.reflectEffect("@",f,x.x)) // NOTE: control dep!
 
   def FUN(f: ((INT=>INT),INT) => INT): INT => INT = {
     val fn = Sym(g.fresh)
