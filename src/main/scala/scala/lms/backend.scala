@@ -388,9 +388,9 @@ class CompactScalaCodeGen extends Traverser {
       // proper inlining will likely work better 
       // as a separate phase b/c it may trigger
       // further optimizations
-      s"{ def ${quote(f)}(${quote(x)}: Int): Int = {" +
+      s"({ ${quote(x)}: Int => " +
       utils.captureOut(traverse(y,f)) +
-      s"}; ${quote(f)} }"
+      s"})"
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
       s"if (${quote(c)} != 0) {" +
       utils.captureOut(traverse(a)) +
@@ -450,6 +450,8 @@ class FrontEnd {
   def PRINT(x: INT): Unit =
     g.reflectEffect("P",x.x) // NOTE: control dep!
 
+
+  def FUN(f: INT => INT): INT => INT = FUN((_,x) => f(x))
 
   def FUN(f: ((INT=>INT),INT) => INT): INT => INT = {
     val fn = Sym(g.fresh)
