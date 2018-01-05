@@ -95,10 +95,6 @@ class BackendTest extends TutorialFunSuite {
   }
   
 
-/*
-@virtualize
-trait NestCondProg2 extends Arith with Functions with IfThenElse with Print {
-  
   /* Previously this program exhibited behavior that is likely undesired in many
   cases. The definition of f was moved *into* g and into the conditional.
   The doLambda in the else branch would not be hoisted out of g either.
@@ -109,42 +105,43 @@ trait NestCondProg2 extends Arith with Functions with IfThenElse with Print {
   */
   
   
-  def test(x: Rep[Unit]) = {
-    val f = doLambda { x: Rep[Double] => 2 * x }
+  testBE("codemotion-02") { x =>
+    val f = FUN { x => 2 * x }
     
-    val g = doLambda { y: Rep[Boolean] =>
-      print("yo")
-      if (y)
-        f
-      else
-        doLambda { x: Rep[Double] => x + 1 }
-    }
-    g
-  }
-  
-}
-
-
-@virtualize
-trait NestCondProg3 extends Arith with Functions with IfThenElse with Print {
-  
-  def test(x: Rep[Unit]) = {
-    val f = if (unit(true)) doLambda { x: Rep[Double] => 2 * x } else doLambda { x: Rep[Double] => 4 * x }
-    
-    val g = doLambda { y: Rep[Boolean] =>
-      print("yo")
-      if (y) {
-        print("then")
-        f
-      } else {
-        print("else")
-        if (unit(false)) doLambda { x: Rep[Double] => x + 1 } else doLambda { x: Rep[Double] => x + 2 }
+    val g = FUN { y =>
+      PRINT(1337)
+      IF (y) {
+        f(1)
+      } /*else*/ {
+        (FUN { x => x + 1 })(2)
       }
     }
-    g
+    g(3)
   }
   
-}
+  testBE("codemotion-03") { x =>
+    // NOTE: currently differs from LMS.
+    // Both IFs are hoisted, LMS moves FUNs into branches.
+    // We hoist the functions (bad if they were loops!)
+    // FIXME
+
+    val f = IF (1) { (FUN { x => 2 * x })(1) } /*else*/ { (FUN { x => 4 * x })(2) }
+    
+    val g = FUN { y =>
+      PRINT(1337)
+      IF (y) {
+        PRINT(1)
+        f
+      } /*else*/ {
+        PRINT(0)
+        IF (0) { (FUN { x => x + 1 })(3) } /*else*/ { (FUN { x => x + 2 })(4) }
+      }
+    }
+    g(5)
+  }
+  
+/*
+
 
 @virtualize
 trait NestCondProg4 extends Arith with Functions with IfThenElse with Print {
