@@ -3,8 +3,8 @@ x6 = (- Const(2) Const(1))
 x7 = (- x4 x6)
 x8 = (@ x2 x7 x5)
 x9 = (* x4 x8)
-x11 = (? x4 Block(List(x5),x9) Block(List(x10),Const(1)))
-x2 = (λ Block(List(x4, x3),x11))
+x11 = (? x4 Block(List(x5),x9,x8) Block(List(x10),Const(1),x10))
+x2 = (λ Block(List(x4, x3),x11,x3))
 x12 = (@ x2 x1 x0)
 // Generic Codegen:
 // in: List(x1, x0)
@@ -15,14 +15,14 @@ x2 = (λ {
     x7 = (- x4 x6)
     x8 = (@ x2 x7 x5)
     x9 = (* x4 x8)
-    x9
+    x9 // out effect: x8
   } {// in: List(x10)
-    Const(1)
+    Const(1) // out effect: x10
   })
-  x11
+  x11 // out effect: x3
 })
 x12 = (@ x2 x1 x0)
-x12
+x12 // out effect: x12
 // Scala Codegen:
 val x6 = 2 - 1
 def x2(x4: Int): Int = {

@@ -20,18 +20,21 @@ object Backend {
     override def toString = s"$n = ($op ${rhs.mkString(" ")})"
   }
 
-  case class Block(in: List[Sym], res: Exp) extends Def
+  case class Block(in: List[Sym], res: Exp, eff: Exp) extends Def
 
     // where should this go?
     def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.in)
 
   def blocks(x: Node): List[Block] = 
-    x.rhs.collect { case a @ Block(_,_) => a }
+    x.rhs.collect { case a @ Block(_,_,_) => a }
 
   def syms(x: Node): List[Sym] = 
-    x.rhs.collect { 
-      case s: Sym => s 
-      case Block(_, s: Sym) => s
+    x.rhs.flatMap { 
+      case s: Sym => List(s) 
+      case Block(_, s: Sym, e: Sym) => List(s,e)
+      case Block(_, s: Sym, _) => List(s)
+      case Block(_, _, e: Sym) => List(e)
+      case _ => Nil
     } diff boundSyms(x)
 }
 
@@ -48,7 +51,8 @@ class GraphBuilder {
     reflect(Sym(fresh), s, as:_*)
   }
   def reflectEffect(s: String, as: Def*): Exp = {
-    reflect(Sym(fresh), s, (as :+ curBlock):_*)
+    val sm = Sym(fresh) 
+    try reflect(sm, s, (as :+ curBlock):_*) finally curBlock = sm
   }
   def reflect(x: Sym, s: String, as: Def*): Exp = {
     globalDefs += Node(x,s,as.toList)
@@ -63,7 +67,7 @@ class GraphBuilder {
       val block = Sym(fresh)
       curBlock = block
       val res = x 
-      Block(block::Nil, res)
+      Block(block::Nil, res, curBlock)
     } finally {
       curBlock = save
     }
@@ -75,7 +79,7 @@ class GraphBuilder {
       val arg = Sym(fresh)
       curBlock = block
       val res = x(arg) 
-      Block(arg::block::Nil, res)
+      Block(arg::block::Nil, res, curBlock)
     } finally {
       curBlock = save
     }
@@ -117,11 +121,17 @@ class Flow extends Phase {
 
   val freq = new mutable.HashMap[Sym,Double]
 
+  // XXX: not clear how to count effect deps
+  // (e.g. 'if' shouldn't count effect as 0.5, b/c together with
+  // a normal dep this is 1.0, and would thus hoist stuff)
+
+  // XXX perhaps we need to count freqs differently (?)
+
   def symsFreq(x: Node): List[(Def,Double)] = x match {
-    case Node(f, "λ", List(Block(in,y: Sym))) => 
-      List((y,100))
-    case Node(_, "?", List(c, Block(ac,ae), Block(bc,be))) => 
-      List((c,1.0),(ae,0.5),(be,0.5))
+    case Node(f, "λ", List(Block(in, y, eff))) => 
+      List((y,100),(eff,0.001))
+    case Node(_, "?", List(c, Block(ac,ae,af), Block(bc,be,bf))) => 
+      List((c,1.0),(ae,0.5),(af,0.001),(be,0.5),(bf,0.001))
     case _ => syms(x) map (s => (s,1.0))
   }
 
@@ -129,6 +139,9 @@ class Flow extends Phase {
 
     if (g.block.res.isInstanceOf[Sym])
       freq(g.block.res.asInstanceOf[Sym]) = 1.0
+
+    if (g.block.eff.isInstanceOf[Sym])
+      freq(g.block.eff.asInstanceOf[Sym]) = 1.0
 
     for (d <- g.nodes.reverseIterator) {
       if (freq contains d.n) {
@@ -138,7 +151,7 @@ class Flow extends Phase {
       }
     }
 
-    //live.toList.sortBy(_._1.n).foreach(println)
+    //freq.toList.sortBy(_._1.n).foreach(println)
 
     g
   }
@@ -219,7 +232,7 @@ abstract class Traverser {
       traverse(y, f)
     case n @ Node(f, op, es) =>
       // generic traversal: go into all blocks
-      for (e @ Block(_,_) <- es)
+      for (e @ Block(_,_,_) <- es)
         traverse(e)
   }
 
@@ -253,7 +266,7 @@ class CodeGen extends Traverser {
   override def traverse(ns: Seq[Node], y: Block): Unit = {
     emit(s"// in: ${y.in}")
     super.traverse(ns, y)
-    emit(y.res.toString)
+    emit(y.res.toString + " // out effect: " + y.eff.toString)
   }
 
   override def traverse(n: Node): Unit = n match {
@@ -263,7 +276,7 @@ class CodeGen extends Traverser {
       emit(s"})")
     case n @ Node(f, op, es) =>
       val ss = es map { 
-        case e @ Block(_,_) => "{" + utils.captureOut(traverse(e)) + "}" // FIXME freq!!
+        case e @ Block(_,_,_) => "{" + utils.captureOut(traverse(e)) + "}" // FIXME freq!!
         case e => e.toString
       }
       emit(s"$f = ($op ${ss.mkString(" ")})")
@@ -305,6 +318,8 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)} * ${quote(y)}")
     case n @ Node(s,"@",List(x,y,ctl)) => 
       emit(s"val $s = ${quote(x)}(${quote(y)})")
+    case n @ Node(s,"P",List(x,ctl)) => 
+      emit(s"val $s = println(${quote(x)})")
     case n @ Node(_,_,_) => 
       emit(s"??? " + n.toString)
   }
@@ -405,6 +420,8 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)} * ${shallow(y)}"
     case n @ Node(s,"@",List(x,y,ctl)) => 
       s"${shallow(x)}(${shallow(y)})"
+    case n @ Node(s,"P",List(x,ctl)) => 
+      s"println(${shallow(x)})"
     case n @ Node(_,_,_) => 
       s"??? " + n.toString
   }
@@ -415,6 +432,8 @@ class CompactScalaCodeGen extends Traverser {
       emit(s"def ${quote(f)}(${quote(x)}: Int): Int = {")
       traverse(y, f)
       emit(s"}")
+    case n @ Node(s,"P",_) => // Unit result
+      emit(shallow(n))
     case n @ Node(s,_,_) => 
       emit(s"val ${quote(s)} = " + shallow(n))
   }
@@ -440,16 +459,15 @@ class FrontEnd {
   }
 
   def IF(c: INT)(a: => INT)(b: => INT): INT = {
-    // TODO effect polymorphism!
+    // TODO: effect polymorphism!
     INT(g.reflect("?",c.x,g.reify(a.x),g.reify(b.x)))
   }
   
   def APP(f: Exp, x: INT): INT = 
-    INT(g.reflectEffect("@",f,x.x)) // NOTE: control dep!
+    INT(g.reflectEffect("@",f,x.x))
 
   def PRINT(x: INT): Unit =
-    g.reflectEffect("P",x.x) // NOTE: control dep!
-
+    g.reflectEffect("P",x.x)
 
   def FUN(f: INT => INT): INT => INT = FUN((_,x) => f(x))
 
@@ -461,9 +479,7 @@ class FrontEnd {
     f1
   }
 
-
   implicit def liftInt(x: Int): INT = INT(Const(x))
-
 
   def program(body: INT => INT): Graph = {
     assert(g == null)

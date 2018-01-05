@@ -16,22 +16,24 @@ class BackendTest extends TutorialFunSuite {
     (under + name).replace("-","_")
   }
 
-  def testBE(name: String)(prog: INT => INT) = {
+  def testBE(name: String, verbose: Boolean = false)(prog: INT => INT) = {
     test(name) {
       checkOut(name, "scala", {
         val g = program(prog)
 
-        println("// Raw:")
-        g.nodes.foreach(println)
+        if (verbose) {
+          println("// Raw:")
+          g.nodes.foreach(println)
 
-        println("// Generic Codegen:")
-        (new CodeGen)(g)
+          println("// Generic Codegen:")
+          (new CodeGen)(g)
 
-        println("// Scala Codegen:")
-        (new ScalaCodeGen)(g)
+          println("// Scala Codegen:")
+          (new ScalaCodeGen)(g)
 
-        println("// Compact Scala Codegen:")
-        (new CompactScalaCodeGen)(g)
+          println("// Compact Scala Codegen:")
+          (new CompactScalaCodeGen)(g)
+        }
 
         val cg = new CompactScalaCodeGen
 
@@ -58,7 +60,7 @@ class BackendTest extends TutorialFunSuite {
 
   // basic scheduling and code motion tests
 
-  testBE("fac-01") { x =>
+  testBE("fac-01", verbose = true) { x =>
     val fac = FUN { (f, n) => 
       IF (n) {
         n * f(n-1)
@@ -69,7 +71,7 @@ class BackendTest extends TutorialFunSuite {
     fac(x)
   }
 
-  testBE("fac-02") { x =>
+  testBE("fac-02", verbose = true) { x =>
     val fac = FUN { (f, n) => 
       IF (n) {
         n * f(n-((2:INT)-1)) // extra stm does not depend on n -> hoist out of fac
@@ -79,5 +81,18 @@ class BackendTest extends TutorialFunSuite {
     }
     fac(x)
   }
+
+  testBE("codemotion-01") { x =>
+  
+    val f = FUN { x =>
+      val g = FUN { y =>
+        PRINT(1337)
+        y + (liftInt(4) * liftInt(3))
+      }
+      g(1)
+    }
+    f(2)
+  }
+  
 
 }
