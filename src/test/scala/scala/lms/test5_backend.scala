@@ -154,26 +154,23 @@ class BackendTest extends TutorialFunSuite {
     g(5)
   }
   
-/*
-
-
-@virtualize
-trait NestCondProg4 extends Arith with Functions with IfThenElse with Print {
+  testBE("codemotion-04") { x =>
   
-  def test(x: Rep[Unit]) = {
-    val g = doLambda { y: Rep[Double] =>
-      if (unit(true)) {
-        val x = y + 1.0
-        print(x)
-        ()
-      } else {
+    val g = FUN { y =>
+      IF (1) {
+        val x = y + 1
+        PRINT(x)
+        0
+      } /*else*/ {
+        0
       }
     }
-    g
+    g(1)
   }
   
-}
 
+
+/*
 
 @virtualize
 trait NestCondProg5 extends Arith with Functions with IfThenElse with Print {
