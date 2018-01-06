@@ -85,7 +85,7 @@ class BackendTest extends TutorialFunSuite {
 
   // nested additive frequency issue
 
-  testBE("codemotion-00", verbose = true) { x =>
+  testBE("codemotion-00") { x =>
   
     val f = FUN { x =>
       IF(1) { 
@@ -137,10 +137,7 @@ class BackendTest extends TutorialFunSuite {
   }
   
   testBE("codemotion-03") { x =>
-    // NOTE: currently differs from LMS.
-    // Both IFs are hoisted, LMS moves FUNs into branches.
-    // We hoist the functions (bad if they were loops!)
-    // FIXME
+    // Both IFs hoisted, FUNs inside branches
 
     val f = IF (1) { (FUN { x => 2 * x })(1) } /*else*/ { (FUN { x => 4 * x })(2) }
     

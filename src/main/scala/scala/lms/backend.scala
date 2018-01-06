@@ -153,7 +153,7 @@ class Flow extends Phase {
       if (freq contains d.n) {
         val s = freq(d.n)
         for ((e:Sym,f) <- symsFreq(d))
-          freq(e) = (freq.getOrElse(e, 0.0) + (f*s))
+          if (f > 0.5) freq(e) = (freq.getOrElse(e, 0.0) + (f*s))
       }
     }
 
@@ -223,7 +223,49 @@ abstract class Traverser {
     }
     // NOTE: nodes with freq = 0 could be removed altogether!
 
-    val (outer1, inner1) = inner.partition(scheduleHere)
+    //val (outer1, inner1) = inner.partition(scheduleHere)
+
+    // -------------------
+
+    def available(d: Node) = 
+      bound.hm(d.n) -- path1 - d.n == Set()
+
+    val g = new Graph(inner, y)
+
+    val reach = new mutable.HashSet[Sym]
+
+  def symsFreq(x: Node): List[(Def,Double)] = x match {
+    case Node(f, "λ", List(Block(in, y, eff))) => 
+      List((y,100),(eff,100))
+    case Node(_, "?", List(c, Block(ac,ae,af), Block(bc,be,bf))) => 
+      List((c,1.0),(ae,0.5),(af,0.001),(be,0.5),(bf,0.001))
+    case _ => syms(x) map (s => (s,1.0))
+  }
+
+    if (g.block.res.isInstanceOf[Sym])
+      reach += g.block.res.asInstanceOf[Sym]
+
+    if (g.block.eff.isInstanceOf[Sym])
+      reach += g.block.eff.asInstanceOf[Sym]
+
+    for (d <- g.nodes.reverseIterator) {
+      if ((reach contains d.n)) {
+        if (available(d)) { 
+          // node will be sched here, don't follow if branches!
+          for ((e:Sym,f) <- symsFreq(d) if f > 0.5) reach += e
+        } else {
+          for ((e:Sym,f) <- symsFreq(d)) reach += e
+        }
+      }
+    }
+
+
+    def scheduleHere2(d: Node) = {
+      available(d) && reach(d.n)
+    }
+
+
+    val (outer1, inner1) = inner.partition(scheduleHere2)
 
     withScope(path1, inner1) {
       traverse(outer1, y)
