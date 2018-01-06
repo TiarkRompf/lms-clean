@@ -170,23 +170,19 @@ class BackendTest extends TutorialFunSuite {
   
 
 
-/*
-
-@virtualize
-trait NestCondProg5 extends Arith with Functions with IfThenElse with Print {
-  
-  def test(x: Rep[Unit]) = {
-    if (unit(true)) {
+  testBE("codemotion-05") { x =>
+    IF (1) {
       // should place 7 + 9 here
-      doLambda { y: Rep[Double] =>
-        print(unit(7.0) + unit(9.0))
-      }
-    } else {
+      (FUN { y =>
+        PRINT((7:INT) + (9:INT))
+        0
+      })(0)
+    } /*else*/ {
+      0
     }
   }
-  
-}
 
+/*
 @virtualize
 trait NestCondProg6 extends Arith with Functions with IfThenElse with Print {
   
