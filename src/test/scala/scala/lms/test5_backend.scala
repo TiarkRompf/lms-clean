@@ -182,23 +182,23 @@ class BackendTest extends TutorialFunSuite {
     }
   }
 
-/*
-@virtualize
-trait NestCondProg6 extends Arith with Functions with IfThenElse with Print {
   
-  // FIXME: this one doesn't work yet!!!
-
-  def test(x: Rep[Unit]) = {
-    val z = unit(7.0) + unit(9.0) // should move into the conditional (but isn't currently)
-    val x = if (unit(true)) {
-      print(z)
-    } else {
+  // this one didn't work in LMS
+  testBE("codemotion-06") { x =>
+    val z = (7:INT) + (9:INT) // should move into the conditional (isn't in LMS)
+    val x = IF (1) {
+      PRINT(z)
+      0
+    } /*else*/ {
+      0
     }
-    doLambda { y: Rep[Boolean] => 
-      print(x)
-    }
+    (FUN { y => 
+      PRINT(x)
+      0
+    })(1)
   }
   
+/*
 }
 
 @virtualize
