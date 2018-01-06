@@ -435,8 +435,18 @@ class CompactScalaCodeGen extends Traverser {
     case _ => quote(n)
   }
 
+  // XXX NOTE: performance implications of capture + concat !!!
+  def quoteBlock(f: => Unit) = {
+    val b = utils.captureOut(f)
+    if (b contains '\n')
+      "{\n" + b + "\n}"
+    else
+      b
+  }
+
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
+  // XXX TODO: precedence of nested expressions!!
   def shallow(n: Node): String = n match {
     case n @ Node(f,"λ",List(y:Block)) => 
       val x = y.in.head
@@ -444,15 +454,16 @@ class CompactScalaCodeGen extends Traverser {
       // proper inlining will likely work better 
       // as a separate phase b/c it may trigger
       // further optimizations
-      s"({ ${quote(x)}: Int => " +
-      utils.captureOut(traverse(y,f)) +
-      s"})"
+      val b = utils.captureOut(traverse(y,f))
+      if (b contains '\n')
+        s"({ ${quote(x)}: Int => \n$b\n})"
+      else
+        s"((${quote(x)}: Int) => $b)"
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
-      s"if (${quote(c)} != 0) {" +
-      utils.captureOut(traverse(a)) +
-      s"} else {" +
-      utils.captureOut(traverse(b)) +
-      s"}"
+      s"if (${quote(c)} != 0) " +
+      quoteBlock(traverse(a)) +
+      s" else " +
+      quoteBlock(traverse(b))
     case n @ Node(s,"+",List(x,y)) => 
       s"${shallow(x)} + ${shallow(y)}"
     case n @ Node(s,"-",List(x,y)) => 
@@ -470,9 +481,7 @@ class CompactScalaCodeGen extends Traverser {
   override def traverse(n: Node): Unit = n match {
     case n @ Node(f,"λ",List(y:Block)) => 
       val x = y.in.head
-      emit(s"def ${quote(f)}(${quote(x)}: Int): Int = {")
-      traverse(y, f)
-      emit(s"}")
+      emit(s"def ${quote(f)}(${quote(x)}: Int): Int = ${ quoteBlock(traverse(y,f)) }")
     case n @ Node(s,"P",_) => // Unit result
       emit(shallow(n))
     case n @ Node(s,_,_) => 

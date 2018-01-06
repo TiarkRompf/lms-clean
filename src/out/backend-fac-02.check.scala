@@ -40,15 +40,13 @@ val x12 = x2(x1)
 x12
 // Compact Scala Codegen:
 val x6 = 2 - 1
-def x2(x4: Int): Int = {
-  if (x4 != 0) {x4 * x2(x4 - x6)} else {1}}
+def x2(x4: Int): Int = if (x4 != 0) x4 * x2(x4 - x6) else 1
 x2(x1)
 // Generated code
 class backend_fac_02 extends (Int => Int) {
   def apply(x0: Int): Int = {
     val x1 = 2 - 1
-    def x2(x3: Int): Int = {
-      if (x3 != 0) {x3 * x2(x3 - x1)} else {1}}
+    def x2(x3: Int): Int = if (x3 != 0) x3 * x2(x3 - x1) else 1
     x2(x0)
   }
 }

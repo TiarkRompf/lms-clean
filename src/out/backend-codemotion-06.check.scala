@@ -1,10 +1,14 @@
 // Generated code
 class backend_codemotion_06 extends (Int => Int) {
   def apply(x0: Int): Int = {
-    val x1 = if (1 != 0) {println(7 + 9)
-      0} else {0}
-    ({ x2: Int => println(x1)
-      0})(1)
+    val x1 = if (1 != 0) {
+      println(7 + 9)
+      0
+    } else 0
+    ({ x2: Int =>
+      println(x1)
+      0
+    })(1)
   }
 }
 compilation: ok
