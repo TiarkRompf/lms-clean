@@ -198,26 +198,20 @@ class BackendTest extends TutorialFunSuite {
     })(1)
   }
   
-/*
-}
-
-@virtualize
-trait NestCondProg7 extends Arith with OrderingOps with Functions with IfThenElse with Print {
-
-  def test(x: Rep[Unit]) = {    
-    doLambda { y: Rep[Double] => 
-      if (y < 100) {
-        val z = y + unit(9.0) // should stay inside conditional: 
-                              // apparently z was moved up because it is also used in the lambda (z+u)
-        doLambda { u: Rep[Double] =>
+  testBE("codemotion-07") { x =>
+    val f = FUN { y  => 
+      IF (y) {
+        val z = y + 9 // should stay inside conditional: 
+                      // apparently z was moved up because it is also used in the lambda (z+u)
+        val g = FUN { u =>
           z + u
         }
-      } else {
+        g(0)
+      } /*else*/ {
+        0
       }
     }
+    f(1)
   }
   
-}
-*/
-
 }
