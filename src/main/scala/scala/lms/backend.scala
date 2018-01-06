@@ -209,38 +209,25 @@ abstract class Traverser {
   def traverse(y: Block, extra: Sym*): Unit = {
     val path1 = y.in ++ extra.toList ++ path
 
-    // Note: frequency must be recalculated for each subgraph
-    // Question: is that costly? Can/should we avoid it?
-    val flow = new Flow
-    flow(new Graph(inner, y))
-
-    def scheduleHere(d: Node) = {
-      // Should node d be scheduled here? It must be:
-      // (1) available: not dependent on other bound vars
-      // (2) used at least as often as the block result
-      bound.hm(d.n) -- path1 - d.n == Set() && 
-      flow.freq.getOrElse(d.n,0.0) >= 1
-    }
-    // NOTE: nodes with freq = 0 could be removed altogether!
-
-    //val (outer1, inner1) = inner.partition(scheduleHere)
-
-    // -------------------
-
+    // a node is available if all bound vars
+    // it depends on are in scope
     def available(d: Node) = 
       bound.hm(d.n) -- path1 - d.n == Set()
 
+    // freq/block computation
+    def symsFreq(x: Node): List[(Def,Double)] = x match {
+      case Node(f, "λ", List(Block(in, y, eff))) => 
+        List((y,100),(eff,100))
+      case Node(_, "?", List(c, Block(ac,ae,af), Block(bc,be,bf))) => 
+        List((c,1.0),(ae,0.5),(af,0.5),(be,0.5),(bf,0.5))
+      case _ => syms(x) map (s => (s,1.0))
+    }
+
+    // find out which nodes are reachable on a
+    // warm path (not only via if/else branches)
     val g = new Graph(inner, y)
 
     val reach = new mutable.HashSet[Sym]
-
-  def symsFreq(x: Node): List[(Def,Double)] = x match {
-    case Node(f, "λ", List(Block(in, y, eff))) => 
-      List((y,100),(eff,100))
-    case Node(_, "?", List(c, Block(ac,ae,af), Block(bc,be,bf))) => 
-      List((c,1.0),(ae,0.5),(af,0.001),(be,0.5),(bf,0.001))
-    case _ => syms(x) map (s => (s,1.0))
-  }
 
     if (g.block.res.isInstanceOf[Sym])
       reach += g.block.res.asInstanceOf[Sym]
@@ -259,21 +246,24 @@ abstract class Traverser {
       }
     }
 
+    // Should node d be scheduled here? It must be:
+    // (1) available: not dependent on other bound vars
+    // (2) used at least as often as the block result
 
-    def scheduleHere2(d: Node) = {
+    def scheduleHere(d: Node) =
       available(d) && reach(d.n)
-    }
 
-
-    val (outer1, inner1) = inner.partition(scheduleHere2)
+    val (outer1, inner1) = inner.partition(scheduleHere)
 
     withScope(path1, inner1) {
       traverse(outer1, y)
     }
   }
+
   def traverse(ns: Seq[Node], res: Block): Unit = {
     ns.foreach(traverse)
   }
+
   def traverse(n: Node): Unit = n match {
     case n @ Node(f,"λ",List(y:Block)) => 
       // special case λ: add free var f
