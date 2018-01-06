@@ -311,7 +311,7 @@ class ScalaCodeGen extends Traverser {
       traverse(y, f)
       emit(s"}")
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
-      emit(s"val $f = if ($c != 0) {")
+      emit(s"val $f = if (${quote(c)} != 0) {")
       traverse(a)
       emit(s"} else {")
       traverse(b)
