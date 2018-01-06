@@ -22,11 +22,17 @@ object Backend {
 
   case class Block(in: List[Sym], res: Exp, eff: Exp) extends Def
 
-    // where should this go?
-    def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.in)
+  // where should this go?
+  def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.in)
 
   def blocks(x: Node): List[Block] = 
     x.rhs.collect { case a @ Block(_,_,_) => a }
+
+  def directSyms(x: Node): List[Sym] = 
+    x.rhs.flatMap { 
+      case s: Sym => List(s) 
+      case _ => Nil
+    }
 
   def syms(x: Node): List[Sym] = 
     x.rhs.flatMap { 
@@ -330,6 +336,8 @@ class CompactScalaCodeGen extends Traverser {
 
   val rename = new mutable.HashMap[Sym,String]
 
+  var doRename = false
+
   def emit(s: String) = println(s)
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
@@ -346,7 +354,7 @@ class CompactScalaCodeGen extends Traverser {
     if (y.res.isInstanceOf[Sym]) hm(y.res.asInstanceOf[Sym]) = 1
     for (n <- ns) {
       df(n.n) = n
-      for (s <- syms(n))
+      for (s <- directSyms(n)) // exclude refs through blocks
         hm(s) = hm.getOrElse(s,0) + 1
     }
 
@@ -385,7 +393,8 @@ class CompactScalaCodeGen extends Traverser {
   }
 
   def quote(s: Def): String = s match {
-    case s @ Sym(n) => rename.getOrElseUpdate(s, s"x${rename.size}")
+    case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
+    case Sym(n) => s.toString
     case Const(x) => x.toString
   }
 

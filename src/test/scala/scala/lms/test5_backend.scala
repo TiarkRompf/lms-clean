@@ -36,6 +36,7 @@ class BackendTest extends TutorialFunSuite {
         }
 
         val cg = new CompactScalaCodeGen
+        cg.doRename = true
 
         val arg = cg.quote(g.block.in.head)
         val src = utils.captureOut(cg(g))
@@ -81,6 +82,22 @@ class BackendTest extends TutorialFunSuite {
     }
     fac(x)
   }
+
+  // nested additive frequency issue
+
+  testBE("codemotion-00", verbose = true) { x =>
+  
+    val f = FUN { x =>
+      IF(1) { 
+        (3:INT) + (4:INT)
+      } {
+        (5:INT) * (6:INT)
+      }
+    }
+    f(2)
+  }
+
+  // Test cases from LMS repo follow
 
   testBE("codemotion-01") { x =>
   
