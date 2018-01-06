@@ -36,9 +36,9 @@ def x2(x4: Int): Int = {
 val x11 = x2(x1)
 x11
 // Compact Scala Codegen:
-def x0(x1: Int): Int = {
-  if (x1 != 0) {x1 * x0(x1 - 1)} else {1}}
-x0(x2)
+def x2(x4: Int): Int = {
+  if (x4 != 0) {x4 * x2(x4 - 1)} else {1}}
+x2(x1)
 // Generated code
 class backend_fac_01 extends (Int => Int) {
   def apply(x0: Int): Int = {
