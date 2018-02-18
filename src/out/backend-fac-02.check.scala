@@ -1,46 +1,49 @@
 // Raw:
-x6 = (- Const(2) Const(1))
-x7 = (- x4 x6)
-x8 = (@ x2 x7 x5)
-x9 = (* x4 x8)
-x11 = (? x4 Block(List(x5),x9,x8) Block(List(x10),Const(1),x10))
-x2 = (λ Block(List(x4, x3),x11,x3))
-x12 = (@ x2 x1 x0)
+x5 = (!= x4 Const(0))
+x7 = (- Const(2) Const(1))
+x8 = (- x4 x7)
+x9 = (@ x2 x8 x6)
+x10 = (* x4 x9)
+x12 = (? x5 Block(List(x6),x10,x9) Block(List(x11),Const(1),x11))
+x2 = (λ Block(List(x4, x3),x12,x3))
+x13 = (@ x2 x1 x0)
 // Generic Codegen:
 // in: List(x1, x0)
-x6 = (- Const(2) Const(1))
+x7 = (- Const(2) Const(1))
 x2 = (λ {
   // in: List(x4, x3)
-  x11 = (? x4 {// in: List(x5)
-    x7 = (- x4 x6)
-    x8 = (@ x2 x7 x5)
-    x9 = (* x4 x8)
-    x9 // out effect: x8
-  } {// in: List(x10)
-    Const(1) // out effect: x10
+  x5 = (!= x4 Const(0))
+  x12 = (? x5 {// in: List(x6)
+    x8 = (- x4 x7)
+    x9 = (@ x2 x8 x6)
+    x10 = (* x4 x9)
+    x10 // out effect: x9
+  } {// in: List(x11)
+    Const(1) // out effect: x11
   })
-  x11 // out effect: x3
+  x12 // out effect: x3
 })
-x12 = (@ x2 x1 x0)
-x12 // out effect: x12
+x13 = (@ x2 x1 x0)
+x13 // out effect: x13
 // Scala Codegen:
-val x6 = 2 - 1
+val x7 = 2 - 1
 def x2(x4: Int): Int = {
-  val x11 = if (x4 != 0) {
-    val x7 = x4 - x6
-    val x8 = x2(x7)
-    val x9 = x4 * x8
-    x9
+  val x5 = x4 != 0
+  val x12 = if (x5) {
+    val x8 = x4 - x7
+    val x9 = x2(x8)
+    val x10 = x4 * x9
+    x10
   } else {
     1
   }
-  x11
+  x12
 }
-val x12 = x2(x1)
-x12
+val x13 = x2(x1)
+x13
 // Compact Scala Codegen:
-val x6 = 2 - 1
-def x2(x4: Int): Int = if (x4 != 0) x4 * x2(x4 - x6) else 1
+val x7 = 2 - 1
+def x2(x4: Int): Int = if (x4 != 0) x4 * x2(x4 - x7) else 1
 x2(x1)
 // Generated code
 class backend_fac_02 extends (Int => Int) {

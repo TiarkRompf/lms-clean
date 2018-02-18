@@ -343,7 +343,7 @@ class ScalaCodeGen extends Traverser {
       traverse(y, f)
       emit(s"}")
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
-      emit(s"val $f = if (${quote(c)} != 0) {")
+      emit(s"val $f = if (${quote(c)}) {")
       traverse(a)
       emit(s"} else {")
       traverse(b)
@@ -354,6 +354,10 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)} - ${quote(y)}")
     case n @ Node(s,"*",List(x,y)) => 
       emit(s"val $s = ${quote(x)} * ${quote(y)}")
+    case n @ Node(s,"==",List(x,y)) => 
+      emit(s"val $s = ${quote(x)} == ${quote(y)}")
+    case n @ Node(s,"!=",List(x,y)) => 
+      emit(s"val $s = ${quote(x)} != ${quote(y)}")
     case n @ Node(s,"@",List(x,y,ctl)) => 
       emit(s"val $s = ${quote(x)}(${quote(y)})")
     case n @ Node(s,"P",List(x,ctl)) => 
@@ -460,7 +464,7 @@ class CompactScalaCodeGen extends Traverser {
       else
         s"((${quote(x)}: Int) => $b)"
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
-      s"if (${quote(c)} != 0) " +
+      s"if (${shallow(c)}) " +
       quoteBlock(traverse(a)) +
       s" else " +
       quoteBlock(traverse(b))
@@ -470,6 +474,10 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)} - ${shallow(y)}"
     case n @ Node(s,"*",List(x,y)) => 
       s"${shallow(x)} * ${shallow(y)}"
+    case n @ Node(s,"==",List(x,y)) => 
+      s"${shallow(x)} == ${shallow(y)}"
+    case n @ Node(s,"!=",List(x,y)) => 
+      s"${shallow(x)} != ${shallow(y)}"
     case n @ Node(s,"@",List(x,y,ctl)) => 
       s"${shallow(x)}(${shallow(y)})"
     case n @ Node(s,"P",List(x,ctl)) => 
@@ -502,15 +510,26 @@ class FrontEnd {
 
   var g: GraphBuilder = null
 
+  case class BOOL(x: Exp) {
+    //def &&(y: => BOOL): BOOL = BOOL(g.reflect("&",x,y.x)) // should call if?
+    //def ||(y: => BOOL): BOOL = BOOL(g.reflect("|",x,y.x))
+    def unary_! = BOOL(g.reflect("!",x))
+  }
+
   case class INT(x: Exp) {
     def +(y: INT): INT = INT(g.reflect("+",x,y.x))
     def -(y: INT): INT = INT(g.reflect("-",x,y.x))
     def *(y: INT): INT = INT(g.reflect("*",x,y.x))
+    def ===(y: INT): BOOL = BOOL(g.reflect("==",x,y.x))
+    def !==(y: INT): BOOL = BOOL(g.reflect("!=",x,y.x))
   }
 
-  def IF(c: INT)(a: => INT)(b: => INT): INT = {
+  def IF(c: BOOL)(a: => INT)(b: => INT): INT = {
     // TODO: effect polymorphism!
-    INT(g.reflect("?",c.x,g.reify(a.x),g.reify(b.x)))
+    val aBlock = g.reify(a.x)
+    val bBlock = g.reify(b.x)
+    // compute effect (aBlock || bBlock)
+    INT(g.reflect("?",c.x,aBlock,bBlock))
   }
   
   def APP(f: Exp, x: INT): INT = 
@@ -530,6 +549,7 @@ class FrontEnd {
   }
 
   implicit def liftInt(x: Int): INT = INT(Const(x))
+  implicit def liftBool(x: Boolean): BOOL = BOOL(Const(x))
 
   def program(body: INT => INT): Graph = {
     assert(g == null)
@@ -558,9 +578,19 @@ class FrontEnd {
 
 // DONE: canonicalize names in generated code
 
+// TODO: more functionality: Bool, String, Array, Var, While, ...
+
 // TODO: mutual recursion
 
 // TODO: fine-grained effects
+
+// TODO: staticData
+
+// TODO: ExplodedStruct
+
+// TODO: transformers
+
+// TODO: fusion
 
 // TODO: lms tutorials & more ...
 
