@@ -403,12 +403,20 @@ class CompactScalaCodeGen extends Traverser {
   def emit(s: String) = println(s)
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
-    // how many times a sym is used locally
-    val hm = new mutable.HashMap[Sym,Int]
-    
     // how many times a sym is used in an inner scope
     val hmi = new mutable.HashMap[Sym,Int]
 
+    // check if a node is used from some inner scope
+    for (n <- inner) {
+      for (s <- syms(n))
+        hmi(s) = hmi.getOrElse(s,0) + 1
+    }
+
+    // ----- forward pass -----
+
+    // how many times a sym is used locally
+    val hm = new mutable.HashMap[Sym,Int]
+    
     // lookup sym -> node for locally defined nodes
     val df = new mutable.HashMap[Sym,Node]
 
@@ -420,25 +428,66 @@ class CompactScalaCodeGen extends Traverser {
         hm(s) = hm.getOrElse(s,0) + 1
     }
 
-    // check if a node is used from some inner scope
-    for (n <- inner) {
-      for (s <- syms(n))
-        hmi(s) = hmi.getOrElse(s,0) + 1
-    }
+    val dis = new mutable.HashSet[Sym]
 
     val save = shouldInline
 
     // should a definition be inlined or let-inserted?
-    // XXX do we need to do something more special for effects?
-    // XXX yes, have to prevent reordering (if result used exactly once)!!!
-    // XXX (see test reorder-01)
     shouldInline = { (n: Sym) => 
       if ((df contains n) &&              // locally defined
-//          (!df(n).rhs.exists(_.isInstanceOf[Eff])) && // no effect
+          (!dis(n)) &&                    // not disabled (fill below!)
           (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
-          (hmi.getOrElse(n, 0) == 0))      // not used in nested scopes
+          (hmi.getOrElse(n, 0) == 0))     // not used in nested scopes
           Some(df(n))
       else None }
+
+
+    // ----- backward pass -----
+
+    var theEff = y.eff.asInstanceOf[Sym]
+
+    def checkInline1(res: Sym): Unit = {
+      val n = df(res)
+      n.rhs.find { _.isInstanceOf[Eff]} match {
+        case Some(Eff(effIn)) if (theEff != res) =>
+          // effectful statement! we can only inline if this 
+          // is the exact statement we expect
+          // (TODO: not prevented by dependency)
+          //println("// can't inline "+res+" want eff "+theEff)
+          dis += res
+        case Some(Eff(effIn)) if (theEff == res) =>
+          theEff = effIn
+          for (s <- directSyms(n).reverse) {
+            checkInline(s)
+          }
+        case _ =>
+          // no effect, can inline -- continue 
+          for (s <- directSyms(n).reverse) {
+            checkInline(s)
+          }
+      }
+    }
+    def checkInline(res: Sym) = if (shouldInline(res).nonEmpty) checkInline1(res)
+
+    if (y.res.isInstanceOf[Sym])
+      checkInline(y.res.asInstanceOf[Sym]) // try to inline y.res, state after must be y.eff
+
+    for (n <- ns.reverse) {
+      if (shouldInline(n.n).isEmpty) {
+        n.rhs.find { _.isInstanceOf[Eff]} match {
+          case Some(Eff(effIn)) =>
+            if (theEff != n.n)
+              println(s"// problem: expected effect "+theEff+" but got "+n.n)
+            theEff = effIn
+          case _ =>
+        }
+        for (s <- directSyms(n).reverse) // for stms that remain, try further inlining
+          checkInline(s)
+      }
+    }
+
+
+    // ----- forward pass -----
 
     // only emit statements if not inlined
     for (n <- ns) {

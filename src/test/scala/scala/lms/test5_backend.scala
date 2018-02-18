@@ -228,14 +228,35 @@ class BackendTest extends TutorialFunSuite {
     s()
   }
 
-/*
-  XXX currently fails!!
   testBE("reorder-01") { x =>
     val i = VAR(x)
     val read = i()
     i() = 10
     read
   }
-*/
+
+  testBE("reorder-02") { x =>
+    val i = VAR(x)
+    val read = i()
+    val add = read + 5
+    i() = 10
+    add
+  }
+
+  testBE("reorder-03") { x =>
+    val i = VAR(x)
+    val read1 = i()
+    val read2 = i()
+    val add = read1 + read2
+    add // should inline
+  }
+
+  testBE("reorder-04") { x =>
+    val i = VAR(x)
+    val read1 = i()
+    val read2 = i()
+    val add = read2 + read1
+    add // should not inline
+  }
 
 }
