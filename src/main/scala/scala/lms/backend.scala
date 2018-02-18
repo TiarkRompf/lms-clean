@@ -327,6 +327,7 @@ class ScalaCodeGen extends Traverser {
 
   def quote(s: Def): String = s match {
     case Sym(n) => s"x$n"
+    case Const(x: String) => "\""+x+"\""
     case Const(x) => x.toString
   }
 
@@ -431,6 +432,7 @@ class CompactScalaCodeGen extends Traverser {
   def quote(s: Def): String = s match {
     case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
     case Sym(n) => s.toString
+    case Const(x: String) => "\""+x+"\""
     case Const(x) => x.toString
   }
 
@@ -524,6 +526,9 @@ class FrontEnd {
     def !==(y: INT): BOOL = BOOL(g.reflect("!=",x,y.x))
   }
 
+  case class STRING(x: Exp) {
+  }
+
   def IF(c: BOOL)(a: => INT)(b: => INT): INT = {
     // TODO: effect polymorphism!
     val aBlock = g.reify(a.x)
@@ -538,6 +543,9 @@ class FrontEnd {
   def PRINT(x: INT): Unit =
     g.reflectEffect("P",x.x)
 
+  def PRINT(x: STRING): Unit =
+    g.reflectEffect("P",x.x)
+
   def FUN(f: INT => INT): INT => INT = FUN((_,x) => f(x))
 
   def FUN(f: ((INT=>INT),INT) => INT): INT => INT = {
@@ -550,6 +558,7 @@ class FrontEnd {
 
   implicit def liftInt(x: Int): INT = INT(Const(x))
   implicit def liftBool(x: Boolean): BOOL = BOOL(Const(x))
+  implicit def liftString(x: String): STRING = STRING(Const(x))
 
   def program(body: INT => INT): Graph = {
     assert(g == null)

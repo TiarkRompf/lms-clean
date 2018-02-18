@@ -103,7 +103,7 @@ class BackendTest extends TutorialFunSuite {
   
     val f = FUN { x =>
       val g = FUN { y =>
-        PRINT(1337)
+        PRINT("1337")
         y + (liftInt(4) * liftInt(3))
       }
       g(1)
@@ -126,7 +126,7 @@ class BackendTest extends TutorialFunSuite {
     val f = FUN { x => 2 * x }
     
     val g = FUN { y =>
-      PRINT(1337)
+      PRINT("1337")
       IF (y !== 0) {
         f(1)
       } /*else*/ {
@@ -142,7 +142,7 @@ class BackendTest extends TutorialFunSuite {
     val f = IF (true) { (FUN { x => 2 * x })(1) } /*else*/ { (FUN { x => 4 * x })(2) }
     
     val g = FUN { y =>
-      PRINT(1337)
+      PRINT("1337")
       IF (y !== 0) {
         PRINT(1)
         f
