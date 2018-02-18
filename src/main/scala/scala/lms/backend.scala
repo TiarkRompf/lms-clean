@@ -22,6 +22,9 @@ object Backend {
 
   case class Block(in: List[Sym], res: Exp, eff: Exp) extends Def
 
+  case class Eff(e: Sym) extends Def
+
+
   // where should this go?
   def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.in)
 
@@ -31,12 +34,14 @@ object Backend {
   def directSyms(x: Node): List[Sym] = 
     x.rhs.flatMap { 
       case s: Sym => List(s) 
+      // case Eff(s) => Nil do not count effect refs
       case _ => Nil
     }
 
   def syms(x: Node): List[Sym] = 
     x.rhs.flatMap { 
       case s: Sym => List(s) 
+      case Eff(s) => List(s) 
       case Block(_, s: Sym, e: Sym) => List(s,e)
       case Block(_, s: Sym, _) => List(s)
       case Block(_, _, e: Sym) => List(e)
@@ -58,7 +63,7 @@ class GraphBuilder {
   }
   def reflectEffect(s: String, as: Def*): Exp = {
     val sm = Sym(fresh) 
-    try reflect(sm, s, (as :+ curBlock):_*) finally curBlock = sm
+    try reflect(sm, s, (as :+ Eff(curBlock)):_*) finally curBlock = sm
   }
   def reflect(x: Sym, s: String, as: Def*): Exp = {
     globalDefs += Node(x,s,as.toList)
@@ -220,6 +225,8 @@ abstract class Traverser {
         List((y,100),(eff,100))
       case Node(_, "?", List(c, Block(ac,ae,af), Block(bc,be,bf))) => 
         List((c,1.0),(ae,0.5),(af,0.5),(be,0.5),(bf,0.5))
+      case Node(_, "W", List(Block(ac,ae,af), Block(bc,be,bf))) => 
+        List((ae,100),(af,100),(be,100),(bf,100))
       case _ => syms(x) map (s => (s,1.0))
     }
 
@@ -349,6 +356,12 @@ class ScalaCodeGen extends Traverser {
       emit(s"} else {")
       traverse(b)
       emit(s"}")
+    case n @ Node(f,"W",List(c:Block,b:Block,e)) => 
+      emit(s"while ({")
+      traverse(c)
+      emit(s"}) else {")
+      traverse(b)
+      emit(s"}")
     case n @ Node(s,"+",List(x,y)) => 
       emit(s"val $s = ${quote(x)} + ${quote(y)}")
     case n @ Node(s,"-",List(x,y)) => 
@@ -359,6 +372,18 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)} == ${quote(y)}")
     case n @ Node(s,"!=",List(x,y)) => 
       emit(s"val $s = ${quote(x)} != ${quote(y)}")
+    case n @ Node(s,"var_new",List(x,e)) => 
+      emit(s"var $s = ${quote(x)}")
+    case n @ Node(s,"var_get",List(x,e)) => 
+      emit(s"val $s = ${quote(x)}")
+    case n @ Node(s,"var_set",List(x,y,e)) => 
+      emit(s"${quote(x)} = ${quote(y)}")
+    case n @ Node(s,"array_new",List(x,e)) => 
+      emit(s"var $s = new Array[Int](${quote(x)})")
+    case n @ Node(s,"array_get",List(x,i,e)) => 
+      emit(s"val $s = ${quote(x)}(${quote(i)})")
+    case n @ Node(s,"array_set",List(x,i,y,e)) => 
+      emit(s"${quote(x)}(${quote(i)}) = ${quote(y)}")
     case n @ Node(s,"@",List(x,y,ctl)) => 
       emit(s"val $s = ${quote(x)}(${quote(y)})")
     case n @ Node(s,"P",List(x,ctl)) => 
@@ -405,8 +430,11 @@ class CompactScalaCodeGen extends Traverser {
 
     // should a definition be inlined or let-inserted?
     // XXX do we need to do something more special for effects?
+    // XXX yes, have to prevent reordering (if result used exactly once)!!!
+    // XXX (see test reorder-01)
     shouldInline = { (n: Sym) => 
       if ((df contains n) &&              // locally defined
+//          (!df(n).rhs.exists(_.isInstanceOf[Eff])) && // no effect
           (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
           (hmi.getOrElse(n, 0) == 0))      // not used in nested scopes
           Some(df(n))
@@ -470,6 +498,11 @@ class CompactScalaCodeGen extends Traverser {
       quoteBlock(traverse(a)) +
       s" else " +
       quoteBlock(traverse(b))
+    case n @ Node(f,"W",List(c:Block,b:Block,e)) => 
+      s"while (" +
+      quoteBlock(traverse(c)) +
+      s") " +
+      quoteBlock(traverse(b))
     case n @ Node(s,"+",List(x,y)) => 
       s"${shallow(x)} + ${shallow(y)}"
     case n @ Node(s,"-",List(x,y)) => 
@@ -480,6 +513,8 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)} == ${shallow(y)}"
     case n @ Node(s,"!=",List(x,y)) => 
       s"${shallow(x)} != ${shallow(y)}"
+    case n @ Node(s,"var_get",List(x,e)) => 
+      s"${shallow(x)}"
     case n @ Node(s,"@",List(x,y,ctl)) => 
       s"${shallow(x)}(${shallow(y)})"
     case n @ Node(s,"P",List(x,ctl)) => 
@@ -494,6 +529,16 @@ class CompactScalaCodeGen extends Traverser {
       emit(s"def ${quote(f)}(${quote(x)}: Int): Int = ${ quoteBlock(traverse(y,f)) }")
     case n @ Node(s,"P",_) => // Unit result
       emit(shallow(n))
+    case n @ Node(s,"W",_) => // Unit result
+      emit(shallow(n))
+    case n @ Node(s,"var_new",List(x,e)) => 
+      emit(s"var ${quote(s)} = ${shallow(x)}")
+    case n @ Node(s,"var_set",List(x,y,e)) => 
+      emit(s"${quote(x)} = ${shallow(y)}")
+    case n @ Node(s,"array_new",List(x,e)) => 
+      emit(s"val ${quote(s)} = new Array[Int](${shallow(x)})")
+    case n @ Node(s,"array_set",List(x,i,y,e)) => 
+      emit(s"${shallow(x)}(${shallow(i)}) = ${shallow(y)}")
     case n @ Node(s,_,_) => 
       emit(s"val ${quote(s)} = " + shallow(n))
   }
@@ -529,6 +574,23 @@ class FrontEnd {
   case class STRING(x: Exp) {
   }
 
+  case class ARRAY(x: Exp) {
+    def apply(i: INT): INT = INT(g.reflectEffect("array_get",x,i.x))
+    def update(i: INT, y: INT): INT = INT(g.reflectEffect("array_set",x,i.x,y.x))
+  }
+  object ARRAY {
+    def apply(n: INT): ARRAY = ARRAY(g.reflectEffect("array_new",n.x))
+  }
+
+  case class VAR(x: Exp) {
+    def apply(): INT = INT(g.reflectEffect("var_get",x))
+    def update(y: INT): INT = INT(g.reflectEffect("var_set",x,y.x))
+  }
+  object VAR {
+    def apply(x: INT): VAR = VAR(g.reflectEffect("var_new",x.x))
+  }
+
+
   def IF(c: BOOL)(a: => INT)(b: => INT): INT = {
     // TODO: effect polymorphism!
     val aBlock = g.reify(a.x)
@@ -536,6 +598,14 @@ class FrontEnd {
     // compute effect (aBlock || bBlock)
     INT(g.reflect("?",c.x,aBlock,bBlock))
   }
+
+  def WHILE(c: => BOOL)(b: => Unit): Unit = {
+    val cBlock = g.reify(c.x)
+    val bBlock = g.reify({b;Const(())})
+    // compute effect (cBlock bBlock)* cBlock
+    g.reflectEffect("W",cBlock,bBlock)
+  }
+
   
   def APP(f: Exp, x: INT): INT = 
     INT(g.reflectEffect("@",f,x.x))
@@ -587,11 +657,17 @@ class FrontEnd {
 
 // DONE: canonicalize names in generated code
 
-// TODO: more functionality: Bool, String, Array, Var, While, ...
+// DONE: more functionality: Bool, String, Array, Var, While, ...
 
-// TODO: mutual recursion
+// TODO: parametricity, type classes
 
-// TODO: fine-grained effects
+// TODO: mutual recursion, memoization for functions
+
+// TODO: fine-grained effects, aliasing, ownership, hard and soft deps
+
+// TODO: CSE
+
+// TODO: smart constructors
 
 // TODO: staticData
 

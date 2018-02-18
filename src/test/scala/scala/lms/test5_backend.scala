@@ -214,4 +214,28 @@ class BackendTest extends TutorialFunSuite {
     f(1)
   }
   
+  // loops, vars, and arrays
+
+  testBE("loops-01") { x =>
+    val as = ARRAY(x)
+    val i = VAR(0)
+    val s = VAR(0)
+    WHILE { i() !== x } { // why does i !== x compile? ScalaTest?
+      s() = s() + i()
+      as(i()) = s()
+      i() = i() + 1
+    }
+    s()
+  }
+
+/*
+  XXX currently fails!!
+  testBE("reorder-01") { x =>
+    val i = VAR(x)
+    val read = i()
+    i() = 10
+    read
+  }
+*/
+
 }
