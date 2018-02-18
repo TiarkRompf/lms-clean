@@ -403,29 +403,32 @@ class CompactScalaCodeGen extends Traverser {
   def emit(s: String) = println(s)
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
-    // how many times a sym is used in an inner scope
-    val hmi = new mutable.HashMap[Sym,Int]
 
     // check if a node is used from some inner scope
+    val hmi = new mutable.HashSet[Sym]
     for (n <- inner) {
-      for (s <- syms(n))
-        hmi(s) = hmi.getOrElse(s,0) + 1
+      hmi ++= syms(n)
     }
 
     // ----- forward pass -----
 
-    // how many times a sym is used locally
-    val hm = new mutable.HashMap[Sym,Int]
-    
     // lookup sym -> node for locally defined nodes
     val df = new mutable.HashMap[Sym,Node]
+
+    // how many times a sym is used locally (excl blocks and effects)
+    val hm = new mutable.HashMap[Sym,Int]
+
+    // local successor nodes (incl blocks and effects)
+    val succ = new mutable.HashMap[Sym,List[Sym]]    
 
     // count how many times a node is used at the current level
     if (y.res.isInstanceOf[Sym]) hm(y.res.asInstanceOf[Sym]) = 1
     for (n <- ns) {
       df(n.n) = n
-      for (s <- directSyms(n)) // exclude refs through blocks
+      for (s <- directSyms(n) if df.contains(s)) // do not count refs through blocks or effects
         hm(s) = hm.getOrElse(s,0) + 1
+      for (s <- syms(n) if df.contains(s))
+        succ(s) = n.n::succ.getOrElse(s,Nil)
     }
 
     val dis = new mutable.HashSet[Sym]
@@ -435,54 +438,39 @@ class CompactScalaCodeGen extends Traverser {
     // should a definition be inlined or let-inserted?
     shouldInline = { (n: Sym) => 
       if ((df contains n) &&              // locally defined
-          (!dis(n)) &&                    // not disabled (fill below!)
           (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
-          (hmi.getOrElse(n, 0) == 0))     // not used in nested scopes
+          (!hmi(n)))                      // not used in nested scopes
           Some(df(n))
       else None }
 
 
     // ----- backward pass -----
 
-    var theEff = y.eff.asInstanceOf[Sym]
+    val seen = new mutable.HashSet[Sym]
 
-    def checkInline1(res: Sym): Unit = {
-      val n = df(res)
-      n.rhs.find { _.isInstanceOf[Eff]} match {
-        case Some(Eff(effIn)) if (theEff != res) =>
-          // effectful statement! we can only inline if this 
-          // is the exact statement we expect
-          // (TODO: not prevented by dependency)
-          //println("// can't inline "+res+" want eff "+theEff)
-          dis += res
-        case Some(Eff(effIn)) if (theEff == res) =>
-          theEff = effIn
-          for (s <- directSyms(n).reverse) {
-            checkInline(s)
-          }
-        case _ =>
-          // no effect, can inline -- continue 
-          for (s <- directSyms(n).reverse) {
-            checkInline(s)
-          }
+    def processNodeHere(n: Node): Unit = {
+      seen += n.n
+      for (s <- directSyms(n).reverse) {
+        checkInline(s)
       }
     }
-    def checkInline(res: Sym) = if (shouldInline(res).nonEmpty) checkInline1(res)
+
+    def checkInline(res: Sym) = shouldInline(res) match { 
+      case Some(n) =>
+        // want to inline, now check that all successors are already there, else disable
+        if (succ.getOrElse(n.n,Nil).forall(seen))
+          processNodeHere(n)
+        else
+          df -= n.n
+      case _ =>
+    }
 
     if (y.res.isInstanceOf[Sym])
       checkInline(y.res.asInstanceOf[Sym]) // try to inline y.res, state after must be y.eff
 
     for (n <- ns.reverse) {
       if (shouldInline(n.n).isEmpty) {
-        n.rhs.find { _.isInstanceOf[Eff]} match {
-          case Some(Eff(effIn)) =>
-            if (theEff != n.n)
-              println(s"// problem: expected effect "+theEff+" but got "+n.n)
-            theEff = effIn
-          case _ =>
-        }
-        for (s <- directSyms(n).reverse) // for stms that remain, try further inlining
-          checkInline(s)
+        processNodeHere(n)
       }
     }
 
