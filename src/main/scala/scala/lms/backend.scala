@@ -111,7 +111,7 @@ abstract class Phase extends (Graph => Graph) {
 }
 
 // Compute liveness information and discard
-// nodes that used in computing the result
+// nodes not used in computing the result
 class DeadCodeElim extends Phase {
   def apply(g: Graph): Graph = {
 
