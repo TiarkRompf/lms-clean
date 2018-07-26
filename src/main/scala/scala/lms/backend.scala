@@ -2,6 +2,8 @@ package scala.lms
 
 /*
   LMS compiler back-end in one file.
+
+  TODO: exploded structs
 */
 
 import scala.collection.mutable
@@ -70,7 +72,7 @@ class GraphBuilder {
     x
   }
 
-  var curBlock: Sym = _
+  var curBlock: Sym = _ // could this become an ExplodedStruct?
 
   def reify(x: => Exp): Block = {
     val save = curBlock
