@@ -19,7 +19,7 @@ class BackendTest extends TutorialFunSuite {
   def testBE(name: String, verbose: Boolean = false)(prog: INT => INT) = {
     test(name) {
       checkOut(name, "scala", {
-        val g = program(prog)
+        var g = program(prog)
 
         if (verbose) {
           println("// Raw:")
@@ -34,6 +34,9 @@ class BackendTest extends TutorialFunSuite {
           println("// Compact Scala Codegen:")
           (new CompactScalaCodeGen)(g)
         }
+
+        // identity transformer -- just to verify it works
+        g = (new Transformer { g = new GraphBuilder }).transform(g)
 
         val cg = new CompactScalaCodeGen
         cg.doRename = true

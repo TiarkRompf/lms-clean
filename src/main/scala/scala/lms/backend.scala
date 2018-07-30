@@ -4,6 +4,8 @@ package scala.lms
   LMS compiler back-end in one file.
 
   TODO: exploded structs
+
+  TODO: fine-grained effects
 */
 
 import scala.collection.mutable
@@ -589,7 +591,73 @@ class CompactScalaCodeGen extends Traverser {
 }
 
 
+abstract class Transformer extends Traverser {
 
+  var g: GraphBuilder = null
+
+  val subst = new mutable.HashMap[Sym,Exp]
+
+  def transform(s: Exp): Exp = s match {
+    case s @ Sym(_) if subst contains s => subst(s)
+    case s @ Sym(_) => println(s"XXX not found in $subst: "+s); s
+    case a => 
+          //println(s"XXX id xform: "+a)
+          a
+  }
+
+  def transform(b: Block): Block = b match {
+    case b @ Block(block::Nil, res, eff) =>
+      g.reify { traverse(b); transform(res) }
+    case b @ Block(arg::block::Nil, res, eff) =>
+      g.reify { e =>
+        subst(arg) = e
+        traverse(b)
+        transform(res)
+      }
+    case _ => ???
+  }
+
+  def transform(n: Node): Exp = n match {
+    case Node(s,"λ", List(b @ Block(in, y, eff))) =>
+      // need to deal with recursive binding!
+      val s1 = Sym(g.fresh)
+      subst(s) = s1
+      g.reflect(s1, "λ", transform(b))
+    case Node(s,op,rs) => 
+      // effect dependencies in target graph are managed by
+      // graph builder, so we drop all effects here
+      val (effects,pure) = rs.partition(_.isInstanceOf[Eff])
+      val args = pure.map {
+        case b @ Block(_,_,_) =>
+          transform(b)
+        case s : Exp => 
+          transform(s)
+        case a => 
+          //println(s"XXX id xform: "+a)
+          a
+      }
+      //if (effects.nonEmpty) println(s"drop effects: $effects")
+      if (effects.nonEmpty)
+        g.reflectEffect(op,args:_*)
+      else
+        g.reflect(op,args:_*)
+  }
+
+  override def traverse(n: Node): Unit = {
+    subst(n.n) = transform(n)
+    // println(s"transformed ${n.n}->${subst(n.n)}")
+  }
+
+  def transform(graph: Graph): Graph = {
+    // XXX unfortunate code duplication, either
+    // with traverser or with transform(Block)
+    val block = g.reify { e => 
+      subst(graph.block.in.head) = e // FIXME 
+      super.apply(graph); transform(graph.block.res) }
+    Graph(g.globalDefs,block)
+  }
+
+}
 
 
 class FrontEnd {
@@ -698,7 +766,9 @@ class FrontEnd {
 
 // DONE: more functionality: Bool, String, Array, Var, While, ...
 
-// TODO: parametricity, type classes
+// DONE: transformers
+
+// TODO: front end: parametric types, type classes
 
 // TODO: mutual recursion, memoization for functions
 
@@ -712,7 +782,7 @@ class FrontEnd {
 
 // TODO: ExplodedStruct
 
-// TODO: transformers
+// TODO: more sophisticated transformers (worklist, register rewrites, etc)
 
 // TODO: fusion
 
