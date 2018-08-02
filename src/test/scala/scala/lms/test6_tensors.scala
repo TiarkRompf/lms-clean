@@ -9,6 +9,8 @@ class TensorFrontEnd extends FrontEnd {
 
   case class SEQ(x: Exp) {
     def apply(y: INT): INT = INT(g.reflect("seq_apply",x,y.x))
+    def explode(n: Int): List[INT] = (0 until n).map(i => apply(i)).toList
+    def length: INT = INT(g.reflect("seq_length",x))
   }
   def SEQ(x: INT*): SEQ = SEQ(g.reflect("seq", x.toList.map(_.x):_*))
 
@@ -55,6 +57,8 @@ class TensorFrontEnd extends FrontEnd {
       case ("seq", args) if args.forall(_.isInstanceOf[Const]) => Const(args map { case Const(x) => x})
       case ("seq_apply", List(Const(a:Seq[_]),Const(b:Int))) => Const(a(b))
       case ("seq_apply", List(Def("seq", a),Const(b:Int))) => a(b).asInstanceOf[Exp]
+      case ("seq_length", List(Const(a:Seq[_]))) => Const(a.length)
+      case ("seq_length", List(Def("seq", a),Const(b:Int))) => Const(a.length)
       case ("tensor_shape", List(Def("tensor",List(sh:Exp,f)))) => sh
       case ("tensor_same_shape", List(Const(as), Const(bs))) if as == bs => Const(as)
       case _ =>
@@ -240,17 +244,25 @@ abstract class MultiLoopLowering extends Transformer {
   val tensors = new mutable.HashMap[Sym, Node]
 
   override def transform(n: Node): Exp = n match {
-    case Node(s, "multiloop", List(Const(sh @ List(sz0: Int)), Const(ops: List[String]), f:Block)) => 
-      val sz = Const(sz0)
+    case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block)) => 
+      val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
+      val shape = SEQ(sh).explode(dims)
+
+      val sz = shape(0).x
+
+      def linearize(sh: List[INT], xs: List[INT]): INT = (sh,xs) match {
+        case (s::Nil, x::Nil) => x
+        case (s::sh, x::xs) => x * sh.reduce(_*_) + linearize(sh,xs)
+      }
 
       class Builder(op: String) { // TODO: proper subclasses?
         val state = if (op == "tensor")
-          g.reflectEffect("array_new", sz)
+          g.reflectEffect("array_new", shape.reduce(_*_).x)
         else
           g.reflectEffect("var_new", Const(0))
 
-        def +=(i: INT, x: INT) = if (op == "tensor")
-          g.reflectEffect("array_set", state, i.x, x.x)
+        def +=(i: List[INT], x: INT) = if (op == "tensor")
+          g.reflectEffect("array_set", state, linearize(shape,i).x, x.x)
         else
           g.reflectEffect("var_set", state, g.reflect("+", g.reflectEffect("var_get", state), x.x))
 
@@ -270,8 +282,13 @@ abstract class MultiLoopLowering extends Transformer {
         }
       }
 
-      forloop(INT(sz)) { e => 
-        subst(f.in.head) = SEQ(e).x
+      def forloops(sz: List[INT])(f: List[INT] => Unit): Unit = sz match {
+        case Nil => f(Nil)
+        case s::sz => forloop(s) { i => forloops(sz) { is => f(i::is) } }
+      }
+
+      forloops(shape) { e => 
+        subst(f.in.head) = SEQ(e:_*).x
         traverse(f)
         val resTuple = transform(f.res)
         for ((b,i) <- builders.zipWithIndex) {

@@ -30,3 +30,34 @@ def tensors_01(x0: Int): Int = {
   println(seq_apply(x1, 1))
   0
 }
+// After Multiloop lowering:
+def tensors_01(x0: Int): Int = {
+  val x1 = new Array[Int](60)
+  val x2 = new Array[Int](60)
+  var x3 = 0
+  while (x3 != 3) {
+    val x4 = x3
+    var x5 = 0
+    val x6 = x4 * 20
+    while (x5 != 4) {
+      val x7 = x5
+      var x8 = 0
+      val x9 = x7 * 5
+      while (x8 != 5) {
+        val x10 = x8
+        val x11 = x6 + x9 + x10
+        x1(x11) = 2
+        x2(x11) = 3
+        x8 = x8 + 1
+        ()
+      }
+      x5 = x5 + 1
+      ()
+    }
+    x3 = x3 + 1
+    ()
+  }
+  println(x1)
+  println(x2)
+  0
+}
