@@ -250,16 +250,15 @@ abstract class MultiLoopLowering extends Transformer {
           g.reflectEffect("var_new", Const(0))
 
         def +=(i: INT, x: INT) = if (op == "tensor")
-            g.reflectEffect("array_set", state, i.x, x.x)
-          else
-            g.reflectEffect("var_set", state, 
-              g.reflect("+", g.reflectEffect("var_get", state), x.x))
+          g.reflectEffect("array_set", state, i.x, x.x)
+        else
+          g.reflectEffect("var_set", state, g.reflect("+", g.reflectEffect("var_get", state), x.x))
 
         def result() = if (op == "tensor")
           state
         else
           g.reflectEffect("var_get", state)
-    }
+      }
 
       val builders = ops map (new Builder(_))
 
