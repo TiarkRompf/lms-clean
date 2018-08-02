@@ -507,6 +507,7 @@ class CompactScalaCodeGen extends Traverser {
 
   def shallow(n: Def): String = n match {
     case InlineSym(n) => shallow(n)
+    case b:Block => quoteBlock1(b)
     case _ => quote(n)
   }
 
@@ -517,6 +518,22 @@ class CompactScalaCodeGen extends Traverser {
       "{\n" + b + "\n}"
     else
       b
+  }
+  def quoteBlock1(y: Block) = {
+    if (y.in.length == 1) {
+      val b = utils.captureOut(traverse(y))
+      if (b contains '\n')
+        "{\n" + b + "\n}"
+      else
+        b
+    } else if (y.in.length == 2) {
+      val x = y.in.head
+      val b = utils.captureOut(traverse(y))
+      if (b contains '\n')
+        s"{ ${quote(x)} => \n$b\n}"
+      else
+        s"(${quote(x)} => $b)"
+    } else (???) //FIXME
   }
 
   // generate string for node's right-hand-size
@@ -529,11 +546,7 @@ class CompactScalaCodeGen extends Traverser {
       // proper inlining will likely work better 
       // as a separate phase b/c it may trigger
       // further optimizations
-      val b = utils.captureOut(traverse(y,f))
-      if (b contains '\n')
-        s"({ ${quote(x)}: Int => \n$b\n})"
-      else
-        s"((${quote(x)}: Int) => $b)"
+      quoteBlock(traverse(y))
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
       s"if (${shallow(c)}) " +
       quoteBlock(traverse(a)) +
@@ -560,8 +573,8 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)}(${shallow(y)})"
     case n @ Node(s,"P",List(x,ctl)) => 
       s"println(${shallow(x)})"
-    case n @ Node(_,_,_) => 
-      s"??? " + n.toString
+    case n @ Node(_,op,args) => 
+      s"$op(${args.map(shallow).mkString(", ")})"
   }
 
   override def traverse(n: Node): Unit = n match {
@@ -737,9 +750,11 @@ class FrontEnd {
   implicit def liftBool(x: Boolean): BOOL = BOOL(Const(x))
   implicit def liftString(x: String): STRING = STRING(Const(x))
 
+  def mkGraphBuilder() = new GraphBuilder
+
   def program(body: INT => INT): Graph = {
     assert(g == null)
-    g = new GraphBuilder
+    g = mkGraphBuilder()
     try {
       val block = g.reify { arg => body(INT(arg)).x }
       Graph(g.globalDefs, block)
@@ -774,9 +789,9 @@ class FrontEnd {
 
 // TODO: fine-grained effects, aliasing, ownership, hard and soft deps
 
-// TODO: CSE
+// DONE(1/2): CSE
 
-// TODO: smart constructors
+// DONE(1/2): smart constructors
 
 // TODO: staticData
 
@@ -784,7 +799,9 @@ class FrontEnd {
 
 // TODO: more sophisticated transformers (worklist, register rewrites, etc)
 
-// TODO: fusion
+// DONE(1/2): fusion
+
+// DONE(1/2): tensor case study
 
 // TODO: lms tutorials & more ...
 
