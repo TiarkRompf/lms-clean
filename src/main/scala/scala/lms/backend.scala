@@ -372,6 +372,10 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)} - ${quote(y)}")
     case n @ Node(s,"*",List(x,y)) => 
       emit(s"val $s = ${quote(x)} * ${quote(y)}")
+    case n @ Node(s,"/",List(x,y)) => 
+      emit(s"val $s = ${quote(x)} / ${quote(y)}")
+    case n @ Node(s,"%",List(x,y)) => 
+      emit(s"val $s = ${quote(x)} % ${quote(y)}")
     case n @ Node(s,"==",List(x,y)) => 
       emit(s"val $s = ${quote(x)} == ${quote(y)}")
     case n @ Node(s,"!=",List(x,y)) => 
@@ -563,6 +567,10 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)} - ${shallow(y)}"
     case n @ Node(s,"*",List(x,y)) => 
       s"${shallow(x)} * ${shallow(y)}"
+    case n @ Node(s,"/",List(x,y)) => 
+      s"${shallow(x)} / ${shallow(y)}"
+    case n @ Node(s,"%",List(x,y)) => 
+      s"${shallow(x)} % ${shallow(y)}"
     case n @ Node(s,"==",List(x,y)) => 
       s"${shallow(x)} == ${shallow(y)}"
     case n @ Node(s,"!=",List(x,y)) => 
@@ -612,7 +620,7 @@ abstract class Transformer extends Traverser {
 
   def transform(s: Exp): Exp = s match {
     case s @ Sym(_) if subst contains s => subst(s)
-    case s @ Sym(_) => println(s"XXX not found in $subst: "+s); s
+    case s @ Sym(_) => println(s"Warning: not found in $subst: "+s); s
     case a => 
           //println(s"XXX id xform: "+a)
           a
@@ -623,9 +631,13 @@ abstract class Transformer extends Traverser {
       g.reify { traverse(b); transform(res) }
     case b @ Block(arg::block::Nil, res, eff) =>
       g.reify { e =>
-        subst(arg) = e
-        traverse(b)
-        transform(res)
+        if (subst contains arg)
+          println(s"Warning: already have a subst for $arg")
+        try {
+          subst(arg) = e
+          traverse(b)
+          transform(res)
+        } finally subst -= arg
       }
     case _ => ???
   }
@@ -687,6 +699,8 @@ class FrontEnd {
     def +(y: INT): INT = INT(g.reflect("+",x,y.x))
     def -(y: INT): INT = INT(g.reflect("-",x,y.x))
     def *(y: INT): INT = INT(g.reflect("*",x,y.x))
+    def /(y: INT): INT = INT(g.reflect("/",x,y.x))
+    def %(y: INT): INT = INT(g.reflect("%",x,y.x))
     def ===(y: INT): BOOL = BOOL(g.reflect("==",x,y.x))
     def !==(y: INT): BOOL = BOOL(g.reflect("!=",x,y.x))
   }
