@@ -25,8 +25,8 @@ def tensors_01(x0: Int): Int = {
 }
 // After Tensor fusion H:
 def tensors_01(x0: Int): Int = {
-  val x1 = fused-tensor(List(3, 4, 5), (x2 => List(2, 3)))
-  println(seq-apply(x1, 0))
-  println(seq-apply(x1, 1))
+  val x1 = multiloop(List(3, 4, 5), List(tensor, tensor), (x2 => List(2, 3)))
+  println(seq_apply(x1, 0))
+  println(seq_apply(x1, 1))
   0
 }

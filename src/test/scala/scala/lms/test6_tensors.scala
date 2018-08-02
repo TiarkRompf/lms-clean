@@ -54,6 +54,7 @@ class TensorFrontEnd extends FrontEnd {
       case ("%", List(Const(a:Int),Const(b:Int))) => Const(a%b)
       case ("seq", args) if args.forall(_.isInstanceOf[Const]) => Const(args map { case Const(x) => x})
       case ("seq_apply", List(Const(a:Seq[_]),Const(b:Int))) => Const(a(b))
+      case ("seq_apply", List(Def("seq", a),Const(b:Int))) => a(b).asInstanceOf[Exp]
       case ("tensor_shape", List(Def("tensor",List(sh:Exp,f)))) => sh
       case ("tensor_same_shape", List(Const(as), Const(bs))) if as == bs => Const(as)
       case _ =>
@@ -130,16 +131,16 @@ abstract class TensorFusionH extends Transformer {
   // NOTE: fuse loops horizontally within a local scope.
   // highly highly preliminary!
   override def traverse(ns: Seq[Node], y: Block): Unit = {
-    val loops = ns.filter(_.op == "tensor")
+    val loops = ns.filter(n => n.op == "tensor" || n.op == "sum").toList
 
-    val hm = new mutable.HashMap[Sym,Set[Sym]] // cross-dep: TODO!!
+    val crossdep = new mutable.HashMap[Sym,Set[Sym]] // cross-dep: TODO!!
 
     if (loops.nonEmpty) {
       // TODO: right now, we assume:
       // - XXX no cross-deps!
       // - XXX all same size!
 
-      val shape = loops.head.rhs.head // FIXME!!!
+      val shape = transform(loops.head.rhs.head.asInstanceOf[Exp]) // FIXME!!!
       // for (n @ Node(s,op,args) <- loops) {
       //   println(n + " // " + bound.hm(s))
       // }
@@ -148,17 +149,15 @@ abstract class TensorFusionH extends Transformer {
       // println("bound:")
       // bound.hm.foreach(println)
 
-      // now how to do the actual fusion?? need to re-sort !!!
-
       val g = new Graph(inner++ns, y)
       val reach = new mutable.HashSet[Sym]
-      //val order = new mutable.ArrayBuffer[Node]
 
       val loopSyms = loops.map(_.n).toSet
       val hereSyms = ns.map(_.n).toSet
       var loopsReached = false
 
-     // XXX FIXME: there are some bad performance issues here (g.nodes.find) ....
+      // XXX FIXME: there are some bad performance issues here (g.nodes.find) 
+      // and the traversal algorithm is also too simple (need actual top-sort)
       def visit(s: Exp): Unit = s match {
         case s: Sym if !loopSyms(s) && !reach(s) => 
           // we reached a normal statement. mark it,
@@ -177,20 +176,27 @@ abstract class TensorFusionH extends Transformer {
               syms(n).foreach(visit)
             }
           }
-          // emit the fused body ...
+          // emit the fused body ... 
+          val loopResPos = new mutable.HashMap[Sym,Int] // local cse on loop results
+          val buf = new mutable.ListBuffer[(String,Exp)]
           val newBody = this.g.reify { e => 
-            val res = for ((Node(s,_,List(sh,b@Block(arg::block::Nil, res, eff))),i) <- loops.zipWithIndex) yield {
-              assert(sh == shape, "fused loop shapes don't match (TODO!)")
+            for ((Node(s,op,List(sh:Exp,b@Block(arg::block::Nil, res, eff))),i) <- loops.zipWithIndex) yield {
+              assert(transform(sh) == shape, "ERROR: fused loop shapes don't match (TODO!)")
               subst(arg) = e
               traverse(b)
-              transform(res)
+              val r = transform(res)
+              val i = buf.indexOf((op,r))
+              if (i < 0) {
+                loopResPos(s) = buf.length
+                buf += ((op,r))
+              } else loopResPos(s) = i
             }
-            this.g.reflect("seq", res:_*)
+            this.g.reflect("seq", buf.map(_._2).toList:_*)
           }
-          val fusedLoopSym = this.g.reflect("fused-tensor", shape, newBody)
+          val fusedLoopSym = this.g.reflect("multiloop", shape, Const(buf.map(_._1).toList), newBody)
           // and now the individual loop bodies
           for ((Node(s,_,_),i) <- loops.zipWithIndex) {
-            subst(s) = this.g.reflect("seq-apply", fusedLoopSym, Const(i))
+            subst(s) = this.g.reflect("seq_apply", fusedLoopSym, Const(loopResPos(s)))
           }
         case _ =>
       }
@@ -221,6 +227,72 @@ abstract class TensorFusionH extends Transformer {
     case _ => super.transform(n)
   }
 }
+
+
+abstract class MultiLoopLowering extends Transformer {
+  val frontEnd: TensorFrontEnd
+  import frontEnd._
+  def init() = {
+    frontEnd.g = frontEnd.mkGraphBuilder()
+    g = frontEnd.g
+  }
+
+  val tensors = new mutable.HashMap[Sym, Node]
+
+  override def transform(n: Node): Exp = n match {
+    case Node(s, "multiloop", List(Const(sh @ List(sz0: Int)), Const(ops: List[String]), f:Block)) => 
+      val sz = Const(sz0)
+
+      class Builder(op: String) { // TODO: proper subclasses?
+        val state = if (op == "tensor")
+          g.reflectEffect("array_new", sz)
+        else
+          g.reflectEffect("var_new", Const(0))
+
+        def +=(i: INT, x: INT) = if (op == "tensor")
+            g.reflectEffect("array_set", state, i.x, x.x)
+          else
+            g.reflectEffect("var_set", state, 
+              g.reflect("+", g.reflectEffect("var_get", state), x.x))
+
+        def result() = if (op == "tensor")
+          state
+        else
+          g.reflectEffect("var_get", state)
+    }
+
+      val builders = ops map (new Builder(_))
+
+      def forloop(sz: INT)(f: INT => Unit) = {
+        val loopVar = VAR(0)
+        WHILE (loopVar() !== sz) { 
+          f(loopVar())
+          loopVar() = loopVar() + 1
+        }
+      }
+
+      forloop(INT(sz)) { e => 
+        subst(f.in.head) = SEQ(e).x
+        traverse(f)
+        val resTuple = transform(f.res)
+        for ((b,i) <- builders.zipWithIndex) {
+          val res = g.reflect("seq_apply", resTuple, Const(i))
+          b += (e,INT(res))
+        }
+      }
+
+      val res = builders map (_.result())
+
+      g.reflect("seq", res:_*)
+
+    case Node(s, "multiloop", _) => 
+      println("TODO: implement lowering for multiloop shape "+n)
+      super.transform(n)
+    case _ => super.transform(n)
+  }
+}
+
+
 
 class TensorTest extends TutorialFunSuite {
   val under = "tensors-"
@@ -257,7 +329,7 @@ class TensorTest extends TutorialFunSuite {
 
         def emitSource() = {
           val cg = new CompactScalaCodeGen
-          //cg.doRename = true
+          if (!verbose) cg.doRename = true
 
           val arg = cg.quote(g.block.in.head)
           val src = utils.captureOut(cg(g))
@@ -280,12 +352,15 @@ class TensorTest extends TutorialFunSuite {
         println("// After Tensor fusion V:")
         println(emitSource())
 
-
         g = (new TensorFusionH { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
         println("// After Tensor fusion H:")
         println(emitSource())
 
+        g = (new MultiLoopLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
+
+        println("// After Multiloop lowering:")
+        println(emitSource())
 
         // val cg = new CompactScalaCodeGen
         // cg.doRename = true
@@ -328,13 +403,11 @@ class TensorTest extends TutorialFunSuite {
   testBE("02") { x =>
 
     val constant = Tensor(100) { i => 1 }
-
-    val linear = Tensor(100) { i => 2*i(0) }
-
-    val affine = Tensor(100) { i => constant(i) + linear(i) }
+    val linear   = Tensor(100) { i => 2*i(0) }
+    val affine   = Tensor(100) { i => constant(i) + linear(i) }
     
-    def square(x: INT) = x*x
-    def mean(x: Tensor) = Sum(x.shape) { i => x(i) } / x.shape(0)
+    def square(x: INT)      = x*x
+    def mean(x: Tensor)     = Sum(x.shape) { i => x(i) } / x.shape(0)
     def variance(x: Tensor) = Sum(x.shape) { i => square(x(i)) } / x.shape(0) - square(mean(x))
     
     val data = affine

@@ -507,6 +507,7 @@ class CompactScalaCodeGen extends Traverser {
     case Sym(n) => s.toString
     case Const(x: String) => "\""+x+"\""
     case Const(x) => x.toString
+    case Eff(x) => ""
   }
 
   def shallow(n: Def): String = n match {
@@ -710,7 +711,7 @@ class FrontEnd {
 
   case class ARRAY(x: Exp) {
     def apply(i: INT): INT = INT(g.reflectEffect("array_get",x,i.x))
-    def update(i: INT, y: INT): INT = INT(g.reflectEffect("array_set",x,i.x,y.x))
+    def update(i: INT, y: INT): Unit = g.reflectEffect("array_set",x,i.x,y.x)
   }
   object ARRAY {
     def apply(n: INT): ARRAY = ARRAY(g.reflectEffect("array_new",n.x))
@@ -718,7 +719,7 @@ class FrontEnd {
 
   case class VAR(x: Exp) {
     def apply(): INT = INT(g.reflectEffect("var_get",x))
-    def update(y: INT): INT = INT(g.reflectEffect("var_set",x,y.x))
+    def update(y: INT): Unit = g.reflectEffect("var_set",x,y.x)
   }
   object VAR {
     def apply(x: INT): VAR = VAR(g.reflectEffect("var_new",x.x))
