@@ -780,14 +780,6 @@ class FrontEnd {
 }
 
 
-// Infrastructure TODOs:
-// - proper test cases
-//   - code motion
-//   - mutual recursion: ackermann 
-// - types
-// - compact printer (--> regalloc?)
-
-
 // DONE: cost-based code motion
 
 // DONE: local liveness and compact printer
@@ -798,15 +790,21 @@ class FrontEnd {
 
 // DONE: transformers
 
+// DONE: CSE
+
+// DONE: smart constructors
+
+// DONE: fusion
+
+// DONE: tensor case study
+
 // TODO: front end: parametric types, type classes
 
 // TODO: mutual recursion, memoization for functions
 
 // TODO: fine-grained effects, aliasing, ownership, hard and soft deps
 
-// DONE(1/2): CSE
-
-// DONE(1/2): smart constructors
+// TODO: metadata: source locations, types, etc
 
 // TODO: staticData
 
@@ -814,13 +812,12 @@ class FrontEnd {
 
 // TODO: more sophisticated transformers (worklist, register rewrites, etc)
 
-// DONE(1/2): fusion
-
-// DONE(1/2): tensor case study
+// TODO: parallellization with OpenMP
 
 // TODO: lms tutorials & more ...
 
 // TODO: low-level:
+// - type checker
 // - CPS conversion
 // - closure conversion
 // - register allocation
