@@ -52,18 +52,31 @@ class TensorFrontEnd extends FrontEnd {
     def toExp(x: INT): Exp = x.x
   }
 
+  implicit object SEQ_Type extends Type[SEQ] {
+    def fromExp(x: Exp): SEQ = SEQ(x)
+    def toExp(x: SEQ): Exp = x.x
+  }
+
   implicit object STRING_Type extends Type[STRING] {
     def fromExp(x: Exp): STRING = STRING(x)
     def toExp(x: STRING): Exp = x.x
   }
 
-  implicit object FUN_Type extends Type[INT => INT] {
+  implicit object FUNII_Type extends Type[INT => INT] {
     def fromExp(x: Exp): INT => INT = (y:INT) => INT(g.reflectEffect("@", x, y.x))
     def toExp(x: INT => INT): Exp = g.reflect("λ",g.reify(xn => x(INT(xn)).x))
   }
-  implicit object FUNU_Type extends Type[INT => Unit] {
+  implicit object FUNIU_Type extends Type[INT => Unit] {
     def fromExp(x: Exp): INT => Unit = (y:INT) => g.reflectEffect("@", x, y.x)
     def toExp(x: INT => Unit): Exp = g.reflect("λ",g.reify{xn => x(INT(xn)); Const(())})
+  }
+  implicit object FUNSI_Type extends Type[SEQ => INT] {
+    def fromExp(x: Exp): SEQ => INT = (y:SEQ) => INT(g.reflectEffect("@", x, y.x))
+    def toExp(x: SEQ => INT): Exp = g.reflect("λ",g.reify(xn => x(SEQ(xn)).x))
+  }
+  implicit object FUNSU_Type extends Type[SEQ => Unit] {
+    def fromExp(x: Exp): SEQ => Unit = (y:SEQ) => g.reflectEffect("@", x, y.x)
+    def toExp(x: SEQ => Unit): Exp = g.reflect("λ",g.reify{xn => x(SEQ(xn)); Const(())})
   }
 
   implicit object TENSOR_Type extends Type[Tensor] {
@@ -131,6 +144,11 @@ class TensorFrontEnd extends FrontEnd {
     def toExp(x: Unit): Exp = Const(())
   }
 
+  implicit object ARRAY_Type extends Type[ARRAY] {
+    def fromExp(x: Exp): ARRAY = ARRAY(x)
+    def toExp(x: ARRAY): Exp = x.x
+  }
+
   implicit object TENSORBUILDER1_Type extends Type[TensorBuilder1] {
     def fromExp(x: Exp): TensorBuilder1 = TensorBuilder1(x)
     def toExp(x: TensorBuilder1): Exp = x.x
@@ -142,41 +160,91 @@ class TensorFrontEnd extends FrontEnd {
     g.reflectEffect("P",x.x)
 
 
+  // @ir("TensorLowering") 
+  // def tensor_add(a: Tensor1, b: Tensor1): Tensor1 = {
+  //   Tensor1(same_shape(a,b), i => a(i) + b(i))
+  // }
+
+
+
+
   @ir("TensorLowering") 
-  def Tensor1(shape: INT, f: INT=>INT): Tensor1 = {
+  def Tensor1(shape: SEQ, f: SEQ=>INT): Tensor1 = {
     val builder = TensorBuilder1(shape)
-    forloop(shape, i => builder_add(builder,i,f(i)))
+    forloops(shape, i => builder_add(builder,i,f(i)))
     builder_res(builder)
   }
 
-  @ir("MultiLoopBuilderLowering") 
-  def TensorBuilder1(shape: INT): TensorBuilder1 = {
-    val data = ARRAY(shape)
-    TensorBuilder1(data.x)
+
+  @ir def tensor_shape(a: Tensor1): SEQ
+  @ir def tensor_builder_shape(a: TensorBuilder1): SEQ
+
+  rewrite { case Mtensor_shape(MTensor1(sh,f)) => sh }
+  rewrite { case Mtensor_builder_shape(MTensorBuilder1(sh)) => sh }
+
+
+  @ir("MultiDimForeachLowering")
+  def linearize(sh: SEQ, xs: SEQ): INT
+
+  rewrite { case Mlinearize(SEQ(Const(xs:List[Int])), ys) => 
+    linearize1(xs.map(i => INT(Const(i))), ys.explode(xs.length))
   }
 
-  @ir("MultiLoopBuilderLowering") 
-  def builder_add(@write builder: TensorBuilder1, i: INT, x: INT): Unit = {
-    val data = ARRAY(builder.x)
-    data(i) = x
+
+
+  def linearize1(sh: List[INT], xs: List[INT]): INT = (sh,xs) match {
+    case (s::Nil, x::Nil) => x
+    case (s::sh, x::xs) => x * sh.reduce(_*_) + linearize1(sh,xs)
   }
 
-  @ir("MultiLoopBuilderLowering") 
+  @ir("MultiDimForeachLowering") 
+  def product(sh: SEQ): INT = sh match {
+    case SEQ(Const(xs: List[Int])) => xs.reduce(_*_)
+  }
+
+
+  @ir
+  def TensorBuilderWrap(shape: SEQ, data: ARRAY): TensorBuilder1
+
+
+  @ir("MultiDimForeachLowering") 
+  def TensorBuilder1(shape: SEQ): TensorBuilder1 = {
+    val data = ARRAY(product(shape))
+    TensorBuilderWrap(shape,data)
+  }
+
+  @ir("MultiDimForeachLowering") 
+  def builder_add(@write builder: TensorBuilder1, i: SEQ, x: INT): Unit = {
+    val MTensorBuilderWrap(shape,data) = builder
+    data(linearize(shape, i)) = x
+  }
+
+  @ir("MultiDimForeachLowering") 
   def builder_res(@write builder: TensorBuilder1): Tensor1 = {
-    val data = ARRAY(builder.x)
-    val shape = INT(Const(7)) // XXX need a tuple that includes shape!!!
+    val MTensorBuilderWrap(shape,data) = builder
     Tensor1(data.x)
   }
 
 
   @ir("MultiDimForeachLowering")
-  def forloop(@write sz: INT, f: INT => Unit): Unit = { // TODO: effect poly
+  def forloops(@write sz: SEQ, f: SEQ => Unit): Unit = sz match { // TODO: effect poly
+    case SEQ(Const(xs: List[Int])) =>
+      def forloops1(sz: List[INT])(f: List[INT] => Unit): Unit = sz match {
+        case Nil => f(Nil)
+        case s::sz => forloop(s, { i => forloops1(sz) { is => f(i::is) } })
+      }
+      forloops1(xs.map(i => INT(Const(i)))) { i => f(SEQ(i:_*)) }
+  }
+
+  @ir("MultiDimForeachLowering")
+  def forloop(@write sz: INT, f: INT => Unit): Unit /*= { // TODO: effect poly
     val loopVar = VAR(0)
     WHILE (loopVar() !== sz) { 
       f(loopVar())
       loopVar() = loopVar() + 1
     }
-  }
+  }*/
+
 
   rewrite0 { 
     // NOTE: this will inline ALL function calls! (TODO: should have a more specific mechanism)
@@ -792,7 +860,7 @@ class TensorTest extends TutorialFunSuite {
 
   testBE("04") { x =>
 
-    val m = Tensor1(7, x => x + 8)
+    val m = Tensor1(SEQ(3,4,5), x => x(0) + x(1) + x(2))
 
     PRINT(m)
     0
