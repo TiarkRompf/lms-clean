@@ -12,7 +12,9 @@ import scala.collection.mutable
 
 object Backend {
 
-  abstract class Def
+  // Expressions are first-class entities in a program
+  // that can be manipulated freely. An expression is
+  // either a constant or a symbolic reference.
   abstract class Exp extends Def
 
   case class Sym(n: Int) extends Exp {
@@ -20,9 +22,17 @@ object Backend {
   }
   case class Const(x: Any) extends Exp
 
+
+  // A node in a computation graph links a symbol with
+  // its definition, consisting of an operator and its
+  // arguments.
   case class Node(n: Sym, op: String, rhs: List[Def]) {
     override def toString = s"$n = ($op ${rhs.mkString(" ")})"
   }
+
+  // A definition is part of the right-hand side of a 
+  // right-hand-side. 
+  abstract class Def
 
   case class Block(in: List[Sym], res: Exp, eff: Exp) extends Def
 
@@ -191,7 +201,7 @@ class Bound extends Phase {
 
     for (d <- g.nodes) {
       val b = boundSyms(d).toSet - d.n
-      hm(d.n) = syms(d).flatMap(hm).toSet -- b
+      hm(d.n) = syms(d).flatMap(a => hm.getOrElse(a,Set(a))).toSet -- b
     }
 
     //hm.foreach(println)
@@ -524,7 +534,7 @@ class CompactScalaCodeGen extends Traverser {
     else
       b
   }
-  def quoteBlock1(y: Block) = {
+  def quoteBlock1(y: Block, argType: Boolean = false) = {
     if (y.in.length == 1) {
       val b = utils.captureOut(traverse(y))
       if (b contains '\n')
@@ -534,10 +544,12 @@ class CompactScalaCodeGen extends Traverser {
     } else if (y.in.length == 2) {
       val x = y.in.head
       val b = utils.captureOut(traverse(y))
+      def typed(s:String) = if (argType) s+": Int" else s
+      def paren(s:String) = if (argType) "("+s+")" else s
       if (b contains '\n')
-        s"{ ${quote(x)} => \n$b\n}"
+        paren(s"{ ${typed(quote(x))} => \n$b\n}")
       else
-        s"(${quote(x)} => $b)"
+        s"(${paren(typed(quote(x)))} => $b)"
     } else (???) //FIXME
   }
 
@@ -551,7 +563,7 @@ class CompactScalaCodeGen extends Traverser {
       // proper inlining will likely work better 
       // as a separate phase b/c it may trigger
       // further optimizations
-      quoteBlock(traverse(y))
+      quoteBlock1(y, true)
     case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
       s"if (${shallow(c)}) " +
       quoteBlock(traverse(a)) +
@@ -583,7 +595,7 @@ class CompactScalaCodeGen extends Traverser {
     case n @ Node(s,"P",List(x,ctl)) => 
       s"println(${shallow(x)})"
     case n @ Node(_,op,args) => 
-      s"$op(${args.map(shallow).mkString(", ")})"
+      s"$op(${args.filterNot(_.isInstanceOf[Eff]).map(shallow).mkString(", ")})"
   }
 
   override def traverse(n: Node): Unit = n match {
@@ -603,7 +615,7 @@ class CompactScalaCodeGen extends Traverser {
     case n @ Node(s,"array_set",List(x,i,y,e)) => 
       emit(s"${shallow(x)}(${shallow(i)}) = ${shallow(y)}")
     case n @ Node(s,_,_) => 
-      emit(s"val ${quote(s)} = " + shallow(n))
+      emit(s"val ${quote(s)} = " + shallow(n)) 
   }
 
   override def apply(g: Graph) = {
@@ -780,7 +792,7 @@ class FrontEnd {
 }
 
 
-// DONE: cost-based code motion
+// DONE: frequency-based code motion
 
 // DONE: local liveness and compact printer
 
@@ -798,13 +810,18 @@ class FrontEnd {
 
 // DONE: tensor case study
 
+
+// TODO: macro front-end to generate lowering
+
 // TODO: front end: parametric types, type classes
+
+// TODO: metadata: source locations, types, etc
+
+// TODO: error reporting architecture
 
 // TODO: mutual recursion, memoization for functions
 
 // TODO: fine-grained effects, aliasing, ownership, hard and soft deps
-
-// TODO: metadata: source locations, types, etc
 
 // TODO: staticData
 
