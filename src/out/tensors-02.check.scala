@@ -57,12 +57,45 @@ def tensors_02(x0: Int): Int = {
     x1 = x1 + x5
     x2 = x2 + x6
     x3 = x3 + 1
-    ()
   }
   val x7 = x1
   val x8 = x2
   val x9 = x7 / 100
   println(x9)
   println(x8 / 100 - x9 * x9)
+  0
+}
+// After Multiloop/Builder lowering:
+def tensors_02(x0: Int): Int = {
+  val x1 = sum_builder_new(List(100))
+  val x2 = sum_builder_new(List(100))
+  foreach(List(100), { x5 =>
+    val x4 = 1 + 2 * seq_apply(x5, 0)
+    val x6 = x4 * x4
+    sum_builder_add(x1, x5, x4)
+    sum_builder_add(x2, x5, x6)
+  })
+  val x9 = sum_builder_get(x1)
+  val x10 = sum_builder_get(x2)
+  val x11 = x9 / 100
+  println(x11)
+  println(x10 / 100 - x11 * x11)
+  0
+}
+// After MultiDim foreach lowering:
+def tensors_02(x0: Int): Int = {
+  val x1 = sum_builder_new(List(100))
+  val x2 = sum_builder_new(List(100))
+  foreach(100, { x5 =>
+    val x4 = seq(x5)
+    val x6 = 1 + 2 * x5
+    sum_builder_add(x1, x4, x6)
+    sum_builder_add(x2, x4, x6 * x6)
+  })
+  val x9 = sum_builder_get(x1)
+  val x10 = sum_builder_get(x2)
+  val x11 = x9 / 100
+  println(x11)
+  println(x10 / 100 - x11 * x11)
   0
 }
