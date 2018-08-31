@@ -309,6 +309,114 @@ abstract class MultiLoopLowering extends Transformer {
 }
 
 
+abstract class MultiLoopBuilderLowering extends Transformer {
+  val frontEnd: TensorFrontEnd
+  import frontEnd._
+  def init() = {
+    frontEnd.name = "MultiLoopBuilderLowering"
+    frontEnd.g = frontEnd.mkGraphBuilder()
+    g = frontEnd.g
+  }
+
+  override def transform(n: Node): Exp = n match {
+    case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block)) => 
+      class Builder(op: String) { // TODO: proper subclasses?
+        val state = g.reflectEffect(op+"_builder_new", sh)
+        def +=(i: SEQ, x: INT) = g.reflectEffect(op+"_builder_add", state, i.x, x.x)
+        def result() = g.reflectEffect(op+"_builder_get", state)
+      }
+
+      val builders = ops map (new Builder(_))
+
+      def foreach(sz: SEQ)(f: SEQ => Unit): Unit = 
+        g.reflectEffect("foreach", sh, g.reify{ e => f(SEQ(e)); Const() })
+
+      foreach(SEQ(sh)) { e => 
+        subst(f.in.head) = e.x
+        traverse(f)
+        val resTuple = transform(f.res)
+        for ((b,i) <- builders.zipWithIndex) {
+          val res = g.reflect("seq_apply", resTuple, Const(i))
+          b += (e,INT(res))
+        }
+      }
+
+      val res = builders map (_.result())
+      g.reflect("seq", res:_*)
+
+    case Node(s, "multiloop", _) => 
+      println("TODO: implement lowering for multiloop shape "+n)
+      super.transform(n)
+    case _ => super.transform(n)
+  }
+}
+
+abstract class MultiDimForeachLowering extends Transformer {
+  val frontEnd: TensorFrontEnd
+  import frontEnd._
+  def init() = {
+    frontEnd.name = "MultiDimForeachLowering"
+    frontEnd.g = frontEnd.mkGraphBuilder()
+    g = frontEnd.g
+  }
+
+  var builders = new mutable.HashMap[Sym,Node]
+
+  override def transform(n: Node): Exp = n match {
+
+    case Node(s, "foreach", List(sh: Exp, f:Block, eff)) => 
+
+      val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
+      val shape = SEQ(sh).explode(dims)
+
+      def foreach(sz: INT)(f: INT => Unit): Unit = 
+        g.reflectEffect("foreach", sz.x, g.reify{ e => f(INT(e)); Const() })
+
+      def forloops(sz: List[INT])(f: List[INT] => Unit): Unit = sz match {
+        case Nil => f(Nil)
+        case s::sz => foreach(s) { i => forloops(sz) { is => f(i::is) } }
+      }
+
+      forloops(shape) { e => 
+        subst(f.in.head) = SEQ(e:_*).x
+        traverse(f)
+        transform(f.res)
+      }
+
+      Const(())
+
+    case Node(s, "foreach", _) => 
+      println("TODO: implement lowering for multiloop shape "+n)
+      super.transform(n)
+
+
+    case Node(s, "tensor_builder_new", List(sh: Exp, eff)) => 
+      builders(s) = n
+      val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
+      val shape = SEQ(sh).explode(dims)
+      g.reflectEffect("arraype_new", shape.reduce(_*_).x)
+
+    case Node(s, "tensor_builder_add", List(builder: Sym, i: Exp, x: Exp, eff)) => 
+      val (Node(s, "tensor_builder_new", List(sh0: Exp, eff))) = builders(builder)
+      val sh = transform(sh0) // TODO: tensor_builder_shape
+      val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
+      val shape = SEQ(sh).explode(dims)
+      val idx = SEQ(transform(i)).explode(dims)
+      def linearize(sh: List[INT], xs: List[INT]): INT = (sh,xs) match {
+        case (s::Nil, x::Nil) => x
+        case (s::sh, x::xs) => x * sh.reduce(_*_) + linearize(sh,xs)
+      }
+      g.reflectEffect("array_set", transform(builder), linearize(shape,idx).x, x)
+
+    case Node(s, "tensor_builder_get", List(builder: Sym, eff)) => 
+      val (Node(s, "tensor_builder_new", List(sh: Exp, eff))) = builders(builder)
+      transform(builder)
+
+
+    case _ => super.transform(n)
+  }
+}
+
 
 class TensorTest extends TutorialFunSuite {
   val under = "tensors-"
@@ -373,10 +481,24 @@ class TensorTest extends TutorialFunSuite {
         println("// After Tensor fusion H:")
         println(emitSource())
 
-        g = (new MultiLoopLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
+        val g_fused = g
+
+        g = (new MultiLoopLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g_fused)
 
         println("// After Multiloop lowering:")
         println(emitSource())
+
+
+        g = (new MultiLoopBuilderLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g_fused)
+
+        println("// After Multiloop/Builder lowering:")
+        println(emitSource())
+
+        g = (new MultiDimForeachLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
+
+        println("// After MultiDim foreach lowering:")
+        println(emitSource())
+
 
         // val cg = new CompactScalaCodeGen
         // cg.doRename = true
