@@ -38,7 +38,191 @@ class TensorFrontEnd extends FrontEnd {
   def PRINT(x: Tensor): Unit =
     g.reflectEffect("P",x.x)
 
-  override def mkGraphBuilder() = new GraphBuilder {
+
+
+  import MACROS._
+
+  abstract class Type[T] {
+    def fromExp(x: Exp): T
+    def toExp(x: T): Exp
+  }
+
+  implicit object INT_Type extends Type[INT] {
+    def fromExp(x: Exp): INT = INT(x)
+    def toExp(x: INT): Exp = x.x
+  }
+
+  implicit object STRING_Type extends Type[STRING] {
+    def fromExp(x: Exp): STRING = STRING(x)
+    def toExp(x: STRING): Exp = x.x
+  }
+
+  implicit object FUN_Type extends Type[INT => INT] {
+    def fromExp(x: Exp): INT => INT = (y:INT) => INT(g.reflectEffect("@", x, y.x))
+    def toExp(x: INT => INT): Exp = g.reflect("λ",g.reify(xn => x(INT(xn)).x))
+  }
+  implicit object FUNU_Type extends Type[INT => Unit] {
+    def fromExp(x: Exp): INT => Unit = (y:INT) => g.reflectEffect("@", x, y.x)
+    def toExp(x: INT => Unit): Exp = g.reflect("λ",g.reify{xn => x(INT(xn)); Const(())})
+  }
+
+  implicit object TENSOR_Type extends Type[Tensor] {
+    def fromExp(x: Exp): Tensor = Tensor(x)
+    def toExp(x: Tensor): Exp = x.x
+  }
+
+
+  def reflect[T:Type](s: String, xs: Exp*): T = unref[T](g.reflect(s, xs:_*))
+  def reflectEffect[T:Type](s: String, xs: Exp*): T = unref[T](g.reflectEffect(s, xs:_*))
+  def ref[T:Type](x: T): Exp = implicitly[Type[T]].toExp(x)
+  def unref[T:Type](x: Exp): T = implicitly[Type[T]].fromExp(x)
+  object Reflect {
+    def unapply(x: Any): Option[(String, List[Exp])] = x match {
+      case (s: String, rhs: List[_]) => 
+        Some((s,rhs.filter(_.isInstanceOf[Exp]).map(_.asInstanceOf[Exp])))
+      case s @ Sym(_) =>
+        g.globalDefs.find(_.n == s).map(n => (n.op,n.rhs.filter(_.isInstanceOf[Exp]).map(_.asInstanceOf[Exp])))
+      case x: Product if x.productArity == 1 => // INT(s), STRING(s), etc
+        unapply(x.productElement(0))
+      case _ => None
+    }
+  }
+
+  var name: String = ""
+
+  var rewrites: (String => Any => Option[Exp]) = (s => x => None)
+
+  def rewriteAt[T:Type](key: Any)(f: PartialFunction[Any,T]) = {
+    val old = rewrites
+    val f1 = ((s: String) => (x:Any) => if (s == key && f.isDefinedAt(x)) Some(ref(f(x))) else None)
+    rewrites = (s => x => f1(s)(x).orElse(old(s)(x)))
+  }
+
+  def rewrite[T:Type](f: PartialFunction[Any,T]) = {
+    val old = rewrites
+    val f1 = ((x:Any) => if (f.isDefinedAt(x)) Some(ref(f(x))) else None)
+    rewrites = (s => x => f1(x).orElse(old(s)(x)))
+  }
+
+  def rewrite0(f: PartialFunction[Any,Exp]) = {
+    val old = rewrites
+    val f1 = ((x:Any) => if (f.isDefinedAt(x)) Some(f(x)) else None)
+    rewrites = (s => x => f1(x).orElse(old(s)(x)))
+  }
+
+
+  @ir("MultiLoopBuilderLowering") 
+  def foobar(arg: INT): INT = 2 * arg
+
+  rewrite { case Mfoobar(Mfoobar(x)) => foobar(x) };
+
+
+  case class Tensor1(x: Exp)
+
+  case class TensorBuilder1(x: Exp)
+
+  implicit object TENSOR1_Type extends Type[Tensor1] {
+    def fromExp(x: Exp): Tensor1 = Tensor1(x)
+    def toExp(x: Tensor1): Exp = x.x
+  }
+
+  implicit object UNIT_Type extends Type[Unit] {
+    def fromExp(x: Exp): Unit = ()
+    def toExp(x: Unit): Exp = Const(())
+  }
+
+  implicit object TENSORBUILDER1_Type extends Type[TensorBuilder1] {
+    def fromExp(x: Exp): TensorBuilder1 = TensorBuilder1(x)
+    def toExp(x: TensorBuilder1): Exp = x.x
+  }
+
+  class write extends scala.annotation.StaticAnnotation
+
+  def PRINT(x: Tensor1): Unit =
+    g.reflectEffect("P",x.x)
+
+
+  @ir("TensorLowering") 
+  def Tensor1(shape: INT, f: INT=>INT): Tensor1 = {
+    val builder = TensorBuilder1(shape)
+    forloop(shape, i => builder_add(builder,i,f(i)))
+    builder_res(builder)
+  }
+
+  @ir("MultiLoopBuilderLowering") 
+  def TensorBuilder1(shape: INT): TensorBuilder1 = {
+    val data = ARRAY(shape)
+    TensorBuilder1(data.x)
+  }
+
+  @ir("MultiLoopBuilderLowering") 
+  def builder_add(@write builder: TensorBuilder1, i: INT, x: INT): Unit = {
+    val data = ARRAY(builder.x)
+    data(i) = x
+  }
+
+  @ir("MultiLoopBuilderLowering") 
+  def builder_res(@write builder: TensorBuilder1): Tensor1 = {
+    val data = ARRAY(builder.x)
+    val shape = INT(Const(7)) // XXX need a tuple that includes shape!!!
+    Tensor1(data.x)
+  }
+
+
+  @ir("MultiDimForeachLowering")
+  def forloop(@write sz: INT, f: INT => Unit): Unit = { // TODO: effect poly
+    val loopVar = VAR(0)
+    WHILE (loopVar() !== sz) { 
+      f(loopVar())
+      loopVar() = loopVar() + 1
+    }
+  }
+
+  rewrite0 { 
+    // NOTE: this will inline ALL function calls! (TODO: should have a more specific mechanism)
+    case Reflect("@", List(f@Reflect("λ", Nil), x)) =>
+      val Node(s,"λ",List(b@Block(List(in,ein),out,eout))) = g.globalDefs.find(_.n == f).get
+
+      val bound = new Bound
+      bound(Graph(g.globalDefs.toList,b))
+
+      val subst = new mutable.HashMap[Def,Exp]
+      subst(in) = x
+      subst(ein) = g.curBlock
+
+      val nodes = g.globalDefs.filter(n => bound.hm.getOrElse(n.n,Set())(in) || bound.hm.getOrElse(n.n,Set())(ein))
+      // println(s"nodes dependent on $in,$ein:")
+      // nodes.foreach(println)
+
+      nodes.foreach { case Node(n,op,rhs) => 
+        val (effects,pure) = rhs.partition(_.isInstanceOf[Eff])
+        val args = pure.map(a => subst.getOrElse(a,a)) // XXX TODO: Blocks!
+        if (effects.nonEmpty)
+          subst(n) = g.reflectEffect(op,args:_*)
+        else
+          subst(n) = g.reflect(op,args:_*)
+      }
+
+      subst.getOrElse(out,out)
+  }
+
+  // NEXT TODO: H-fusion
+
+
+
+
+
+
+
+
+
+
+
+  //lower { case `Mfoobar`(arg) => foobar_next(arg) }
+
+  override def mkGraphBuilder() = new MyGraphBuilder()
+
+  class MyGraphBuilder extends GraphBuilder {
 
     object Def {
       def unapply(xs: Def): Option[(String,List[Def])] = xs match {
@@ -47,6 +231,11 @@ class TensorFrontEnd extends FrontEnd {
         case _ => None
       }
     }
+
+    // registerRewrite (x => (x + x) ====> (2 * x))
+
+    // List("====>", ("+", x, x), ("*", 2, x))
+    // List("====>", ("+", x, x), ("*", 2, x))
 
     override def reflect(s: String, as: Def*): Exp = (s,as.toList) match {
       case ("+", List(Const(a:Int),Const(b:Int))) => Const(a+b)
@@ -61,11 +250,32 @@ class TensorFrontEnd extends FrontEnd {
       case ("seq_length", List(Def("seq", a),Const(b:Int))) => Const(a.length)
       case ("tensor_shape", List(Def("tensor",List(sh:Exp,f)))) => sh
       case ("tensor_same_shape", List(Const(as), Const(bs))) if as == bs => Const(as)
-      case _ =>
+
+      //case Mfoobar(x) => ref { 4 * x }
+
+      case p =>
+        rewrites(name)(p) match { 
+          case Some(e) => e 
+          case None => 
+
         // CSE
         globalDefs.find(n => n.op == s && n.rhs == as).map(_.n)
           .getOrElse(super.reflect(s, as:_*))
+        }
     }
+
+    override def reflectEffect(s: String, as: Def*): Exp = (s,as.toList) match {
+      case p =>
+        rewrites(name)(p) match { 
+          case Some(e) => e 
+          case None => 
+              super.reflectEffect(s, as:_*)
+        }
+
+        // CSE?
+    }
+
+
   }
 
 
@@ -78,6 +288,7 @@ abstract class TensorLowering extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
+    frontEnd.name = "TensorLowering"
     frontEnd.g = frontEnd.mkGraphBuilder()
     g = frontEnd.g
   }
@@ -98,6 +309,7 @@ abstract class TensorFusionV extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
+    frontEnd.name = "TensorFusionV"
     frontEnd.g = frontEnd.mkGraphBuilder()
     g = frontEnd.g
   }
@@ -126,6 +338,7 @@ abstract class TensorFusionH extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
+    frontEnd.name = "TensorFusionH"
     frontEnd.g = frontEnd.mkGraphBuilder()
     g = frontEnd.g
   }
@@ -218,7 +431,6 @@ abstract class TensorFusionH extends Transformer {
   }
 
 
-
   override def transform(n: Node): Exp = n match {
     case Node(s, "tensor", List(sh:Exp, f:Block)) => 
       tensors(s) = n
@@ -237,18 +449,15 @@ abstract class MultiLoopLowering extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
+    frontEnd.name = "MultiLoopLowering"
     frontEnd.g = frontEnd.mkGraphBuilder()
     g = frontEnd.g
   }
-
-  val tensors = new mutable.HashMap[Sym, Node]
 
   override def transform(n: Node): Exp = n match {
     case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block)) => 
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
-
-      val sz = shape(0).x
 
       def linearize(sh: List[INT], xs: List[INT]): INT = (sh,xs) match {
         case (s::Nil, x::Nil) => x
@@ -456,13 +665,26 @@ class TensorTest extends TutorialFunSuite {
           if (!verbose) cg.doRename = true
 
           val arg = cg.quote(g.block.in.head)
-          val src = utils.captureOut(cg(g))
+          var src = utils.captureOut(cg(g))
+
+          // remove "()" on a single line
+          src = src.replaceAll(" *\\(\\) *","") // replac
+
+          // remove unused val x1 = ...
+          val names = cg.rename.map(p => p._2).toSet
+          for (n <- names) {
+            val removed = src.replace(s"val $n = ","")
+            if (removed.indexOf(n) < 0)
+              src = removed
+          }
+
           val className = mkClassName(name)
           s"def ${className}($arg: Int): Int = {\n $src\n }"        
         }
 
         println("// Initial code:")
         println(emitSource())
+
 
         // lower zeros, ones, etc to uniform tensor constructor
         g = (new TensorLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
@@ -557,5 +779,24 @@ class TensorTest extends TutorialFunSuite {
     PRINT(v)
     0
   }
+
+  testBE("03") { x =>
+
+    val m = foobar(7)
+    val n = foobar(m)
+
+    PRINT(n)
+    0
+  }
+
+
+  testBE("04") { x =>
+
+    val m = Tensor1(7, x => x + 8)
+
+    PRINT(m)
+    0
+  }
+
 
 }

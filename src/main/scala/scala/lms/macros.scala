@@ -12,3 +12,12 @@ class virtualize extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro macros.virtualize.impl
 }
 
+class api extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro macros.ir2.impl
+}
+
+object MACROS {
+  class ir extends StaticAnnotation {
+    def macroTransform(annottees: Any*): Any = macro macros.ir2.impl
+  }
+}
