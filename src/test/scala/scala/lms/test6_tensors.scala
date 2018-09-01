@@ -160,15 +160,17 @@ class TensorFrontEnd extends FrontEnd {
     g.reflectEffect("P",x.x)
 
 
-  // @ir("TensorLowering") 
-  // def tensor_add(a: Tensor1, b: Tensor1): Tensor1 = {
-  //   Tensor1(same_shape(a,b), i => a(i) + b(i))
-  // }
-
-
-
+  //@ir("TensorLowering") 
+  def tensor_add(a: Tensor1, b: Tensor1): Tensor1 = {
+    Tensor1(tensor_shape(a), i => tensor_apply(a,i) + tensor_apply(b,i)) // XXX todo: same shape
+  }
 
   @ir("TensorLowering") 
+  def tensor_apply(a: Tensor1, b: SEQ): INT
+
+
+
+  @ir("MultiLoopBuilderLowering") 
   def Tensor1(shape: SEQ, f: SEQ=>INT): Tensor1 = {
     val builder = TensorBuilder1(shape)
     forloops(shape, i => builder_add(builder,i,f(i)))
@@ -191,6 +193,11 @@ class TensorFrontEnd extends FrontEnd {
   }
 
 
+  // V-Fusion
+  rewriteAt("TensorFusionV") { case Mtensor_apply(MTensor1(shape, f), i) => 
+    f(i)
+  }
+
 
   def linearize1(sh: List[INT], xs: List[INT]): INT = (sh,xs) match {
     case (s::Nil, x::Nil) => x
@@ -208,7 +215,7 @@ class TensorFrontEnd extends FrontEnd {
 
 
   @ir("MultiDimForeachLowering") 
-  def TensorBuilder1(shape: SEQ): TensorBuilder1 = {
+  def TensorBuilder1(@write shape: SEQ): TensorBuilder1 = { // TODO: mark effect differently!
     val data = ARRAY(product(shape))
     TensorBuilderWrap(shape,data)
   }
@@ -861,8 +868,8 @@ class TensorTest extends TutorialFunSuite {
   testBE("04") { x =>
 
     val m = Tensor1(SEQ(3,4,5), x => x(0) + x(1) + x(2))
-
-    PRINT(m)
+    val n = tensor_add(m,m)
+    PRINT(n)
     0
   }
 
