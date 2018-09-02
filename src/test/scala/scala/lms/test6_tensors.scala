@@ -283,12 +283,9 @@ class TensorFrontEnd extends FrontEnd {
 
   // NEXT TODO: H-fusion
 
+  // NEXT TODO: fine-grained effect deps
 
-
-
-
-
-
+  // NEXT TODO: types, source context, error reporting
 
 
 
