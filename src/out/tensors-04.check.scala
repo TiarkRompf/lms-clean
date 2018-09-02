@@ -1,10 +1,7 @@
 // Initial code:
 def tensors_04(x0: Int): Int = {
   val x1 = Tensor1(List(3, 4, 5), ((x2: Int) => seq_apply(x2, 0) + seq_apply(x2, 1) + seq_apply(x2, 2)))
-  println(Tensor1(List(3, 4, 5), ({ x4: Int =>
-    val x3 = tensor_apply(x1, x4)
-    x3 + x3
-  })))
+  println(tensor_add1(x1, x1))
   0
 }
 // After Tensor lowering:

@@ -5,6 +5,8 @@ import scala.annotation.implicitNotFound
 import scala.collection.{mutable,immutable}
 import Backend._
 
+import util.GraphUtil
+
 class TensorFrontEnd extends FrontEnd {
 
   case class SEQ(x: Exp) {
@@ -160,8 +162,8 @@ class TensorFrontEnd extends FrontEnd {
     g.reflectEffect("P",x.x)
 
 
-  //@ir("TensorLowering") 
-  def tensor_add(a: Tensor1, b: Tensor1): Tensor1 = {
+  @ir("TensorLowering") 
+  def tensor_add1(a: Tensor1, b: Tensor1): Tensor1 = {
     Tensor1(tensor_shape(a), i => tensor_apply(a,i) + tensor_apply(b,i)) // XXX todo: same shape
   }
 
@@ -263,7 +265,7 @@ class TensorFrontEnd extends FrontEnd {
 
       val subst = new mutable.HashMap[Def,Exp]
       subst(in) = x
-      subst(ein) = g.curBlock
+      //subst(ein) = g.curBlock
 
       val nodes = g.globalDefs.filter(n => bound.hm.getOrElse(n.n,Set())(in) || bound.hm.getOrElse(n.n,Set())(ein))
       // println(s"nodes dependent on $in,$ein:")
@@ -491,7 +493,7 @@ abstract class TensorFusionH extends Transformer {
       }
 
       visit(g.block.res)
-      visit(g.block.eff)
+      g.block.eff.foreach(visit)
 
       // println("---")
       // order.foreach(println)
@@ -514,6 +516,112 @@ abstract class TensorFusionH extends Transformer {
       transform(res)
     case _ => super.transform(n)
   }
+}
+
+
+abstract class TensorFusionH2 extends Transformer {
+  val frontEnd: TensorFrontEnd
+  import frontEnd._
+  def init() = {
+    frontEnd.name = "TensorFusionH2"
+    frontEnd.g = frontEnd.mkGraphBuilder()
+    g = frontEnd.g
+  }
+
+  // NOTE: fuse loops horizontally within a local scope.
+  // highly highly preliminary!
+  override def traverse(ns: Seq[Node], y: Block): Unit = {
+    val loops = ns.filter(n => n.op == "forloops" || n.op == "forloop").toList
+
+    val crossdep = new mutable.HashMap[Sym,Set[Sym]] // cross-dep: TODO!!
+
+    if (loops.nonEmpty) {
+      // TODO: right now, we assume:
+      // - XXX no cross-deps!
+      // - XXX all same size! (fix: group by shape)
+
+      val shape = transform(loops.head.rhs.head.asInstanceOf[Exp]) // FIXME!!!
+      for (n @ Node(s,op,args) <- loops) {
+        println(n + " // " + bound.hm(s))
+      }
+      println("stms:")
+      ns.foreach(println)
+      // println("bound:")
+      // bound.hm.foreach(println)
+
+      val g = new Graph(inner++ns, y)
+      val reach = new mutable.HashSet[Sym]
+
+      val loopSyms = loops.map(_.n).toSet
+      val hereSyms = ns.map(_.n).toSet
+      var loopsReached = false
+
+      //def stronglyConnectedComponents[T](start: List[T], succ: T=>List[T]): List[List[T]]
+
+      def find(s: Exp): List[Node] = s match {
+        case s: Sym if loopSyms(s) => loops
+        case _ => g.nodes.filter(_.n == s).toList
+      }
+
+      def dep(n: Node): List[Exp] = if (n.op == "TensorBuilder1") Nil
+      else syms(n)
+
+      val scc = GraphUtil.stronglyConnectedComponents[List[Node]](
+        find(g.block.res)::g.block.eff.map(find),
+        es => es.map(dep).flatMap(_.map(find))
+      )
+
+
+
+      scc.reverse.foreach(println)
+
+
+      // XXX FIXME: there are some bad performance issues here (g.nodes.find) 
+      // and the traversal algorithm is also too simple (need actual top-sort)
+      def visit(s: Exp): Unit = s match {
+        case s: Sym if !loopSyms(s) && !reach(s) => 
+          // we reached a normal statement. mark it,
+          // process children, then emit transformed statement
+          reach += s
+          g.nodes.find(_.n == s).foreach { n => 
+            syms(n).foreach(visit)
+            if (hereSyms(n.n))
+              traverse(n)
+          }
+        case s: Sym if loopSyms(s) && !loopsReached => 
+          // we reached the fused loops
+          loopsReached = true
+          for (s <- loopSyms) {
+            g.nodes.find(_.n == s).foreach { n => 
+              syms(n).foreach(visit)
+            }
+          }
+          // emit the fused body ... 
+          val newBody = this.g.reify { e => 
+            for (l <- loops) {
+              val (Node(s,op,List(sh:Exp,f:Exp,_))) = l
+              assert(transform(sh) == shape, "ERROR: fused loop shapes don't match (TODO!)")
+              this.g.reflectEffect("@", transform(f), e)
+            }
+            Const(())
+          }
+          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))
+        case _ =>
+      }
+
+      visit(g.block.res)
+      //visit(g.block.eff)
+
+      // println("---")
+      // order.foreach(println)
+      // println("---")
+
+    } else {
+      super.traverse(ns,y)
+    }
+  }
+
+
 }
 
 
@@ -713,7 +821,7 @@ class TensorTest extends TutorialFunSuite {
     (under + name).replace("-","_")
   }
 
-  def testBE(name: String, verbose: Boolean = false)(prog: INT => INT) = {
+  def testBE(name: String, verbose: Boolean = false, alt: Boolean = false)(prog: INT => INT) = {
     test(name) {
       checkOut(name, "scala", {
         var g = program(prog)
@@ -775,18 +883,28 @@ class TensorTest extends TutorialFunSuite {
         println("// After Tensor fusion H:")
         println(emitSource())
 
-        val g_fused = g
+        if (!alt) {
+          val g_fused = g
 
-        g = (new MultiLoopLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g_fused)
+          g = (new MultiLoopLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g_fused)
 
-        println("// After Multiloop lowering:")
-        println(emitSource())
+          println("// After Multiloop lowering:")
+          println(emitSource())
 
+          g = g_fused
+        }
 
-        g = (new MultiLoopBuilderLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g_fused)
+        g = (new MultiLoopBuilderLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
         println("// After Multiloop/Builder lowering:")
         println(emitSource())
+
+        if (alt) {
+          g = (new TensorFusionH2 { val frontEnd = new TensorFrontEnd; init() }).transform(g)
+
+          println("// After Tensor fusion H2:")
+          println(emitSource())
+        }
 
         g = (new MultiDimForeachLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
@@ -865,10 +983,19 @@ class TensorTest extends TutorialFunSuite {
   testBE("04") { x =>
 
     val m = Tensor1(SEQ(3,4,5), x => x(0) + x(1) + x(2))
-    val n = tensor_add(m,m)
+    val n = tensor_add1(m,m)
     PRINT(n)
     0
   }
 
+  testBE("05", alt = true) { x =>
+
+    val m = Tensor1(SEQ(3,4,5), x => x(0) + x(1) + x(2))
+    val a = tensor_add1(m,m)
+    PRINT(a)
+    val b = tensor_add1(tensor_add1(m,m),m)
+    PRINT(b)
+    0
+  }
 
 }

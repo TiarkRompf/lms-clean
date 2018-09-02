@@ -34,9 +34,9 @@ object Backend {
   // right-hand-side. 
   abstract class Def
 
-  case class Block(in: List[Sym], res: Exp, eff: Exp) extends Def
+  case class Block(in: List[Sym], res: Exp, eff: List[Exp]) extends Def
 
-  case class Eff(e: Sym) extends Def
+  case class Eff(e: List[Sym]) extends Def
 
 
   // where should this go?
@@ -55,10 +55,8 @@ object Backend {
   def syms(x: Node): List[Sym] = 
     x.rhs.flatMap { 
       case s: Sym => List(s) 
-      case Eff(s) => List(s) 
-      case Block(_, s: Sym, e: Sym) => List(s,e)
-      case Block(_, s: Sym, _) => List(s)
-      case Block(_, _, e: Sym) => List(e)
+      case Eff(s) => s
+      case Block(_, res, eff) => (res::eff) collect { case s: Sym => s }
       case _ => Nil
     } diff boundSyms(x)
 }
@@ -77,20 +75,22 @@ class GraphBuilder {
   }
   def reflectEffect(s: String, as: Def*): Exp = {
     val sm = Sym(fresh) 
-    try reflect(sm, s, (as :+ Eff(curBlock)):_*) finally curBlock = sm
+    try reflect(sm, s, (as :+ Eff(curBlock)):_*) finally curBlock = sm::Nil 
+    // alternative:
+    // curBlock = sm::curBlock (will record all effects directly...)
   }
   def reflect(x: Sym, s: String, as: Def*): Exp = {
     globalDefs += Node(x,s,as.toList)
     x
   }
 
-  var curBlock: Sym = _ // could this become an ExplodedStruct?
+  var curBlock: List[Sym] = _ // could this become an ExplodedStruct?
 
   def reify(x: => Exp): Block = {
     val save = curBlock
     try {
       val block = Sym(fresh)
-      curBlock = block
+      curBlock = List(block)
       val res = x 
       Block(block::Nil, res, curBlock)
     } finally {
@@ -102,7 +102,7 @@ class GraphBuilder {
     try {
       val block = Sym(fresh)
       val arg = Sym(fresh)
-      curBlock = block
+      curBlock = List(block)
       val res = x(arg) 
       Block(arg::block::Nil, res, curBlock)
     } finally {
@@ -154,9 +154,9 @@ class Flow extends Phase {
 
   def symsFreq(x: Node): List[(Def,Double)] = x match {
     case Node(f, "λ", List(Block(in, y, eff))) => 
-      List((y,100),(eff,0.001))
-    case Node(_, "?", List(c, Block(ac,ae,af), Block(bc,be,bf))) => 
-      List((c,1.0),(ae,0.5),(af,0.001),(be,0.5),(bf,0.001))
+      List((y,100.0)) ++ eff.map(e => (e,0.001))
+    case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::_) => 
+      List((c,1.0),(ae,0.5),(be,0.5)) ++ af.map(e => (e,0.001)) ++ bf.map(e => (e,0.001))
     case _ => syms(x) map (s => (s,1.0))
   }
 
@@ -165,8 +165,9 @@ class Flow extends Phase {
     if (g.block.res.isInstanceOf[Sym])
       freq(g.block.res.asInstanceOf[Sym]) = 1.0
 
-    if (g.block.eff.isInstanceOf[Sym])
-      freq(g.block.eff.asInstanceOf[Sym]) = 1.0
+    for (e <- g.block.eff)
+      if (e.isInstanceOf[Sym])
+        freq(e.asInstanceOf[Sym]) = 1.0
 
     for (d <- g.nodes.reverseIterator) {
       if (freq contains d.n) {
@@ -236,11 +237,13 @@ abstract class Traverser {
     // freq/block computation
     def symsFreq(x: Node): List[(Def,Double)] = x match {
       case Node(f, "λ", List(Block(in, y, eff))) => 
-        List((y,100),(eff,100))
-      case Node(_, "?", List(c, Block(ac,ae,af), Block(bc,be,bf))) => 
-        List((c,1.0),(ae,0.5),(af,0.5),(be,0.5),(bf,0.5))
-      case Node(_, "W", List(Block(ac,ae,af), Block(bc,be,bf))) => 
-        List((ae,100),(af,100),(be,100),(bf,100))
+        (y::eff).map(e => (e,100.0))
+      case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil) => 
+        List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
+      case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Eff(es)::Nil) => 
+        (c::es).map(e => (e,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
+      case Node(_, "W", Block(ac,ae,af)::Block(bc,be,bf)::Eff(es)::Nil) => 
+        es.map(e => (e,1.0)) ++ (ae::be::af ++ bf).map(e => (e,100.0))
       case _ => syms(x) map (s => (s,1.0))
     }
 
@@ -253,8 +256,9 @@ abstract class Traverser {
     if (g.block.res.isInstanceOf[Sym])
       reach += g.block.res.asInstanceOf[Sym]
 
-    if (g.block.eff.isInstanceOf[Sym])
-      reach += g.block.eff.asInstanceOf[Sym]
+    for (e <- g.block.eff)
+      if (e.isInstanceOf[Sym])
+        reach += e.asInstanceOf[Sym]
 
     for (d <- g.nodes.reverseIterator) {
       if ((reach contains d.n)) {
@@ -364,7 +368,7 @@ class ScalaCodeGen extends Traverser {
       // see what becomes available given new bound vars
       traverse(y, f)
       emit(s"}")
-    case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
+    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_) => 
       emit(s"val $f = if (${quote(c)}) {")
       traverse(a)
       emit(s"} else {")
@@ -402,7 +406,7 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)}(${quote(i)})")
     case n @ Node(s,"array_set",List(x,i,y,e)) => 
       emit(s"${quote(x)}(${quote(i)}) = ${quote(y)}")
-    case n @ Node(s,"@",List(x,y,ctl)) => 
+    case n @ Node(s,"@",x::y::_) => 
       emit(s"val $s = ${quote(x)}(${quote(y)})")
     case n @ Node(s,"P",List(x,ctl)) => 
       emit(s"val $s = println(${quote(x)})")
@@ -564,7 +568,7 @@ class CompactScalaCodeGen extends Traverser {
       // as a separate phase b/c it may trigger
       // further optimizations
       quoteBlock1(y, true)
-    case n @ Node(f,"?",List(c,a:Block,b:Block)) => 
+    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_) => 
       s"if (${shallow(c)}) " +
       quoteBlock(traverse(a)) +
       s" else " +
@@ -590,7 +594,7 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)} != ${shallow(y)}"
     case n @ Node(s,"var_get",List(x,e)) => 
       s"${shallow(x)}"
-    case n @ Node(s,"@",List(x,y,ctl)) => 
+    case n @ Node(s,"@",x::y::_) => 
       s"${shallow(x)}(${shallow(y)})"
     case n @ Node(s,"P",List(x,ctl)) => 
       s"println(${shallow(x)})"
@@ -737,13 +741,17 @@ class FrontEnd {
     def apply(x: INT): VAR = VAR(g.reflectEffect("var_new",x.x))
   }
 
+  def isPure(b: Block) = b.eff == List(b.in.last)
 
   def IF(c: BOOL)(a: => INT)(b: => INT): INT = {
-    // TODO: effect polymorphism!
     val aBlock = g.reify(a.x)
     val bBlock = g.reify(b.x)
     // compute effect (aBlock || bBlock)
-    INT(g.reflect("?",c.x,aBlock,bBlock))
+    val pure = isPure(aBlock) && isPure(bBlock)
+    if (pure)
+      INT(g.reflect("?",c.x,aBlock,bBlock))
+    else
+      INT(g.reflectEffect("?",c.x,aBlock,bBlock))
   }
 
   def WHILE(c: => BOOL)(b: => Unit): Unit = {
@@ -754,8 +762,15 @@ class FrontEnd {
   }
 
   
-  def APP(f: Exp, x: INT): INT = 
-    INT(g.reflectEffect("@",f,x.x))
+  def APP(f: Exp, x: INT): INT = {
+    // XXX lookup lambda ...
+    g.globalDefs.find(_.n == f) match {
+      case Some(Node(f, "λ", List(b: Block))) if isPure(b) =>
+        INT(g.reflect("@",f,x.x))
+      case _ =>
+        INT(g.reflectEffect("@",f,x.x))
+    }
+  }
 
   def PRINT(x: INT): Unit =
     g.reflectEffect("P",x.x)

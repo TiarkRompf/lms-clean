@@ -172,7 +172,6 @@ class BackendTest extends TutorialFunSuite {
   }
   
 
-
   testBE("codemotion-05") { x =>
     IF (true) {
       // should place 7 + 9 here
