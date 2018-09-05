@@ -74,8 +74,8 @@ def tensors_01(x0: Int): Int = {
 }
 // After MultiDim foreach lowering:
 def tensors_01(x0: Int): Int = {
-  val x1 = arraype_new(60)
-  val x2 = arraype_new(60)
+  val x1 = new Array[Int](60)
+  val x2 = new Array[Int](60)
   foreach(3, { x5 =>
     val x4 = x5 * 20
     foreach(4, { x8 =>
