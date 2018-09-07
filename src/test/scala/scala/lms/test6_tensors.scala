@@ -574,50 +574,31 @@ abstract class TensorFusionH2 extends Transformer {
         es => es.map(dep).flatMap(_.map(find))
       )
 
+      val scc1 = scc.reverse
+      
+      scc1.foreach(println)
 
+      scc1.foreach {
+        case List(List(n)) if ns contains n =>
+          traverse(n)
+        case List(List(n)) =>
+          // not at top-level --> ignore
+        case List(List()) =>
+          // first --> ignore
+        case List(xs) =>
+          assert(xs == loops, s"$xs != $loops") //XXX TODO error message!
 
-      scc.reverse.foreach(println)
-
-
-      // XXX FIXME: there are some bad performance issues here (g.nodes.find) 
-      // and the traversal algorithm is also too simple (need actual top-sort)
-      def visit(s: Exp): Unit = s match {
-        case s: Sym if !loopSyms(s) && !reach(s) => 
-          // we reached a normal statement. mark it,
-          // process children, then emit transformed statement
-          reach += s
-          g.nodes.find(_.n == s).foreach { n => 
-            syms(n).foreach(visit)
-            if (hereSyms(n.n))
-              traverse(n)
-          }
-        case s: Sym if loopSyms(s) && !loopsReached => 
-          // we reached the fused loops
-          loopsReached = true
-          for (s <- loopSyms) {
-            g.nodes.find(_.n == s).foreach { n => 
-              syms(n).foreach(visit)
-            }
-          }
           // emit the fused body ... 
           val newBody = this.g.reify { e => 
             for (l <- loops) {
               val (Node(s,op,List(sh:Exp,f:Exp,_), _)) = l
               assert(transform(sh) == shape, "ERROR: fused loop shapes don't match (TODO!)")
-              this.g.reflectEffect("@", transform(f), e)()
+              this.g.reflectEffect("@", transform(f), e)() //XXX effect
             }
             Const(())
           }
-          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))()
-        case _ =>
+          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(STORE)
       }
-
-      visit(g.block.res)
-      //visit(g.block.eff)
-
-      // println("---")
-      // order.foreach(println)
-      // println("---")
 
     } else {
       super.traverse(ns,y)
