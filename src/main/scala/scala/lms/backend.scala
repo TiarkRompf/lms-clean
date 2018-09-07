@@ -73,19 +73,22 @@ class GraphBuilder {
   def reflect(s: String, as: Def*): Exp = {
     reflect(Sym(fresh), s, as:_*)()
   }
+
   def reflectEffect(s: String, as: Def*)(efs: Exp*): Exp = {
     val sm = Sym(fresh) 
     // try reflect(sm, s, (as :+ Eff(curBlock)):_*)(efs:_*) 
     // finally curBlock = List(sm)
-
-    try reflect(sm, s, (as :+ Eff(effectForKeys(curBlock,efs.toList))):_*)(efs:_*)
-    finally curBlock = List(sm)
-
-    // finally curBlock = wrap(reflect("effect-update", ((unwrap(curBlock)::efs.toList) :+ sm):_*))
-
     // alternative:
     // curBlock = sm::curBlock (will record all effects directly...)
+
+    val prev = effectForKeys(curBlock,efs.toList)
+    try reflect(sm, s, (as :+ Eff(prev)):_*)(efs:_*)
+    finally curBlock = sm::(curBlock.filterNot(prev.toSet)) 
+    // remove all dependencies from curBlock that are implied 
+    // by current node
+    // TODO: is this enough? (when following individual keys?)
   }
+  
   def reflect(x: Sym, s: String, as: Def*)(efs: Exp*): Exp = {
     globalDefs += Node(x,s,as.toList,efs.toList)
     x
@@ -97,8 +100,20 @@ class GraphBuilder {
   type Effect = List[Sym]
 
   def effectForKeys(es: Effect, efs: List[Exp]): Effect = {
+    es.flatMap { e =>
+      globalDefs.find(_.n == e) match {
+        case Some(Node(n,op,rhs,eff)) =>
+          if ((efs contains n) || (efs intersect eff).nonEmpty) {
+            List(e)
+          } else {
+            effectForKeys(rhs.collect { case Eff(e) => e }.flatten, efs)
+          }
+        case _ => List(e)
+      }
+    }.distinct
+/*
     //efs.map(ef => reflect("effect-get", Eff(es), ef).asInstanceOf[Sym])
-    es
+    es*/
   }
 
   def effectToExp(es: Effect): Exp = { // convert curBlock to an Exp
@@ -773,6 +788,7 @@ class FrontEnd {
   var g: GraphBuilder = null
 
   val CTRL = Const("CTRL")
+  val STORE = Const("STORE")
 
   case class BOOL(x: Exp) {
     //def &&(y: => BOOL): BOOL = BOOL(g.reflect("&",x,y.x)) // should call if?
@@ -798,7 +814,7 @@ class FrontEnd {
     def update(i: INT, y: INT): Unit = g.reflectEffect("array_set",x,i.x,y.x)(x)
   }
   object ARRAY {
-    def apply(n: INT): ARRAY = ARRAY(g.reflectEffect("array_new",n.x)())
+    def apply(n: INT): ARRAY = ARRAY(g.reflectEffect("array_new",n.x)(STORE))
   }
 
   case class VAR(x: Exp) {
@@ -806,7 +822,7 @@ class FrontEnd {
     def update(y: INT): Unit = g.reflectEffect("var_set",x,y.x)(x)
   }
   object VAR {
-    def apply(x: INT): VAR = VAR(g.reflectEffect("var_new",x.x)())
+    def apply(x: INT): VAR = VAR(g.reflectEffect("var_new",x.x)(STORE))
   }
 
   def isPure(b: Block) = g.isPure(b)

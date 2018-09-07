@@ -45,10 +45,15 @@ object ir2 {
     println(a)
     def transform(a: c.Expr[Any]): c.Expr[Any] = a.tree match {
 
+      // TODO
+      //  1. Proper reflectEffect call
+      //  2. Method annotation for allocation (e.g. TensorBuilder1)
+      //  3. Extract actual arg annotation symbol
+
 
       case q"def $name[..$t](..$args): $tpe" =>
-        val effects = args exists { case v@ValDef(_,x,t,y) => v.toString contains("@") } // any ann counts as effect!
-        val reflect = if (effects) q"reflectEffect" else q"reflect"
+        val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: currently any ann counts as effect!
+        val reflect = if (effects.nonEmpty) q"reflectEffect" else q"reflect"
         val args1 = args map { case ValDef(_,x,_,_) => q"ref($x)" }
         val tpes = args map { case ValDef(_,x,t,_) => q"$t" }
         val name_extract = TermName("M"+name.toString)
@@ -64,9 +69,9 @@ object ir2 {
           }
         """)
       case q"def $name[..$t](..$args): $tpe = $body" =>
-        // TODO: strip by-name type
-        val effects = args exists { case v@ValDef(_,x,t,y) => v.toString contains("@") } // any ann counts as effect!
-        val reflect = if (effects) q"reflectEffect" else q"reflect"
+        // TODO: strip by-name type (?)
+        val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: any ann counts as effect!
+        val reflect = if (effects.nonEmpty) q"reflectEffect" else q"reflect"
         val args0 = args map { case ValDef(_,x,_,_) => q"$x" }
         val args1 = args map { case ValDef(_,x,_,_) => q"ref($x)" }
         val tpes = args map { case ValDef(_,x,t,_) => q"$t" }

@@ -89,7 +89,7 @@ class TensorFrontEnd extends FrontEnd {
 
   // FIXME: macro should tell which param!
   def reflect[T:Type](s: String, xs: Exp*): T = unref[T](g.reflect(s, xs:_*))
-  def reflectEffect[T:Type](s: String, xs: Exp*): T = unref[T](g.reflectEffect(s, xs:_*)(CTRL))
+  def reflectEffect[T:Type](s: String, xs: Exp*): T = unref[T](g.reflectEffect(s, xs:_*)(Const("STORE")))
   def ref[T:Type](x: T): Exp = implicitly[Type[T]].toExp(x)
   def unref[T:Type](x: Exp): T = implicitly[Type[T]].fromExp(x)
   object Reflect {

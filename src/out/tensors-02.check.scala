@@ -92,10 +92,8 @@ def tensors_02(x0: Int): Int = {
     sum_builder_add(x1, x4, x6)
     sum_builder_add(x2, x4, x6 * x6)
   })
-  val x9 = sum_builder_get(x1)
-  val x10 = sum_builder_get(x2)
-  val x11 = x9 / 100
-  println(x11)
-  println(x10 / 100 - x11 * x11)
+  val x9 = sum_builder_get(x1) / 100
+  println(x9)
+  println(sum_builder_get(x2) / 100 - x9 * x9)
   0
 }
