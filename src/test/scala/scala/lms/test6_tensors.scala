@@ -88,8 +88,28 @@ class TensorFrontEnd extends FrontEnd {
 
 
   // FIXME: macro should tell which param!
-  def reflect[T:Type](s: String, xs: Exp*): T = unref[T](g.reflect(s, xs:_*))
-  def reflectEffect[T:Type](s: String, xs: Exp*): T = unref[T](g.reflectEffect(s, xs:_*)(Const("STORE")))
+  def reflect[T:Type](s: String, xs: Exp*)(efs: Exp*): T = {
+    // TODO: extract any closure args from xs, and
+    // accumulate their effects
+
+    def getLatentEffect(x: Exp) = g.globalDefs.find(_.n == x) match {
+      case Some(Node(_, "λ", List(b @ Block(in::ein::Nil, out, eout)), _)) =>
+        getEfs(b)
+      case _ => 
+        Nil
+    }
+
+    // XXX TODO: getEfs is wrong!!!
+
+    val efs2 = xs.flatMap(getLatentEffect).distinct ++ efs
+    if (efs2.isEmpty)
+      unref[T](g.reflect(s, xs:_*)) // ignore efs, just to keep macro uniform
+    else
+      unref[T](g.reflectEffect(s, xs:_*)(efs2:_*)) // ignore efs, just to keep macro uniform
+  }
+  def reflectEffect[T:Type](s: String, xs: Exp*)(efs: Exp*): T = {
+    unref[T](g.reflectEffect(s, xs:_*)(efs:_*))
+  }
   def ref[T:Type](x: T): Exp = implicitly[Type[T]].toExp(x)
   def unref[T:Type](x: Exp): T = implicitly[Type[T]].fromExp(x)
   object Reflect {
@@ -103,6 +123,7 @@ class TensorFrontEnd extends FrontEnd {
       case _ => None
     }
   }
+
 
   var name: String = ""
 
@@ -209,7 +230,7 @@ class TensorFrontEnd extends FrontEnd {
 
   @ir("MultiDimForeachLowering") 
   def product(sh: SEQ): INT = sh match {
-    case SEQ(Const(xs: List[Int])) => xs.reduce(_*_)
+    case SEQ(Const(xs: List[Int])) => xs.reduce(_*_) 
   }
 
 
@@ -218,7 +239,7 @@ class TensorFrontEnd extends FrontEnd {
 
 
   @ir("MultiDimForeachLowering") 
-  def TensorBuilder1(@write shape: SEQ): TensorBuilder1 = { // TODO: mark effect differently!
+  def TensorBuilder1(shape: SEQ): TensorBuilder1 @write = { // TODO: mark effect differently!
     val data = ARRAY(product(shape))
     TensorBuilderWrap(shape,data)
   }
@@ -237,7 +258,7 @@ class TensorFrontEnd extends FrontEnd {
 
 
   @ir("MultiDimForeachLowering")
-  def forloops(@write sz: SEQ, f: SEQ => Unit): Unit = sz match { // TODO: effect poly
+  def forloops(sz: SEQ, f: SEQ => Unit): Unit = sz match { // TODO: effect poly
     case SEQ(Const(xs: List[Int])) =>
       def forloops1(sz: List[INT])(f: List[INT] => Unit): Unit = sz match {
         case Nil => f(Nil)
@@ -247,7 +268,7 @@ class TensorFrontEnd extends FrontEnd {
   }
 
   @ir("MultiDimForeachLowering")
-  def forloop(@write sz: INT, f: INT => Unit): Unit /*= { // TODO: effect poly
+  def forloop(sz: INT, f: INT => Unit): Unit /*= { // TODO: effect poly
     val loopVar = VAR(0)
     WHILE (loopVar() !== sz) { 
       f(loopVar())

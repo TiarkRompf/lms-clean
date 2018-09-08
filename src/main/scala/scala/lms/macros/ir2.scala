@@ -46,10 +46,11 @@ object ir2 {
     def transform(a: c.Expr[Any]): c.Expr[Any] = a.tree match {
 
       // TODO
-      //  1. Proper reflectEffect call
-      //  2. Method annotation for allocation (e.g. TensorBuilder1)
-      //  3. Extract actual arg annotation symbol
+      // + 1. Proper reflectEffect call
+      // - 2. Method annotation for allocation (e.g. TensorBuilder1)
+      // - 3. Extract actual arg annotation symbol
 
+      // - 4. effect polymorphism for lambda args (e.g. forloops)
 
       case q"def $name[..$t](..$args): $tpe" =>
         val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: currently any ann counts as effect!
@@ -60,7 +61,7 @@ object ir2 {
         val args3 = args map { case ValDef(_,x,_,_) => pq"$x" }
         val args2 = args map { case ValDef(_,x,t,_) => q"unref[$t]($x)" }
         return c.Expr(q"""
-          def $name[..$t](..$args): $tpe = $reflect[$tpe](${name.toString},..$args1) 
+          def $name[..$t](..$args): $tpe = $reflect[$tpe](${name.toString},..$args1)(..$effects)
           object $name_extract {
             def unapply(xx_x: Any): Option[(..$tpes)] = xx_x match {
               case Reflect(${Literal(Constant(name.toString))}, List(..$args3)) => Some((..$args2))
@@ -70,7 +71,21 @@ object ir2 {
         """)
       case q"def $name[..$t](..$args): $tpe = $body" =>
         // TODO: strip by-name type (?)
-        val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: any ann counts as effect!
+        var effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: any ann counts as effect!
+        var effects2 = args collect { case v@ValDef(m,x,t,y) if m.annotations.nonEmpty => q"ref($x)" }
+        assert(effects.toString == effects2.toString, s"$effects != $effects2")
+        if (tpe.toString.contains("@")) {
+          println(tpe.getClass)
+          tpe match {
+            case tq"$t @..$foo" => println(s"YAY $t $foo")
+            case _ => println("NAY")
+          }
+          //XXX TODO cleanup!!
+          // println(tpe.asInstanceOf[scala.reflect.internal.Trees$Tree].annotations)
+          println("XXXXXXXXXXXXX "+tpe)
+          effects :+= q"Const(STORE)"
+        }
+
         val reflect = if (effects.nonEmpty) q"reflectEffect" else q"reflect"
         val args0 = args map { case ValDef(_,x,_,_) => q"$x" }
         val args1 = args map { case ValDef(_,x,_,_) => q"ref($x)" }
@@ -82,7 +97,7 @@ object ir2 {
         val lower = target match { case Some(t) => q"rewriteAt($t)" case _ => q"rewrite"}
         return c.Expr(q"""
           $lower { case $name_extract(..$args3) => $name_next(..$args0) }
-          def $name[..$t](..$args): $tpe = $reflect[$tpe](${name.toString},..$args1)
+          def $name[..$t](..$args): $tpe = $reflect[$tpe](${name.toString},..$args1)(..$effects)
           def $name_next[..$t](..$args): $tpe = $body
           object $name_extract {
             def unapply(xx_x: Any): Option[(..$tpes)] = xx_x match {
