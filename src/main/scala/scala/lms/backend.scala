@@ -125,10 +125,20 @@ class GraphBuilder {
     List(es.asInstanceOf[Sym])
   }
 
+  // NOTE: want to mask out purely local effects
   def isPure(b: Block) = b.eff == List(b.in.last)
 
-  def getEfs(b: Block): List[Exp] = 
-    if (isPure(b)) Nil else List(Const("CTRL"))
+  def getEfs(b: Block): List[Exp] = {
+    // TODO -- cleanup: performance!!!
+
+    val bound = new Bound
+    bound(Graph(globalDefs.toList,b))
+
+    val nodes = globalDefs.toList.filter(n => bound.hm.getOrElse(n.n,Set())(b.in.last))
+    
+    // TODO: remove deps on nodes that are bound inside??
+    nodes.flatMap(_.eff).distinct
+  }
 
 
 
@@ -916,8 +926,10 @@ class FrontEnd {
 
 // DONE: tensor case study
 
+// DONE: macro front-end to generate lowering
 
-// TODO: macro front-end to generate lowering
+// DONE: fine-grained effects 
+
 
 // TODO: front end: parametric types, type classes
 
@@ -927,7 +939,7 @@ class FrontEnd {
 
 // TODO: mutual recursion, memoization for functions
 
-// TODO: fine-grained effects, aliasing, ownership, hard and soft deps
+// TODO: aliasing, ownership, hard and soft deps
 
 // TODO: staticData
 

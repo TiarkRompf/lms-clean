@@ -47,7 +47,7 @@ object ir2 {
 
       // TODO
       // + 1. Proper reflectEffect call
-      // - 2. Method annotation for allocation (e.g. TensorBuilder1)
+      // + 2. Method annotation for allocation (e.g. TensorBuilder1)
       // - 3. Extract actual arg annotation symbol
 
       // - 4. effect polymorphism for lambda args (e.g. forloops)

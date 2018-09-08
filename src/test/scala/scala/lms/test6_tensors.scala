@@ -119,6 +119,7 @@ class TensorFrontEnd extends FrontEnd {
       unref[T](g.reflectEffect(s, xs:_*)(efs2:_*)) // ignore efs, just to keep macro uniform
   }
   def reflectEffect[T:Type](s: String, xs: Exp*)(efs: Exp*): T = {
+    // TODO: latent effects
     unref[T](g.reflectEffect(s, xs:_*)(efs:_*))
   }
   def ref[T:Type](x: T): Exp = implicitly[Type[T]].toExp(x)
@@ -576,11 +577,12 @@ abstract class TensorFusionH2 extends Transformer {
       // - XXX all same size! (fix: group by shape)
 
       val shape = transform(loops.head.rhs.head.asInstanceOf[Exp]) // FIXME!!!
-      for (n @ Node(s,op,args, _) <- loops) {
-        println(n + " // " + bound.hm(s))
-      }
-      println("stms:")
-      ns.foreach(println)
+
+      // for (n @ Node(s,op,args, _) <- loops) {
+      //   println(n + " // " + bound.hm(s))
+      // }
+      // println("stms:")
+      // ns.foreach(println)
       // println("bound:")
       // bound.hm.foreach(println)
 
@@ -598,8 +600,7 @@ abstract class TensorFusionH2 extends Transformer {
         case _ => g.nodes.filter(_.n == s).toList
       }
 
-      def dep(n: Node): List[Exp] = if (n.op == "TensorBuilder1") Nil
-      else syms(n)
+      def dep(n: Node): List[Exp] = syms(n)
 
       val scc = GraphUtil.stronglyConnectedComponents[List[Node]](
         find(g.block.res)::g.block.eff.map(find),
@@ -608,7 +609,7 @@ abstract class TensorFusionH2 extends Transformer {
 
       val scc1 = scc.reverse
       
-      scc1.foreach(println)
+      //scc1.foreach(println)
 
       scc1.foreach {
         case List(List(n)) if ns contains n =>
@@ -629,7 +630,7 @@ abstract class TensorFusionH2 extends Transformer {
             }
             Const(())
           }
-          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(STORE)
+          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(getEfs(newBody):_*)
       }
 
     } else {
