@@ -99,12 +99,15 @@ class TensorFrontEnd extends FrontEnd {
         Nil
     }
     /*
-    NOTE: there are many problems with the approach of having
+    NOTE: There are many problems with the approach of having
     to analyze all lambda arguments to a function to discover
     latent effects. What if the lambda is wrapped in a struct?
     In general we need to find all lambdas potentially reachable
     from an argument. This looks awfully similar to how we
-    deal with aliases to mutable variables in LMS1.
+    deal with aliases to mutable variables in LMS 1.x.
+    (A possible view here is that tracking lambdas is the same
+    as tracking aliases/separation of data structures by means 
+    of closure conversion).
     */
 
     // XXX TODO: getEfs is wrong!!!
