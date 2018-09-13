@@ -94,7 +94,7 @@ class TensorFrontEnd extends FrontEnd {
 
     def getLatentEffect(x: Exp) = g.globalDefs.find(_.n == x) match {
       case Some(Node(_, "λ", List(b @ Block(in::ein::Nil, out, eout)), _)) =>
-        getEfs(b)
+        g.getEfs(b)
       case _ => 
         Nil
     }
@@ -109,8 +109,6 @@ class TensorFrontEnd extends FrontEnd {
     as tracking aliases/separation of data structures by means 
     of closure conversion).
     */
-
-    // XXX TODO: getEfs is wrong!!!
 
     val efs2 = xs.flatMap(getLatentEffect).distinct ++ efs
     if (efs2.isEmpty)
@@ -334,13 +332,6 @@ class TensorFrontEnd extends FrontEnd {
 
   class MyGraphBuilder extends GraphBuilder {
 
-    object Def {
-      def unapply(xs: Def): Option[(String,List[Def])] = xs match {
-        case s @ Sym(n) =>
-          globalDefs.find(_.n == s).map(n => (n.op,n.rhs))
-        case _ => None
-      }
-    }
 
     // registerRewrite (x => (x + x) ====> (2 * x))
 
@@ -630,7 +621,7 @@ abstract class TensorFusionH2 extends Transformer {
             }
             Const(())
           }
-          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(getEfs(newBody):_*)
+          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(this.g.getEfs(newBody):_*)
       }
 
     } else {
@@ -663,9 +654,9 @@ abstract class MultiLoopLowering extends Transformer {
 
       class Builder(op: String) { // TODO: proper subclasses?
         val state = if (op == "tensor")
-          g.reflectEffect("array_new", shape.reduce(_*_).x)()
+          g.reflectEffect("array_new", shape.reduce(_*_).x)(STORE)
         else
-          g.reflectEffect("var_new", Const(0))()
+          g.reflectEffect("var_new", Const(0))(STORE)
 
         def +=(i: List[INT], x: INT) = if (op == "tensor")
           g.reflectEffect("array_set", state, linearize(shape,i).x, x.x)(state)
@@ -727,15 +718,17 @@ abstract class MultiLoopBuilderLowering extends Transformer {
   override def transform(n: Node): Exp = n match {
     case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block), _) => 
       class Builder(op: String) { // TODO: proper subclasses?
-        val state = g.reflectEffect(op+"_builder_new", sh)()
+        val state = g.reflectEffect(op+"_builder_new", sh)(STORE)
         def +=(i: SEQ, x: INT) = g.reflectEffect(op+"_builder_add", state, i.x, x.x)(state)
         def result() = g.reflectEffect(op+"_builder_get", state)(state)
       }
 
       val builders = ops map (new Builder(_))
 
-      def foreach(sz: SEQ)(f: SEQ => Unit): Unit = 
-        g.reflectEffect("foreach", sh, g.reify{ e => f(SEQ(e)); Const() })()
+      def foreach(sz: SEQ)(f: SEQ => Unit): Unit = {
+        val b = g.reify{ e => f(SEQ(e)); Const() }
+        g.reflectEffect("foreach", sh, b)(g.getEfs(b):_*)
+      }
 
       foreach(SEQ(sh)) { e => 
         subst(f.in.head) = e.x
@@ -775,8 +768,10 @@ abstract class MultiDimForeachLowering extends Transformer {
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
 
-      def foreach(sz: INT)(f: INT => Unit): Unit = 
-        g.reflectEffect("foreach", sz.x, g.reify{ e => f(INT(e)); Const() })()
+      def foreach(sz: INT)(f: INT => Unit): Unit = {
+        val b = g.reify{ e => f(INT(e)); Const() }
+        g.reflectEffect("foreach", sz.x, b)(g.getEfs(b):_*)
+      }
 
       def forloops(sz: List[INT])(f: List[INT] => Unit): Unit = sz match {
         case Nil => f(Nil)
@@ -800,7 +795,7 @@ abstract class MultiDimForeachLowering extends Transformer {
       builders(s) = n
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
-      g.reflectEffect("array_new", shape.reduce(_*_).x)()
+      g.reflectEffect("array_new", shape.reduce(_*_).x)(STORE)
 
     case Node(s, "tensor_builder_add", List(builder: Sym, i: Exp, x: Exp, eff), _) => 
       val (Node(s, "tensor_builder_new", List(sh0: Exp, eff), _)) = builders(builder)

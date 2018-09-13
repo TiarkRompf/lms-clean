@@ -3,9 +3,19 @@ package scala.lms
 /*
   LMS compiler back-end in one file.
 
-  TODO: exploded structs
+  Functionality:
+  - Graph IR
+  - Rewriting & CSE
+  - Code motion & DCE
+  - Effects (fine-grained, with aliasing)
+  - Transformers
 
-  TODO: fine-grained effects
+  TODO: 
+  - clean up
+  - tension between original purpose (keep it
+    minimal, explain and explore) and secondary 
+    purpose (solid and real-world framework)
+
 */
 
 import scala.collection.mutable
@@ -74,19 +84,25 @@ class GraphBuilder {
     reflect(Sym(fresh), s, as:_*)()
   }
 
+  object Def {
+    def unapply(xs: Def): Option[(String,List[Def])] = xs match {
+      case s @ Sym(n) =>
+        globalDefs.find(_.n == s).map(n => (n.op,n.rhs))
+      case _ => None
+    }
+  }
+
+
   def reflectEffect(s: String, as: Def*)(efs: Exp*): Exp = {
     val sm = Sym(fresh) 
-    // try reflect(sm, s, (as :+ Eff(curBlock)):_*)(efs:_*) 
-    // finally curBlock = List(sm)
-    // alternative:
-    // curBlock = sm::curBlock (will record all effects directly...)
 
-    val prev = effectForKeys(curBlock,efs.toList)
-    try reflect(sm, s, (as :+ Eff(prev)):_*)(efs:_*)
-    finally curBlock = sm::(curBlock.filterNot(prev.toSet)) 
-    // remove all dependencies from curBlock that are implied 
-    // by current node
-    // TODO: is this enough? (when following individual keys?)
+    if (efs.nonEmpty) {
+      val prev = effectForKeys(curBlock,efs.toList)
+      try reflect(sm, s, (as :+ Eff(prev)):_*)(efs:_*)
+      finally curBlock = updateEffectForKeys(curBlock,efs.toList,sm)
+    } else {
+      reflect(sm, s, as:_*)(efs:_*)
+    }
   }
   
   def reflect(x: Sym, s: String, as: Def*)(efs: Exp*): Exp = {
@@ -111,9 +127,14 @@ class GraphBuilder {
         case _ => List(e)
       }
     }.distinct
-/*
-    //efs.map(ef => reflect("effect-get", Eff(es), ef).asInstanceOf[Sym])
-    es*/
+  }
+
+  def updateEffectForKeys(es: Effect, efs: List[Exp], sm: Sym): Effect = {
+    val prev = effectForKeys(es,efs)
+    sm::(curBlock.filterNot(prev.toSet))
+    // remove all dependencies from curBlock that are implied 
+    // by current node
+    // TODO: is this enough? (when following individual keys?)
   }
 
   def effectToExp(es: Effect): Exp = { // convert curBlock to an Exp
@@ -835,16 +856,12 @@ class FrontEnd {
     def apply(x: INT): VAR = VAR(g.reflectEffect("var_new",x.x)(STORE))
   }
 
-  def isPure(b: Block) = g.isPure(b)
-
-  def getEfs(b: Block): List[Exp] = g.getEfs(b)
-
   def IF(c: BOOL)(a: => INT)(b: => INT): INT = {
     val aBlock = g.reify(a.x)
     val bBlock = g.reify(b.x)
     // compute effect (aBlock || bBlock)
-    val pure = isPure(aBlock) && isPure(bBlock)
-    val efs = (getEfs(aBlock) ++ getEfs(bBlock)).distinct
+    val pure = g.isPure(aBlock) && g.isPure(bBlock)
+    val efs = (g.getEfs(aBlock) ++ g.getEfs(bBlock)).distinct
     if (pure)
       INT(g.reflect("?",c.x,aBlock,bBlock))
     else
@@ -855,7 +872,7 @@ class FrontEnd {
     val cBlock = g.reify(c.x)
     val bBlock = g.reify({b;Const(())})
     // compute effect (cBlock bBlock)* cBlock
-    val efs = (getEfs(cBlock) ++ getEfs(bBlock)).distinct
+    val efs = (g.getEfs(cBlock) ++ g.getEfs(bBlock)).distinct
     g.reflectEffect("W",cBlock,bBlock)(efs:_*)
   }
 
@@ -864,10 +881,10 @@ class FrontEnd {
     // XXX lookup lambda ...
     g.globalDefs.find(_.n == f) match {
       case Some(Node(f, "λ", List(b: Block), _)) =>
-        if (isPure(b))
+        if (g.isPure(b))
           INT(g.reflect("@",f,x.x))
         else 
-          INT(g.reflectEffect("@",f,x.x)(getEfs(b):_*))
+          INT(g.reflectEffect("@",f,x.x)(g.getEfs(b):_*))
       case _ =>
         INT(g.reflectEffect("@",f,x.x)(CTRL))
     }
