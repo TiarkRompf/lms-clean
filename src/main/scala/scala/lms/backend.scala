@@ -10,6 +10,14 @@ package scala.lms
   - Effects (fine-grained, with aliasing)
   - Transformers
 
+  Classic compiler fare (tbd):
+  - Parsing
+  - Typing
+  - CPS
+  - Dataflow
+  - Closure conversion
+  - Register allocation
+
   TODO: 
   - clean up
   - tension between original purpose (keep it
@@ -41,7 +49,7 @@ object Backend {
   }
 
   // A definition is part of the right-hand side of a 
-  // right-hand-side. 
+  // node definition.
   abstract class Def
 
   case class Block(in: List[Sym], res: Exp, eff: List[Exp]) extends Def
