@@ -135,7 +135,7 @@ class TensorFrontEnd extends FrontEnd {
   }
 
 
-  var name: String = ""
+  //var name: String = ""
 
   var rewrites: (String => Any => Option[Exp]) = (s => x => None)
 
@@ -317,26 +317,11 @@ class TensorFrontEnd extends FrontEnd {
       subst.getOrElse(out,out)
   }
 
-  // NEXT TODO: H-fusion
-
-  // NEXT TODO: fine-grained effect deps
-
-  // NEXT TODO: types, source context, error reporting
-
-
-
-
-  //lower { case `Mfoobar`(arg) => foobar_next(arg) }
 
   override def mkGraphBuilder() = new MyGraphBuilder()
 
   class MyGraphBuilder extends GraphBuilder {
-
-
-    // registerRewrite (x => (x + x) ====> (2 * x))
-
-    // List("====>", ("+", x, x), ("*", 2, x))
-    // List("====>", ("+", x, x), ("*", 2, x))
+    rewrites = TensorFrontEnd.this.rewrites
 
     override def reflect(s: String, as: Def*): Exp = (s,as.toList) match {
       case ("+", List(Const(a:Int),Const(b:Int))) => Const(a+b)
@@ -352,31 +337,9 @@ class TensorFrontEnd extends FrontEnd {
       case ("tensor_shape", List(Def("tensor",List(sh:Exp,f)))) => sh
       case ("tensor_same_shape", List(Const(as), Const(bs))) if as == bs => Const(as)
 
-      //case Mfoobar(x) => ref { 4 * x }
-
       case p =>
-        rewrites(name)(p) match { 
-          case Some(e) => e 
-          case None => 
-
-        // CSE
-        globalDefs.find(n => n.op == s && n.rhs == as).map(_.n)
-          .getOrElse(super.reflect(s, as:_*))
-        }
+        super.reflect(s, as:_*)
     }
-
-    override def reflectEffect(s: String, as: Def*)(efs: Exp*): Exp = (s,as.toList) match {
-      case p =>
-        rewrites(name)(p) match { 
-          case Some(e) => e 
-          case None => 
-              super.reflectEffect(s, as:_*)(efs:_*)
-        }
-
-        // CSE?
-    }
-
-
   }
 
 
@@ -389,8 +352,8 @@ abstract class TensorLowering extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
-    frontEnd.name = "TensorLowering"
     frontEnd.g = frontEnd.mkGraphBuilder()
+    frontEnd.g.name = "TensorLowering"
     g = frontEnd.g
   }
 
@@ -410,8 +373,8 @@ abstract class TensorFusionV extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
-    frontEnd.name = "TensorFusionV"
     frontEnd.g = frontEnd.mkGraphBuilder()
+    frontEnd.g.name = "TensorFusionV"
     g = frontEnd.g
   }
 
@@ -439,8 +402,8 @@ abstract class TensorFusionH extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
-    frontEnd.name = "TensorFusionH"
     frontEnd.g = frontEnd.mkGraphBuilder()
+    frontEnd.g.name = "TensorFusionH"
     g = frontEnd.g
   }
 
@@ -550,8 +513,8 @@ abstract class TensorFusionH2 extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
-    frontEnd.name = "TensorFusionH2"
     frontEnd.g = frontEnd.mkGraphBuilder()
+    frontEnd.g.name = "TensorFusionH2"
     g = frontEnd.g
   }
 
@@ -637,8 +600,8 @@ abstract class MultiLoopLowering extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
-    frontEnd.name = "MultiLoopLowering"
     frontEnd.g = frontEnd.mkGraphBuilder()
+    frontEnd.g.name = "MultiLoopLowering"
     g = frontEnd.g
   }
 
@@ -710,8 +673,8 @@ abstract class MultiLoopBuilderLowering extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
-    frontEnd.name = "MultiLoopBuilderLowering"
     frontEnd.g = frontEnd.mkGraphBuilder()
+    frontEnd.g.name = "MultiLoopBuilderLowering"
     g = frontEnd.g
   }
 
@@ -754,8 +717,8 @@ abstract class MultiDimForeachLowering extends Transformer {
   val frontEnd: TensorFrontEnd
   import frontEnd._
   def init() = {
-    frontEnd.name = "MultiDimForeachLowering"
     frontEnd.g = frontEnd.mkGraphBuilder()
+    frontEnd.g.name = "MultiDimForeachLowering"
     g = frontEnd.g
   }
 

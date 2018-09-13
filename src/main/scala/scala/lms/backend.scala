@@ -88,10 +88,6 @@ class GraphBuilder {
   var nSyms = 0
   def fresh = try nSyms finally nSyms += 1
 
-  def reflect(s: String, as: Def*): Exp = {
-    reflect(Sym(fresh), s, as:_*)()
-  }
-
   object Def {
     def unapply(xs: Def): Option[(String,List[Def])] = xs match {
       case s @ Sym(n) =>
@@ -100,16 +96,41 @@ class GraphBuilder {
     }
   }
 
+  var name: String = ""
+
+  var rewrites: (String => Any => Option[Exp]) = (s => x => None)
+
+  def rewrite(f: PartialFunction[Any,Exp]) = {
+    val old = rewrites
+    val f1 = ((x:Any) => if (f.isDefinedAt(x)) Some(f(x)) else None)
+    rewrites = (s => x => f1(x).orElse(old(s)(x)))
+  }
+
+
+  def reflect(s: String, as: Def*): Exp = {
+    reflectEffect(s, as:_*)()
+  }
 
   def reflectEffect(s: String, as: Def*)(efs: Exp*): Exp = {
-    val sm = Sym(fresh) 
+    // rewrite?
+    rewrites(name)((s,as.toList)) match {
+      case Some(e) => e 
+      case None => 
 
-    if (efs.nonEmpty) {
-      val prev = effectForKeys(curBlock,efs.toList)
-      try reflect(sm, s, (as :+ Eff(prev)):_*)(efs:_*)
-      finally curBlock = updateEffectForKeys(curBlock,efs.toList,sm)
-    } else {
-      reflect(sm, s, as:_*)(efs:_*)
+      // effects or pure?
+      if (efs.nonEmpty) {
+        val sm = Sym(fresh) 
+        val prev = effectForKeys(curBlock,efs.toList)
+        try reflect(sm, s, (as :+ Eff(prev)):_*)(efs:_*)
+        finally curBlock = updateEffectForKeys(curBlock,efs.toList,sm)
+      } else {
+        // cse?
+        globalDefs.find(n => n.op == s && n.rhs == as) match {
+          case Some(n) => n.n
+          case None =>
+            reflect(Sym(fresh), s, as:_*)(efs:_*)
+        }
+      }
     }
   }
   
