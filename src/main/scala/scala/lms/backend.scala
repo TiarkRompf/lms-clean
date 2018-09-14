@@ -117,18 +117,21 @@ class GraphBuilder {
       case Some(e) => e 
       case None => 
 
+      // latent effects? closures, mutable vars, ...
+      val efs2 = (as.toList.flatMap(getLatentEffect) ++ efs).distinct
+
       // effects or pure?
-      if (efs.nonEmpty) {
+      if (efs2.nonEmpty) {
         val sm = Sym(fresh) 
-        val prev = effectForKeys(curBlock,efs.toList)
-        try reflect(sm, s, (as :+ Eff(prev)):_*)(efs:_*)
-        finally curBlock = updateEffectForKeys(curBlock,efs.toList,sm)
+        val prev = effectForKeys(curBlock,efs2)
+        try reflect(sm, s, (as :+ Eff(prev)):_*)(efs2:_*)
+        finally curBlock = updateEffectForKeys(curBlock,efs2,sm)
       } else {
-        // cse?
+        // cse? never for effectful stm
         globalDefs.find(n => n.op == s && n.rhs == as) match {
           case Some(n) => n.n
           case None =>
-            reflect(Sym(fresh), s, as:_*)(efs:_*)
+            reflect(Sym(fresh), s, as:_*)()
         }
       }
     }
@@ -137,6 +140,26 @@ class GraphBuilder {
   def reflect(x: Sym, s: String, as: Def*)(efs: Exp*): Exp = {
     globalDefs += Node(x,s,as.toList,efs.toList)
     x
+  }
+
+  /*
+  NOTE: There are many problems with the approach of having
+  to analyze all lambda arguments to a function to discover
+  latent effects. What if the lambda is wrapped in a struct?
+  In general we need to find all lambdas potentially reachable
+  from an argument. This looks awfully similar to how we
+  deal with aliases to mutable variables in LMS 1.x.
+  (A possible view here is that tracking lambdas is the same
+  as tracking aliases/separation of data structures by means 
+  of closure conversion).
+  */
+
+  // TODO: include blocks!
+  def getLatentEffect(x: Def) = globalDefs.find(_.n == x) match {
+    case Some(Node(_, "λ", List(b @ Block(in::ein::Nil, out, eout)), _)) =>
+      getEfs(b)
+    case _ => 
+      Nil
   }
 
 

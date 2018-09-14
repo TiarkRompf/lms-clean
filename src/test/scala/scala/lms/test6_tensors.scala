@@ -89,35 +89,9 @@ class TensorFrontEnd extends FrontEnd {
 
   // FIXME: macro should tell which param!
   def reflect[T:Type](s: String, xs: Exp*)(efs: Exp*): T = {
-    // TODO: extract any closure args from xs, and
-    // accumulate their effects
-
-    def getLatentEffect(x: Exp) = g.globalDefs.find(_.n == x) match {
-      case Some(Node(_, "λ", List(b @ Block(in::ein::Nil, out, eout)), _)) =>
-        g.getEfs(b)
-      case _ => 
-        Nil
-    }
-    /*
-    NOTE: There are many problems with the approach of having
-    to analyze all lambda arguments to a function to discover
-    latent effects. What if the lambda is wrapped in a struct?
-    In general we need to find all lambdas potentially reachable
-    from an argument. This looks awfully similar to how we
-    deal with aliases to mutable variables in LMS 1.x.
-    (A possible view here is that tracking lambdas is the same
-    as tracking aliases/separation of data structures by means 
-    of closure conversion).
-    */
-
-    val efs2 = xs.flatMap(getLatentEffect).distinct ++ efs
-    if (efs2.isEmpty)
-      unref[T](g.reflect(s, xs:_*)) // ignore efs, just to keep macro uniform
-    else
-      unref[T](g.reflectEffect(s, xs:_*)(efs2:_*)) // ignore efs, just to keep macro uniform
+    unref[T](g.reflectEffect(s, xs:_*)(efs:_*))
   }
   def reflectEffect[T:Type](s: String, xs: Exp*)(efs: Exp*): T = {
-    // TODO: latent effects
     unref[T](g.reflectEffect(s, xs:_*)(efs:_*))
   }
   def ref[T:Type](x: T): Exp = implicitly[Type[T]].toExp(x)
