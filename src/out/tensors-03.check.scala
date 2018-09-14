@@ -18,12 +18,12 @@ def tensors_03(x0: Int): Int = {
   println(foobar(7))
   0
 }
-// After Multiloop lowering:
+// After Multiloop/Builder lowering:
 def tensors_03(x0: Int): Int = {
-  println(foobar(7))
+  println(14)
   0
 }
-// After Multiloop/Builder lowering:
+// After Tensor fusion H2:
 def tensors_03(x0: Int): Int = {
   println(14)
   0

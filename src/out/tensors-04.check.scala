@@ -29,15 +29,17 @@ def tensors_04(x0: Int): Int = {
   })))
   0
 }
-// After Multiloop lowering:
+// After Multiloop/Builder lowering:
 def tensors_04(x0: Int): Int = {
-  println(Tensor1(List(3, 4, 5), ({ x2: Int =>
-    val x1 = seq_apply(x2, 0) + seq_apply(x2, 1) + seq_apply(x2, 2)
-    x1 + x1
-  })))
+  val x1 = TensorBuilder1(List(3, 4, 5))
+  forloops(List(3, 4, 5), ({ x4: Int =>
+    val x3 = seq_apply(x4, 0) + seq_apply(x4, 1) + seq_apply(x4, 2)
+    builder_add(x1, x4, x3 + x3)
+  }))
+  println(builder_res(x1))
   0
 }
-// After Multiloop/Builder lowering:
+// After Tensor fusion H2:
 def tensors_04(x0: Int): Int = {
   val x1 = TensorBuilder1(List(3, 4, 5))
   forloops(List(3, 4, 5), ({ x4: Int =>
