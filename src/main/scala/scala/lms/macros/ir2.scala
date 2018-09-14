@@ -33,7 +33,7 @@ object ir2 {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
 
-    println("YOUPI")
+    println("--- @ir macro ---")
     println(c.prefix)
 
     val target = c.prefix.tree match {
