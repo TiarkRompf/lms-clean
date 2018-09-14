@@ -64,6 +64,16 @@ class TensorFrontEnd2 extends FrontEnd {
     def toExp(x: STRING): Exp = x.x
   }
 
+  implicit object UNIT_Type extends Type[Unit] {
+    def fromExp(x: Exp): Unit = ()
+    def toExp(x: Unit): Exp = Const(())
+  }
+
+  implicit object ARRAY_Type extends Type[ARRAY] {
+    def fromExp(x: Exp): ARRAY = ARRAY(x)
+    def toExp(x: ARRAY): Exp = x.x
+  }
+
   implicit object FUNII_Type extends Type[INT => INT] {
     def fromExp(x: Exp): INT => INT = (y:INT) => INT(g.reflectEffect("@", x, y.x)(CTRL))
     def toExp(x: INT => INT): Exp = g.reflect("λ",g.reify(xn => x(INT(xn)).x))
@@ -81,17 +91,8 @@ class TensorFrontEnd2 extends FrontEnd {
     def toExp(x: SEQ => Unit): Exp = g.reflect("λ",g.reify{xn => x(SEQ(xn)); Const(())})
   }
 
-  implicit object TENSOR_Type extends Type[Tensor] {
-    def fromExp(x: Exp): Tensor = Tensor(x)
-    def toExp(x: Tensor): Exp = x.x
-  }
 
-
-  // FIXME: macro should tell which param!
   def reflect[T:Type](s: String, xs: Exp*)(efs: Exp*): T = {
-    unref[T](g.reflectEffect(s, xs:_*)(efs:_*))
-  }
-  def reflectEffect[T:Type](s: String, xs: Exp*)(efs: Exp*): T = {
     unref[T](g.reflectEffect(s, xs:_*)(efs:_*))
   }
   def ref[T:Type](x: T): Exp = implicitly[Type[T]].toExp(x)
@@ -145,16 +146,6 @@ class TensorFrontEnd2 extends FrontEnd {
   implicit object TENSOR1_Type extends Type[Tensor1] {
     def fromExp(x: Exp): Tensor1 = Tensor1(x)
     def toExp(x: Tensor1): Exp = x.x
-  }
-
-  implicit object UNIT_Type extends Type[Unit] {
-    def fromExp(x: Exp): Unit = ()
-    def toExp(x: Unit): Exp = Const(())
-  }
-
-  implicit object ARRAY_Type extends Type[ARRAY] {
-    def fromExp(x: Exp): ARRAY = ARRAY(x)
-    def toExp(x: ARRAY): Exp = x.x
   }
 
   implicit object TENSORBUILDER1_Type extends Type[TensorBuilder1] {
@@ -223,7 +214,7 @@ class TensorFrontEnd2 extends FrontEnd {
 
 
   @ir("MultiDimForeachLowering") 
-  def TensorBuilder1(shape: SEQ): TensorBuilder1 @write = { // TODO: mark effect differently!
+  def TensorBuilder1(shape: SEQ): TensorBuilder1 @write = {
     val data = ARRAY(product(shape))
     TensorBuilderWrap(shape,data)
   }
@@ -242,7 +233,7 @@ class TensorFrontEnd2 extends FrontEnd {
 
 
   @ir("MultiDimForeachLowering")
-  def forloops(sz: SEQ, f: SEQ => Unit): Unit = sz match { // TODO: effect poly
+  def forloops(sz: SEQ, f: SEQ => Unit): Unit = sz match {
     case SEQ(Const(xs: List[Int])) =>
       def forloops1(sz: List[INT])(f: List[INT] => Unit): Unit = sz match {
         case Nil => f(Nil)
@@ -252,7 +243,7 @@ class TensorFrontEnd2 extends FrontEnd {
   }
 
   @ir("MultiDimForeachLowering")
-  def forloop(sz: INT, f: INT => Unit): Unit /*= { // TODO: effect poly
+  def forloop(sz: INT, f: INT => Unit): Unit /*= {
     val loopVar = VAR(0)
     WHILE (loopVar() !== sz) { 
       f(loopVar())
@@ -308,8 +299,6 @@ class TensorFrontEnd2 extends FrontEnd {
       case ("seq_apply", List(Def("seq", a),Const(b:Int))) => a(b).asInstanceOf[Exp]
       case ("seq_length", List(Const(a:Seq[_]))) => Const(a.length)
       case ("seq_length", List(Def("seq", a),Const(b:Int))) => Const(a.length)
-      case ("tensor_shape", List(Def("tensor",List(sh:Exp,f)))) => sh
-      case ("tensor_same_shape", List(Const(as), Const(bs))) if as == bs => Const(as)
 
       case p =>
         super.reflect(s, as:_*)
