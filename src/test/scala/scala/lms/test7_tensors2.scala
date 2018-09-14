@@ -16,32 +16,7 @@ class TensorFrontEnd2 extends FrontEnd {
   }
   def SEQ(x: INT*): SEQ = SEQ(g.reflect("seq", x.toList.map(_.x):_*))
 
-  case class Tensor(x: Exp) {
-    def shape: SEQ = SEQ(g.reflect("tensor_shape", x))
-    def apply(y: INT*): INT = apply(SEQ(y:_*))
-    def apply(y: SEQ): INT = INT(g.reflect("tensor_apply",x,y.x))
-
-    def +(y: Tensor): Tensor = Tensor(g.reflect("tensor_add",x,y.x))
-  }
-
-  def Tensor(shape: SEQ)(f: SEQ => INT): Tensor = Tensor(g.reflect("tensor", shape.x, g.reify(xn => f(SEQ(xn)).x)))
-  def Tensor(shape: INT*)(f: SEQ => INT): Tensor = Tensor(SEQ(shape:_*))(f)
-
-  def zeros(sh: SEQ): Tensor = Tensor(g.reflect("tensor_zeros",sh.x))
-  def ones(sh: SEQ): Tensor = Tensor(g.reflect("tensor_ones",sh.x))
-  def rand(sh: SEQ): Tensor = Tensor(g.reflect("tensor_rand",sh.x))
-
-  def same_shape(a: SEQ, b: SEQ): SEQ = SEQ(g.reflect("tensor_same_shape",a.x,b.x))
-
-  def Sum(shape: SEQ)(f: SEQ => INT): INT = INT(g.reflect("sum", shape.x, g.reify(xn => f(SEQ(xn)).x)))
-
-  def PRINT(x: SEQ): Unit =
-    g.reflectEffect("P",x.x)(CTRL)
-  def PRINT(x: Tensor): Unit =
-    g.reflectEffect("P",x.x)(CTRL)
-
-
-
+  
   import MACROS._
 
   abstract class Type[T] {
@@ -72,6 +47,11 @@ class TensorFrontEnd2 extends FrontEnd {
   implicit object ARRAY_Type extends Type[ARRAY] {
     def fromExp(x: Exp): ARRAY = ARRAY(x)
     def toExp(x: ARRAY): Exp = x.x
+  }
+
+  implicit object VAR_Type extends Type[VAR] {
+    def fromExp(x: Exp): VAR = VAR(x)
+    def toExp(x: VAR): Exp = x.x
   }
 
   implicit object FUNII_Type extends Type[INT => INT] {
@@ -143,6 +123,8 @@ class TensorFrontEnd2 extends FrontEnd {
 
   case class TensorBuilder1(x: Exp)
 
+  case class SumBuilder1(x: Exp)
+
   implicit object TENSOR1_Type extends Type[Tensor1] {
     def fromExp(x: Exp): Tensor1 = Tensor1(x)
     def toExp(x: Tensor1): Exp = x.x
@@ -151,6 +133,11 @@ class TensorFrontEnd2 extends FrontEnd {
   implicit object TENSORBUILDER1_Type extends Type[TensorBuilder1] {
     def fromExp(x: Exp): TensorBuilder1 = TensorBuilder1(x)
     def toExp(x: TensorBuilder1): Exp = x.x
+  }
+
+  implicit object SUMBUILDER1_Type extends Type[SumBuilder1] {
+    def fromExp(x: Exp): SumBuilder1 = SumBuilder1(x)
+    def toExp(x: SumBuilder1): Exp = x.x
   }
 
   class write extends scala.annotation.StaticAnnotation
@@ -170,10 +157,17 @@ class TensorFrontEnd2 extends FrontEnd {
 
 
   @ir("MultiLoopBuilderLowering") 
-  def Tensor1(shape: SEQ, f: SEQ=>INT): Tensor1 = {
+  def Tensor1(shape: SEQ, f: SEQ => INT): Tensor1 = {
     val builder = TensorBuilder1(shape)
     forloops(shape, i => builder_add(builder,i,f(i)))
     builder_res(builder)
+  }
+
+  @ir("MultiLoopBuilderLowering") 
+  def Sum(shape: SEQ, f: SEQ => INT): INT = {
+    val builder = SumBuilder1(0)
+    forloops(shape, i => sum_builder_add(builder,i,f(i)))
+    sum_builder_res(builder)
   }
 
 
@@ -228,8 +222,31 @@ class TensorFrontEnd2 extends FrontEnd {
   @ir("MultiDimForeachLowering") 
   def builder_res(@write builder: TensorBuilder1): Tensor1 = {
     val MTensorBuilderWrap(shape,data) = builder
-    Tensor1(data.x)
+    Tensor1(data.x) // could be: TensorWrap(array)
   }
+
+  @ir
+  def SumBuilderWrap(data: VAR): SumBuilder1
+
+
+  @ir("MultiDimForeachLowering") 
+  def SumBuilder1(x: INT): SumBuilder1 @write = {
+    SumBuilderWrap(VAR(x))
+  }
+
+  @ir("MultiDimForeachLowering") 
+  def sum_builder_add(@write builder: SumBuilder1, i: SEQ, x: INT): Unit = {
+    val MSumBuilderWrap(data) = builder
+    data() = data() + x
+  }
+
+  @ir("MultiDimForeachLowering") 
+  def sum_builder_res(@write builder: SumBuilder1): INT = {
+    val MSumBuilderWrap(data) = builder
+    data()
+  }
+
+
 
 
   @ir("MultiDimForeachLowering")
@@ -262,7 +279,7 @@ class TensorFrontEnd2 extends FrontEnd {
 
       val subst = new mutable.HashMap[Def,Exp]
       subst(in) = x
-      subst(ein) = g.effectToExp(g.curBlock)
+      //subst(ein) = g.effectToExp(g.curBlock)
 
       val nodes = g.globalDefs.filter(n => bound.hm.getOrElse(n.n,Set())(in) || bound.hm.getOrElse(n.n,Set())(ein))
       // println(s"nodes dependent on $in,$ein:")
@@ -574,7 +591,7 @@ class TensorTest2 extends TutorialFunSuite {
     0
   }
 
-  testBE("05", alt = true, eff=true) { x =>
+  testBE("05", eff=true) { x =>
 
     val m = Tensor1(SEQ(3,4,5), x => x(0) + x(1) + x(2))
     val a = tensor_add1(m,m)
@@ -583,5 +600,31 @@ class TensorTest2 extends TutorialFunSuite {
     PRINT(b)
     0
   }
+
+  testBE("06", eff=true) { x =>
+
+    implicit class TensorOps(x: Tensor1) {
+      def apply(y: SEQ) = tensor_apply(x,y)
+      def shape = tensor_shape(x)
+    }
+
+    val constant = Tensor1(SEQ(100), { i => 1 })
+    val linear   = Tensor1(SEQ(100), { i => 2*i(0) })
+    val affine   = Tensor1(SEQ(100), { i => constant(i) + linear(i) })
+    
+    def square(x: INT)       = x*x
+    def mean(x: Tensor1)     = Sum(x.shape, { i => x(i) }) / x.shape(0)
+    def variance(x: Tensor1) = Sum(x.shape, { i => square(x(i)) }) / x.shape(0) - square(mean(x))
+    
+    val data = affine
+    
+    val m = mean(data)
+    val v = variance(data)
+
+    PRINT(m)
+    PRINT(v)
+    0
+  }
+
 
 }

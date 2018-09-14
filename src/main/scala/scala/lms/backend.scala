@@ -805,7 +805,7 @@ abstract class Transformer extends Traverser {
   def transform(b: Block): Block = b match {
     case b @ Block(block::Nil, res, eff) =>
       g.reify { 
-        subst(block) = g.effectToExp(g.curBlock) //XXX
+        //subst(block) = g.effectToExp(g.curBlock) //XXX
         traverse(b); transform(res) 
       }
     case b @ Block(arg::block::Nil, res, eff) =>
@@ -814,7 +814,7 @@ abstract class Transformer extends Traverser {
           println(s"Warning: already have a subst for $arg")
         try {
           subst(arg) = e
-          subst(block) = g.effectToExp(g.curBlock) //XXX
+          //subst(block) = g.effectToExp(g.curBlock) //XXX
           traverse(b)
           transform(res)
         } finally subst -= arg

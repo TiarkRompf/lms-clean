@@ -48,9 +48,7 @@ object ir2 {
       // TODO
       // + 1. Proper reflectEffect call
       // + 2. Method annotation for allocation (e.g. TensorBuilder1)
-      // - 3. Extract actual arg annotation symbol
-
-      // - 4. effect polymorphism for lambda args (e.g. forloops)
+      // - 3. Extract meaningful arg annotation symbol?
 
       case q"def $name[..$t](..$args): $tpe" =>
         val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: currently any ann counts as effect!
