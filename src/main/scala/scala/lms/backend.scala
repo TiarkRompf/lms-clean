@@ -18,12 +18,6 @@ package scala.lms
   - Closure conversion
   - Register allocation
 
-  TODO: 
-  - clean up
-  - tension between original purpose (keep it
-    minimal, explain and explore) and secondary 
-    purpose (solid and real-world framework)
-
 */
 
 import scala.collection.mutable
@@ -189,14 +183,14 @@ class GraphBuilder {
     // TODO: is this enough? (when following individual keys?)
   }
 
-  def effectToExp(es: Effect): Exp = { // convert curBlock to an Exp
-    assert(es.length == 1)
-    es.head
-  }
+  // def effectToExp(es: Effect): Exp = { // convert curBlock to an Exp
+  //   assert(es.length == 1)
+  //   es.head
+  // }
 
-  def effectFromExp(es: Exp): Effect = { // convert curBlock from an Exp
-    List(es.asInstanceOf[Sym])
-  }
+  // def effectFromExp(es: Exp): Effect = { // convert curBlock from an Exp
+  //   List(es.asInstanceOf[Sym])
+  // }
 
   // NOTE: want to mask out purely local effects
   def isPure(b: Block) = b.eff == List(b.in.last)
