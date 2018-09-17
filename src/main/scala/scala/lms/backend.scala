@@ -1,4 +1,4 @@
-package scala.lms
+package lms
 
 /*
   LMS compiler back-end in one file.

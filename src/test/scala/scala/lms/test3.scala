@@ -4,7 +4,7 @@ Generating C directly
 
 */
 
-package scala.lms
+package lms
 
 import scala.annotation.implicitNotFound
 

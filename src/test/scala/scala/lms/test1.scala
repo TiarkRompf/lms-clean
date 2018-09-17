@@ -30,7 +30,7 @@ without *any* implicit conversions, and should therefore
 drastically cut down on compile-times.
 */
 
-package scala.lms
+package lms
 
 class IsoTest extends TutorialFunSuite {
   val under = "iso-"

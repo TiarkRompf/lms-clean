@@ -1,4 +1,4 @@
-package scala.lms.macros
+package lms.macros
 
 //import language.experimental.macros
 import scala.annotation.StaticAnnotation

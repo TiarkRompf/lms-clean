@@ -4,7 +4,7 @@ Rewrites with Generic Types
 
 */
 
-package scala.lms
+package lms
 
 import scala.annotation.implicitNotFound
 

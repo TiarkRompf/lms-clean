@@ -1,4 +1,4 @@
-package scala.lms
+package lms
 package internal
 
 import java.io._

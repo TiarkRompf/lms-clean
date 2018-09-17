@@ -4,7 +4,7 @@ Auto-Generating the IR
 
 */
 
-package scala.lms
+package lms
 
 import scala.annotation.implicitNotFound
 

@@ -6,8 +6,6 @@ version := "0.0.1-SNAPSHOT"
 
 scalaVersion := "2.12.4"
 
-//scalaOrganization := "org.scala-lang.virtualized" // for now, keep using virtualized
-
 val paradiseVersion = "2.1.0"
 
 //crossScalaVersions := Seq("2.12.1")

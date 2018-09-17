@@ -1,4 +1,4 @@
-package scala.lms
+package lms
 
 import java.io._
 import org.scalatest.FunSuite
