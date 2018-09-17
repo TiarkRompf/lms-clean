@@ -1,4 +1,5 @@
 package lms
+package core
 
 import scala.annotation.implicitNotFound
 
@@ -8,7 +9,7 @@ class BackendTest extends TutorialFunSuite {
   val fe = new FrontEnd
   import fe._
 
-  val sc = new internal.ScalaCompile {}
+  val sc = new util.ScalaCompile {}
   sc.dumpGeneratedCode = true
 
   def mkClassName(name: String) = {

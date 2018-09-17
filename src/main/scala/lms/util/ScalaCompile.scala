@@ -1,5 +1,4 @@
-package lms
-package internal
+package lms.util
 
 import java.io._
 

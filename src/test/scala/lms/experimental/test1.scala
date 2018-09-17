@@ -31,6 +31,9 @@ drastically cut down on compile-times.
 */
 
 package lms
+package experimental
+
+import lms.core.virtualize
 
 class IsoTest extends TutorialFunSuite {
   val under = "iso-"

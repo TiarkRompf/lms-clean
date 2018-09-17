@@ -5,6 +5,7 @@ Auto-Generating the IR
 */
 
 package lms
+package experimental
 
 import scala.annotation.implicitNotFound
 

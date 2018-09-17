@@ -1,11 +1,13 @@
 package lms
+package tensors
 
 import scala.annotation.implicitNotFound
 
 import scala.collection.{mutable,immutable}
-import Backend._
 
-import util.GraphUtil
+import lms.util.GraphUtil
+import lms.core._
+import Backend._
 
 class TensorFrontEnd2 extends FrontEnd {
 
@@ -17,8 +19,6 @@ class TensorFrontEnd2 extends FrontEnd {
   def SEQ(x: INT*): SEQ = SEQ(g.reflect("seq", x.toList.map(_.x):_*))
 
   
-  import MACROS._
-
   abstract class Type[T] {
     def fromExp(x: Exp): T
     def toExp(x: T): Exp
@@ -425,7 +425,7 @@ class TensorTest2 extends TutorialFunSuite {
   val fe = new TensorFrontEnd2
   import fe._
 
-  val sc = new internal.ScalaCompile {}
+  val sc = new util.ScalaCompile {}
   sc.dumpGeneratedCode = true
 
   def mkClassName(name: String) = {

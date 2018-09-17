@@ -1,4 +1,5 @@
 package lms
+package core
 
 import language.experimental.{macros => m}
 import scala.annotation.StaticAnnotation
@@ -10,14 +11,4 @@ class ir extends StaticAnnotation {
 
 class virtualize extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro macros.virtualize.impl
-}
-
-class api extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro macros.ir2.impl
-}
-
-object MACROS {
-  class ir extends StaticAnnotation {
-    def macroTransform(annottees: Any*): Any = macro macros.ir2.impl
-  }
 }

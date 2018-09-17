@@ -1,11 +1,14 @@
 package lms
+package tensors
 
 import scala.annotation.implicitNotFound
 
 import scala.collection.{mutable,immutable}
-import Backend._
 
-import util.GraphUtil
+import lms.core._
+import lms.util.GraphUtil
+
+import Backend._
 
 class TensorFrontEnd extends FrontEnd {
 
@@ -424,7 +427,7 @@ class TensorTest extends TutorialFunSuite {
   val fe = new TensorFrontEnd
   import fe._
 
-  val sc = new internal.ScalaCompile {}
+  val sc = new util.ScalaCompile {}
   sc.dumpGeneratedCode = true
 
   def mkClassName(name: String) = {

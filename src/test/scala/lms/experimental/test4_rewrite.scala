@@ -5,6 +5,7 @@ Rewrites with Generic Types
 */
 
 package lms
+package experimental
 
 import scala.annotation.implicitNotFound
 

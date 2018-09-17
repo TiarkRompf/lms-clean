@@ -1,4 +1,4 @@
-package lms
+package lms.experimental
 
 import scala.annotation.implicitNotFound
 

@@ -1,4 +1,4 @@
-package lms
+package lms.core
 
 /*
   LMS compiler back-end in one file.
