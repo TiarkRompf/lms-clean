@@ -1,0 +1,238 @@
+import scala.annotation.implicitNotFound
+
+import scala.collection.mutable.ArrayBuffer
+
+
+var numExp = 0
+var acc: List[Any] = Nil
+
+
+case class Exp(xs: List[Any]) {
+  val id = numExp
+  numExp += 1
+  acc ::= this
+  override def toString = s"""#$id(${xs.mkString(" ")})"""
+}
+
+case class Block(xs: List[Any]) {
+}
+
+def evalRef(x: Any): String = x match {
+  case x @ Block(xs) => "[" + xs.init.mkString(";") + "] " + evalRef(xs.last)
+  case x @ Exp(xs) => s"x${x.id}"
+  case x => x.toString
+}
+
+def emitRef(x: Any): Unit = x match {
+  case x @ Block(xs) => print("{\n"); xs.init foreach eval; emitRef(xs.last); print("\n}")
+  case x @ Exp(xs) => print(s"x${x.id}")
+  case x => print(x.toString)
+}; def eval(x: Any): Unit = x match {
+  case x @ Exp(xs) => 
+    val s = s"x${x.id}"
+    print(s"val $s = ")
+    xs foreach { x =>
+      emitRef(x); print(" ")
+    }
+    println()
+}
+
+def runExp(x: Exp) = {
+  acc.reverse foreach eval
+  emitRef(x)
+}
+
+
+
+
+
+trait CodeBuilder {// mutable state goes here ...
+
+  def const(x: Any) = Exp(List(x))
+
+  def reflect(s: Any*) = Exp(s.toList)
+
+  def reifyBlock(f: => Exp) = {
+    val save = acc
+    acc = Nil
+    val (stms,res) = try {
+      val res = f 
+      (acc.reverse,res)
+    } finally acc = save
+    Block(stms ++ List(res))
+  }
+
+  def reifyPattern[T](f: => T):T = ???
+  
+}
+
+
+
+trait Base {
+  // preliminaries
+  @implicitNotFound("${T} is not a DSL type")
+  type Typ[T]
+  @implicitNotFound("${A} cannot be implicitly lifted to ${B}")
+  type Lift[A,B]
+  implicit def identLift[T:Typ]: Lift[T,T]
+  implicit def lift[T,U](x:T)(implicit e: Lift[T,U]): U
+
+  case class Rewrite[T:Typ](a:T, b:T)
+
+  def lower[A:Typ,B:Typ,C:Typ](f: (A,B) => Rewrite[C]): Unit
+}
+
+trait BaseExp extends Base {
+
+  val codeBuilder: CodeBuilder
+
+  trait Typ[T] {
+    def from(e:Exp): T
+    def to(x:T):Exp
+  }
+  trait Lift[A,B] {
+    def to(x:A):B
+  }
+  implicit def identLift[T:Typ]: Lift[T,T] = new Lift[T,T] { def to(x:T) = x }
+  implicit def lift[T,U](x:T)(implicit e: Lift[T,U]): U = e.to(x)
+
+  def typ[T:Typ] = implicitly[Typ[T]]
+
+  def const(s:Any):Exp = codeBuilder.const(s) // ?
+  def reflect[T:Typ](s:Any*):T = typ[T].from(codeBuilder.reflect(s:_*))
+  def ref[T:Typ](f: => T): Block = codeBuilder.reifyBlock(typ[T].to(f))
+
+  //case class Rewrite[T:Typ](a:T, b:T)
+
+  def lower[A:Typ,B:Typ,C:Typ](f: (A,B) => Rewrite[C]): Unit = ???
+}
+
+
+trait DSL extends Base {
+  trait IntOps {
+    def +(y: Int): Int
+    def -(y: Int): Int
+    def *(y: Int): Int
+    def /(y: Int): Int
+    def %(y: Int): Int
+  }
+  trait BooleanOps {
+    def &&(y: => Boolean): Boolean
+    def ||(y: => Boolean): Boolean
+    def unary_! : Boolean
+  }
+  type Int <: IntOps
+  type Boolean <: BooleanOps
+  implicit def intTyp: Typ[Int]
+  implicit def intLift: Lift[scala.Int,Int]
+  implicit def booleanTyp: Typ[Boolean]
+  implicit def booleanLift: Lift[scala.Boolean,Boolean]
+
+  trait ArrayOps[T] {
+    def length: Int
+    def apply(x: Int): T
+    def update(x: Int, y: T): Unit
+  }
+  type Array[T] <: ArrayOps[T]
+  def NewArray[T:Typ](x: Int): Array[T]
+  implicit def arrayTyp[T:Typ]: Typ[Array[T]]
+
+  def __ifThenElse[C,A,B](c:Boolean, a: =>A, b: =>B)(implicit mA: Lift[A,C], mB: Lift[B,C], mC: Typ[C]): C
+
+  // tuples, variables (for c: are variables just 0-elem arrays?), functions
+
+}
+
+trait Impl extends BaseExp with DSL { self =>
+  val codeBuilder = new CodeBuilder {}
+
+  case class Int(e: Exp) extends IntOps {
+    def +(y: Int) = reflect[Int](e,"+",y.e)
+    def -(y: Int) = reflect[Int](e,"-",y.e)
+    def *(y: Int) = reflect[Int](e,"*",y.e)
+    def /(y: Int) = reflect[Int](e,"/",y.e)
+    def %(y: Int) = reflect[Int](e,"%",y.e)
+  }
+  case class Boolean(e: Exp) extends BooleanOps {
+    def &&(y: => Boolean) = reflect[Boolean](e,"&&",y.e)
+    def ||(y: => Boolean) = reflect[Boolean](e,"||",y.e)
+    def unary_! = reflect[Boolean]("!",e)
+  }
+
+  implicit val unitTyp: Typ[Unit] = new Typ[Unit] { def from(e:Exp) = (); def to(x:Unit) = const("()"); override def toString = "Unit" }
+  implicit val intTyp: Typ[Int] = new Typ[Int] { def from(e:Exp) = Int(e); def to(x:Int) = x.e; override def toString = "Int" }
+  implicit val booleanTyp: Typ[Boolean] = new Typ[Boolean] { def from(e:Exp) = Boolean(e); def to(x:Boolean) = x.e; override def toString = "Boolean" }
+
+  implicit val intLift: Lift[scala.Int,Int] = new Lift[scala.Int,Int] { def to(x:scala.Int) = Int(const(x.toString)) }
+  implicit val booleanLift: Lift[scala.Boolean,Boolean] = new Lift[scala.Boolean,Boolean] { def to(x:scala.Boolean) = Boolean(const(x.toString)) }
+  
+  case class Array[T:Typ](e: Exp) extends ArrayOps[T] {
+    def length = reflect[Int](e,".length")
+    def apply(x: Int) = reflect[T](e,"(",ref(x),")")
+    def update(x: Int, y: T): Unit = reflect[Unit](e,"(",ref(x),") = ",ref(y))
+  }
+  def NewArray[T:Typ](x: Int): Array[T] = reflect[Array[T]]("new Array[",typ[T],"](",ref(x),")")
+  implicit def arrayTyp[T:Typ]: Typ[Array[T]] = new Typ[Array[T]] { def from(e:Exp) = Array(e); def to(x:Array[T]) = x.e; override def toString = "Array["+typ[T]+"]" }
+
+  def __ifThenElse[C,A,B](c:Boolean, a: =>A, b: =>B)(implicit mA: Lift[A,C], mB: Lift[B,C], mC: Typ[C]): C = {
+    reflect[C]("if (",ref(c),") ",ref(mA.to(a))," else ",ref(mB.to(b)))
+  }
+
+  def PRINTLN[S,T](x:S)(implicit m: Lift[S,T], mT: Typ[T]): Unit = reflect[Unit]("println", mT.to(m.to(x)))
+
+  case class VAR[T:Typ] private (e: Exp) {
+    def apply(): T = reflect[T]("get", e)
+    def update(x: T): Unit = reflect[Unit]("set", e, typ[T].to(x))
+  }
+
+  object VAR {
+    def apply[S,T](x:S)(implicit m: Lift[S,T], mT: Typ[T]): VAR[T] = 
+      VAR[T](codeBuilder.reflect("var", mT.to(x)))
+  }
+
+  def IF[C,A,B](c:Boolean)(a: =>A)(b: =>B)(implicit mA: Lift[A,C], mB: Lift[B,C], mC: Typ[C]): C = {
+    __ifThenElse[C,A,B](c,a,b)
+  }
+
+  trait Lift2[A,B,C] {
+    val mA: Lift[A,C]
+    val mB: Lift[B,C]
+    val mC: Typ[C]
+  }
+
+  implicit def lub[A,B,C](implicit a: Lift[A,C], b: Lift[B,C], c: Typ[C]): Lift2[A,B,C] = new Lift2[A,B,C] {
+    val mA = a; val mB = b; val mC = c
+  }
+
+  implicit class eqOps[A](x:A) {
+    def EQ[B,C](y:B)(implicit m: Lift2[A,B,C]): Boolean = 
+    reflect[Boolean]("==", m.mC.to(m.mA.to(x)), m.mC.to(m.mB.to(y)))
+  }
+}
+
+
+
+val lms = new Impl {}
+import lms._
+
+def run[T:Typ](x:T) = runExp(typ[T] to x)
+
+
+
+val x: Int = 3
+
+val x1 = 4 + x
+
+val st = VAR(5)
+
+IF(st() EQ 0) { PRINTLN(666) } { st() = st() - 1 }
+
+acc.reverse foreach println
+
+
+
+
+
+
+
+
