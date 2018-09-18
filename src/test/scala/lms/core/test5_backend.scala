@@ -4,7 +4,7 @@ package core
 import scala.annotation.implicitNotFound
 
 class BackendTest extends TutorialFunSuite {
-  val under = "backend-"
+  val under = "backend/"
 
   val fe = new FrontEnd
   import fe._
@@ -14,7 +14,7 @@ class BackendTest extends TutorialFunSuite {
 
   def mkClassName(name: String) = {
     // mangle class name
-    (under + name).replace("-","_")
+    (under + name).replace("-","_").replace("/","_")
   }
 
   def testBE(name: String, verbose: Boolean = false)(prog: INT => INT) = {

@@ -422,7 +422,7 @@ abstract class MultiDimForeachLowering extends Transformer {
 
 
 class TensorTest extends TutorialFunSuite {
-  val under = "tensors-"
+  val under = "demos/tensors/tensors-"
 
   val fe = new TensorFrontEnd
   import fe._
@@ -432,7 +432,7 @@ class TensorTest extends TutorialFunSuite {
 
   def mkClassName(name: String) = {
     // mangle class name
-    (under + name).replace("-","_")
+    ("tensors-" + name).replace("-","_")
   }
 
   def testBE(name: String, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(prog: INT => INT) = {

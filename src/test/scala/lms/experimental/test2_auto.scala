@@ -10,7 +10,7 @@ package experimental
 import scala.annotation.implicitNotFound
 
 class AutoTest extends TutorialFunSuite {
-  val under = "auto-"
+  val under = "experimental/auto-"
 
   test("one") {
     val res = utils.captureOut {

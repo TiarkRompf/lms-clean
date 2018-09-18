@@ -36,7 +36,7 @@ package experimental
 import lms.core.virtualize
 
 class IsoTest extends TutorialFunSuite {
-  val under = "iso-"
+  val under = "experimental/iso-"
 
 /**
 Test Case (Client Code)

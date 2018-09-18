@@ -10,7 +10,7 @@ package experimental
 import scala.annotation.implicitNotFound
 
 class RewriteTest extends TutorialFunSuite {
-  val under = "rewrite-"
+  val under = "experimental/rewrite-"
 
   val IR: DSL with BaseExp = new Impl {}
   import IR._ // Int means IR.Int

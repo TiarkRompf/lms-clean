@@ -10,7 +10,7 @@ package experimental
 import scala.annotation.implicitNotFound
 
 class CGenTest extends TutorialFunSuite {
-  val under = "cgen-"
+  val under = "experimental/cgen-"
 
   test("01") {
     val res = utils.captureOut {

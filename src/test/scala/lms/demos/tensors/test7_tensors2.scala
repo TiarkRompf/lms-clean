@@ -420,7 +420,7 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
 
 
 class TensorTest2 extends TutorialFunSuite {
-  val under = "tensors-"
+  val under = "demos/tensors/tensors-"
 
   val fe = new TensorFrontEnd2
   import fe._
@@ -430,7 +430,7 @@ class TensorTest2 extends TutorialFunSuite {
 
   def mkClassName(name: String) = {
     // mangle class name
-    (under + name).replace("-","_")
+    ("tensors-" + name).replace("-","_")
   }
 
   def testBE(name: String, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(prog: INT => INT) = {
