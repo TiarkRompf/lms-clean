@@ -743,6 +743,8 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)} != ${shallow(y)}"
     case n @ Node(s,"var_get",List(x,e),_) => 
       s"${shallow(x)}"
+    case n @ Node(s,"array_get",List(x,i,e),_) => 
+      s"${shallow(x)}(${shallow(i)})"
     case n @ Node(s,"@",x::y::_,_) => 
       s"${shallow(x)}(${shallow(y)})"
     case n @ Node(s,"P",List(x,ctl),_) => 
