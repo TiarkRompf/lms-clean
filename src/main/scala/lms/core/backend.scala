@@ -749,6 +749,18 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)}(${shallow(y)})"
     case n @ Node(s,"P",List(x,ctl),_) => 
       s"println(${shallow(x)})"
+    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) => 
+      quoteBlock {
+        emit("//#" + str)
+        if (verbose) {
+          emit("// generated code for " + str.replace('_', ' '))
+        } else {
+          emit("// generated code")
+        }
+        traverse(b)
+        emit("//#" + str)
+      }
+
     case n @ Node(_,op,args,_) => 
       val (eff,data) = args.partition(_.isInstanceOf[Eff])
       s"$op(${data.map(shallow).mkString(", ")})"
