@@ -35,11 +35,13 @@ object Backend {
   case class Const(x: Any) extends Exp
 
 
+  case class EffectSummary(deps: List[Exp], keys: List[Exp])
+
   // A node in a computation graph links a symbol with
   // its definition, consisting of an operator and its
   // arguments.
   // effKeys: a list of effect keys (mutable vars, ...)
-  case class Node(n: Sym, op: String, rhs: List[Def], effKeys: List[Exp]) {
+  case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary) {
     override def toString = s"$n = ($op ${rhs.mkString(" ")})"
   }
 
@@ -146,7 +148,7 @@ class GraphBuilder {
   }
   
   def reflect(x: Sym, s: String, as: Def*)(efs: Exp*): Exp = {
-    globalDefs += Node(x,s,as.toList,efs.toList)
+    globalDefs += Node(x,s,as.toList,EffectSummary(Nil, efs.toList)) // XXX TODO; Nil?
     x
   }
 
@@ -179,10 +181,10 @@ class GraphBuilder {
     es.flatMap { e =>
       globalDefs.find(_.n == e) match {
         case Some(Node(n,op,rhs,eff)) =>
-          if ((efs contains n) || (efs intersect eff).nonEmpty) {
+          if ((efs contains n) || (efs intersect eff.keys).nonEmpty) {
             List(e)
           } else {
-            effectForKeys(rhs.collect { case Eff(e) => e }.flatten, efs)
+            effectForKeys(rhs.collect { case Eff(e) => e }.flatten, efs) // XXX TODO!
           }
         case _ => List(e)
       }
@@ -218,7 +220,7 @@ class GraphBuilder {
     val nodes = globalDefs.toList.filter(n => bound.hm.getOrElse(n.n,Set())(b.in.last))
     
     // TODO: remove deps on nodes that are bound inside??
-    nodes.flatMap(_.effKeys).distinct
+    nodes.flatMap(_.eff.keys).distinct
   }
 
 
@@ -681,7 +683,7 @@ class CompactScalaCodeGen extends Traverser {
 
   def quoteEff(n: Node): String = if (!doPrintEffects) "" else {
     val deps = n.rhs.filter(_.isInstanceOf[Eff])
-    val eff = n.effKeys
+    val eff = n.eff.keys
     if (deps.isEmpty && eff.isEmpty) "" else {
       s"/* val ${quote(n.n)} = ${eff.map(quote).mkString(",")}:${deps.map(quote).mkString(",")} */"
     }
@@ -854,7 +856,7 @@ abstract class Transformer extends Traverser {
     case Node(s,op,rs,es) => 
       // effect dependencies in target graph are managed by
       // graph builder, so we drop all effects here
-      val (effects,pure) = rs.partition(_.isInstanceOf[Eff])
+      val (effects,pure) = rs.partition(_.isInstanceOf[Eff]) // XXX TODO!
       val args = pure.map {
         case b @ Block(_,_,_) =>
           transform(b)
@@ -865,7 +867,7 @@ abstract class Transformer extends Traverser {
       }
       // NOTE: we're not transforming 'effects' here
       if (effects.nonEmpty)
-        g.reflectEffect(op,args:_*)(es.map(transform):_*)
+        g.reflectEffect(op,args:_*)(es.keys.map(transform):_*)
       else
         g.reflect(op,args:_*)
   }

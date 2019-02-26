@@ -288,7 +288,7 @@ class TensorFrontEnd2 extends FrontEnd {
       nodes.foreach { case Node(n,op,rhs,efs) => 
         val (effects,pure) = rhs.partition(_.isInstanceOf[Eff])
         val args = pure.map(a => subst.getOrElse(a,a)) // XXX TODO: Blocks!
-        val efs1 = efs.map(a => subst.getOrElse(a,a))
+        val efs1 = efs.keys.map(a => subst.getOrElse(a,a))
         // XXX losing effect stuff here !!!
         if (effects.nonEmpty)
           subst(n) = g.reflectEffect(op,args:_*)(efs1:_*)
