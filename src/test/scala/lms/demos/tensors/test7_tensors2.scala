@@ -286,7 +286,7 @@ class TensorFrontEnd2 extends FrontEnd {
       // nodes.foreach(println)
 
       nodes.foreach { case Node(n,op,rhs,efs) => 
-        val (effects,pure) = rhs.partition(_.isInstanceOf[Eff])
+        val (effects,pure) = (efs.deps,rhs)
         val args = pure.map(a => subst.getOrElse(a,a)) // XXX TODO: Blocks!
         val efs1 = efs.keys.map(a => subst.getOrElse(a,a))
         // XXX losing effect stuff here !!!
@@ -399,7 +399,7 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
           // emit the fused body ... 
           val newBody = this.g.reify { e => 
             for (l <- loops) {
-              val (Node(s,op,List(sh:Exp,f:Exp,_), _)) = l
+              val (Node(s,op,List(sh:Exp,f:Exp), _)) = l
               assert(transform(sh) == shape, "ERROR: fused loop shapes don't match (TODO!)")
               this.g.reflectEffect("@", transform(f), e)() //XXX effect
             }

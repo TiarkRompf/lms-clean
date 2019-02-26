@@ -365,7 +365,7 @@ abstract class MultiDimForeachLowering extends Transformer {
 
   override def transform(n: Node): Exp = n match {
 
-    case Node(s, "foreach", List(sh: Exp, f:Block, eff), _) => 
+    case Node(s, "foreach", List(sh: Exp, f:Block), _) => 
 
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
@@ -393,14 +393,14 @@ abstract class MultiDimForeachLowering extends Transformer {
       super.transform(n)
 
 
-    case Node(s, "tensor_builder_new", List(sh: Exp, eff), _) => 
+    case Node(s, "tensor_builder_new", List(sh: Exp), _) => 
       builders(s) = n
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
       g.reflectEffect("array_new", shape.reduce(_*_).x)(STORE)
 
-    case Node(s, "tensor_builder_add", List(builder: Sym, i: Exp, x: Exp, eff), _) => 
-      val (Node(s, "tensor_builder_new", List(sh0: Exp, eff), _)) = builders(builder)
+    case Node(s, "tensor_builder_add", List(builder: Sym, i: Exp, x: Exp), _) => 
+      val (Node(s, "tensor_builder_new", List(sh0: Exp), _)) = builders(builder)
       val sh = transform(sh0) // TODO: tensor_builder_shape
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
@@ -411,8 +411,8 @@ abstract class MultiDimForeachLowering extends Transformer {
       }
       g.reflectEffect("array_set", transform(builder), linearize(shape,idx).x, x)(transform(builder))
 
-    case Node(s, "tensor_builder_get", List(builder: Sym, eff), _) => 
-      val (Node(s, "tensor_builder_new", List(sh: Exp, eff), _)) = builders(builder)
+    case Node(s, "tensor_builder_get", List(builder: Sym), _) => 
+      val (Node(s, "tensor_builder_new", List(sh: Exp), _)) = builders(builder)
       transform(builder)
 
 

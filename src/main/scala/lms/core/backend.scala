@@ -34,23 +34,32 @@ object Backend {
   }
   case class Const(x: Any) extends Exp
 
+  // A list of effect keys (mutable vars, ...) and
+  // dependencies (previous writes, ...)
+  //
+  // TOOD: this can be made more fine-grained, i.e.,
+  // distinguish may/must and read/write effects, 
+  // soft dependencies, ...
 
-  case class EffectSummary(deps: List[Exp], keys: List[Exp])
+  case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
+    override def toString = if (deps.nonEmpty || keys.nonEmpty)
+      s"[${keys.mkString(" ")}: ${deps.mkString(" ")}]" else ""
+  }
 
   // A node in a computation graph links a symbol with
   // its definition, consisting of an operator and its
-  // arguments.
-  // effKeys: a list of effect keys (mutable vars, ...)
+  // arguments, as well as an effect summary.
+
   case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary) {
-    override def toString = s"$n = ($op ${rhs.mkString(" ")})"
+    override def toString = s"$n = ($op ${rhs.mkString(" ")})  $eff"
   }
 
   /* YYY TODO
-    - Node should have a separate field for effect dependencies
+    + Node should have a separate field for effect dependencies
       in addition to effect keys. Currently they are lumped
       at the end of rhs (wrapped in Eff(...)) which does not
       seem ideal.
-    - Block should separate out effects, too
+    - Block should separate out input effects, too
     - Should (can?) we get rid of type Def? what prevents
       us from allowing any value as part of rhs
       (guess: typeclass to/fro conversion for FrontEnd)
@@ -63,8 +72,6 @@ object Backend {
 
   case class Block(in: List[Sym], res: Exp, eff: List[Exp]) extends Def
 
-  case class Eff(e: List[Sym]) extends Def
-
 
   // where should this go?
   def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.in)
@@ -75,17 +82,15 @@ object Backend {
   def directSyms(x: Node): List[Sym] = 
     x.rhs.flatMap { 
       case s: Sym => List(s) 
-      // case Eff(s) => Nil do not count effect refs
       case _ => Nil
     }
 
   def syms(x: Node): List[Sym] = 
-    x.rhs.flatMap { 
+    (x.rhs.flatMap { 
       case s: Sym => List(s) 
-      case Eff(s) => s
       case Block(_, res, eff) => (res::eff) collect { case s: Sym => s }
       case _ => Nil
-    } diff boundSyms(x)
+    } ++ x.eff.deps.collect { case s: Sym => s }) diff boundSyms(x)
 }
 
 import Backend._
@@ -134,21 +139,21 @@ class GraphBuilder {
         val sm = Sym(fresh) 
         // gather effect dependencies
         val prev = effectForKeys(curBlock,efs2)
-        try reflect(sm, s, (as :+ Eff(prev)):_*)(efs2:_*)
+        try reflect(sm, s, as:_*)(prev:_*)(efs2:_*)
         finally curBlock = updateEffectForKeys(curBlock,efs2,sm)
       } else {
         // cse? never for effectful stm
         globalDefs.find(n => n.op == s && n.rhs == as) match {
           case Some(n) => n.n
           case None =>
-            reflect(Sym(fresh), s, as:_*)()
+            reflect(Sym(fresh), s, as:_*)()()
         }
       }
     }
   }
   
-  def reflect(x: Sym, s: String, as: Def*)(efs: Exp*): Exp = {
-    globalDefs += Node(x,s,as.toList,EffectSummary(Nil, efs.toList)) // XXX TODO; Nil?
+  def reflect(x: Sym, s: String, as: Def*)(efDeps: Exp*)(efKeys: Exp*): Exp = {
+    globalDefs += Node(x,s,as.toList,EffectSummary(efDeps.toList, efKeys.toList))
     x
   }
 
@@ -175,7 +180,7 @@ class GraphBuilder {
 
   var curBlock: Effect = _ // could this become an ExplodedStruct?
 
-  type Effect = List[Sym]
+  type Effect = List[Exp]
 
   def effectForKeys(es: Effect, efs: List[Exp]): Effect = {
     es.flatMap { e =>
@@ -184,7 +189,7 @@ class GraphBuilder {
           if ((efs contains n) || (efs intersect eff.keys).nonEmpty) {
             List(e)
           } else {
-            effectForKeys(rhs.collect { case Eff(e) => e }.flatten, efs) // XXX TODO!
+            effectForKeys(eff.deps, efs)
           }
         case _ => List(e)
       }
@@ -377,12 +382,12 @@ abstract class Traverser {
     def symsFreq(x: Node): List[(Def,Double)] = x match {
       case Node(f, "λ", List(Block(in, y, eff)), _) => 
         (y::eff).map(e => (e,100.0))
-      case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) => 
-        List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
-      case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Eff(es)::Nil, _) => 
-        (c::es).map(e => (e,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
-      case Node(_, "W", Block(ac,ae,af)::Block(bc,be,bf)::Eff(es)::Nil, _) => 
-        es.map(e => (e,1.0)) ++ (ae::be::af ++ bf).map(e => (e,100.0))
+      // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) => 
+        // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
+      case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, eff) => 
+        (c::eff.deps).map(e => (e,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
+      case Node(_, "W", Block(ac,ae,af)::Block(bc,be,bf)::Nil, eff) => 
+        eff.deps.map(e => (e,1.0)) ++ (ae::be::af ++ bf).map(e => (e,100.0)) // XXX why eff.deps?
       case _ => syms(x) map (s => (s,1.0))
     }
 
@@ -480,12 +485,13 @@ class CodeGen extends Traverser {
       emit(s"$f = (λ {")
       traverse(y, f)
       emit(s"})")
-    case n @ Node(f, op, es, _) =>
+    case n @ Node(f, op, es, eff) =>
       val ss = es map { 
         case e @ Block(_,_,_) => "{" + utils.captureOut(traverse(e)) + "}" // FIXME freq!!
         case e => e.toString
       }
-      emit(s"$f = ($op ${ss.mkString(" ")})")
+      val efc = if (eff.deps.nonEmpty) s" // Eff: ${eff.deps.mkString(" ")}" else ""
+      emit(s"$f = ($op ${ss.mkString(" ")})$efc")
   }
 }
 
@@ -537,21 +543,21 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)} == ${quote(y)}")
     case n @ Node(s,"!=",List(x,y),_) => 
       emit(s"val $s = ${quote(x)} != ${quote(y)}")
-    case n @ Node(s,"var_new",List(x,e),_) => 
+    case n @ Node(s,"var_new",List(x),_) => 
       emit(s"var $s = ${quote(x)}")
-    case n @ Node(s,"var_get",List(x,e),_) => 
+    case n @ Node(s,"var_get",List(x),_) => 
       emit(s"val $s = ${quote(x)}")
-    case n @ Node(s,"var_set",List(x,y,e),_) => 
+    case n @ Node(s,"var_set",List(x,y),_) => 
       emit(s"${quote(x)} = ${quote(y)}")
-    case n @ Node(s,"array_new",List(x,e),_) => 
+    case n @ Node(s,"array_new",List(x),_) => 
       emit(s"var $s = new Array[Int](${quote(x)})")
-    case n @ Node(s,"array_get",List(x,i,e),_) => 
+    case n @ Node(s,"array_get",List(x,i),_) => 
       emit(s"val $s = ${quote(x)}(${quote(i)})")
-    case n @ Node(s,"array_set",List(x,i,y,e),_) => 
+    case n @ Node(s,"array_set",List(x,i,y),_) => 
       emit(s"${quote(x)}(${quote(i)}) = ${quote(y)}")
     case n @ Node(s,"@",x::y::_,_) => 
       emit(s"val $s = ${quote(x)}(${quote(y)})")
-    case n @ Node(s,"P",List(x,ctl),_) => 
+    case n @ Node(s,"P",List(x),_) => 
       emit(s"val $s = println(${quote(x)})")
     case n @ Node(_,_,_,_) => 
       emit(s"??? " + n.toString)
@@ -665,7 +671,7 @@ class CompactScalaCodeGen extends Traverser {
     case Sym(n) => s.toString
     case Const(x: String) => "\""+x+"\""
     case Const(x) => x.toString
-    case Eff(x) => x.map(quote).mkString("")
+    // case Eff(x) => x.map(quote).mkString("")
   }
 
   def shallow(n: Def): String = n match {
@@ -679,13 +685,14 @@ class CompactScalaCodeGen extends Traverser {
     else " /* " + quote(x) + " */"
 
   def quoteEff(x: List[Exp]): String = 
-    quoteEff(Eff(x.asInstanceOf[List[Sym]]))
+    if (!doPrintEffects) "" 
+    else " /* " + x.map(quote).mkString("") + " */"
 
   def quoteEff(n: Node): String = if (!doPrintEffects) "" else {
-    val deps = n.rhs.filter(_.isInstanceOf[Eff])
+    val deps = n.eff.deps
     val eff = n.eff.keys
     if (deps.isEmpty && eff.isEmpty) "" else {
-      s"/* val ${quote(n.n)} = ${eff.map(quote).mkString(",")}:${deps.map(quote).mkString(",")} */"
+      s"/* val ${quote(n.n)} = ${eff.map(quote).mkString(",")}:${deps.map(quote).mkString("")} */"
     }
   }
 
@@ -739,7 +746,7 @@ class CompactScalaCodeGen extends Traverser {
       quoteBlock(traverse(a)) +
       s" else " +
       quoteBlock(traverse(b))
-    case n @ Node(f,"W",List(c:Block,b:Block,e),_) => 
+    case n @ Node(f,"W",List(c:Block,b:Block),_) => 
       s"while (" +
       quoteBlock(traverse(c)) +
       s") " +
@@ -758,13 +765,13 @@ class CompactScalaCodeGen extends Traverser {
       s"${shallow(x)} == ${shallow(y)}"
     case n @ Node(s,"!=",List(x,y),_) => 
       s"${shallow(x)} != ${shallow(y)}"
-    case n @ Node(s,"var_get",List(x,e),_) => 
+    case n @ Node(s,"var_get",List(x),_) => 
       s"${shallow(x)}"
-    case n @ Node(s,"array_get",List(x,i,e),_) => 
+    case n @ Node(s,"array_get",List(x,i),_) => 
       s"${shallow(x)}(${shallow(i)})"
     case n @ Node(s,"@",x::y::_,_) => 
       s"${shallow(x)}(${shallow(y)})"
-    case n @ Node(s,"P",List(x,ctl),_) => 
+    case n @ Node(s,"P",List(x),_) => 
       s"println(${shallow(x)})"
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) => 
       quoteBlock {
@@ -779,8 +786,7 @@ class CompactScalaCodeGen extends Traverser {
       }
 
     case n @ Node(_,op,args,_) => 
-      val (eff,data) = args.partition(_.isInstanceOf[Eff])
-      s"$op(${data.map(shallow).mkString(", ")})"
+      s"$op(${args.map(shallow).mkString(", ")})"
   }) + quoteEff(n)
 
   override def traverse(n: Node): Unit = n match {
@@ -791,13 +797,13 @@ class CompactScalaCodeGen extends Traverser {
       emit(shallow(n))
     case n @ Node(s,"W",_,_) => // Unit result
       emit(shallow(n))
-    case n @ Node(s,"var_new",List(x,e),_) => 
+    case n @ Node(s,"var_new",List(x),_) => 
       emit(s"var ${quote(s)} = ${shallow(x)}")
-    case n @ Node(s,"var_set",List(x,y,e),_) => 
+    case n @ Node(s,"var_set",List(x,y),_) => 
       emit(s"${quote(x)} = ${shallow(y)}")
-    case n @ Node(s,"array_new",List(x,e),_) => 
+    case n @ Node(s,"array_new",List(x),_) => 
       emit(s"val ${quote(s)} = new Array[Int](${shallow(x)})")
-    case n @ Node(s,"array_set",List(x,i,y,e),_) => 
+    case n @ Node(s,"array_set",List(x,i,y),_) => 
       emit(s"${shallow(x)}(${shallow(i)}) = ${shallow(y)}")
     case n @ Node(s,op,_,_) if op.startsWith("effect-") => 
       emit(s"/* val ${quote(s)} = " + shallow(n) + "*/") 
@@ -852,11 +858,11 @@ abstract class Transformer extends Traverser {
       // need to deal with recursive binding!
       val s1 = Sym(g.fresh)
       subst(s) = s1
-      g.reflect(s1, "λ", transform(b))()
+      g.reflect(s1, "λ", transform(b))()()
     case Node(s,op,rs,es) => 
       // effect dependencies in target graph are managed by
       // graph builder, so we drop all effects here
-      val (effects,pure) = rs.partition(_.isInstanceOf[Eff]) // XXX TODO!
+      val (effects,pure) = (es.deps,rs)
       val args = pure.map {
         case b @ Block(_,_,_) =>
           transform(b)
@@ -979,7 +985,7 @@ class FrontEnd {
     val fn = Sym(g.fresh)
     //val xn = Sym(g.fresh)
     val f1 = (x: INT) => APP(fn,x)
-    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()
+    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()
     f1
   }
 

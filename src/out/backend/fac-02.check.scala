@@ -2,11 +2,11 @@
 x5 = (!= x4 Const(0))
 x7 = (- Const(2) Const(1))
 x8 = (- x4 x7)
-x9 = (@ x2 x8 Eff(List(x6)))
+x9 = (@ x2 x8)  [Const(CTRL): x6]
 x10 = (* x4 x9)
-x12 = (? x5 Block(List(x6),x10,List(x9)) Block(List(x11),Const(1),List(x11)) Eff(List(x3)))
+x12 = (? x5 Block(List(x6),x10,List(x9)) Block(List(x11),Const(1),List(x11)))  [Const(CTRL): x3]
 x2 = (λ Block(List(x4, x3),x12,List(x12)))
-x13 = (@ x2 x1 Eff(List(x0)))
+x13 = (@ x2 x1)  [Const(CTRL): x0]
 // Generic Codegen:
 // in: List(x1, x0)
 x7 = (- Const(2) Const(1))
@@ -15,15 +15,15 @@ x2 = (λ {
   x5 = (!= x4 Const(0))
   x12 = (? x5 {// in: List(x6)
     x8 = (- x4 x7)
-    x9 = (@ x2 x8 Eff(List(x6)))
+    x9 = (@ x2 x8) // Eff: x6
     x10 = (* x4 x9)
     x10 // out effect: List(x9)
   } {// in: List(x11)
     Const(1) // out effect: List(x11)
-  } Eff(List(x3)))
+  }) // Eff: x3
   x12 // out effect: List(x12)
 })
-x13 = (@ x2 x1 Eff(List(x0)))
+x13 = (@ x2 x1) // Eff: x0
 x13 // out effect: List(x13)
 // Scala Codegen:
 val x7 = 2 - 1
