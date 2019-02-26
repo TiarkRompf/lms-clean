@@ -405,7 +405,7 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
             }
             Const(())
           }
-          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(this.g.getEfs(newBody):_*)
+          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(this.g.getEffKeys(newBody):_*)
       }
 
     } else {

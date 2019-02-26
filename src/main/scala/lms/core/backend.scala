@@ -38,9 +38,22 @@ object Backend {
   // A node in a computation graph links a symbol with
   // its definition, consisting of an operator and its
   // arguments.
-  case class Node(n: Sym, op: String, rhs: List[Def], eff: List[Exp]) {
+  // effKeys: a list of effect keys (mutable vars, ...)
+  case class Node(n: Sym, op: String, rhs: List[Def], effKeys: List[Exp]) {
     override def toString = s"$n = ($op ${rhs.mkString(" ")})"
   }
+
+  /* YYY TODO
+    - Node should have a separate field for effect dependencies
+      in addition to effect keys. Currently they are lumped
+      at the end of rhs (wrapped in Eff(...)) which does not
+      seem ideal.
+    - Block should separate out effects, too
+    - Should (can?) we get rid of type Def? what prevents
+      us from allowing any value as part of rhs
+      (guess: typeclass to/fro conversion for FrontEnd)
+  */
+
 
   // A definition is part of the right-hand side of a 
   // node definition.
@@ -111,12 +124,13 @@ class GraphBuilder {
       case Some(e) => e 
       case None => 
 
-      // latent effects? closures, mutable vars, ...
+      // latent effects? closures, mutable vars, ... (these are the keys!)
       val efs2 = (as.toList.flatMap(getLatentEffect) ++ efs).distinct
 
       // effects or pure?
       if (efs2.nonEmpty) {
         val sm = Sym(fresh) 
+        // gather effect dependencies
         val prev = effectForKeys(curBlock,efs2)
         try reflect(sm, s, (as :+ Eff(prev)):_*)(efs2:_*)
         finally curBlock = updateEffectForKeys(curBlock,efs2,sm)
@@ -151,7 +165,7 @@ class GraphBuilder {
   // TODO: include blocks!
   def getLatentEffect(x: Def) = globalDefs.find(_.n == x) match {
     case Some(Node(_, "λ", List(b @ Block(in::ein::Nil, out, eout)), _)) =>
-      getEfs(b)
+      getEffKeys(b)
     case _ => 
       Nil
   }
@@ -195,7 +209,7 @@ class GraphBuilder {
   // NOTE: want to mask out purely local effects
   def isPure(b: Block) = b.eff == List(b.in.last)
 
-  def getEfs(b: Block): List[Exp] = {
+  def getEffKeys(b: Block): List[Exp] = {
     // TODO -- cleanup: performance!!!
 
     val bound = new Bound
@@ -204,7 +218,7 @@ class GraphBuilder {
     val nodes = globalDefs.toList.filter(n => bound.hm.getOrElse(n.n,Set())(b.in.last))
     
     // TODO: remove deps on nodes that are bound inside??
-    nodes.flatMap(_.eff).distinct
+    nodes.flatMap(_.effKeys).distinct
   }
 
 
@@ -667,7 +681,7 @@ class CompactScalaCodeGen extends Traverser {
 
   def quoteEff(n: Node): String = if (!doPrintEffects) "" else {
     val deps = n.rhs.filter(_.isInstanceOf[Eff])
-    val eff = n.eff
+    val eff = n.effKeys
     if (deps.isEmpty && eff.isEmpty) "" else {
       s"/* val ${quote(n.n)} = ${eff.map(quote).mkString(",")}:${deps.map(quote).mkString(",")} */"
     }
@@ -679,6 +693,7 @@ class CompactScalaCodeGen extends Traverser {
 
 
   // XXX NOTE: performance implications of capture + concat !!!
+  // XXX TODO: what if block is empty?
   def quoteBlock(f: => Unit) = {
     val b = utils.captureOut(f)
     if (b contains '\n')
@@ -921,7 +936,7 @@ class FrontEnd {
     val bBlock = g.reify(b.x)
     // compute effect (aBlock || bBlock)
     val pure = g.isPure(aBlock) && g.isPure(bBlock)
-    val efs = (g.getEfs(aBlock) ++ g.getEfs(bBlock)).distinct
+    val efs = (g.getEffKeys(aBlock) ++ g.getEffKeys(bBlock)).distinct
     if (pure)
       INT(g.reflect("?",c.x,aBlock,bBlock))
     else
@@ -932,7 +947,7 @@ class FrontEnd {
     val cBlock = g.reify(c.x)
     val bBlock = g.reify({b;Const(())})
     // compute effect (cBlock bBlock)* cBlock
-    val efs = (g.getEfs(cBlock) ++ g.getEfs(bBlock)).distinct
+    val efs = (g.getEffKeys(cBlock) ++ g.getEffKeys(bBlock)).distinct
     g.reflectEffect("W",cBlock,bBlock)(efs:_*)
   }
 
@@ -944,7 +959,7 @@ class FrontEnd {
         if (g.isPure(b))
           INT(g.reflect("@",f,x.x))
         else 
-          INT(g.reflectEffect("@",f,x.x)(g.getEfs(b):_*))
+          INT(g.reflectEffect("@",f,x.x)(g.getEffKeys(b):_*))
       case _ =>
         INT(g.reflectEffect("@",f,x.x)(CTRL))
     }
