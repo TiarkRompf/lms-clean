@@ -169,7 +169,7 @@ class GraphBuilder {
   of closure conversion).
   */
 
-  // TODO: include blocks!
+  // TODO: x might be a block!
   def getLatentEffect(x: Def) = globalDefs.find(_.n == x) match {
     case Some(Node(_, "λ", List(b @ Block(in::ein::Nil, out, eout)), _)) =>
       getEffKeys(b)
@@ -182,6 +182,9 @@ class GraphBuilder {
 
   type Effect = List[Exp]
 
+  // es the accumulated effect (list of effectful stms) of the current block
+  // efs is the set of effect keys of interest
+  // return a new effect (subset of es) based on the keys efs
   def effectForKeys(es: Effect, efs: List[Exp]): Effect = {
     es.flatMap { e =>
       globalDefs.find(_.n == e) match {
@@ -196,24 +199,16 @@ class GraphBuilder {
     }.distinct
   }
 
+  // remove all dependencies from es (typically curBlock) that are implied 
+  // by current node (sm, with effectKeys efs)
   def updateEffectForKeys(es: Effect, efs: List[Exp], sm: Sym): Effect = {
     val prev = effectForKeys(es,efs)
-    sm::(curBlock.filterNot(prev.toSet))
-    // remove all dependencies from curBlock that are implied 
-    // by current node
+    sm::(es.filterNot(prev.toSet))
     // TODO: is this enough? (when following individual keys?)
   }
 
-  // def effectToExp(es: Effect): Exp = { // convert curBlock to an Exp
-  //   assert(es.length == 1)
-  //   es.head
-  // }
-
-  // def effectFromExp(es: Exp): Effect = { // convert curBlock from an Exp
-  //   List(es.asInstanceOf[Sym])
-  // }
-
-  // NOTE: want to mask out purely local effects
+  
+  // NOTE/TODO: want to mask out purely local effects
   def isPure(b: Block) = b.eff == List(b.in.last)
 
   def getEffKeys(b: Block): List[Exp] = {
@@ -871,7 +866,7 @@ abstract class Transformer extends Traverser {
         case a => 
           a
       }
-      // NOTE: we're not transforming 'effects' here
+      // NOTE: we're not transforming 'effects' here (just the keys)
       if (effects.nonEmpty)
         g.reflectEffect(op,args:_*)(es.keys.map(transform):_*)
       else
@@ -985,6 +980,9 @@ class FrontEnd {
     val fn = Sym(g.fresh)
     //val xn = Sym(g.fresh)
     val f1 = (x: INT) => APP(fn,x)
+    // NOTE: lambda expression itself does not have
+    // an effect, so body block should not count as 
+    // latent effect of the lambda
     g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()
     f1
   }
