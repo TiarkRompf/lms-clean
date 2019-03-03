@@ -70,14 +70,18 @@ object Backend {
   // node definition.
   abstract class Def
 
-  case class Block(in: List[Sym], res: Exp, eff: List[Exp]) extends Def
+  // inputs, result, effect input, effect output summary
+  case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def {
+    def bound = ein::in
+    def used = (res::eff.deps).distinct collect { case s: Sym => s }
+  }
 
 
   // where should this go?
-  def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.in)
+  def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.bound)
 
   def blocks(x: Node): List[Block] = 
-    x.rhs.collect { case a @ Block(_,_,_) => a }
+    x.rhs.collect { case a @ Block(_,_,_,_) => a }
 
   def directSyms(x: Node): List[Sym] = 
     x.rhs.flatMap { 
@@ -86,11 +90,11 @@ object Backend {
     }
 
   def syms(x: Node): List[Sym] = 
-    (x.rhs.flatMap { 
+    x.rhs.flatMap {
       case s: Sym => List(s) 
-      case Block(_, res, eff) => (res::eff) collect { case s: Sym => s }
+      case b: Block => b.used
       case _ => Nil
-    } ++ x.eff.deps.collect { case s: Sym => s }) diff boundSyms(x)
+    } ++ x.eff.deps.collect { case s: Sym => s }
 }
 
 import Backend._
@@ -171,7 +175,7 @@ class GraphBuilder {
 
   // TODO: x might be a block!
   def getLatentEffect(x: Def) = globalDefs.find(_.n == x) match {
-    case Some(Node(_, "λ", List(b @ Block(in::ein::Nil, out, eout)), _)) =>
+    case Some(Node(_, "λ", List(b @ Block(ins, out, ein, eout)), _)) =>
       getEffKeys(b)
     case _ => 
       Nil
@@ -209,19 +213,21 @@ class GraphBuilder {
 
   
   // NOTE/TODO: want to mask out purely local effects
-  def isPure(b: Block) = b.eff == List(b.in.last)
+  def isPure(b: Block) = b.eff.deps == List(b.ein)
 
-  def getEffKeys(b: Block): List[Exp] = {
+  def getEffKeys0(b: Block): List[Exp] = {
     // TODO -- cleanup: performance!!!
 
     val bound = new Bound
     bound(Graph(globalDefs.toList,b))
 
-    val nodes = globalDefs.toList.filter(n => bound.hm.getOrElse(n.n,Set())(b.in.last))
-    
+    val nodes = globalDefs.toList.filter(n => bound.hm.getOrElse(n.n,Set())(b.ein))
+
     // TODO: remove deps on nodes that are bound inside??
     nodes.flatMap(_.eff.keys).distinct
   }
+
+  def getEffKeys(b: Block): List[Exp] = b.eff.keys
 
 
 
@@ -231,7 +237,8 @@ class GraphBuilder {
       val block = Sym(fresh)
       curBlock = List(block)
       val res = x 
-      Block(block::Nil, res, curBlock)
+      val b0 = Block(Nil, res, block, EffectSummary(curBlock, Nil)) // XXX FIXME temp 
+      Block(Nil, res, block, EffectSummary(curBlock, getEffKeys0(b0)))
     } finally {
       curBlock = save
     }
@@ -243,7 +250,8 @@ class GraphBuilder {
       val arg = Sym(fresh)
       curBlock = List(block)
       val res = x(arg) 
-      Block(arg::block::Nil, res, curBlock)
+      val b0 = Block(arg::Nil, res, block, EffectSummary(curBlock, Nil)) // XXX FIXME temp 
+      Block(arg::Nil, res, block, EffectSummary(curBlock, getEffKeys0(b0)))
     } finally {
       curBlock = save
     }
@@ -292,10 +300,10 @@ class Flow extends Phase {
   // XXX perhaps we need to count freqs differently (?)
 
   def symsFreq(x: Node): List[(Def,Double)] = x match {
-    case Node(f, "λ", List(Block(in, y, eff)), _) => 
-      List((y,100.0)) ++ eff.map(e => (e,0.001))
-    case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::_, _) => 
-      List((c,1.0),(ae,0.5),(be,0.5)) ++ af.map(e => (e,0.001)) ++ bf.map(e => (e,0.001))
+    case Node(f, "λ", List(Block(in, y, ein, eff)), _) => 
+      List((y,100.0)) ++ eff.deps.map(e => (e,0.001))
+    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::_, _) => 
+      List((c,1.0),(ae,0.5),(be,0.5)) ++ af.deps.map(e => (e,0.001)) ++ bf.deps.map(e => (e,0.001))
     case _ => syms(x) map (s => (s,1.0))
   }
 
@@ -304,7 +312,7 @@ class Flow extends Phase {
     if (g.block.res.isInstanceOf[Sym])
       freq(g.block.res.asInstanceOf[Sym]) = 1.0
 
-    for (e <- g.block.eff)
+    for (e <- g.block.eff.deps)
       if (e.isInstanceOf[Sym])
         freq(e.asInstanceOf[Sym]) = 1.0
 
@@ -329,7 +337,7 @@ class Bound extends Phase {
   val hm = new mutable.HashMap[Sym,Set[Sym]]
 
   def apply(g: Graph): Graph = {
-    val bound = g.nodes.flatMap(boundSyms).toSet ++ g.block.in
+    val bound = g.nodes.flatMap(boundSyms).toSet ++ g.block.bound
 
     // for recursive syms, we don't want to force
     // non-recursive deps into nested scopes
@@ -366,7 +374,7 @@ abstract class Traverser {
   }
 
   def traverse(y: Block, extra: Sym*): Unit = {
-    val path1 = y.in ++ extra.toList ++ path
+    val path1 = y.bound ++ extra.toList ++ path
 
     // a node is available if all bound vars
     // it depends on are in scope
@@ -375,14 +383,14 @@ abstract class Traverser {
 
     // freq/block computation
     def symsFreq(x: Node): List[(Def,Double)] = x match {
-      case Node(f, "λ", List(Block(in, y, eff)), _) => 
-        (y::eff).map(e => (e,100.0))
+      case Node(f, "λ", List(Block(in, y, ein, eff)), _) => 
+        (y::eff.deps).map(e => (e,100.0))
       // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) => 
         // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
-      case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, eff) => 
-        (c::eff.deps).map(e => (e,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
-      case Node(_, "W", Block(ac,ae,af)::Block(bc,be,bf)::Nil, eff) => 
-        eff.deps.map(e => (e,1.0)) ++ (ae::be::af ++ bf).map(e => (e,100.0)) // XXX why eff.deps?
+      case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) => 
+        (c::eff.deps).map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
+      case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) => 
+        eff.deps.map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,100.0)) // XXX why eff.deps?
       case _ => syms(x) map (s => (s,1.0))
     }
 
@@ -395,7 +403,7 @@ abstract class Traverser {
     if (g.block.res.isInstanceOf[Sym])
       reach += g.block.res.asInstanceOf[Sym]
 
-    for (e <- g.block.eff)
+    for (e <- g.block.eff.deps)
       if (e.isInstanceOf[Sym])
         reach += e.asInstanceOf[Sym]
 
@@ -438,7 +446,7 @@ abstract class Traverser {
       traverse(y, f)
     case n @ Node(f, op, es, _) =>
       // generic traversal: go into all blocks
-      for (e @ Block(_,_,_) <- es)
+      for (e @ Block(_,_,_,_) <- es)
         traverse(e)
   }
 
@@ -470,7 +478,7 @@ class CodeGen extends Traverser {
   def emit(s: String) = println(s)
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
-    emit(s"// in: ${y.in}")
+    emit(s"// in: ${y.in.mkString(" ")} effect: ${y.ein}") // XXX compat
     super.traverse(ns, y)
     emit(y.res.toString + " // out effect: " + y.eff.toString)
   }
@@ -482,10 +490,10 @@ class CodeGen extends Traverser {
       emit(s"})")
     case n @ Node(f, op, es, eff) =>
       val ss = es map { 
-        case e @ Block(_,_,_) => "{" + utils.captureOut(traverse(e)) + "}" // FIXME freq!!
+        case e @ Block(_,_,_,_) => "{" + utils.captureOut(traverse(e)) + "}" // FIXME freq!!
         case e => e.toString
       }
-      val efc = if (eff.deps.nonEmpty) s" // Eff: ${eff.deps.mkString(" ")}" else ""
+      val efc = if (eff.deps.nonEmpty) s" // Eff: ${eff}" else ""
       emit(s"$f = ($op ${ss.mkString(" ")})$efc")
   }
 }
@@ -683,6 +691,8 @@ class CompactScalaCodeGen extends Traverser {
     if (!doPrintEffects) "" 
     else " /* " + x.map(quote).mkString("") + " */"
 
+  def quoteEff(x: EffectSummary): String = quoteEff(x.deps)
+
   def quoteEff(n: Node): String = if (!doPrintEffects) "" else {
     val deps = n.eff.deps
     val eff = n.eff.keys
@@ -706,14 +716,14 @@ class CompactScalaCodeGen extends Traverser {
       b
   }
   def quoteBlock1(y: Block, argType: Boolean = false) = {
-    def eff = quoteEff(y.in.last)
-    if (y.in.length == 1) {
+    def eff = quoteEff(y.ein)
+    if (y.in.length == 0) {
       val b = utils.captureOut(traverse(y))
       if (b contains '\n')
         s"{$eff\n" + eff + b + "\n}"
       else
         b
-    } else if (y.in.length == 2) {
+    } else if (y.in.length == 1) {
       val x = y.in.head
       val b = utils.captureOut(traverse(y))
       def typed(s:String) = if (argType) s+": Int" else s //FIXME hardcoded
@@ -730,7 +740,6 @@ class CompactScalaCodeGen extends Traverser {
   // XXX TODO: precedence of nested expressions!!
   def shallow(n: Node): String = (n match {
     case n @ Node(f,"λ",List(y:Block),_) => 
-      val x = y.in.head
       // XXX what should we do for functions? 
       // proper inlining will likely work better 
       // as a separate phase b/c it may trigger
@@ -787,7 +796,7 @@ class CompactScalaCodeGen extends Traverser {
   override def traverse(n: Node): Unit = n match {
     case n @ Node(f,"λ",List(y:Block),_) => 
       val x = y.in.head
-      emit(s"def ${quote(f)}(${quote(x)}: Int): Int${quoteEff(y.in.last)} = ${ quoteBlock(traverse(y,f)) }")
+      emit(s"def ${quote(f)}(${quote(x)}: Int): Int${quoteEff(y.ein)} = ${ quoteBlock(traverse(y,f)) }")
     case n @ Node(s,"P",_,_) => // Unit result
       emit(shallow(n))
     case n @ Node(s,"W",_,_) => // Unit result
@@ -821,20 +830,17 @@ abstract class Transformer extends Traverser {
 
   def transform(s: Exp): Exp = s match {
     case s @ Sym(_) if subst contains s => subst(s)
-    case s @ Sym(n) if n < 0 => s
     case s @ Sym(_) => println(s"Warning: not found in subst $subst: "+s); s
-    case a => 
-      //println(s"XXX id xform: "+a)
-      a
+    case a => a // must be const
   }
 
   def transform(b: Block): Block = b match {
-    case b @ Block(block::Nil, res, eff) =>
+    case b @ Block(Nil, res, block, eff) =>
       g.reify { 
         //subst(block) = g.effectToExp(g.curBlock) //XXX
         traverse(b); transform(res) 
       }
-    case b @ Block(arg::block::Nil, res, eff) =>
+    case b @ Block(arg::Nil, res, block, eff) =>
       g.reify { e =>
         if (subst contains arg)
           println(s"Warning: already have a subst for $arg")
@@ -849,7 +855,7 @@ abstract class Transformer extends Traverser {
   }
 
   def transform(n: Node): Exp = n match {
-    case Node(s,"λ", List(b @ Block(in, y, eff)),_) =>
+    case Node(s,"λ", List(b @ Block(in, y, ein, eff)),_) =>
       // need to deal with recursive binding!
       val s1 = Sym(g.fresh)
       subst(s) = s1
@@ -859,7 +865,7 @@ abstract class Transformer extends Traverser {
       // graph builder, so we drop all effects here
       val (effects,pure) = (es.deps,rs)
       val args = pure.map {
-        case b @ Block(_,_,_) =>
+        case b @ Block(_,_,_,_) =>
           transform(b)
         case s : Exp => 
           transform(s)
@@ -882,9 +888,9 @@ abstract class Transformer extends Traverser {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
     val block = g.reify { e => 
-      assert(graph.block.in.length == 2)
+      assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
-      subst(graph.block.in(1)) = g.curBlock.head // XXX 
+      // subst(graph.block.ein) = g.curBlock.head // XXX 
       super.apply(graph); transform(graph.block.res) }
     Graph(g.globalDefs,block)
   }

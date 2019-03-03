@@ -272,7 +272,7 @@ class TensorFrontEnd2 extends FrontEnd {
   rewrite0 { 
     // NOTE: this will inline ALL function calls! (TODO: should have a more specific mechanism)
     case Reflect("@", List(f@Reflect("λ", Nil), x)) =>
-      val Node(s,"λ",List(b@Block(List(in,ein),out,eout)),_) = g.globalDefs.find(_.n == f).get
+      val Node(s,"λ",List(b@Block(List(in),out,ein,eout)),_) = g.globalDefs.find(_.n == f).get
 
       val bound = new Bound
       bound(Graph(g.globalDefs.toList,b))
@@ -378,7 +378,7 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
       def dep(n: Node): List[Exp] = syms(n)
 
       val scc = GraphUtil.stronglyConnectedComponents[List[Node]](
-        find(g.block.res)::g.block.eff.map(find),
+        find(g.block.res)::g.block.eff.deps.map(find),
         es => es.map(dep).flatMap(_.map(find))
       )
 
@@ -458,7 +458,7 @@ class TensorTest2 extends TutorialFunSuite {
           if (eff)      cg.doPrintEffects = true
 
           val arg = cg.quote(g.block.in.head)
-          val efs = cg.quoteEff(g.block.in.last)
+          val efs = cg.quoteEff(g.block.ein)
           var src = utils.captureOut(cg(g))
 
           if (!verbose) {

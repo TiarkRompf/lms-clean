@@ -111,7 +111,7 @@ abstract class TensorFusionV extends Transformer {
       tensors(s) = n
       super.transform(n)
     case Node(s, "tensor_apply", List(a:Sym,b:Exp), _) if tensors contains a => 
-      val Node(_, _, List(sh:Exp, f @ Block(arg::block::Nil, res, eff)), _) = tensors(a)
+      val Node(_, _, List(sh:Exp, f @ Block(arg::Nil, res, block, eff)), _) = tensors(a)
       if (subst contains arg) println(s"Warning: already have a subst for $arg")
       try { 
         subst(arg) = transform(b)
@@ -185,7 +185,7 @@ abstract class TensorFusionH extends Transformer {
           val loopResPos = new mutable.HashMap[Sym,Int] // local cse on loop results
           val buf = new mutable.ListBuffer[(String,Exp)]
           val newBody = this.g.reify { e => 
-            for ((Node(s,op,List(sh:Exp,b@Block(arg::block::Nil, res, eff)), _),i) <- loops.zipWithIndex) yield {
+            for ((Node(s,op,List(sh:Exp,b@Block(arg::Nil, res, block, eff)), _),i) <- loops.zipWithIndex) yield {
               assert(transform(sh) == shape, "ERROR: fused loop shapes don't match (TODO!)")
               subst(arg) = e
               traverse(b)
@@ -207,7 +207,7 @@ abstract class TensorFusionH extends Transformer {
       }
 
       visit(g.block.res)
-      g.block.eff.foreach(visit)
+      g.block.eff.deps.foreach(visit)
 
       // println("---")
       // order.foreach(println)
@@ -224,7 +224,7 @@ abstract class TensorFusionH extends Transformer {
       tensors(s) = n
       super.transform(n)
     case Node(s, "tensor_apply", List(a:Sym,b:Exp), _) if tensors contains a => 
-      val Node(_, _, List(sh:Exp, f @ Block(arg::block::Nil, res, eff)), _) = tensors(a)
+      val Node(_, _, List(sh:Exp, f @ Block(arg::Nil, res, block, eff)), _) = tensors(a)
       subst(arg) = b
       traverse(f)
       transform(res)
@@ -460,7 +460,7 @@ class TensorTest extends TutorialFunSuite {
           if (eff)      cg.doPrintEffects = true
 
           val arg = cg.quote(g.block.in.head)
-          val efs = cg.quoteEff(g.block.in.last)
+          val efs = cg.quoteEff(g.block.ein)
           var src = utils.captureOut(cg(g))
 
           if (!verbose) {
