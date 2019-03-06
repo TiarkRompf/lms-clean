@@ -549,14 +549,19 @@ class ScalaCodeGen extends Traverser {
 }
 
 
-class CompactScalaCodeGen extends Traverser {
 
-  val rename = new mutable.HashMap[Sym,String]
+class CompactTraverser extends Traverser {
 
-  var doRename = false
-  var doPrintEffects = false
+  var shouldInline: Sym => Option[Node] = (_ => None)
 
-  def emit(s: String) = println(s)
+  object InlineSym {
+    def unapply(x: Sym) = shouldInline(x)
+  }
+
+  override def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
+    val save = shouldInline
+    try super.withScope(p, ns)(b) finally { shouldInline = save }
+  }
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
 
@@ -589,8 +594,6 @@ class CompactScalaCodeGen extends Traverser {
 
     val dis = new mutable.HashSet[Sym]
 
-    val save = shouldInline
-
     // should a definition be inlined or let-inserted?
     shouldInline = { (n: Sym) => 
       if ((df contains n) &&              // locally defined
@@ -598,6 +601,7 @@ class CompactScalaCodeGen extends Traverser {
           (!hmi(n)))                      // not used in nested scopes
           Some(df(n))
       else None }
+    // (shouldInline is protected by withScope)
 
 
     // ----- backward pass -----
@@ -638,17 +642,44 @@ class CompactScalaCodeGen extends Traverser {
       if (shouldInline(n.n).isEmpty)
         traverse(n)
     }
-
-    print(shallow(y.res) + quoteEff(y.eff))
-
-    shouldInline = save
   }
 
-  var shouldInline: Sym => Option[Node] = (_ => None)
 
-  object InlineSym {
-    def unapply(x: Sym) = shouldInline(x)
+  // subclass responsibility:
+
+  // -- disabled here because don't want to fix result type
+  def traverseShallow(n: Def): Unit = n match {
+    case InlineSym(n) => traverseShallow(n)
+    case b:Block => traverse(b)
+    case _ => 
   }
+
+  def traverseShallow(n: Node): Unit = n match {
+    case n @ Node(_,op,args,_) => 
+      args.foreach(traverseShallow)
+  }
+
+  override def traverse(n: Node): Unit = n match {
+    case n @ Node(f,"λ",List(y:Block),_) => 
+      // special case λ: add free var f
+      traverse(y,f)
+    case n @ Node(f, op, es, _) =>
+      // generic traversal
+      es.foreach(traverseShallow)
+  }
+}
+
+
+class CompactScalaCodeGen extends CompactTraverser {
+
+  val rename = new mutable.HashMap[Sym,String]
+
+  var doRename = false
+  var doPrintEffects = false
+
+  def emit(s: String) = println(s)
+
+
 
   def quote(s: Def): String = s match {
     case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
@@ -715,6 +746,14 @@ class CompactScalaCodeGen extends Traverser {
         s"(${paren(typed(quote(x)))}$eff => $b)"
     } else (???) //FIXME
   }
+
+
+  // process and print block results
+  override def traverse(ns: Seq[Node], y: Block): Unit = {
+    super.traverse(ns, y)
+    print(shallow(y.res) + quoteEff(y.eff))
+  }
+
 
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
