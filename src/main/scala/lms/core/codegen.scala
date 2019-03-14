@@ -49,6 +49,7 @@ class ScalaCodeGen extends Traverser {
   def quote(s: Def): String = s match {
     case Sym(n) => s"x$n"
     case Const(x: String) => "\""+x+"\""
+    case Const(x: Char) => "'"+x+"'"
     case Const(x) => x.toString
   }
 
@@ -131,6 +132,7 @@ class CompactScalaCodeGen extends CompactTraverser {
     case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
     case Sym(n) => s.toString
     case Const(x: String) => "\""+x+"\""
+    case Const(x: Char) => "'"+x+"'"
     case Const(x) => x.toString
     // case Eff(x) => x.map(quote).mkString("")
   }
@@ -263,6 +265,7 @@ class CompactScalaCodeGen extends CompactTraverser {
     case n @ Node(f,"λ",List(y:Block),_) => 
       val x = y.in.head
       emit(s"def ${quote(f)}(${quote(x)}: Int): Int${quoteEff(y.ein)} = ${ quoteBlock(traverse(y,f)) }")
+    // XXX: should not need these below!
     case n @ Node(s,"P",_,_) => // Unit result
       emit(shallow(n))
     case n @ Node(s,"W",_,_) => // Unit result
@@ -275,11 +278,16 @@ class CompactScalaCodeGen extends CompactTraverser {
       emit(s"val ${quote(s)} = new Array[Int](${shallow(x)})")
     case n @ Node(s,"array_set",List(x,i,y),_) => 
       emit(s"${shallow(x)}(${shallow(i)}) = ${shallow(y)}")
-    case n @ Node(s,op,_,_) if op.startsWith("effect-") => 
-      emit(s"/* val ${quote(s)} = " + shallow(n) + "*/") 
     case n @ Node(s,_,_,_) => 
-      emit(s"val ${quote(s)} = " + shallow(n)) 
+      // emit(s"val ${quote(s)} = " + shallow(n)) 
+      emitValDef(s, shallow(n))
   }
+
+  def emitValDef(s: Sym, rhs: => String): Unit = {
+    emit(s"val ${quote(s)} = " + rhs)
+  }
+
+
 
   override def apply(g: Graph) = {
     super.apply(g)

@@ -40,7 +40,7 @@ object Backend {
       in addition to effect keys. Currently they are lumped
       at the end of rhs (wrapped in Eff(...)) which does not
       seem ideal.
-    - Block should separate out input effects, too
+    + Block should separate out input effects, too
     - Should (can?) we get rid of type Def? what prevents
       us from allowing any value as part of rhs
       (guess: typeclass to/fro conversion for FrontEnd)
@@ -55,6 +55,7 @@ object Backend {
   case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def {
     def bound = ein::in
     def used = (res::eff.deps).distinct collect { case s: Sym => s }
+    def isPure = eff.deps == List(ein)
   }
 
 
@@ -154,10 +155,16 @@ class GraphBuilder {
   of closure conversion).
   */
 
-  // TODO: x might be a block!
-  def getLatentEffect(x: Def) = globalDefs.find(_.n == x) match {
-    case Some(Node(_, "λ", List(b @ Block(ins, out, ein, eout)), _)) =>
+  def getLatentEffect(x: Def) = x match {
+    case b: Block => 
       getEffKeys(b)
+    case x: Sym =>
+      globalDefs.find(_.n == x) match {
+        case Some(Node(_, "λ", List(b @ Block(ins, out, ein, eout)), _)) =>
+          getEffKeys(b)
+        case _ => 
+          Nil
+      }
     case _ => 
       Nil
   }
