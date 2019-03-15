@@ -6,6 +6,20 @@ import Backend._
 
 abstract class Traverser {
 
+  // freq/block computation
+  def symsFreq(x: Node): List[(Def,Double)] = x match {
+    case Node(f, "λ", List(Block(in, y, ein, eff)), _) => 
+      (y::eff.deps).map(e => (e,100.0))
+    // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) => 
+      // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
+    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) => 
+      (c::eff.deps).map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
+    case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) => 
+      eff.deps.map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,100.0)) // XXX why eff.deps?
+    case _ => syms(x) map (s => (s,1.0))
+  }
+
+
   val bound = new Bound
 
   var path = List[Sym]()
@@ -24,19 +38,6 @@ abstract class Traverser {
     // it depends on are in scope
     def available(d: Node) = 
       bound.hm(d.n) -- path1 - d.n == Set()
-
-    // freq/block computation
-    def symsFreq(x: Node): List[(Def,Double)] = x match {
-      case Node(f, "λ", List(Block(in, y, ein, eff)), _) => 
-        (y::eff.deps).map(e => (e,100.0))
-      // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) => 
-        // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
-      case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) => 
-        (c::eff.deps).map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
-      case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) => 
-        eff.deps.map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,100.0)) // XXX why eff.deps?
-      case _ => syms(x) map (s => (s,1.0))
-    }
 
     // find out which nodes are reachable on a
     // warm path (not only via if/else branches)
@@ -108,6 +109,12 @@ abstract class Traverser {
 
 class CompactTraverser extends Traverser {
 
+  def mayInline(n: Node): Boolean = n match {
+    case Node(s, "var_new", _, _) => false
+    case _ => true
+  }
+
+
   var shouldInline: Sym => Option[Node] = (_ => None)
 
   object InlineSym {
@@ -175,7 +182,7 @@ class CompactTraverser extends Traverser {
     def checkInline(res: Sym) = shouldInline(res) match { 
       case Some(n) =>
         // want to inline, now check that all successors are already there, else disable
-        if (succ.getOrElse(n.n,Nil).forall(seen))
+        if (mayInline(n) && succ.getOrElse(n.n,Nil).forall(seen))
           processNodeHere(n)
         else
           df -= n.n

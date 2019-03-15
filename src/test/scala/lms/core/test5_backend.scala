@@ -262,8 +262,7 @@ class BackendTest extends TutorialFunSuite {
     add // should not inline
   }
 
-/*
-  This one requires some thought: 
+  // This one requires some thought: 
 
   testBE("reorder-05") { x =>
     val i = VAR(x)
@@ -271,6 +270,7 @@ class BackendTest extends TutorialFunSuite {
     read // should inline read, but not var def?
   }
 
+/*
   One initial assumption was that variables should 
   always be second class: var_new is always a 
   statement, never an expression. However, the 
