@@ -262,4 +262,33 @@ class BackendTest extends TutorialFunSuite {
     add // should not inline
   }
 
+/*
+  This one requires some thought: 
+
+  testBE("reorder-05") { x =>
+    val i = VAR(x)
+    val read = i()
+    read // should inline read, but not var def?
+  }
+
+  One initial assumption was that variables should 
+  always be second class: var_new is always a 
+  statement, never an expression. However, the 
+  compact codegen logic generates this code:
+
+  def apply(x0: Int): Int = {
+    var_new(x0)
+  }
+
+  There are several ways to solve this:
+  0. Override ShouldInline for certain 
+     expressions 
+  1. Rewrite ver_get(var_new(x)) -> x
+     (under appropriate side condition, i.e. 
+     dataflow or frequency)
+  2. Emit shallow(var_new(x)) as x
+     (then what about var_set(var_new), i.e. 
+     want to remove this by DCE)
+*/
+
 }
