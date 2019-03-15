@@ -162,6 +162,7 @@ class CompactTraverser extends Traverser {
 
     // ----- backward pass -----
 
+    // for nodes that should be inlined, disable if dependencies interfere
     val seen = new mutable.HashSet[Sym]
 
     def processNodeHere(n: Node): Unit = {
