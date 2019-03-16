@@ -179,9 +179,6 @@ class FFTTest extends TutorialFunSuite {
           var src = utils.captureOut(cg(g))
 
           if (!verbose) {
-            // remove "()" on a single line
-            src = src.replaceAll(" *\\(\\) *","")
-
             // remove unused val x1 = ...
             val names = cg.rename.map(p => p._2).toSet
             for (n <- names) {

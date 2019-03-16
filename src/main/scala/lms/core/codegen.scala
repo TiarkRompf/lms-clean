@@ -124,9 +124,8 @@ class CompactScalaCodeGen extends CompactTraverser {
   var doRename = false
   var doPrintEffects = false
 
-  def emit(s: String) = println(s)
-
-
+  var lines: List[String] = Nil
+  def emit(s: String) = if (s != "") lines = s::lines
 
   def quote(s: Def): String = s match {
     case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
@@ -168,27 +167,36 @@ class CompactScalaCodeGen extends CompactTraverser {
 
   // XXX NOTE: performance implications of capture + concat !!!
   // XXX TODO: what if block is empty?
+  def captureLines(f: => Unit): List[String] = {
+    val save = lines
+    try {
+      lines = Nil
+      f
+      lines.reverse
+    } finally { lines = save }
+  }
+
   def quoteBlock(f: => Unit) = {
-    val b = utils.captureOut(f)
-    if (b contains '\n')
-      "{\n" + b + "\n}"
-    else
-      b
+    val ls = captureLines(f)
+    if (ls.length > 1) {
+      "{\n" + ls.mkString("\n") + "\n}"
+    } else ls.mkString("\n")
   }
   def quoteBlock1(y: Block, argType: Boolean = false) = {
     def eff = quoteEff(y.ein)
     if (y.in.length == 0) {
-      val b = utils.captureOut(traverse(y))
-      if (b contains '\n')
-        s"{$eff\n" + eff + b + "\n}"
-      else
+      val b = quoteBlock(traverse(y))
+      // if (b contains '\n')
+        // s"{$eff\n" + eff + b + "\n}"
+      // else
         b
     } else if (y.in.length == 1) {
       val x = y.in.head
-      val b = utils.captureOut(traverse(y))
+      val l = captureLines(traverse(y))
+      val b = l.mkString("\n")
       def typed(s:String) = if (argType) s+": Int" else s //FIXME hardcoded
       def paren(s:String) = if (argType) "("+s+")" else s
-      if (b contains '\n')
+      if (l.length > 1)
         paren(s"{ ${typed(quote(x))}$eff => \n$b\n}")
       else
         s"(${paren(typed(quote(x)))}$eff => $b)"
@@ -197,9 +205,14 @@ class CompactScalaCodeGen extends CompactTraverser {
 
 
   // process and print block results
-  override def traverse(ns: Seq[Node], y: Block): Unit = {
-    super.traverse(ns, y)
-    print(shallow(y.res) + quoteEff(y.eff))
+  override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
+    // if (numStms > 0) emit("{")
+    super.traverseCompact(ns, y)
+    if (y.res != Const(()))
+      emit(shallow(y.res) + quoteEff(y.eff))
+    else
+      emit(quoteEff(y.eff))
+    // if (numStms > 0) emit("}")
   }
 
 
@@ -290,8 +303,8 @@ class CompactScalaCodeGen extends CompactTraverser {
 
 
   override def apply(g: Graph) = {
-    super.apply(g)
-    println
+    val ls = captureLines(super.apply(g))
+    ls.foreach(println)
   }
 }
 

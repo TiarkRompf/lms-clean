@@ -114,8 +114,8 @@ class CompactTraverser extends Traverser {
     case _ => true
   }
 
-
   var shouldInline: Sym => Option[Node] = (_ => None)
+  var numStms = 0
 
   object InlineSym {
     def unapply(x: Sym) = shouldInline(x)
@@ -123,7 +123,8 @@ class CompactTraverser extends Traverser {
 
   override def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
     val save = shouldInline
-    try super.withScope(p, ns)(b) finally { shouldInline = save }
+    val save1 = numStms
+    try super.withScope(p, ns)(b) finally { shouldInline = save; numStms = save1 }
   }
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
@@ -192,22 +193,27 @@ class CompactTraverser extends Traverser {
     if (y.res.isInstanceOf[Sym])
       checkInline(y.res.asInstanceOf[Sym]) // try to inline y.res, state after must be y.eff
 
+    numStms = 0
+
     for (n <- ns.reverse) {
       if (shouldInline(n.n).isEmpty) {
-        processNodeHere(n)
+        processNodeHere(n); numStms += 1
       }
     }
 
 
     // ----- forward pass -----
 
+    traverseCompact(ns, y)
+  }
+
+  def traverseCompact(ns: Seq[Node], y: Block): Unit = {
     // only emit statements if not inlined
     for (n <- ns) {
       if (shouldInline(n.n).isEmpty)
         traverse(n)
     }
   }
-
 
   // subclass responsibility:
 
