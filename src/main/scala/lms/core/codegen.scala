@@ -178,7 +178,7 @@ class CompactScalaCodeGen extends CompactTraverser {
 
   def quoteBlock(f: => Unit) = {
     val ls = captureLines(f)
-    if (ls.length > 1) {
+    if (ls.length != 1) {
       "{\n" + ls.mkString("\n") + "\n}"
     } else ls.mkString("\n")
   }
@@ -196,7 +196,7 @@ class CompactScalaCodeGen extends CompactTraverser {
       val b = l.mkString("\n")
       def typed(s:String) = if (argType) s+": Int" else s //FIXME hardcoded
       def paren(s:String) = if (argType) "("+s+")" else s
-      if (l.length > 1)
+      if (l.length != 1)
         paren(s"{ ${typed(quote(x))}$eff => \n$b\n}")
       else
         s"(${paren(typed(quote(x)))}$eff => $b)"
