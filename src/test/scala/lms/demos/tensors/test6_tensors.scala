@@ -77,7 +77,6 @@ abstract class TensorLowering extends Transformer {
   import frontEnd._
   def init() = {
     frontEnd.g = frontEnd.mkGraphBuilder()
-    frontEnd.g.name = "TensorLowering"
     g = frontEnd.g
   }
 
@@ -98,7 +97,6 @@ abstract class TensorFusionV extends Transformer {
   import frontEnd._
   def init() = {
     frontEnd.g = frontEnd.mkGraphBuilder()
-    frontEnd.g.name = "TensorFusionV"
     g = frontEnd.g
   }
 
@@ -127,7 +125,6 @@ abstract class TensorFusionH extends Transformer {
   import frontEnd._
   def init() = {
     frontEnd.g = frontEnd.mkGraphBuilder()
-    frontEnd.g.name = "TensorFusionH"
     g = frontEnd.g
   }
 
@@ -240,7 +237,6 @@ abstract class MultiLoopLowering extends Transformer {
   import frontEnd._
   def init() = {
     frontEnd.g = frontEnd.mkGraphBuilder()
-    frontEnd.g.name = "MultiLoopLowering"
     g = frontEnd.g
   }
 
@@ -313,7 +309,6 @@ abstract class MultiLoopBuilderLowering extends Transformer {
   import frontEnd._
   def init() = {
     frontEnd.g = frontEnd.mkGraphBuilder()
-    frontEnd.g.name = "MultiLoopBuilderLowering"
     g = frontEnd.g
   }
 
@@ -357,7 +352,6 @@ abstract class MultiDimForeachLowering extends Transformer {
   import frontEnd._
   def init() = {
     frontEnd.g = frontEnd.mkGraphBuilder()
-    frontEnd.g.name = "MultiDimForeachLowering"
     g = frontEnd.g
   }
 

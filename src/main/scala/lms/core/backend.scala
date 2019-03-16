@@ -5,6 +5,8 @@ import scala.collection.mutable
 
 object Backend {
 
+  // TODO: add type info and location info
+
   // Expressions are first-class entities in a program
   // that can be manipulated freely. An expression is
   // either a constant or a symbolic reference.
@@ -96,37 +98,29 @@ class GraphBuilder {
     }
   }
 
-  var name: String = ""
 
-  var rewrites: (String => Any => Option[Exp]) = (s => x => None)
-
-  def rewrite(f: PartialFunction[Any,Exp]) = {
-    val old = rewrites
-    val f1 = ((x:Any) => if (f.isDefinedAt(x)) Some(f(x)) else None)
-    rewrites = (s => x => f1(x).orElse(old(s)(x)))
-  }
-
+  def rewrite(s: String, as: List[Def]): Option[Exp] = None
 
   def reflect(s: String, as: Def*): Exp = {
     reflectEffect(s, as:_*)()
   }
 
-  def reflectEffect(s: String, as: Def*)(efs: Exp*): Exp = {
+  def reflectEffect(s: String, as: Def*)(efKeys: Exp*): Exp = {
     // rewrite?
-    rewrites(name)((s,as.toList)) match {
+    rewrite(s,as.toList) match {
       case Some(e) => e 
       case None => 
 
       // latent effects? closures, mutable vars, ... (these are the keys!)
-      val efs2 = (as.toList.flatMap(getLatentEffect) ++ efs).distinct
+      val efKeys2 = (as.toList.flatMap(getLatentEffect) ++ efKeys).distinct
 
       // effects or pure?
-      if (efs2.nonEmpty) {
+      if (efKeys2.nonEmpty) {
         val sm = Sym(fresh) 
         // gather effect dependencies
-        val prev = effectForKeys(curBlock,efs2)
-        try reflect(sm, s, as:_*)(prev:_*)(efs2:_*)
-        finally curBlock = updateEffectForKeys(curBlock,efs2,sm)
+        val prev = effectForKeys(curBlock,efKeys2)
+        try reflect(sm, s, as:_*)(prev:_*)(efKeys2:_*)
+        finally curBlock = updateEffectForKeys(curBlock,efKeys2,sm)
       } else {
         // cse? never for effectful stm
         globalDefs.find(n => n.op == s && n.rhs == as) match {
@@ -174,8 +168,8 @@ class GraphBuilder {
 
   type Effect = List[Exp]
 
-  // es the accumulated effect (list of effectful stms) of the current block
-  // efs is the set of effect keys of interest
+  // es: the accumulated effect (list of effectful stms) of the current block
+  // efs: the set of effect keys of interest
   // return a new effect (subset of es) based on the keys efs
   def effectForKeys(es: Effect, efs: List[Exp]): Effect = {
     es.flatMap { e =>

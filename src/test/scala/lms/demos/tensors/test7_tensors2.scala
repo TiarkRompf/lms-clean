@@ -90,8 +90,8 @@ class TensorFrontEnd2 extends FrontEnd {
   }
 
 
-  //var name: String = ""
-
+  var name: String = ""
+  
   var rewrites: (String => Any => Option[Exp]) = (s => x => None)
 
   def rewriteAt[T:Type](key: Any)(f: PartialFunction[Any,T]) = {
@@ -305,6 +305,11 @@ class TensorFrontEnd2 extends FrontEnd {
   class MyGraphBuilder extends GraphBuilder {
     rewrites = TensorFrontEnd2.this.rewrites
 
+    override def rewrite(s: String, as: List[Def]): Option[Exp] = {
+      rewrites(name)((s,as))
+    }
+
+
     override def reflect(s: String, as: Def*): Exp = (s,as.toList) match {
       case ("+", List(Const(a:Int),Const(b:Int))) => Const(a+b)
       case ("-", List(Const(a:Int),Const(b:Int))) => Const(a-b)
@@ -330,7 +335,7 @@ class TensorFrontEnd2 extends FrontEnd {
 class TensorTransformer(name: String) extends Transformer {
   val frontEnd: TensorFrontEnd2 = new TensorFrontEnd2
   frontEnd.g = frontEnd.mkGraphBuilder()
-  frontEnd.g.name = name
+  frontEnd.name = name
   g = frontEnd.g
 }
 
