@@ -303,7 +303,6 @@ class TensorFrontEnd2 extends FrontEnd {
   override def mkGraphBuilder() = new MyGraphBuilder()
 
   class MyGraphBuilder extends GraphBuilder {
-    rewrites = TensorFrontEnd2.this.rewrites
 
     override def rewrite(s: String, as: List[Def]): Option[Exp] = {
       rewrites(name)((s,as))
