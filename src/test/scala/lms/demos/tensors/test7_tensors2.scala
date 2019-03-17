@@ -82,7 +82,7 @@ class TensorFrontEnd2 extends FrontEnd {
       case (s: String, rhs: List[_]) => 
         Some((s,rhs.filter(_.isInstanceOf[Exp]).map(_.asInstanceOf[Exp])))
       case s @ Sym(_) =>
-        g.globalDefs.find(_.n == s).map(n => (n.op,n.rhs.filter(_.isInstanceOf[Exp]).map(_.asInstanceOf[Exp])))
+        g.findDefinition(s).map(n => (n.op,n.rhs.filter(_.isInstanceOf[Exp]).map(_.asInstanceOf[Exp])))
       case x: Product if x.productArity == 1 => // INT(s), STRING(s), etc
         unapply(x.productElement(0))
       case _ => None
@@ -272,7 +272,7 @@ class TensorFrontEnd2 extends FrontEnd {
   rewrite0 { 
     // NOTE: this will inline ALL function calls! (TODO: should have a more specific mechanism)
     case Reflect("@", List(f@Reflect("λ", Nil), x)) =>
-      val Node(s,"λ",List(b@Block(List(in),out,ein,eout)),_) = g.globalDefs.find(_.n == f).get
+      val Node(s,"λ",List(b@Block(List(in),out,ein,eout)),_) = g.findDefinition(f).get
 
       val bound = new Bound
       bound(Graph(g.globalDefs.toList,b))

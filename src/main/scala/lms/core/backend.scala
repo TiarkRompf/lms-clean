@@ -86,6 +86,9 @@ import Backend._
 
 class GraphBuilder {
   val globalDefs = new mutable.ArrayBuffer[Node]
+  // TODO:
+  // val globalDefsCache = new mutable.HashMap[Sym,Node]
+  // val globalDefsReverseCache = new mutable.HashMap[Sym,Node]
 
   var nSyms = 0
   def fresh = try nSyms finally nSyms += 1
@@ -93,11 +96,13 @@ class GraphBuilder {
   object Def {
     def unapply(xs: Def): Option[(String,List[Def])] = xs match {
       case s @ Sym(n) =>
-        globalDefs.find(_.n == s).map(n => (n.op,n.rhs))
+        findDefinition(s).map(n => (n.op,n.rhs))
       case _ => None
     }
   }
 
+  def findDefinition(s: Exp): Option[Node] = globalDefs.find(_.n == s)
+  def findDefinition(op: String, as: Seq[Def]): Option[Node] = globalDefs.find(n => n.op == op && n.rhs == as)
 
   def rewrite(s: String, as: List[Def]): Option[Exp] = None
 
@@ -126,7 +131,7 @@ class GraphBuilder {
         res
       } else {
         // cse? never for effectful stm
-        globalDefs.find(n => n.op == s && n.rhs == as) match {
+        findDefinition(s,as) match {
           case Some(n) => n.n
           case None =>
             reflect(Sym(fresh), s, as:_*)()()
@@ -156,8 +161,8 @@ class GraphBuilder {
   def getLatentEffect(x: Def) = x match {
     case b: Block => 
       getEffKeys(b)
-    case x: Sym =>
-      globalDefs.find(_.n == x) match {
+    case s: Sym =>
+      findDefinition(s) match {
         case Some(Node(_, "λ", List(b @ Block(ins, out, ein, eout)), _)) =>
           getEffKeys(b)
         case _ => 

@@ -67,7 +67,7 @@ class FrontEnd {
   
   def APP(f: Exp, x: INT): INT = {
     // XXX lookup lambda ...
-    g.globalDefs.find(_.n == f) match {
+    g.findDefinition(f) match {
       case Some(Node(f, "λ", List(b: Block), _)) =>
         if (g.isPure(b))
           INT(g.reflect("@",f,x.x))
