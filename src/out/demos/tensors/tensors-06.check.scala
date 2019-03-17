@@ -50,22 +50,22 @@ def tensors_06(x0: Int): Int /* x1 */ = {
   val x3 = forloops(List(100), ({ x5: Int /* x6 */ =>
     val x4 = sum_builder_add(x2, x5, 1 + 2 * seq_apply(x5, 0))/* val x4 = x2:x6 */
     /* x4 */
-  })/* val x7 = x2:x2 */)/* val x3 = x2:x7 */
-  val x8 = SumBuilder1(0)/* val x8 = Const(STORE):x2 */
-  val x9 = forloops(List(100), ({ x11: Int /* x13 */ =>
-    val x10 = 1 + 2 * seq_apply(x11, 0)
-    val x12 = sum_builder_add(x8, x11, x10 * x10)/* val x12 = x8:x13 */
-    /* x12 */
-  })/* val x14 = x8:x8x1 */)/* val x9 = x8:x14x1 */
-  val x15 = SumBuilder1(0)/* val x15 = Const(STORE):x8x1x2 */
-  val x16 = forloops(List(100), ({ x18: Int /* x19 */ =>
-    val x17 = sum_builder_add(x15, x18, 1 + 2 * seq_apply(x18, 0))/* val x17 = x15:x19 */
-    /* x17 */
-  })/* val x20 = x15:x15x1 */)/* val x16 = x15:x20x1 */
-  val x21 = sum_builder_res(x15)/* val x22 = x15:x16x1 */ / 100
-  println(sum_builder_res(x2)/* val x23 = x2:x3 */ / 100)/* val x24 = "CTRL":x1 */
-  println(sum_builder_res(x8)/* val x25 = x8:x9x1 */ / 100 - x21 * x21)/* val x26 = "CTRL":x24x1 */
-  0 /* x26x22x25x23 */
+  }))/* val x3 = x2:x2 */
+  val x7 = SumBuilder1(0)/* val x7 = Const(STORE):x2 */
+  val x8 = forloops(List(100), ({ x10: Int /* x12 */ =>
+    val x9 = 1 + 2 * seq_apply(x10, 0)
+    val x11 = sum_builder_add(x7, x10, x9 * x9)/* val x11 = x7:x12 */
+    /* x11 */
+  }))/* val x8 = x7:x7 */
+  val x13 = SumBuilder1(0)/* val x13 = Const(STORE):x7 */
+  val x14 = forloops(List(100), ({ x16: Int /* x17 */ =>
+    val x15 = sum_builder_add(x13, x16, 1 + 2 * seq_apply(x16, 0))/* val x15 = x13:x17 */
+    /* x15 */
+  }))/* val x14 = x13:x13 */
+  val x18 = sum_builder_res(x13)/* val x19 = x13:x14 */ / 100
+  println(sum_builder_res(x2)/* val x20 = x2:x3 */ / 100)/* val x21 = "CTRL":x1 */
+  println(sum_builder_res(x7)/* val x22 = x7:x8 */ / 100 - x18 * x18)/* val x23 = "CTRL":x21 */
+  0 /* x13x20x19x23x22 */
 }
 // After Tensor fusion H2:
 def tensors_06(x0: Int): Int /* x1 */ = {
@@ -77,12 +77,12 @@ def tensors_06(x0: Int): Int /* x1 */ = {
     val x8 = sum_builder_add(x2, x7, x6)/* val x8 = x2:x9 */
     val x10 = sum_builder_add(x3, x7, x6 * x6)/* val x10 = x3:x9 */
     val x11 = sum_builder_add(x4, x7, x6)/* val x11 = x4:x9 */
-    /* x11x10x8 */
-  })/* val x12 = x2,x3,x4:x4 */)/* val x5 = x2,x3,x4:x12 */
-  val x13 = sum_builder_res(x4)/* val x14 = x4:x5 */ / 100
-  println(sum_builder_res(x2)/* val x15 = x2:x5 */ / 100)/* val x16 = "CTRL":x1 */
-  println(sum_builder_res(x3)/* val x17 = x3:x5 */ / 100 - x13 * x13)/* val x18 = "CTRL":x16x1 */
-  0 /* x18x15x14x17 */
+    /* x8x10x11 */
+  }))/* val x5 = x2,x3,x4:x2x3x4 */
+  val x12 = sum_builder_res(x4)/* val x13 = x4:x5 */ / 100
+  println(sum_builder_res(x2)/* val x14 = x2:x5 */ / 100)/* val x15 = "CTRL":x1 */
+  println(sum_builder_res(x3)/* val x16 = x3:x5 */ / 100 - x12 * x12)/* val x17 = "CTRL":x15 */
+  0 /* x13x4x16x17x14 */
 }
 // After MultiDim foreach lowering:
 def tensors_06(x0: Int): Int /* x1 */ = {
@@ -95,9 +95,9 @@ def tensors_06(x0: Int): Int /* x1 */ = {
     x3 = x3/* x3:x9 */ + x6 * x6
     x4 = x4/* x4:x9 */ + x6
     /* x12x13x14 */
-  })/* val x15 = x2,x3,x4:x4 */)/* val x5 = x2,x3,x4:x15 */
-  val x16 = x4/* val x17 = x4:x5 */ / 100
-  println(x2/* val x18 = x2:x5 */ / 100)/* val x19 = "CTRL":x1 */
-  println(x3/* val x20 = x3:x5 */ / 100 - x16 * x16)/* val x21 = "CTRL":x19x1 */
-  0 /* x21x18x17x20 */
+  }))/* val x5 = x2,x3,x4:x2x3x4 */
+  val x15 = x4/* val x16 = x4:x5 */ / 100
+  println(x2/* val x17 = x2:x5 */ / 100)/* val x18 = "CTRL":x1 */
+  println(x3/* val x19 = x3:x5 */ / 100 - x15 * x15)/* val x20 = "CTRL":x18 */
+  0 /* x19x16x4x20x17 */
 }

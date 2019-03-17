@@ -112,15 +112,18 @@ class GraphBuilder {
       case None => 
 
       // latent effects? closures, mutable vars, ... (these are the keys!)
-      val efKeys2 = (as.toList.flatMap(getLatentEffect) ++ efKeys).distinct
+      val efKeys2 = (if (s == "λ") efKeys else // NOTE: block in lambda is a latent effect for app, not declaration
+        (as.toList.flatMap(getLatentEffect) ++ efKeys)).distinct
 
       // effects or pure?
       if (efKeys2.nonEmpty) {
         val sm = Sym(fresh) 
         // gather effect dependencies
-        val prev = effectForKeys(curBlock,efKeys2)
-        try reflect(sm, s, as:_*)(prev:_*)(efKeys2:_*)
-        finally curBlock = updateEffectForKeys(curBlock,efKeys2,sm)
+        def latest(e1: Exp, e2: Exp) = if (curLocalDefs(e1)) e1 else e2
+        val prev = efKeys2.map(e => curEffects.getOrElse(e,latest(e,curBlock))).distinct
+        val res = reflect(sm, s, as:_*)(prev:_*)(efKeys2:_*)
+        for (e <- efKeys2) curEffects = curEffects + (e -> res)
+        res
       } else {
         // cse? never for effectful stm
         globalDefs.find(n => n.op == s && n.rhs == as) match {
@@ -134,6 +137,7 @@ class GraphBuilder {
   
   def reflect(x: Sym, s: String, as: Def*)(efDeps: Exp*)(efKeys: Exp*): Exp = {
     globalDefs += Node(x,s,as.toList,EffectSummary(efDeps.toList, efKeys.toList))
+    curLocalDefs += x
     x
   }
 
@@ -164,49 +168,18 @@ class GraphBuilder {
   }
 
 
-  var curBlock: Effect = _ // could this become an ExplodedStruct?
-
-  type Effect = List[Exp]
-
-  // es: the accumulated effect (list of effectful stms) of the current block
-  // efs: the set of effect keys of interest
-  // return a new effect (subset of es) based on the keys efs
-  def effectForKeys(es: Effect, efs: List[Exp]): Effect = {
-    es.flatMap { e =>
-      globalDefs.find(_.n == e) match {
-        case Some(Node(n,op,rhs,eff)) =>
-          if ((efs contains n) || (efs intersect eff.keys).nonEmpty) {
-            List(e)
-          } else {
-            effectForKeys(eff.deps, efs)
-          }
-        case _ => List(e)
-      }
-    }.distinct
-  }
-
-  // remove all dependencies from es (typically curBlock) that are implied 
-  // by current node (sm, with effectKeys efs)
-  def updateEffectForKeys(es: Effect, efs: List[Exp], sm: Sym): Effect = {
-    val prev = effectForKeys(es,efs)
-    sm::(es.filterNot(prev.toSet))
-    // TODO: is this enough? (when following individual keys?)
-  }
-
+  var curBlock: Exp = _ // could this become an ExplodedStruct?
+  var curEffects: Map[Exp,Exp] = _ // map key to dep
+  var curLocalDefs: Set[Exp] = _
   
   // NOTE/TODO: want to mask out purely local effects
   def isPure(b: Block) = b.eff.deps == List(b.ein)
 
-  def getEffKeys0(b: Block): List[Exp] = {
-    // TODO -- cleanup: performance!!!
-
+  def getInnerNodes(b: Block): List[Node] = {
     val bound = new Bound
     bound(Graph(globalDefs.toList,b))
-
-    val nodes = globalDefs.toList.filter(n => bound.hm.getOrElse(n.n,Set())(b.ein))
-
-    // TODO: remove deps on nodes that are bound inside??
-    nodes.flatMap(_.eff.keys).distinct
+    val ins = b.ein::b.in
+    globalDefs.toList.filter(n => ins.exists(bound.hm.getOrElse(n.n,Set())))
   }
 
   def getEffKeys(b: Block): List[Exp] = b.eff.keys
@@ -215,27 +188,47 @@ class GraphBuilder {
 
   def reify(x: => Exp): Block = {
     val save = curBlock
+    val saveEffects = curEffects
+    val saveLocalDefs = curLocalDefs
     try {
       val block = Sym(fresh)
-      curBlock = List(block)
+      curBlock = block
+      curEffects = Map()
+      curLocalDefs = Set()
       val res = x 
-      val b0 = Block(Nil, res, block, EffectSummary(curBlock, Nil)) // XXX FIXME temp 
-      Block(Nil, res, block, EffectSummary(curBlock, getEffKeys0(b0)))
+      // remove local definitions from visible effect keys
+      // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
+      // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
+      val keys = curEffects.keys.filterNot(curLocalDefs).toList
+      val deps = if (curEffects.nonEmpty) curEffects.values.toList.distinct else List(curBlock)
+      Block(Nil, res, block, EffectSummary(deps, keys))
     } finally {
       curBlock = save
+      curEffects = saveEffects
+      curLocalDefs = saveLocalDefs
     }
   }
   def reify(x: Exp => Exp): Block = {
     val save = curBlock
+    val saveEffects = curEffects
+    val saveLocalDefs = curLocalDefs
     try {
       val block = Sym(fresh)
       val arg = Sym(fresh)
-      curBlock = List(block)
+      curBlock = block
+      curEffects = Map()
+      curLocalDefs = Set()
       val res = x(arg) 
-      val b0 = Block(arg::Nil, res, block, EffectSummary(curBlock, Nil)) // XXX FIXME temp 
-      Block(arg::Nil, res, block, EffectSummary(curBlock, getEffKeys0(b0)))
+      // remove local definitions from visible effect keys
+      // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
+      // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
+      val keys = curEffects.keys.filterNot(curLocalDefs).toList
+      val deps = if (curEffects.nonEmpty) curEffects.values.toList.distinct else List(curBlock)
+      Block(arg::Nil, res, block, EffectSummary(deps, keys))
     } finally {
       curBlock = save
+      curEffects = saveEffects
+      curLocalDefs = saveLocalDefs
     }
   }
 
