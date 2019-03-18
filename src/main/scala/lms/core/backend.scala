@@ -86,9 +86,8 @@ import Backend._
 
 class GraphBuilder {
   val globalDefs = new mutable.ArrayBuffer[Node]
-  // TODO:
-  // val globalDefsCache = new mutable.HashMap[Sym,Node]
-  // val globalDefsReverseCache = new mutable.HashMap[Sym,Node]
+  val globalDefsCache = new mutable.HashMap[Sym,Node]
+  val globalDefsReverseCache = new mutable.HashMap[(String,Seq[Def]),Node]
 
   var nSyms = 0
   def fresh = try nSyms finally nSyms += 1
@@ -101,8 +100,8 @@ class GraphBuilder {
     }
   }
 
-  def findDefinition(s: Exp): Option[Node] = globalDefs.find(_.n == s)
-  def findDefinition(op: String, as: Seq[Def]): Option[Node] = globalDefs.find(n => n.op == op && n.rhs == as)
+  def findDefinition(s: Exp): Option[Node] = s match { case s: Sym => globalDefsCache.get(s) case _ => None }
+  def findDefinition(op: String, as: Seq[Def]): Option[Node] = globalDefsReverseCache.get((op,as))
 
   def rewrite(s: String, as: List[Def]): Option[Exp] = None
 
@@ -141,7 +140,10 @@ class GraphBuilder {
   }
   
   def reflect(x: Sym, s: String, as: Def*)(efDeps: Exp*)(efKeys: Exp*): Exp = {
-    globalDefs += Node(x,s,as.toList,EffectSummary(efDeps.toList, efKeys.toList))
+    val n = Node(x,s,as.toList,EffectSummary(efDeps.toList, efKeys.toList))
+    globalDefs += n
+    globalDefsCache(x) = n
+    globalDefsReverseCache((s,n.rhs)) = n
     curLocalDefs += x
     x
   }
