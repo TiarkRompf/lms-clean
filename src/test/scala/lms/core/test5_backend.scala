@@ -50,7 +50,7 @@ class BackendTest extends TutorialFunSuite {
 
         val fc = sc.compile[Int,Int](className, {
           s"// Generated code\nclass ${className} extends (Int => Int) {\n def apply($arg: Int): Int = {\n $src\n }\n }"
-        })
+        }, Nil)
 
         println("// Output:")
 

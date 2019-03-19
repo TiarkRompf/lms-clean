@@ -52,7 +52,7 @@ trait ScalaCompile {
 
   // NOTE: class name must be unique (e.g. use nextClassName)
   //def compile[A,B](f: Exp[A] => Exp[B])(implicit mA: Typ[A], mB: Typ[B]): A=>B = {
-  def compile[A,B](className: String, source: String): A=>B = {
+  def compile[A,B](className: String, source: String, staticData: List[(Class[_],Any)]): A=>B = {
     if (this.compiler eq null)
       setupCompiler()
     
@@ -62,7 +62,7 @@ trait ScalaCompile {
     // val writer = new PrintWriter(source)
     // val staticData = codegen.emitSource(f, className, writer)
 
-    val staticData: List[({val tp: Manifest[Any]},Any)] = Nil
+    // val staticData: List[({val tp: Manifest[Any]},Any)] = Nil
 
     // codegen.emitDataStructures(writer)
 
@@ -90,7 +90,7 @@ trait ScalaCompile {
     val loader = new AbstractFileClassLoader(fileSystem, this.getClass.getClassLoader)
 
     val cls: Class[_] = loader.loadClass(className)
-    val cons = cls.getConstructor(staticData.map(_._1.tp.erasure):_*)
+    val cons = cls.getConstructor(staticData.map(_._1):_*)
     
     val obj: A=>B = cons.newInstance(staticData.map(_._2.asInstanceOf[AnyRef]):_*).asInstanceOf[A=>B]
     obj
