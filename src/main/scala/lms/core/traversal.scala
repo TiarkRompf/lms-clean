@@ -150,8 +150,8 @@ class CompactTraverser extends Traverser {
     if (y.res.isInstanceOf[Sym]) hm(y.res.asInstanceOf[Sym]) = 1
     for (n <- ns) {
       df(n.n) = n
-      for (s <- directSyms(n) if df.contains(s)) // do not count refs through blocks or effects
-        hm(s) = hm.getOrElse(s,0) + 1
+      for (s <- directSyms(n) if df.contains(s) || n.op == "λforward") // do not count refs through blocks or effects
+        hm(s) = hm.getOrElse(s,0) + 1                                  // NOTE: λforward is to deal with recursive defs
       for (s <- syms(n) if df.contains(s))
         succ(s) = n.n::succ.getOrElse(s,Nil)
     }
