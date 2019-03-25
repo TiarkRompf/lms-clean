@@ -7,6 +7,7 @@ Auto-Generating the IR
 package lms
 package experimental
 
+import lms.core.utils
 import scala.annotation.implicitNotFound
 
 class AutoTest extends TutorialFunSuite {

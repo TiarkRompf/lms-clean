@@ -7,6 +7,7 @@ Rewrites with Generic Types
 package lms
 package experimental
 
+import lms.core.utils
 import scala.annotation.implicitNotFound
 
 class RewriteTest extends TutorialFunSuite {

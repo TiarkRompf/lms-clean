@@ -4,19 +4,6 @@ import scala.collection.mutable
 
 import Backend._
 
-
-object utils {
-    // XXX do without
-  def captureOut(func: => Any): String = {
-    val source = new java.io.ByteArrayOutputStream()
-    withOutput(new java.io.PrintStream(source))(func)
-    source.toString    
-  }
-  def withOutput[T](out: java.io.PrintStream)(f: => Unit): Unit = {
-    scala.Console.withOut(out)(scala.Console.withErr(out)(f))
-  }
-}
-
 class CodeGen extends Traverser {
 
   def emit(s: String) = println(s)

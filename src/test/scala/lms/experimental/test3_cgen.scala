@@ -7,6 +7,7 @@ Generating C directly
 package lms
 package experimental
 
+import lms.core.utils
 import scala.annotation.implicitNotFound
 
 class CGenTest extends TutorialFunSuite {
