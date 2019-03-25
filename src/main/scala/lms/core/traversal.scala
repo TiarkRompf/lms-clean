@@ -67,6 +67,50 @@ abstract class Traverser {
       }
     }
 
+/*
+    NOTES ON RECURSIVE SCHEDULES
+
+    // E.g. from tutorials/AutomataTest:
+    //    x2 = fwd; x23 = DFAState(x2); x2' = (λ ...); x23
+
+    // PROBLEM: Since we iterate over g.nodes in reverse order, the lambda (x2') 
+    // is initially not reachable (only the fwd node x2)!
+
+    // Ideally we would directly want to build something like 
+    //    x23 = fwd; x2 = (λ ...) ; x23 = DFAState(x2)
+    // but this seems hard to achieve in general.
+
+    // We fixed it so far by using a different symbol inside and outside the
+    // function, so now we get:
+    //    x2 = fwd; x23 = DFAState(x2); x2' = (λ ...) ; x33 = DFAState(x2')
+
+    // This is less ideal in terms of CSE, but at least we get a correct
+    // schedule.
+
+    // We could improve this by using a proper call to SCC instead of just
+    // iterating over g.nodes in reverse order. The performance implications
+    // aren't clear, to we decided to postponse this.
+
+    // Code would look like this:
+
+    def find(s: Sym) = g.nodes.reverse.find(_.n == s).toList
+    def succ(s: Sym) = {
+      find(s).flatMap { d =>
+      if (available(d)) symsFreq(d) collect { case (e:Sym,f) if f > 0.5 => e }
+      else symsFreq(d) collect { case (e:Sym,f) => e }
+    }}
+
+    val nodes1 = lms.util.GraphUtil.stronglyConnectedComponents(g.block.used, succ)
+
+    // nodes1.foreach(println)
+
+    // def tb(x: Boolean) = if (x) 1 else 0
+    // for (n <- inner) {
+    //   println(s"// ${tb(available(n))} ${tb(reach(n.n))} $n ${symsFreq(n)}")
+    // }
+*/
+
+
     // Should node d be scheduled here? It must be:
     // (1) available: not dependent on other bound vars
     // (2) used at least as often as the block result
