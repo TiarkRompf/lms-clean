@@ -376,7 +376,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen0 {
   def quoteEff(x: Def) = ""
 
   def remap(m: Manifest[_]): String = m.toString
-  val nameMap: Map[String, String] = Map(
+  val nameMap: Map[String, String] = Map( // FIXME: tutorial-specific
     "ScannerNew"     -> "new scala.lms.tutorial.Scanner",
     "ScannerHasNext" -> "Scanner.hasNext",
     "ScannerNext"    -> "Scanner.next",

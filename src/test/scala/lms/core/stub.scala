@@ -271,7 +271,7 @@ trait UtilOpsExp extends UtilOps with BaseExp { this: DslExp =>
 
 
 
-@virtualize
+// @virtualize
 trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString with LiftPrimitives with LiftNumeric with LiftBoolean with IfThenElse with Equal with RangeOps with OrderingOps with MiscOps with ArrayOps with StringOps with SeqOps with Functions with While with StaticData with Variables with LiftVariables with ObjectOps with UtilOps {
   implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
   implicit class BooleanOps2(lhs: Rep[Boolean]) {
@@ -282,7 +282,7 @@ trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString w
   def comment[A:Typ](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A]
 }
 
-@virtualize
+// @virtualize
 trait DslExp extends Dsl with PrimitiveOpsExpOpt with NumericOpsExpOpt with BooleanOpsExp with IfThenElseExpOpt with EqualExpBridgeOpt with RangeOpsExp with OrderingOpsExp with MiscOpsExp with EffectExp with ArrayOpsExpOpt with StringOpsExp with SeqOpsExp with FunctionsRecursiveExp with WhileExp with StaticDataExp with VariablesExpOpt with ObjectOpsExpOpt with UtilOpsExp {
   //STUB
   // override def boolean_or(lhs: Exp[Boolean], rhs: Exp[Boolean])(implicit pos: SourceContext) : Exp[Boolean] = lhs match {
@@ -323,7 +323,7 @@ trait DslExp extends Dsl with PrimitiveOpsExpOpt with NumericOpsExpOpt with Bool
   // override def isPrimitiveType[T](m: Typ[T]) = (m == manifest[String]) || super.isPrimitiveType(m)
 }
 
-@virtualize
+// @virtualize
 trait DslGen extends ScalaGenNumericOps
     with ScalaGenPrimitiveOps with ScalaGenBooleanOps with ScalaGenIfThenElse
     with ScalaGenEqual with ScalaGenRangeOps with ScalaGenOrderingOps
@@ -369,7 +369,7 @@ trait DslGen extends ScalaGenNumericOps
 */
 }
 
-@virtualize
+// @virtualize
 trait DslImpl extends DslExp { q =>
   val codegen = new DslGen {
     val IR: q.type = q
@@ -377,7 +377,7 @@ trait DslImpl extends DslExp { q =>
 }
 
 // TODO: currently part of this is specific to the query tests. generalize? move?
-@virtualize
+// @virtualize
 trait DslGenC extends CGenBase with CGenNumericOps
     with CGenPrimitiveOps with CGenBooleanOps with CGenIfThenElse
     with CGenEqual with CGenRangeOps with CGenOrderingOps
@@ -521,12 +521,12 @@ trait DslGenC extends CGenBase with CGenNumericOps
 
 
 
-@virtualize
+// @virtualize
 abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
   def snippet(x: Rep[A]): Rep[B]
 }
 
-@virtualize
+// @virtualize
 abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl with CompileScala {
   lazy val f = compile(snippet)(manifestTyp[A],manifestTyp[B])
   def precompile: Unit = f
@@ -542,7 +542,7 @@ abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with Dsl
   }
 }
 
-@virtualize
+// @virtualize
 abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] with DslExp {
   q =>
   val codegen = new DslGenC {
