@@ -747,7 +747,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   implicit class RangeOps(lhs: Rep[Range]) {
-    def foreach(f: Rep[Int] => Rep[Unit]): Rep[Unit] = {
+    def foreach(f: Rep[Int] => Rep[Unit])(implicit __pos: SourceContext): Rep[Unit] = {
 
       // XXX TODO: it would be good to do this as lowering/codegen
       // (as done previously in LMS), but for now just construct
@@ -798,6 +798,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
                      (Adapter.INT(Unwrap(b))).x)
   }
   def __whileDo(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
+      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
+  }
+  def __whileDoInternal(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
       Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
   }
 
@@ -1019,14 +1022,14 @@ trait OrderingOps extends Base with OverloadHack {
 trait LiftPrimitives {
   this: PrimitiveOps =>
 
-  implicit def intToRepInt(x: Int) = unit(x)
-  implicit def floatToRepFloat(x: Float) = unit(x)
-  implicit def doubleToRepDouble(x: Double) = unit(x)
-  implicit def longToRepLong(x: Long) = unit(x)
+  implicit def intToRepInt(x: Int)(implicit __pos: SourceContext) = unit(x)
+  implicit def floatToRepFloat(x: Float)(implicit __pos: SourceContext) = unit(x)
+  implicit def doubleToRepDouble(x: Double)(implicit __pos: SourceContext) = unit(x)
+  implicit def longToRepLong(x: Long)(implicit __pos: SourceContext) = unit(x)
 
   // precision-widening promotions
-  implicit def chainIntToRepFloat[A:Manifest](x: A)(implicit c: A => Rep[Int]): Rep[Float] = repIntToRepFloat(c(x))
-  implicit def chainFloatToRepDouble[A:Manifest](x: A)(implicit c: A => Rep[Float]): Rep[Double] = repFloatToRepDouble(c(x))
+  implicit def chainIntToRepFloat[A:Manifest](x: A)(implicit c: A => Rep[Int], __pos: SourceContext): Rep[Float] = repIntToRepFloat(c(x))
+  implicit def chainFloatToRepDouble[A:Manifest](x: A)(implicit c: A => Rep[Float], __pos: SourceContext): Rep[Double] = repFloatToRepDouble(c(x))
 }
 
 /**
@@ -1039,13 +1042,13 @@ trait PrimitiveOps extends Base with OverloadHack {
   /**
    * Primitive conversions
    */
-  implicit def repIntToRepDouble(x: Rep[Int]): Rep[Double] = x.toDouble
-  implicit def repIntToRepFloat(x: Rep[Int]): Rep[Float] = x.toFloat
-  implicit def repIntToRepLong(x: Rep[Int]): Rep[Long] = x.toLong
-  implicit def repFloatToRepDouble(x: Rep[Float]): Rep[Double] = x.toDouble
-  implicit def repLongToRepFloat(x: Rep[Long]): Rep[Float] = x.toFloat
-  implicit def repLongToRepDouble(x: Rep[Long]): Rep[Double] = x.toDouble
-  implicit def repCharToRepInt(x: Rep[Char]): Rep[Int] = x.toInt
+  implicit def repIntToRepDouble(x: Rep[Int])(implicit __pos: SourceContext): Rep[Double] = x.toDouble
+  implicit def repIntToRepFloat(x: Rep[Int])(implicit __pos: SourceContext): Rep[Float] = x.toFloat
+  implicit def repIntToRepLong(x: Rep[Int])(implicit __pos: SourceContext): Rep[Long] = x.toLong
+  implicit def repFloatToRepDouble(x: Rep[Float])(implicit __pos: SourceContext): Rep[Double] = x.toDouble
+  implicit def repLongToRepFloat(x: Rep[Long])(implicit __pos: SourceContext): Rep[Float] = x.toFloat
+  implicit def repLongToRepDouble(x: Rep[Long])(implicit __pos: SourceContext): Rep[Double] = x.toDouble
+  implicit def repCharToRepInt(x: Rep[Char])(implicit __pos: SourceContext): Rep[Int] = x.toInt
 
   /**
    * Enumerate all combinations of primitive math.
@@ -1294,7 +1297,7 @@ trait PrimitiveOps extends Base with OverloadHack {
    */
 
   object Double {
-    def parseDouble(s:Rep[String]) = obj_double_parseDouble(s)
+    def parseDouble(s:Rep[String])(implicit __pos: SourceContext) = obj_double_parseDouble(s)
     def PositiveInfinity(implicit pos: SourceContext) = obj_double_positive_infinity
     def NegativeInfinity(implicit pos: SourceContext) = obj_double_negative_infinity
     def MinValue(implicit pos: SourceContext) = obj_double_min_value
@@ -1456,14 +1459,14 @@ trait PrimitiveOps extends Base with OverloadHack {
   }
 
   object Integer {
-    def parseInt(s: Rep[String])  = obj_integer_parseInt(s)
+    def parseInt(s: Rep[String])(implicit __pos: SourceContext)  = obj_integer_parseInt(s)
   }
 
   implicit def intToIntOps(n: Int): IntOpsCls = new IntOpsCls(unit(n))
   implicit def repIntToIntOps(n: Rep[Int]): IntOpsCls = new IntOpsCls(n)
   implicit def varIntToIntOps(n: Var[Int]): IntOpsCls = new IntOpsCls(readVar(n))
 
-  class IntOpsCls(self: Rep[Int])(implicit pos: SourceContext) {
+  class IntOpsCls(self: Rep[Int]) {
     // def +(__arg1: Int)(implicit pos: SourceContext,__imp1: Overloaded15) = { int_plus(self,unit(__arg1)) }
     // def +(__arg1: Float)(implicit pos: SourceContext,__imp1: Overloaded16) = { float_plus(self.toFloat,unit(__arg1)) }
     // def +(__arg1: Double)(implicit pos: SourceContext,__imp1: Overloaded17) = { double_plus(self.toDouble,unit(__arg1)) }
@@ -1556,7 +1559,7 @@ trait PrimitiveOps extends Base with OverloadHack {
 
   implicit def charToCharOps(self: Rep[Char]) = new CharOpsCls(self)
 
-  class CharOpsCls(self: Rep[Char])(implicit pos: SourceContext) {
+  class CharOpsCls(self: Rep[Char]) {
     def toInt(implicit pos: SourceContext) = char_toInt(self)
   }
 
@@ -1577,7 +1580,7 @@ trait PrimitiveOps extends Base with OverloadHack {
   implicit def repLongToLongOps(n: Rep[Long]): LongOpsCls = new LongOpsCls(n)
   implicit def varLongToLongOps(n: Var[Long]): LongOpsCls = new LongOpsCls(readVar(n))
 
-  class LongOpsCls(self: Rep[Long])(implicit pos: SourceContext) {
+  class LongOpsCls(self: Rep[Long]) {
     // def +(__arg1: Int)(implicit pos: SourceContext,__imp1: Overloaded15) = { long_plus(self,unit(__arg1.toLong)) }
     // def +(__arg1: Float)(implicit pos: SourceContext,__imp1: Overloaded16) = { float_plus(self.toFloat,unit(__arg1)) }
     // def +(__arg1: Double)(implicit pos: SourceContext,__imp1: Overloaded17) = { double_plus(self.toDouble,unit(__arg1)) }
