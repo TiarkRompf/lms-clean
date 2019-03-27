@@ -12,175 +12,56 @@ import Backend._
 
 import utils.time
 
-object Adapter extends FrontEnd {
+object Global {
   val sc = new lms.util.ScalaCompile {}
-  // sc.dumpGeneratedCode = true
+}
 
-  // def mkClassName(name: String) = {
-  //   // mangle class name
-  //   (name).replace("-","_")
-  // }
+
+object Adapter extends FrontEnd {
 
   def emitScala(name: String)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
-    emitCommon(name, "scala")(m1, m2)(prog)
+    emitCommon(name, new ExtendedScalaCodeGen)(m1, m2)(prog)
   }
 
   def emitC(name: String)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
-    emitCommon(name, "c")(m1, m2)(prog)
+    emitCommon(name, new ExtendedCCodeGen)(m1, m2)(prog)
   }
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
 
-  def emitCommon(name: String, target: String, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
-    // test(name) {
-      // lms.util.checkOut(name, "scala", {
-        // TODO: proper way to deal with state (move into graphBuilder?)
-        typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
-        funTable = Nil
+  def emitCommon(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
+    typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
+    funTable = Nil
 
-        var g = time("staging") { program(x => INT(prog(x.x))) }
+    var g = time("staging") { program(x => INT(prog(x.x))) }
 
+    def extra() =  if (verbose) utils.captureOut {
+      println("// Raw:")
+      g.nodes.foreach(println)
 
-        def extra() =  if (verbose) utils.captureOut {
-          println("// Raw:")
-          g.nodes.foreach(println)
+      println("// Generic Codegen:")
+      (new CodeGen)(g)
 
-          println("// Generic Codegen:")
-          (new CodeGen)(g)
+      println("// Scala Codegen:")
+      (new ScalaCodeGen)(g)
 
-          println("// Scala Codegen:")
-          (new ScalaCodeGen)(g)
+      println("// Compact Scala Codegen:")
+      (new ExtendedScalaCodeGen)(g)
+    } else ""
 
-          println("// Compact Scala Codegen:")
-          (new ExtendedScalaCodeGen)(g)
-        } else ""
+    time("codegen") {
+      val btstrm = new java.io.ByteArrayOutputStream()
+      val stream = new java.io.PrintStream(btstrm)
 
-        def emitSource() = {
+      cg.typeMap = typeMap
+      cg.stream = stream
 
-          val btstrm = new java.io.ByteArrayOutputStream()
-          val stream = new java.io.PrintStream(btstrm)
+      cg.emitAll(g,name)(m1,m2)
 
-          val cg: ExtendedCodeGen0 = target match {
-            case "scala" => new ExtendedScalaCodeGen
-            case "c"     => new ExtendedCCodeGen
-          }
-          // if (!verbose) cg.doRename = true
-          // if (eff)      cg.doPrintEffects = true
-
-          cg.typeMap = typeMap
-          cg.stream = stream
-
-          cg.init(g) // will run dce, compute statics
-
-          val arg = cg.quote(g.block.in.head)
-          val efs = "" //cg.quoteEff(g.block.ein)
-
-          def quoteStatic(n: Node) = n match {
-            case Node(s, "staticData", List(Const(a)), _) =>
-              val arg = "p"+cg.quote(s)
-              val tpe = a match { // FIXME: hardcoded ...
-                case a: Array[Array[Int]] => "Array[Array[Int]]"
-                case a: Array[Int] => "Array[Int]"
-              }
-              s"$arg: $tpe"
-          }
-
-          def extractStatic(n: Node) = n match {
-            case Node(s, "staticData", List(Const(a)), _) =>
-              (a.getClass, a)
-          }
-
-          val stt = cg.dce.statics.map(quoteStatic).mkString(", ")
-
-          target match {
-            case "scala" => 
-              val (ms1, ms2) = (cg.remap(m1), cg.remap(m2))
-              val className = name
-              stream.println("""
-              /*****************************************
-              Emitting Generated Code
-              *******************************************/
-              """)
-              stream.println(s"class $className($stt) extends ($ms1 => $ms2) {")
-              stream.println(s"  def apply($arg: $ms1): $ms2$efs = {")
-              cg(g)
-              stream.println( "  }")
-              stream.println( "}")
-              stream.println("""
-              /*****************************************
-              End of Generated Code
-              *******************************************/
-              """)
-            case "c"     => 
-              val (ms1, ms2) = (cg.remap(m1), cg.remap(m2))
-              val functionName = name
-              stream.println("""
-              #include <fcntl.h>
-              #include <errno.h>
-              #include <err.h>
-              #include <sys/mman.h>
-              #include <sys/stat.h>
-              #include <stdio.h>
-              #include <stdint.h>
-              #include <unistd.h>
-              #ifndef MAP_FILE
-              #define MAP_FILE MAP_SHARED
-              #endif
-              int fsize(int fd) {
-                struct stat stat;
-                int res = fstat(fd,&stat);
-                return stat.st_size;
-              }
-              int printll(char* s) {
-                while (*s != '\n' && *s != ',' && *s != '\t') {
-                  putchar(*s++);
-                }
-                return 0;
-              }
-              long hash(char *str0, int len)
-              {
-                unsigned char* str = (unsigned char*)str0;
-                unsigned long hash = 5381;
-                int c;
-
-                while ((c = *str++) && len--)
-                  hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-
-                return hash;
-              }
-              void Snippet(char*);
-              int main(int argc, char *argv[])
-              {
-                if (argc != 2) {
-                  printf("usage: query <filename>\n");
-                  return 0;
-                }
-                Snippet(argv[1]);
-                return 0;
-              }
-              /*****************************************
-              Emitting C Generated Code
-              *******************************************/
-              #include <stdio.h>
-              #include <stdlib.h>
-              #include <string.h>
-              #include <stdbool.h>
-              """)
-              stream.println(s"$ms2 $functionName($ms1 $arg) {")
-              cg(g)
-              stream.println("}")
-              stream.println("""
-              /*****************************************
-              End of C Generated Code
-              *******************************************/
-              """)
-          }
-          (btstrm.toString, cg.dce.statics.map(extractStatic))
-        }
-
-        time("codegen") { /*extra() + */emitSource() }
+      (btstrm.toString, cg.extractAllStatics)
     }
+  }
 
   override def mkGraphBuilder() = new MyGraphBuilder()
 
@@ -689,7 +570,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // def compile[A,B](f: Rep[A] => Rep[B]): A=>B = ???
   def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
     val (src, statics) = Adapter.emitScala("Snippet")(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
-    val fc = time("scalac") { Adapter.sc.compile[A,B]("Snippet", src, statics.toList) }
+    val fc = time("scalac") { Global.sc.compile[A,B]("Snippet", src, statics.toList) }
     fc
   }
 

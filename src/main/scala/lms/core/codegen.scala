@@ -336,7 +336,7 @@ class DeadCodeElimCG {
   }
 }
 
-trait ExtendedCodeGen0 extends CompactTraverser {
+trait ExtendedCodeGen extends CompactTraverser {
 
   var typeMap: collection.Map[lms.core.Backend.Exp, Manifest[_]] = _
 
@@ -348,10 +348,31 @@ trait ExtendedCodeGen0 extends CompactTraverser {
   def remap(m: Manifest[_]): String
 
   def init(g: Graph): Unit = { dce(g) }
+
+
+  def quoteStatic(n: Node) = n match {
+    case Node(s, "staticData", List(Const(a)), _) =>
+      val arg = "p"+quote(s)
+      val tpe = a match { // FIXME: hardcoded ...
+        case a: Array[Array[Int]] => "Array[Array[Int]]"
+        case a: Array[Int] => "Array[Int]"
+      }
+      s"$arg: $tpe"
+  }
+
+  def extractStatic(n: Node) = n match {
+    case Node(s, "staticData", List(Const(a)), _) =>
+      (a.getClass, a)
+  }
+
+  def extractAllStatics() = dce.statics.map(extractStatic)
+
+  def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit
+
 }
 
 
-class ExtendedScalaCodeGen extends ExtendedCodeGen0 {
+class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
   val rename = new mutable.HashMap[Sym,String]
 
@@ -562,9 +583,34 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen0 {
   def emitln(s: String) = stream.println(s)
   def emitln() = stream.println()
 
+
+  def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit = {
+    init(g)
+    val arg = quote(g.block.in.head)
+    val efs = "" //quoteEff(g.block.ein)
+    val stt = dce.statics.map(quoteStatic).mkString(", ")
+    val (ms1, ms2) = (remap(m1), remap(m2))
+    val className = name
+    stream.println("""
+    /*****************************************
+    Emitting Generated Code
+    *******************************************/
+    """)
+    stream.println(s"class $className($stt) extends ($ms1 => $ms2) {")
+    stream.println(s"  def apply($arg: $ms1): $ms2$efs = {")
+    apply(g)
+    stream.println( "  }")
+    stream.println( "}")
+    stream.println("""
+    /*****************************************
+    End of Generated Code
+    *******************************************/
+    """)
+  }
+
 }
 
-abstract class ExtendedCodeGen extends CompactScalaCodeGen with ExtendedCodeGen0 {
+abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen {
 
   // var typeMap: collection.Map[lms.core.Backend.Exp, Manifest[_]] = _
 
@@ -636,7 +682,7 @@ abstract class ExtendedCodeGen extends CompactScalaCodeGen with ExtendedCodeGen0
 
 class Unknown // HACK: Sentinel for typeMap
 
-class ExtendedCCodeGen extends ExtendedCodeGen {
+class ExtendedCCodeGen extends ExtendedCodeGen1 {
   def remap(m: Manifest[_]): String = m.toString match {
     case "Unit" => "void"
     case "Boolean" => "bool"
@@ -808,5 +854,74 @@ class ExtendedCCodeGen extends ExtendedCodeGen {
     case n @ Node(s,_,_,_) => 
       // emit(s"val ${quote(s)} = " + shallow(n)) 
       emitValDef(s, shallow(n))
+  }
+
+  def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit = {
+    init(g)
+    val arg = quote(g.block.in.head)
+    val efs = "" //quoteEff(g.block.ein)
+    val stt = dce.statics.map(quoteStatic).mkString(", ")
+    val (ms1, ms2) = (remap(m1), remap(m2))
+    val functionName = name
+    stream.println("""
+    #include <fcntl.h>
+    #include <errno.h>
+    #include <err.h>
+    #include <sys/mman.h>
+    #include <sys/stat.h>
+    #include <stdio.h>
+    #include <stdint.h>
+    #include <unistd.h>
+    #ifndef MAP_FILE
+    #define MAP_FILE MAP_SHARED
+    #endif
+    int fsize(int fd) {
+      struct stat stat;
+      int res = fstat(fd,&stat);
+      return stat.st_size;
+    }
+    int printll(char* s) {
+      while (*s != '\n' && *s != ',' && *s != '\t') {
+        putchar(*s++);
+      }
+      return 0;
+    }
+    long hash(char *str0, int len)
+    {
+      unsigned char* str = (unsigned char*)str0;
+      unsigned long hash = 5381;
+      int c;
+
+      while ((c = *str++) && len--)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+      return hash;
+    }
+    void Snippet(char*);
+    int main(int argc, char *argv[])
+    {
+      if (argc != 2) {
+        printf("usage: query <filename>\n");
+        return 0;
+      }
+      Snippet(argv[1]);
+      return 0;
+    }
+    /*****************************************
+    Emitting C Generated Code
+    *******************************************/
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <stdbool.h>
+    """)
+    stream.println(s"$ms2 $functionName($ms1 $arg) {")
+    apply(g)
+    stream.println("}")
+    stream.println("""
+    /*****************************************
+    End of C Generated Code
+    *******************************************/
+    """)
   }
 }
