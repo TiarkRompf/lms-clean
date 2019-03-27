@@ -19,13 +19,13 @@ object Global {
 
 object Adapter extends FrontEnd {
 
-  def emitScala(name: String)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
-    emitCommon(name, new ExtendedScalaCodeGen)(m1, m2)(prog)
-  }
+  // def emitScala(name: String)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
+  //   emitCommon(name, new ExtendedScalaCodeGen)(m1, m2)(prog)
+  // }
 
-  def emitC(name: String)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
-    emitCommon(name, new ExtendedCCodeGen)(m1, m2)(prog)
-  }
+  // def emitC(name: String)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
+  //   emitCommon(name, new ExtendedCCodeGen)(m1, m2)(prog)
+  // }
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
@@ -718,30 +718,30 @@ trait Compile
 trait CompileScala
 
 trait BaseExp
-trait ScalaGenBase {
+trait ScalaGenBase extends ExtendedScalaCodeGen {
   val IR: Base
   import IR._
   implicit class CodegenHelper(sc: StringContext) {
     def src(args: Any*): String = ???
   }
-  def remap[A](m: Manifest[A]): String = ???
-  def quote(x: Exp[Any]) : String = ???
+  // def remap[A](m: Manifest[A]): String = ???
+  // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
   def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Class[_], Any)] = {
-    val (src,statics) = Adapter.emitScala(className)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
+    val (src,statics) = Adapter.emitCommon(className,this)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
     stream.println(src)
     statics.toList
   }
   def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintWriter): List[(Sym[Any], Any)] = ???
 }
-trait CGenBase {
+trait CGenBase extends ExtendedCCodeGen {
   val IR: Base
   import IR._
-  def remap[A](m: Manifest[A]): String = ???
-  def quote(x: Exp[Any]) : String = ???
+  // def remap[A](m: Manifest[A]): String = ???
+  // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
   def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Class[_], Any)] = {
-    val (src,statics) = Adapter.emitC(className)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
+    val (src,statics) = Adapter.emitCommon(className,this)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
     stream.println(src)
     statics.toList
   }
