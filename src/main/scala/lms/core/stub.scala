@@ -409,17 +409,18 @@ abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
 
 // @virtualize
 abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl with CompileScala {
-  lazy val f = compile(snippet)(manifestTyp[A],manifestTyp[B])
+  lazy val f = time("scalac") { Global.sc.compile[A,B]("Snippet", code, statics) }
+
   def precompile: Unit = f
 
   def precompileSilently: Unit = utils.devnull(f)
 
   def eval(x: A): B = f(x)
 
-  lazy val code: String = {
+  lazy val (code, statics) = {
     val source = new java.io.StringWriter()
-    codegen.emitSource(snippet, "Snippet", new java.io.PrintWriter(source))(manifestTyp[A],manifestTyp[B])
-    source.toString
+    val statics = codegen.emitSource(snippet, "Snippet", new java.io.PrintWriter(source))(manifestTyp[A],manifestTyp[B])
+    (source.toString, statics)
   }
 }
 
@@ -429,23 +430,23 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
   val codegen = new DslGenC {
     val IR: q.type = q
   }
-  lazy val code: String = {
+  lazy val (code, statics) = {
     val source = new java.io.StringWriter()
-    codegen.emitSource[A,B](snippet _, "Snippet", new java.io.PrintWriter(source))
-    source.toString
+    val statics = codegen.emitSource[A,B](snippet _, "Snippet", new java.io.PrintWriter(source))
+    (source.toString, statics)
   }
-
-  def eval(a: A): Unit = {
+  lazy val f: A => Unit = {
     // TBD: should read result of type B?
     val out = new java.io.PrintWriter("/tmp/snippet.c")
     out.println(code)
     out.close
-    //TODO: use precompile
     (new java.io.File("/tmp/snippet")).delete
     import scala.sys.process._
+    // TODO: would like to use time("cc") { .. }, but messes with captureOut
     (s"cc -std=c99 -O3 /tmp/snippet.c -o /tmp/snippet": ProcessBuilder).lines.foreach(Console.println _)
-    (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
+    (a: A) => (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
   }
+  def eval(a: A): Unit = f(a)
 }
 
 // STUB CODE
@@ -568,11 +569,11 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   // def compile[A,B](f: Rep[A] => Rep[B]): A=>B = ???
-  def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
-    val (src, statics) = Adapter.emitScala("Snippet")(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
-    val fc = time("scalac") { Global.sc.compile[A,B]("Snippet", src, statics.toList) }
-    fc
-  }
+  // def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
+  //   val (src, statics) = Adapter.emitScala("Snippet")(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
+  //   val fc = time("scalac") { Global.sc.compile[A,B]("Snippet", src, statics.toList) }
+  //   fc
+  // }
 
   class SeqOpsCls[T](x: Rep[Seq[Char]])
 
@@ -726,10 +727,10 @@ trait ScalaGenBase {
   def remap[A](m: Manifest[A]): String = ???
   def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Sym[Any], Any)] = {
-    val (src,_) = Adapter.emitScala(className)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
+  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Class[_], Any)] = {
+    val (src,statics) = Adapter.emitScala(className)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
     stream.println(src)
-    Nil
+    statics.toList
   }
   def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintWriter): List[(Sym[Any], Any)] = ???
 }
@@ -739,10 +740,10 @@ trait CGenBase {
   def remap[A](m: Manifest[A]): String = ???
   def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Sym[Any], Any)] = {
-    val (src,_) = Adapter.emitC(className)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
+  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Class[_], Any)] = {
+    val (src,statics) = Adapter.emitC(className)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
     stream.println(src)
-    Nil
+    statics.toList
   }
   def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintWriter): List[(Sym[Any], Any)] = ???
 }
