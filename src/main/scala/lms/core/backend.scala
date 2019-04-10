@@ -239,6 +239,58 @@ class GraphBuilder {
     }
   }
 
+  def reify(x: (Exp, Exp) => Exp): Block = {
+    val save = curBlock
+    val saveEffects = curEffects
+    val saveLocalDefs = curLocalDefs
+    try {
+      val block = Sym(fresh)
+      val arg = Sym(fresh)
+      val arg2 = Sym(fresh)
+      curBlock = block
+      curEffects = Map()
+      curLocalDefs = Set()
+      val res = x(arg, arg2)
+      // remove local definitions from visible effect keys
+      // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
+      // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
+      val keys = curEffects.keys.filterNot(curLocalDefs).toList
+      val deps = if (curEffects.nonEmpty) curEffects.values.toList.distinct else List(curBlock)
+      Block(arg::arg2::Nil, res, block, EffectSummary(deps, keys))
+    } finally {
+      curBlock = save
+      curEffects = saveEffects
+      curLocalDefs = saveLocalDefs
+    }
+  }
+
+  def reify(x: (Exp, Exp, Exp) => Exp): Block = {
+    val save = curBlock
+    val saveEffects = curEffects
+    val saveLocalDefs = curLocalDefs
+    try {
+      val block = Sym(fresh)
+      val arg = Sym(fresh)
+      val arg2 = Sym(fresh)
+      val arg3 = Sym(fresh)
+      curBlock = block
+      curEffects = Map()
+      curLocalDefs = Set()
+      val res = x(arg, arg2, arg3)
+      // remove local definitions from visible effect keys
+      // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
+      // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
+      val keys = curEffects.keys.filterNot(curLocalDefs).toList
+      val deps = if (curEffects.nonEmpty) curEffects.values.toList.distinct else List(curBlock)
+      Block(arg::arg2::arg3::Nil, res, block, EffectSummary(deps, keys))
+    } finally {
+      curBlock = save
+      curEffects = saveEffects
+      curLocalDefs = saveLocalDefs
+    }
+  }
+
+
 }
 
 

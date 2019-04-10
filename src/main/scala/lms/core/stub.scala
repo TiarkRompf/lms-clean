@@ -568,6 +568,54 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       Wrap[B](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x))(Adapter.CTRL))
   }
 
+  def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = {
+    val can = canonicalize(f)
+    Adapter.funTable.find(_._2 == can) match {
+      case Some((funSym, _)) =>
+        Wrap[(A, B) => C](funSym)
+      case _ =>
+        val fn = Backend.Sym(Adapter.g.fresh)
+        Adapter.funTable = (fn, can)::Adapter.funTable
+        
+        val fn1 = Backend.Sym(Adapter.g.fresh)
+        Adapter.g.reflect(fn, "λforward", fn1)()()
+        val res = Wrap[(A,B)=>C](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2)))))(fn)())
+        Adapter.funTable = Adapter.funTable.map {
+          case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
+        }
+        res
+    }
+  }
+  def doLambda[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = fun(f)
+  implicit class FunOps2[A:Manifest,B:Manifest,C:Manifest](f: Rep[(A,B) => C]) {
+    def apply(x: Rep[A], y: Rep[B]): Rep[C] =
+      Wrap[C](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y))(Adapter.CTRL))
+  }
+  
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = {
+    val can = canonicalize(f)
+    Adapter.funTable.find(_._2 == can) match {
+      case Some((funSym, _)) =>
+        Wrap[(A, B, C) => D](funSym)
+      case _ =>
+        val fn = Backend.Sym(Adapter.g.fresh)
+        Adapter.funTable = (fn, can)::Adapter.funTable
+        
+        val fn1 = Backend.Sym(Adapter.g.fresh)
+        Adapter.g.reflect(fn, "λforward", fn1)()()
+        val res = Wrap[(A,B,C)=>D](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3)))))(fn)())
+        Adapter.funTable = Adapter.funTable.map {
+          case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
+        }
+        res
+    }
+  }
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = fun(f)
+  implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =
+      Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))(Adapter.CTRL))
+  }
+
   // def compile[A,B](f: Rep[A] => Rep[B]): A=>B = ???
   // def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
   //   val (src, statics) = Adapter.emitScala("Snippet")(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
@@ -604,8 +652,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   implicit class OpsInfixVarT[T:Manifest:Numeric](lhs: Var[T]) {
     def +=(rhs: T): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
-    def +=(rhs: Var[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),readVar(rhs)))
+    def +=(rhs: Rep[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
     def -=(rhs: T): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
+    def -=(rhs: Rep[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
   }
 
 
@@ -1006,6 +1055,9 @@ trait PrimitiveOps extends Base with OverloadHack {
     def -(rhs: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded10) = { double_minus(self, rhs) }
     def *(rhs: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded10) = { double_times(self, rhs) }
     def /(rhs: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_divide(self, rhs) }
+    def sin()(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_sin(self) }
+    def cos()(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_cos(self) }
+
     def +(rhs: Var[Double])(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_plus(self, readVar(rhs)) }
     def -(rhs: Var[Double])(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_minus(self, readVar(rhs)) }
     def *(rhs: Var[Double])(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_times(self, readVar(rhs)) }
@@ -1306,6 +1358,9 @@ trait PrimitiveOps extends Base with OverloadHack {
   def double_minus(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
   def double_times(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
   def double_divide(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
+  def double_sin(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
+  def double_cos(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
+
   def double_to_int(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Int] = ???
   def double_to_float(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Float] = ???
   def double_to_long(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Long] = ???
