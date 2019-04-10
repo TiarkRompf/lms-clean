@@ -578,11 +578,15 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   class SeqOpsCls[T](x: Rep[Seq[Char]])
 
   // XXX HACK for generic type!
-  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = NewArray[T,Int](x)
+  def NewArray[T:Manifest,Size:Manifest](x: Rep[Size]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewArray[T](x: Rep[Long], init: Option[Int], tpe: String)(implicit o: Overloaded1, mT: Manifest[T]): Rep[Array[T]] = NewArray[T,Long](x, init, tpe)
+  def NewArray[T:Manifest,Size:Manifest](x: Rep[Size], init: Option[Int], tpe: String): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
-    def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Int], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
-    def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("Array.length", Unwrap(x)))
+    def apply[Size:Manifest](i: Rep[Size]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+    def update[Size:Manifest](i: Rep[Size], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def length[Size:Manifest]: Rep[Size] = Wrap[Size](Adapter.g.reflect("Array.length", Unwrap(x)))
+    def slice[Size:Manifest](s: Rep[Size], e: Rep[Size]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
   }
 
 
@@ -600,6 +604,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   implicit class OpsInfixVarT[T:Manifest:Numeric](lhs: Var[T]) {
     def +=(rhs: T): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
+    def +=(rhs: Var[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),readVar(rhs)))
     def -=(rhs: T): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
   }
 
@@ -649,6 +654,48 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       __whileDo(notequals(readVar(i), Wrap[Int](x1)), {
         f(readVar(i))
         i += 1
+      })
+    }
+  }
+
+  trait LongRange
+  implicit class longWrapper(start: Long) {
+    // Note that these are ambiguous - need to use type ascription here (e.g. 1 until 10 : Rep[LongRange])
+
+    def until(end: Rep[Long])(implicit pos: SourceContext) = longrange_until(unit(start),end)
+    def until(end: Long)(implicit pos: SourceContext): Rep[LongRange] = longrange_until(unit(start),unit(end))
+
+    def until(end: Long)(implicit pos: SourceContext, o: Overloaded1): immutable.NumericRange.Exclusive[Long] = new immutable.NumericRange.Exclusive(start,end,1L)
+  }
+  def longrange_until(start: Rep[Long], end: Rep[Long]): Rep[LongRange] = {
+    Wrap(Adapter.g.reflect("longrange_until", Unwrap(start), Unwrap(end)))
+  }
+
+  implicit class LongRangeConstrOps(lhs: Rep[Long]) {
+    def until(y: Rep[Long]): Rep[LongRange] = longrange_until(lhs,y)
+
+    // unrelated
+    def ToString: Rep[String] =
+      Wrap(Adapter.g.reflect("Object.toString", Unwrap(lhs)))
+  }
+
+  implicit class LongRangeOps(lhs: Rep[LongRange]) {
+    def foreach(f: Rep[Long] => Rep[Unit])(implicit __pos: SourceContext): Rep[Unit] = {
+
+      // XXX TODO: it would be good to do this as lowering/codegen
+      // (as done previously in LMS), but for now just construct
+      // a while loop directly
+
+      val Adapter.g.Def("longrange_until", List(x0:Backend.Exp,x1:Backend.Exp)) = Unwrap(lhs)
+
+      // val b = Adapter.g.reify(i => Unwrap(f(Wrap(i))))
+      // val f1 = Adapter.g.reflect("λ",b)
+      // Wrap(Adapter.g.reflect("range_foreach", x0, x1, b))
+
+      val i = var_new(Wrap[Long](x0))
+      __whileDo(notequals(readVar(i), Wrap[Long](x1)), {
+        f(readVar(i))
+        i += 1L
       })
     }
   }
