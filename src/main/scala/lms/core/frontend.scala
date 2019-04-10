@@ -15,6 +15,8 @@ class FrontEnd {
     def unary_! = BOOL(g.reflect("!",x))
   }
 
+  case class UNIT(x: Exp)
+
   case class INT(x: Exp) {
     def +(y: INT): INT = INT(g.reflect("+",x,y.x))
     def -(y: INT): INT = INT(g.reflect("-",x,y.x))
@@ -64,14 +66,14 @@ class FrontEnd {
     g.reflectEffect("W",cBlock,bBlock)(efs:_*)
   }
 
-  
+
   def APP(f: Exp, x: INT): INT = {
     // XXX lookup lambda ...
     g.findDefinition(f) match {
       case Some(Node(f, "λ", List(b: Block), _)) =>
         if (g.isPure(b))
           INT(g.reflect("@",f,x.x))
-        else 
+        else
           INT(g.reflectEffect("@",f,x.x)(g.getEffKeys(b):_*))
       case _ =>
         INT(g.reflectEffect("@",f,x.x)(CTRL))
@@ -91,7 +93,7 @@ class FrontEnd {
     //val xn = Sym(g.fresh)
     val f1 = (x: INT) => APP(fn,x)
     // NOTE: lambda expression itself does not have
-    // an effect, so body block should not count as 
+    // an effect, so body block should not count as
     // latent effect of the lambda
     g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()
     f1

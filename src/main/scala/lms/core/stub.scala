@@ -76,7 +76,7 @@ object Adapter extends FrontEnd {
         }
 
       // as(i) = as(i) => ()   side condition: no write in-between!
-      case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1, i1)))) 
+      case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1, i1))))
         if as == as1 && i == i1 && curEffects.get(as) == Some(rs) =>
         Some(Const(()))
 
@@ -99,7 +99,7 @@ object Adapter extends FrontEnd {
       case ("*", List(a:Exp,Const(0))) => Const(0)
       case ("/", List(Const(a:Int),Const(b:Int))) => Const(a/b)
       case ("%", List(Const(a:Int),Const(b:Int))) => Const(a%b)
-      
+
       // TBD: can't just rewrite, need to reflect block!
       // case ("?", List(Const(true),a:Block,b:Block)) => a
 
@@ -156,7 +156,7 @@ trait UtilOpsExp extends UtilOps with BaseExp { this: DslExp =>
 trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString with LiftPrimitives with LiftNumeric with LiftBoolean with IfThenElse with Equal with RangeOps with OrderingOps with MiscOps with ArrayOps with StringOps with SeqOps with Functions with While with StaticData with Variables with LiftVariables with ObjectOps with UtilOps {
   implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
   implicit class BooleanOps2(lhs: Rep[Boolean]) {
-    def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) = 
+    def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
     __ifThenElse(lhs, rhs, unit(false)) }
 //  override def boolean_and(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext): Rep[Boolean] = __ifThenElse(lhs, rhs, unit(false))
   def generate_comment(l: String): Rep[Unit]
@@ -225,11 +225,11 @@ trait DslGen extends ScalaGenNumericOps
   }
 
   override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case Assign(Variable(a), b) => 
+    case Assign(Variable(a), b) =>
       emitAssignment(a.asInstanceOf[Sym[Variable[Any]]], quote(b))
     case IfThenElse(c,Block(Const(true)),Block(Const(false))) =>
       emitValDef(sym, quote(c))
-    case PrintF(f:String,xs) => 
+    case PrintF(f:String,xs) =>
       emitValDef(sym, src"printf(${Const(f)::xs})")
     case GenerateComment(s) =>
       stream.println("// "+s)
@@ -461,8 +461,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
     Adapter.typeMap(x) = manifest[A]
   }
-  def Unwrap(x: Exp[Any]) = x match { 
-    case Wrap(x) => x 
+  def Unwrap(x: Exp[Any]) = x match {
+    case Wrap(x) => x
     case Const(x) => Backend.Const(x)
   }
 
@@ -486,7 +486,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap(Adapter.g.reflect(p.productPrefix, xs:_*))
   }
 
-  def staticData[T](x: T): Rep[T] = 
+  def staticData[T](x: T): Rep[T] =
     Wrap(Adapter.g.reflect("staticData", Backend.Const(x)))
 
 
@@ -516,7 +516,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     //val xn = Sym(g.fresh)
     val f1 = (x: INT) => APP(fn,x)
     // NOTE: lambda expression itself does not have
-    // an effect, so body block should not count as 
+    // an effect, so body block should not count as
     // latent effect of the lambda
     g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()
     f1
@@ -547,16 +547,16 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       case _ =>
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn,can)::Adapter.funTable
-        
+
         val fn1 = Backend.Sym(Adapter.g.fresh)
         Adapter.g.reflect(fn,"λforward",fn1)()()
         //val xn = Sym(g.fresh)
         //val f1 = (x: INT) => APP(fn,x)
         // NOTE: lambda expression itself does not have
-        // an effect, so body block should not count as 
+        // an effect, so body block should not count as
         // latent effect of the lambda
         val res = Wrap[A=>B](Adapter.g.reflect(fn1,"λ",Adapter.g.reify(xn => Unwrap(f(Wrap[A](xn)))))(fn)())
-        Adapter.funTable = Adapter.funTable.map { case (fn2,can2) => 
+        Adapter.funTable = Adapter.funTable.map { case (fn2,can2) =>
           if (can == can2) (fn1,can) else (fn2,can2)
         }
         res
@@ -610,7 +610,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // NOTE(trans): it has to be called 'intWrapper' to shadow the standard Range constructor
   implicit class intWrapper(start: Int) {
     // Note that these are ambiguous - need to use type ascription here (e.g. 1 until 10 : Rep[Range])
-    
+
     def until(end: Rep[Int])(implicit pos: SourceContext) = range_until(unit(start),end)
     def until(end: Int)(implicit pos: SourceContext): Rep[Range] = range_until(unit(start),unit(end))
 
@@ -624,7 +624,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def until(y: Rep[Int]): Rep[Range] = range_until(lhs,y)
 
     // unrelated
-    def ToString: Rep[String] = 
+    def ToString: Rep[String] =
       Wrap(Adapter.g.reflect("Object.toString", Unwrap(lhs)))
   }
 
@@ -663,7 +663,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
 
-  def println(x: Rep[Any]): Unit = 
+  def println(x: Rep[Any]): Unit =
     Adapter.g.reflectEffect("P",Unwrap(x))(Adapter.CTRL)
 
   def printf(f: String, x: Rep[Any]*): Unit = {
@@ -707,11 +707,11 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     val bb = g.reify(Unwrap(b))
     if (g.isPure(bb))
       Wrap(g.reflect("comment",Backend.Const(l),Backend.Const(verbose),bb))
-    else 
+    else
       Wrap(g.reflectEffect("comment",Backend.Const(l),Backend.Const(verbose),bb)(g.getEffKeys(bb):_*))
   }
 
-
+  def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
 }
 
 trait Compile
@@ -748,47 +748,47 @@ trait CGenBase extends ExtendedCCodeGen {
   def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintWriter): List[(Sym[Any], Any)] = ???
 }
 
-// trait PrimitiveOps 
-trait NumericOps 
-trait BooleanOps 
-trait LiftString 
-// trait LiftPrimitives 
-trait LiftNumeric 
-trait LiftBoolean 
-trait IfThenElse 
-// trait Equal 
-trait RangeOps 
-// trait OrderingOps 
-trait MiscOps 
-trait ArrayOps 
-trait StringOps 
-trait SeqOps 
-trait Functions 
-trait While 
-trait StaticData 
-trait Variables 
-// trait LiftVariables 
-trait ObjectOps 
+// trait PrimitiveOps
+trait NumericOps
+trait BooleanOps
+trait LiftString
+// trait LiftPrimitives
+trait LiftNumeric
+trait LiftBoolean
+trait IfThenElse
+// trait Equal
+trait RangeOps
+// trait OrderingOps
+trait MiscOps
+trait ArrayOps
+trait StringOps
+trait SeqOps
+trait Functions
+trait While
+trait StaticData
+trait Variables
+// trait LiftVariables
+trait ObjectOps
 // trait UtilOps
 trait UncheckedOps
 
-trait PrimitiveOpsExpOpt 
-trait NumericOpsExpOpt 
-trait BooleanOpsExp 
-trait IfThenElseExpOpt 
-trait EqualExpBridgeOpt 
-trait RangeOpsExp 
-trait OrderingOpsExp 
-trait MiscOpsExp 
-trait EffectExp 
-trait ArrayOpsExpOpt 
-trait StringOpsExp 
-trait SeqOpsExp 
-trait FunctionsRecursiveExp 
-trait WhileExp 
-trait StaticDataExp 
-trait VariablesExpOpt 
-trait ObjectOpsExpOpt 
+trait PrimitiveOpsExpOpt
+trait NumericOpsExpOpt
+trait BooleanOpsExp
+trait IfThenElseExpOpt
+trait EqualExpBridgeOpt
+trait RangeOpsExp
+trait OrderingOpsExp
+trait MiscOpsExp
+trait EffectExp
+trait ArrayOpsExpOpt
+trait StringOpsExp
+trait SeqOpsExp
+trait FunctionsRecursiveExp
+trait WhileExp
+trait StaticDataExp
+trait VariablesExpOpt
+trait ObjectOpsExpOpt
 // trait UtilOpsExp
 trait UncheckedOpsExp
 
@@ -814,16 +814,16 @@ trait ScalaGenEffect extends ScalaGenBase
 
 trait CGenNumericOps
 trait CGenPrimitiveOps
-trait CGenBooleanOps 
+trait CGenBooleanOps
 trait CGenIfThenElse
 trait CGenEqual
-trait CGenRangeOps 
+trait CGenRangeOps
 trait CGenOrderingOps
 trait CGenMiscOps
-trait CGenArrayOps 
+trait CGenArrayOps
 trait CGenStringOps
 trait CGenSeqOps
-trait CGenFunctions 
+trait CGenFunctions
 trait CGenWhile
 trait CGenStaticData
 trait CGenVariables
@@ -856,11 +856,11 @@ trait Equal extends Base {
   def infix_!=[A,B](a: A, b: Rep[B])(implicit o: Overloaded5, mA: Manifest[A], mB: Manifest[B], pos: SourceContext) : Rep[Boolean] = notequals(unit(a), b)
   def infix_!=[A,B](a: Var[A], b: B)(implicit o: Overloaded6, mA: Manifest[A], mB: Manifest[B], pos: SourceContext) : Rep[Boolean] = notequals(a, unit(b))
   def infix_!=[A,B](a: A, b: Var[B])(implicit o: Overloaded7, mA: Manifest[A], mB: Manifest[B], pos: SourceContext) : Rep[Boolean] = notequals(unit(a), b)
-  def infix_!=[A,B](a: Var[A], b: Var[B])(implicit o: Overloaded8, mA: Manifest[A], mB: Manifest[B], pos: SourceContext) : Rep[Boolean] = notequals(a,b)  
+  def infix_!=[A,B](a: Var[A], b: Var[B])(implicit o: Overloaded8, mA: Manifest[A], mB: Manifest[B], pos: SourceContext) : Rep[Boolean] = notequals(a,b)
 
-  def equals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean] = 
+  def equals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean] =
     Wrap(Adapter.g.reflect("==",Unwrap(a),Unwrap(b)))
-  def notequals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean] = 
+  def notequals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean] =
     Wrap(Adapter.g.reflect("!=",Unwrap(a),Unwrap(b)))
 }
 
@@ -1059,8 +1059,8 @@ trait PrimitiveOps extends Base with OverloadHack {
     def -(rhs: Char)(implicit __pos: SourceContext,__imp1: Overloaded73): Rep[Char] = char_minus(self, rhs)
   }
 
-  def char_minus(lhs: Rep[Char], rhs: Rep[Char])(implicit pos: SourceContext): Rep[Char] = 
-    Wrap((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x)    
+  def char_minus(lhs: Rep[Char], rhs: Rep[Char])(implicit pos: SourceContext): Rep[Char] =
+    Wrap((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x)
 
 
   implicit def repToPrimitiveMathOpsIntOpsCls(x: Rep[Int])(implicit __pos: SourceContext) = new PrimitiveMathOpsIntOpsCls(x)(__pos)
@@ -1424,7 +1424,7 @@ trait PrimitiveOps extends Base with OverloadHack {
 
   def int_mod(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_binaryor(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
-  def int_binaryand(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = 
+  def int_binaryand(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] =
     Wrap[Int](Adapter.g.reflect("&", Unwrap(lhs), Unwrap(rhs)))
   def int_binaryxor(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_bitwise_not(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Int] = ???
@@ -1445,7 +1445,7 @@ trait PrimitiveOps extends Base with OverloadHack {
     def toInt(implicit pos: SourceContext) = char_toInt(self)
   }
 
-  def char_toInt(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Int] = 
+  def char_toInt(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Int] =
     Wrap(Adapter.g.reflect("Char.toInt", Unwrap(lhs)))
 
   /**
@@ -1523,13 +1523,13 @@ trait PrimitiveOps extends Base with OverloadHack {
     def toFloat(implicit pos: SourceContext) = long_to_float(self)
   }
 
-  def long_plus(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = 
+  def long_plus(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long]((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x) // XXX type
-  def long_minus(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = 
+  def long_minus(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long]((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x) // XXX type
-  def long_times(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = 
+  def long_times(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long]((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x) // XXX type
-  def long_divide(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = 
+  def long_divide(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long]((Adapter.INT(Unwrap(lhs)) / Adapter.INT(Unwrap(rhs))).x) // XXX type
 
   def obj_long_parse_long(s: Rep[String])(implicit pos: SourceContext): Rep[Long] = ???
@@ -1542,9 +1542,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   def long_shiftleft(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
   def long_shiftright_signed(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
   def long_shiftright_unsigned(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
-  def long_to_int(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Int] = 
+  def long_to_int(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Int] =
     Wrap(Adapter.g.reflect("Long.toInt", Unwrap(lhs)))
   def long_to_float(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Float] = ???
   def long_to_double(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Double] = ???
 }
-
