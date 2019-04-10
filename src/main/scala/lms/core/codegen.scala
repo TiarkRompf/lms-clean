@@ -453,6 +453,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
 
   val binop = Set("+","-","*","/","%","==","!=","<",">","&","!")
+  val scalaMath = Set("sin", "cos", "tanh", "exp", "sqrt")
 
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
@@ -510,6 +511,9 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
     case n @ Node(s,op,List(x,y),_) if binop(op) => 
       shallow1(x); emit(" "); emit(op); emit(" "); shallow1(y)
+
+    case n @ Node(s,op,List(x),_) if scalaMath(op) =>
+      emit(s"scala.math.$op("); shallow1(x); emit(")")
 
     case n @ Node(s,op,args,_) if op contains "[ ]" => // unchecked
       var s = op

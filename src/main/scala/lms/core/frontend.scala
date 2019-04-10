@@ -25,6 +25,8 @@ class FrontEnd {
     def %(y: INT): INT = INT(g.reflect("%",x,y.x))
     def ===(y: INT): BOOL = BOOL(g.reflect("==",x,y.x))
     def !==(y: INT): BOOL = BOOL(g.reflect("!=",x,y.x))
+    def sin(): INT = INT(g.reflect("sin", x))
+    def cos(): INT = INT(g.reflect("cos", x))
   }
 
   case class STRING(x: Exp) {

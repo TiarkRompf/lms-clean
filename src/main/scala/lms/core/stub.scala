@@ -1354,12 +1354,18 @@ trait PrimitiveOps extends Base with OverloadHack {
   def obj_double_negative_infinity(implicit pos: SourceContext): Rep[Double] = ???
   def obj_double_min_value(implicit pos: SourceContext): Rep[Double] = ???
   def obj_double_max_value(implicit pos: SourceContext): Rep[Double] = ???
-  def double_plus(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
-  def double_minus(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
-  def double_times(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
-  def double_divide(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
-  def double_sin(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
-  def double_cos(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] = ???
+  def double_plus(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x)
+  def double_minus(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x)
+  def double_times(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x)
+  def double_divide(lhs: Rep[Double], rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(lhs)) / Adapter.INT(Unwrap(rhs))).x)
+  def double_sin(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(rhs)).sin()).x)
+  def double_cos(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(rhs)).cos()).x)
 
   def double_to_int(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Int] = ???
   def double_to_float(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Float] = ???
