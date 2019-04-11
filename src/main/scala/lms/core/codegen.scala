@@ -459,7 +459,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
   }
 
 
-  val binop = Set("+","-","*","/","%","==","!=","<",">","&","!")
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","!")
   val scalaMath = Set("sin", "cos", "tanh", "exp", "sqrt")
   val numTypeConv = Set("toInt", "toLong", "toFloat", "toDouble")
 
