@@ -576,7 +576,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       case _ =>
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
-        
+
         val fn1 = Backend.Sym(Adapter.g.fresh)
         Adapter.g.reflect(fn, "λforward", fn1)()()
         val res = Wrap[(A,B)=>C](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2)))))(fn)())
@@ -591,7 +591,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def apply(x: Rep[A], y: Rep[B]): Rep[C] =
       Wrap[C](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y))(Adapter.CTRL))
   }
-  
+
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
@@ -600,7 +600,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       case _ =>
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
-        
+
         val fn1 = Backend.Sym(Adapter.g.fresh)
         Adapter.g.reflect(fn, "λforward", fn1)()()
         val res = Wrap[(A,B,C)=>D](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3)))))(fn)())
@@ -626,10 +626,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   class SeqOpsCls[T](x: Rep[Seq[Char]])
 
   // XXX HACK for generic type!
-  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = NewArray[T,Int](x)
-  def NewArray[T:Manifest,Size:Manifest](x: Rep[Size]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
-  def NewArray[T](x: Rep[Long], init: Option[Int], tpe: String)(implicit o: Overloaded1, mT: Manifest[T]): Rep[Array[T]] = NewArray[T,Long](x, init, tpe)
-  def NewArray[T:Manifest,Size:Manifest](x: Rep[Size], init: Option[Int], tpe: String): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Int], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
@@ -637,6 +634,15 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
   }
 
+  trait LongArray[+T]
+  def NewLongArray[T:Manifest](x: Rep[Long]): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int], tpe: String = ""): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
+    def apply(i: Rep[Long]): Rep[A] = Wrap(Adapter.g.reflectEffect("longarray_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+    def update(i: Rep[Long], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("longarray_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("LongArray.length", Unwrap(x)))
+    def slice(s: Rep[Long], e: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("LongArray.slice", Unwrap(s), Unwrap(e)))
+  }
 
   implicit def readVar[T:Manifest](x: Var[T]): Rep[T] = Wrap(Adapter.g.reflectEffect("var_get", UnwrapV(x))(UnwrapV(x)))
   def var_new[T:Manifest](x: Rep[T]): Var[T] = WrapV[T](Adapter.g.reflectEffect("var_new", Unwrap(x))(Adapter.STORE))
@@ -653,8 +659,10 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   implicit class OpsInfixVarT[T:Manifest:Numeric](lhs: Var[T]) {
     def +=(rhs: T): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
     def +=(rhs: Rep[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
+    def +=(rhs: Var[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),readVar(rhs)))
     def -=(rhs: T): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
     def -=(rhs: Rep[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
+    def -=(rhs: Var[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),readVar(rhs)))
   }
 
 
