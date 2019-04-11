@@ -371,7 +371,7 @@ trait ExtendedCodeGen extends CompactTraverser {
       (a.getClass, a)
   }
 
-  def extractAllStatics() = dce.statics.map(extractStatic)
+  def extractAllStatics() = dce.statics.toList.map(extractStatic)
 
   def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit
 
@@ -614,7 +614,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
     init(g)
     val arg = quote(g.block.in.head)
     val efs = "" //quoteEff(g.block.ein)
-    val stt = dce.statics.map(quoteStatic).mkString(", ")
+    val stt = dce.statics.toList.map(quoteStatic).mkString(", ")
     val (ms1, ms2) = (remap(m1), remap(m2))
     val className = name
     stream.println("""
@@ -888,7 +888,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     init(g)
     val arg = quote(g.block.in.head)
     val efs = "" //quoteEff(g.block.ein)
-    val stt = dce.statics.map(quoteStatic).mkString(", ")
+    val stt = dce.statics.toList.map(quoteStatic).mkString(", ")
     val (ms1, ms2) = (remap(m1), remap(m2))
     val functionName = name
     stream.println("""
