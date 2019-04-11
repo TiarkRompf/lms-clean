@@ -192,18 +192,10 @@ class GraphBuilder {
   def getEffKeys(b: Block): List[Exp] = b.eff.keys
 
   def reify(x: => Exp): Block =  reify(0, xs => x )
-  def reify(x: Exp => Exp): Block = {
-    reify(1, xs => x(xs(0)))
-  }
-  def reify(x: (Exp, Exp) => Exp): Block = {
-    reify(1, xs => x(xs(0), xs(1)))
-  }
-  def reify(x: (Exp, Exp, Exp) => Exp): Block = {
-    reify(1, xs => x(xs(0), xs(1), xs(2)))
-  }
-  def reify(x: (Exp, Exp, Exp, Exp) => Exp): Block = {
-    reify(1, xs => x(xs(0), xs(1), xs(2), xs(3)))
-  }
+  def reify(x: Exp => Exp): Block = reify(1, xs => x(xs(0)))
+  def reify(x: (Exp, Exp) => Exp): Block = reify(2, xs => x(xs(0), xs(1)))
+  def reify(x: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => x(xs(0), xs(1), xs(2)))
+  def reify(x: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => x(xs(0), xs(1), xs(2), xs(3)))
 
   def reify(n: Int, x: List[Exp] => Exp): Block = {
     val save = curBlock
