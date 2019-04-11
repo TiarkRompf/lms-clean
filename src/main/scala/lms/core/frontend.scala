@@ -29,6 +29,9 @@ class FrontEnd {
     def cos(): INT = INT(g.reflect("cos", x))
     def abs(): INT = INT(g.reflect("abs", x))
     def tanh(): INT = INT(g.reflect("tanh", x))
+    def exp(): INT = INT(g.reflect("exp", x))
+    def log(): INT = INT(g.reflect("log", x))
+    def sqrt(): INT = INT(g.reflect("sqrt", x))
   }
 
   case class STRING(x: Exp) {

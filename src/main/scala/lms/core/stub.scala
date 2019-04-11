@@ -651,6 +651,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // XXX HACK for generic type!
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(xs))(Adapter.STORE))
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Int], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
@@ -795,8 +796,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   implicit def var2boolOps(lhs: Var[Boolean]) = new BoolOps(lhs)
   implicit class BoolOps(lhs: Rep[Boolean]) {
     def unary_!(implicit pos: SourceContext): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.!", Unwrap(lhs)))
-    def &&(rhs: => Rep[Boolean]): Rep[Boolean] = ???
-    def ||(rhs: => Rep[Boolean]): Rep[Boolean] = ???
+    def &&(rhs: => Rep[Boolean]): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.&&", Unwrap(lhs), Unwrap(rhs)))
+    def ||(rhs: => Rep[Boolean]): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.||", Unwrap(lhs), Unwrap(rhs)))
   }
 
 
@@ -1322,6 +1323,9 @@ trait PrimitiveOps extends Base with OverloadHack {
     def tanh(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_tanh(x)
     def sin(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_sin(x)
     def cos(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_cos(x)
+    def exp(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_exp(x)
+    def log(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_log(x)
+    def sqrt(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_sqrt(x)
   }
   // -- END FORGE-GENERATED SECTION
 
@@ -1416,6 +1420,12 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Double]((Adapter.INT(Unwrap(rhs)).tanh()).x)
   def double_abs(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
     Wrap[Double]((Adapter.INT(Unwrap(rhs)).abs()).x)
+  def double_exp(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(rhs)).exp()).x)
+  def double_log(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(rhs)).log()).x)
+  def double_sqrt(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(rhs)).sqrt()).x)
 
   def double_to_int(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Int] = ???
   def double_to_float(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Float] = ???

@@ -14,35 +14,7 @@ trait ClosureCompare extends Externalizable {
     throw new NotSerializableException("this is just a mock-up!")
   }
 
-  def canonicalize(f: Function[_,_]) = {
-    val s = new java.io.ByteArrayOutputStream()
-    val o = new java.io.ObjectOutputStream(s)
-    o.writeObject(f)
-    s.toString("ASCII")
-  }
-
-  def canonicalize(f: Function2[_,_,_]) = {
-    val s = new java.io.ByteArrayOutputStream()
-    val o = new java.io.ObjectOutputStream(s)
-    o.writeObject(f)
-    s.toString("ASCII")
-  }
-
-  def canonicalize(f: Function3[_,_,_,_]) = {
-    val s = new java.io.ByteArrayOutputStream()
-    val o = new java.io.ObjectOutputStream(s)
-    o.writeObject(f)
-    s.toString("ASCII")
-  }
-
-  def canonicalize(f: Function4[_,_,_,_,_]) = {
-    val s = new java.io.ByteArrayOutputStream()
-    val o = new java.io.ObjectOutputStream(s)
-    o.writeObject(f)
-    s.toString("ASCII")
-  }
-
-  def canonicalize(f: Function5[_,_,_,_,_,_]) = {
+  def canonicalize(f: AnyRef) = {
     val s = new java.io.ByteArrayOutputStream()
     val o = new java.io.ObjectOutputStream(s)
     o.writeObject(f)
