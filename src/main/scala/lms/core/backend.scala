@@ -21,7 +21,7 @@ object Backend {
   // dependencies (previous writes, ...)
   //
   // TOOD: this can be made more fine-grained, i.e.,
-  // distinguish may/must and read/write effects, 
+  // distinguish may/must and read/write effects,
   // soft dependencies, ...
 
   case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
@@ -49,7 +49,7 @@ object Backend {
   */
 
 
-  // A definition is part of the right-hand side of a 
+  // A definition is part of the right-hand side of a
   // node definition.
   abstract class Def
 
@@ -64,18 +64,18 @@ object Backend {
   // where should this go?
   def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.bound)
 
-  def blocks(x: Node): List[Block] = 
+  def blocks(x: Node): List[Block] =
     x.rhs.collect { case a @ Block(_,_,_,_) => a }
 
-  def directSyms(x: Node): List[Sym] = 
-    x.rhs.flatMap { 
-      case s: Sym => List(s) 
+  def directSyms(x: Node): List[Sym] =
+    x.rhs.flatMap {
+      case s: Sym => List(s)
       case _ => Nil
     }
 
-  def syms(x: Node): List[Sym] = 
+  def syms(x: Node): List[Sym] =
     x.rhs.flatMap {
-      case s: Sym => List(s) 
+      case s: Sym => List(s)
       case b: Block => b.used
       case _ => Nil
     } ++ x.eff.deps.collect { case s: Sym => s }
@@ -112,8 +112,8 @@ class GraphBuilder {
   def reflectEffect(s: String, as: Def*)(efKeys: Exp*): Exp = {
     // rewrite?
     rewrite(s,as.toList) match {
-      case Some(e) => e 
-      case None => 
+      case Some(e) => e
+      case None =>
 
       // latent effects? closures, mutable vars, ... (these are the keys!)
       val efKeys2 = (if (s == "λ") efKeys else // NOTE: block in lambda is a latent effect for app, not declaration
@@ -121,7 +121,7 @@ class GraphBuilder {
 
       // effects or pure?
       if (efKeys2.nonEmpty) {
-        val sm = Sym(fresh) 
+        val sm = Sym(fresh)
         // gather effect dependencies
         def latest(e1: Exp, e2: Exp) = if (curLocalDefs(e1)) e1 else e2
         val prev = efKeys2.map(e => curEffects.getOrElse(e,latest(e,curBlock))).distinct
@@ -138,7 +138,7 @@ class GraphBuilder {
       }
     }
   }
-  
+
   def reflect(x: Sym, s: String, as: Def*)(efDeps: Exp*)(efKeys: Exp*): Exp = {
     val n = Node(x,s,as.toList,EffectSummary(efDeps.toList, efKeys.toList))
     globalDefs += n
@@ -156,21 +156,21 @@ class GraphBuilder {
   from an argument. This looks awfully similar to how we
   deal with aliases to mutable variables in LMS 1.x.
   (A possible view here is that tracking lambdas is the same
-  as tracking aliases/separation of data structures by means 
+  as tracking aliases/separation of data structures by means
   of closure conversion).
   */
 
   def getLatentEffect(x: Def) = x match {
-    case b: Block => 
+    case b: Block =>
       getEffKeys(b)
     case s: Sym =>
       findDefinition(s) match {
         case Some(Node(_, "λ", List(b @ Block(ins, out, ein, eout)), _)) =>
           getEffKeys(b)
-        case _ => 
+        case _ =>
           Nil
       }
-    case _ => 
+    case _ =>
       Nil
   }
 
@@ -178,7 +178,7 @@ class GraphBuilder {
   var curBlock: Exp = _ // could this become an ExplodedStruct?
   var curEffects: Map[Exp,Exp] = _ // map key to dep
   var curLocalDefs: Set[Exp] = _
-  
+
   // NOTE/TODO: want to mask out purely local effects
   def isPure(b: Block) = b.eff.deps == List(b.ein)
 
@@ -243,7 +243,7 @@ class DeadCodeElim extends Phase {
 
     if (g.block.res.isInstanceOf[Sym])
       live += g.block.res.asInstanceOf[Sym]
-    
+
     for (d <- g.nodes.reverseIterator)
       if (live(d.n)) live ++= syms(d)
 
@@ -265,9 +265,9 @@ class Flow extends Phase {
   // XXX perhaps we need to count freqs differently (?)
 
   def symsFreq(x: Node): List[(Def,Double)] = x match {
-    case Node(f, "λ", List(Block(in, y, ein, eff)), _) => 
+    case Node(f, "λ", List(Block(in, y, ein, eff)), _) =>
       List((y,100.0)) ++ eff.deps.map(e => (e,0.001))
-    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::_, _) => 
+    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::_, _) =>
       List((c,1.0),(ae,0.5),(be,0.5)) ++ af.deps.map(e => (e,0.001)) ++ bf.deps.map(e => (e,0.001))
     case _ => syms(x) map (s => (s,1.0))
   }
@@ -295,7 +295,7 @@ class Flow extends Phase {
   }
 }
 
-// Compute bound structure information 
+// Compute bound structure information
 // (i.e., which bound variables a node depends on)
 class Bound extends Phase {
 
@@ -309,7 +309,7 @@ class Bound extends Phase {
     for (Node(b,"λ",_,_) <- g.nodes)
       hm(b) = Set()
 
-    for (b <- bound) 
+    for (b <- bound)
       hm(b) = Set(b)
 
     for (d <- g.nodes) {

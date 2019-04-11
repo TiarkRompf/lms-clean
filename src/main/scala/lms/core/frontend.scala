@@ -112,11 +112,13 @@ class FrontEnd {
 
   def mkGraphBuilder() = new GraphBuilder
 
-  def program(body: INT => INT): Graph = {
+  def program(f: INT => INT): Graph = program(g.reify { x => f(INT(x)).x })
+  // def program(f: (Exp, Exp) => Exp): Graph = program(g.reify { f })
+  def program(body: => Block): Graph = {
     assert(g == null)
     g = mkGraphBuilder()
     try {
-      val block = g.reify { arg => body(INT(arg)).x }
+      val block = body
       Graph(g.globalDefs, block)
     } finally g = null
   }

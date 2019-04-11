@@ -30,11 +30,16 @@ object Adapter extends FrontEnd {
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
 
-  def emitCommon(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
+  def emitCommon1(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) =
+    emitCommon(name, cg, verbose, alt, eff)(m1, m2)(g.reify(prog))
+  def emitCommon2(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: (Exp, Exp) => Exp) =
+    emitCommon(name, cg, verbose, alt, eff)(m1, m2)(g.reify(prog))
+
+  def emitCommon(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: => Block) = {
     typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
     funTable = Nil
 
-    var g = time("staging") { program(x => INT(prog(x.x))) }
+    var g = time("staging") { program(prog) }
 
     def extra() =  if (verbose) utils.captureOut {
       println("// Raw:")
@@ -624,7 +629,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       case _ =>
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
-        
+
         val fn1 = Backend.Sym(Adapter.g.fresh)
         Adapter.g.reflect(fn, "λforward", fn1)()()
         val res = Wrap[(A,B,C,D)=>E](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3, xn4) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3), Wrap[D](xn4)))))(fn)())
@@ -868,7 +873,7 @@ trait ScalaGenBase extends ExtendedScalaCodeGen {
   // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
   def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Class[_], Any)] = {
-    val (src,statics) = Adapter.emitCommon(className,this)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
+    val (src,statics) = Adapter.emitCommon1(className,this)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
     stream.println(src)
     statics.toList
   }
@@ -881,7 +886,7 @@ trait CGenBase extends ExtendedCCodeGen {
   // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
   def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Class[_], Any)] = {
-    val (src,statics) = Adapter.emitCommon(className,this)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
+    val (src,statics) = Adapter.emitCommon1(className,this)(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
     stream.println(src)
     statics.toList
   }
