@@ -1198,6 +1198,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   class PrimitiveMathOpsCharOpsCls(val self: Rep[Char])(implicit __pos: SourceContext) {
     //STUB
     def -(rhs: Char)(implicit __pos: SourceContext,__imp1: Overloaded73): Rep[Char] = char_minus(self, rhs)
+    def -(rhs: Rep[Char])(implicit __pos: SourceContext,__imp1: Overloaded73): Rep[Char] = char_minus(self, rhs)
+
   }
 
   def char_minus(lhs: Rep[Char], rhs: Rep[Char])(implicit pos: SourceContext): Rep[Char] =
@@ -1631,10 +1633,14 @@ trait PrimitiveOps extends Base with OverloadHack {
 
   class CharOpsCls(self: Rep[Char]) {
     def toInt(implicit pos: SourceContext) = char_toInt(self)
+    def toLong(implicit pos: SourceContext) = char_toLong(self)
   }
 
   def char_toInt(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Int] =
     Wrap(Adapter.g.reflect("Char.toInt", Unwrap(lhs)))
+
+  def char_toLong(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Long] =
+    Wrap(Adapter.g.reflect("Char.toLong", Unwrap(lhs)))
 
   /**
    * Long
