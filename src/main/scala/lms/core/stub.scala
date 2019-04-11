@@ -1437,12 +1437,18 @@ trait PrimitiveOps extends Base with OverloadHack {
   }
 
   def obj_float_parse_float(s: Rep[String])(implicit pos: SourceContext): Rep[Float] = ???
-  def float_plus(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] = ???
-  def float_minus(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] = ???
-  def float_times(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] = ???
-  def float_divide(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] = ???
-  def float_to_int(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Int] = ???
-  def float_to_double(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Double] = ???
+  def float_plus(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] =
+    Wrap[Float]((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x)
+  def float_minus(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] =
+    Wrap[Float]((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x)
+  def float_times(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] =
+    Wrap[Float]((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x)
+  def float_divide(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] =
+    Wrap[Float]((Adapter.INT(Unwrap(lhs)) / Adapter.INT(Unwrap(rhs))).x)
+  def float_to_int(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Int] =
+    Wrap[Int](Adapter.g.reflect("toInt", Unwrap(lhs)))
+  def float_to_double(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double](Adapter.g.reflect("toDouble", Unwrap(lhs)))
 
 
   /**
@@ -1542,9 +1548,12 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Int](Adapter.g.reflect("&", Unwrap(lhs), Unwrap(rhs)))
   def int_binaryxor(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_bitwise_not(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Int] = ???
-  def int_to_long(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Long] = ???
-  def int_to_float(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Float] = ???
-  def int_to_double(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Double] = ???
+  def int_to_long(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Long] =
+    Wrap[Long](Adapter.g.reflect("toLong", Unwrap(lhs)))
+  def int_to_float(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Float] =
+    Wrap[Float](Adapter.g.reflect("toFloat", Unwrap(lhs)))
+  def int_to_double(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Double] =
+    Wrap[Double](Adapter.g.reflect("toDouble", Unwrap(lhs)))
   def int_leftshift(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_rightshiftarith(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_rightshiftlogical(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???

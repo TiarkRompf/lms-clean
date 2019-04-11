@@ -397,6 +397,20 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
   def quoteEff(x: Def) = ""
 
   def remap(m: Manifest[_]): String = m.toString
+  def needNullInit(m: Manifest[_]): Boolean = m.toString match {
+    case "Unit" => false
+    case "Boolean" => false
+    case "Char" => false
+    case "Int" => false
+    case "Double" => false
+    case "Float" => false
+    case "Long" => false
+    case "java.lang.String" => true
+    case "Array[Char]" => true
+    case "Array[Int]" => true
+    case "Array[java.lang.String]" => true
+    case s => true
+  }
   val nameMap: Map[String, String] = Map( // FIXME: tutorial-specific
     "ScannerNew"     -> "new scala.lms.tutorial.Scanner",
     "ScannerHasNext" -> "Scanner.hasNext",
@@ -427,7 +441,9 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
     if (recursive) {
       for (d <- ns if d.op != "λ" && shouldInline(d.n).isEmpty && dce.live(d.n)) {
-        emit("var "); emit(quote(d.n)); emit(": "); emit(remap(typeMap(d.n))); emitln(" = null")
+        if (needNullInit(typeMap(d.n))) {
+          emit("var "); emit(quote(d.n)); emit(": "); emit(remap(typeMap(d.n))); emitln(" = null")
+        }
       }
     }
 
@@ -454,6 +470,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
   val binop = Set("+","-","*","/","%","==","!=","<",">","&","!")
   val scalaMath = Set("sin", "cos", "tanh", "exp", "sqrt")
+  val numTypeConv = Set("toInt", "toLong", "toFloat", "toDouble")
 
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
@@ -514,6 +531,9 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
     case n @ Node(s,op,List(x),_) if scalaMath(op) =>
       emit(s"scala.math.$op("); shallow1(x); emit(")")
+
+    case n @ Node(s,op,List(x),_) if numTypeConv(op) =>
+      shallow1(x); emit(s".$op")
 
     case n @ Node(s,op,args,_) if op contains "[ ]" => // unchecked
       var s = op
@@ -692,6 +712,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case "Boolean" => "bool"
     case "Char" => "char"
     case "Int" => "int"
+    case "Double" => "double"
+    case "Float" => "float"
     case "Long" => "long"
     case "java.lang.String" => "char*"
     case "Array[Char]" => "char*"
