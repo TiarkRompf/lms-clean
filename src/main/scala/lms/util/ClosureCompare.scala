@@ -41,6 +41,14 @@ trait ClosureCompare extends Externalizable {
     o.writeObject(f)
     s.toString("ASCII")
   }
+
+  def canonicalize(f: Function5[_,_,_,_,_,_]) = {
+    val s = new java.io.ByteArrayOutputStream()
+    val o = new java.io.ObjectOutputStream(s)
+    o.writeObject(f)
+    s.toString("ASCII")
+  }
+  
   def sameFunction(f: Function[_,_], g: Function[_,_]): Boolean = {
 
     def ser(f: Function[_,_]) = f.isInstanceOf[java.io.Serializable]

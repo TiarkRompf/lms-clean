@@ -616,6 +616,30 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))(Adapter.CTRL))
   }
 
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = {
+    val can = canonicalize(f)
+    Adapter.funTable.find(_._2 == can) match {
+      case Some((funSym, _)) =>
+        Wrap[(A, B, C, D) => E](funSym)
+      case _ =>
+        val fn = Backend.Sym(Adapter.g.fresh)
+        Adapter.funTable = (fn, can)::Adapter.funTable
+        
+        val fn1 = Backend.Sym(Adapter.g.fresh)
+        Adapter.g.reflect(fn, "λforward", fn1)()()
+        val res = Wrap[(A,B,C,D)=>E](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3, xn4) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3), Wrap[D](xn4)))))(fn)())
+        Adapter.funTable = Adapter.funTable.map {
+          case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
+        }
+        res
+    }
+  }
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
+  implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D]): Rep[E] =
+      Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))(Adapter.CTRL))
+  }
+
   // def compile[A,B](f: Rep[A] => Rep[B]): A=>B = ???
   // def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
   //   val (src, statics) = Adapter.emitScala("Snippet")(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
@@ -655,6 +679,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
   def numeric_minus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
     Wrap((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
+  def numeric_mult[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
+    Wrap((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
 
   implicit class OpsInfixVarT[T:Manifest:Numeric](lhs: Var[T]) {
     def +=(rhs: T): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
@@ -663,6 +689,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def -=(rhs: T): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
     def -=(rhs: Rep[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
     def -=(rhs: Var[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),readVar(rhs)))
+    def *=(rhs: T): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
+    def *=(rhs: Rep[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
+    def *=(rhs: Var[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),readVar(rhs)))
   }
 
 
@@ -1063,8 +1092,6 @@ trait PrimitiveOps extends Base with OverloadHack {
     def -(rhs: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded10) = { double_minus(self, rhs) }
     def *(rhs: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded10) = { double_times(self, rhs) }
     def /(rhs: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_divide(self, rhs) }
-    def sin()(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_sin(self) }
-    def cos()(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_cos(self) }
 
     def +(rhs: Var[Double])(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_plus(self, readVar(rhs)) }
     def -(rhs: Var[Double])(implicit __pos: SourceContext,__imp1: Overloaded11) = { double_minus(self, readVar(rhs)) }
@@ -1285,6 +1312,17 @@ trait PrimitiveOps extends Base with OverloadHack {
     def *(rhs: Var[Long])(implicit __pos: SourceContext,__imp1: Overloaded116) = { long_times(self, readVar(rhs)) }
     def /(rhs: Var[Long])(implicit __pos: SourceContext,__imp1: Overloaded117) = { long_divide(self, readVar(rhs)) }
   }
+
+  object Math {
+    def abs(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_abs(x)
+    def abs(x: Rep[Float])(implicit __pos: SourceContext,__imp1: Overloaded43): Rep[Float] = float_abs(x)
+    def abs(x: Rep[Long])(implicit __pos: SourceContext,__imp1: Overloaded44): Rep[Long] = long_abs(x)
+    def abs(x: Rep[Int])(implicit __pos: SourceContext,__imp1: Overloaded45): Rep[Int] = int_abs(x)
+
+    def tanh(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_tanh(x)
+    def sin(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_sin(x)
+    def cos(x: Rep[Double])(implicit __pos: SourceContext,__imp1: Overloaded42): Rep[Double] = double_cos(x)
+  }
   // -- END FORGE-GENERATED SECTION
 
   /**
@@ -1374,6 +1412,10 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Double]((Adapter.INT(Unwrap(rhs)).sin()).x)
   def double_cos(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
     Wrap[Double]((Adapter.INT(Unwrap(rhs)).cos()).x)
+  def double_tanh(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(rhs)).tanh()).x)
+  def double_abs(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Double]((Adapter.INT(Unwrap(rhs)).abs()).x)
 
   def double_to_int(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Int] = ???
   def double_to_float(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Float] = ???
@@ -1453,6 +1495,9 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Float]((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x)
   def float_divide(lhs: Rep[Float], rhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] =
     Wrap[Float]((Adapter.INT(Unwrap(lhs)) / Adapter.INT(Unwrap(rhs))).x)
+  def float_abs(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] =
+    Wrap[Float](Adapter.INT(Unwrap(lhs)).abs().x)
+
   def float_to_int(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Int] =
     Wrap[Int](Adapter.g.reflect("toInt", Unwrap(lhs)))
   def float_to_double(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Double] =
@@ -1549,6 +1594,8 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Int]((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x)
   def int_divide(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] =
     Wrap[Int]((Adapter.INT(Unwrap(lhs)) / Adapter.INT(Unwrap(rhs))).x)
+  def int_abs(lhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] =
+    Wrap[Int](Adapter.INT(Unwrap(lhs)).abs().x)
 
   def int_mod(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_binaryor(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
@@ -1662,6 +1709,8 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Long]((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x) // XXX type
   def long_divide(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long]((Adapter.INT(Unwrap(lhs)) / Adapter.INT(Unwrap(rhs))).x) // XXX type
+  def long_abs(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
+    Wrap[Long](Adapter.INT(Unwrap(lhs)).abs().x)
 
   def obj_long_parse_long(s: Rep[String])(implicit pos: SourceContext): Rep[Long] = ???
   def obj_long_max_value(implicit pos: SourceContext): Rep[Long] = ???

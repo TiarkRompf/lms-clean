@@ -27,6 +27,8 @@ class FrontEnd {
     def !==(y: INT): BOOL = BOOL(g.reflect("!=",x,y.x))
     def sin(): INT = INT(g.reflect("sin", x))
     def cos(): INT = INT(g.reflect("cos", x))
+    def abs(): INT = INT(g.reflect("abs", x))
+    def tanh(): INT = INT(g.reflect("tanh", x))
   }
 
   case class STRING(x: Exp) {
