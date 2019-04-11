@@ -397,20 +397,6 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
   def quoteEff(x: Def) = ""
 
   def remap(m: Manifest[_]): String = m.toString
-  def needNullInit(m: Manifest[_]): Boolean = m.toString match {
-    case "Unit" => false
-    case "Boolean" => false
-    case "Char" => false
-    case "Int" => false
-    case "Double" => false
-    case "Float" => false
-    case "Long" => false
-    case "java.lang.String" => true
-    case "Array[Char]" => true
-    case "Array[Int]" => true
-    case "Array[java.lang.String]" => true
-    case s => true
-  }
   val nameMap: Map[String, String] = Map( // FIXME: tutorial-specific
     "ScannerNew"     -> "new scala.lms.tutorial.Scanner",
     "ScannerHasNext" -> "Scanner.hasNext",
@@ -441,9 +427,8 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
     if (recursive) {
       for (d <- ns if d.op != "λ" && shouldInline(d.n).isEmpty && dce.live(d.n)) {
-        if (needNullInit(typeMap(d.n))) {
-          emit("var "); emit(quote(d.n)); emit(": "); emit(remap(typeMap(d.n))); emitln(" = null")
-        }
+        emit("var "); emit(quote(d.n)); emit(": "); emit(remap(typeMap(d.n)))
+        emitln(s" = null.asInstanceOf[${remap(typeMap(d.n))}]")
       }
     }
 
@@ -584,7 +569,12 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       emit("// "); emitln(x.toString)
 
     case n @ Node(s,"var_new",List(x),_) => 
-      /*if (dce.live(s))*/ emit(s"var ${quote(s)} = "); shallow(x); emitln()
+      /*if (dce.live(s))*/
+      if (!recursive) {
+        emit(s"var ${quote(s)} = "); shallow(x); emitln()
+      } else {
+        emit(s"${quote(s)} = "); shallow(x); emitln()
+      }
     case n @ Node(s,"var_set",List(x,y),_) => 
       emit(s"${quote(x)} = "); shallow(y); emitln()
     case n @ Node(s,"array_new",List(x),_) => 
