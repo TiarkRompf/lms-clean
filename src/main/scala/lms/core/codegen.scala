@@ -356,6 +356,12 @@ trait ExtendedCodeGen extends CompactTraverser {
       val tpe = a match { // FIXME: hardcoded ...
         case a: Array[Array[Int]] => "Array[Array[Int]]"
         case a: Array[Int] => "Array[Int]"
+        case a: Array[Array[Double]] => "Array[Array[Double]]"
+        case a: Array[Double] => "Array[Double]"
+        case a: Array[Array[Float]] => "Array[Array[Float]]"
+        case a: Array[Float] => "Array[Float]"
+        case a: Array[Array[Long]] => "Array[Array[Long]]"
+        case a: Array[Long] => "Array[Long]"
       }
       s"$arg: $tpe"
   }
