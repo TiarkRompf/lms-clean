@@ -491,8 +491,13 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       shallow(x)
     case n @ Node(s,"array_get",List(x,i),_) => 
       shallow1(x); emit("("); shallow(i); emit(")")
-    case n @ Node(s,"@",x::y::_,_) => 
-      shallow1(x); emit("("); shallow(y); emit(")")
+    case n @ Node(s,"@",x::y,_) => {
+      def emitArgs(y: List[Def]): Unit = y match {
+        case t::Nil => shallow(t)
+        case t::ys  => shallow(t); emit(","); emitArgs(ys)
+      }
+      shallow1(x); emit("("); emitArgs(y); emit(")")
+    }
     case n @ Node(s,"P",List(x),_) => 
       emit("println"); emit("("); shallow(x); emit(")")
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) => 
@@ -562,12 +567,13 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(f,"λ",List(y:Block),_) => 
-      val x = y.in.head
-      val a = typeMap(x)
+      val x = y.in
+      val a = x.map(typeMap(_))
       val b = typeMap(y.res)
       val e = quoteEff(y.ein)
 
-      emit(s"def ${quote(f)}(${quote(x)}: $a): $b$e = ")
+      val args = (x zip a).map{case (x, a) => s"${quote(x)}:$a"}.mkString(", ")
+      emit(s"def ${quote(f)}($args): $b$e = ")
       quoteBlockp(traverse(y,f))
       emitln()
 
