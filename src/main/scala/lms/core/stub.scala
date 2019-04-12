@@ -977,9 +977,9 @@ trait Equal extends Base {
   def infix_!=[A,B](a: Var[A], b: Var[B])(implicit o: Overloaded8, mA: Manifest[A], mB: Manifest[B], pos: SourceContext) : Rep[Boolean] = notequals(a,b)
 
   def equals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean] =
-    Wrap(Adapter.g.reflect("==",Unwrap(a),Unwrap(b)))
+    Wrap[Boolean](Adapter.g.reflect("==",Unwrap(a),Unwrap(b)))
   def notequals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean] =
-    Wrap(Adapter.g.reflect("!=",Unwrap(a),Unwrap(b)))
+    Wrap[Boolean](Adapter.g.reflect("!=",Unwrap(a),Unwrap(b)))
 }
 
 trait OrderingOps extends Base with OverloadHack {
@@ -1489,9 +1489,9 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Float](Adapter.INT(Unwrap(lhs)).abs().x)
 
   def float_to_int(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Int] =
-    Wrap[Int](Adapter.g.reflect("toInt", Unwrap(lhs)))
+    Wrap[Int](Adapter.g.reflect("Float.toInt", Unwrap(lhs)))
   def float_to_double(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Double] =
-    Wrap[Double](Adapter.g.reflect("toDouble", Unwrap(lhs)))
+    Wrap[Double](Adapter.g.reflect("Float.toDouble", Unwrap(lhs)))
 
 
   /**
@@ -1594,11 +1594,11 @@ trait PrimitiveOps extends Base with OverloadHack {
   def int_binaryxor(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_bitwise_not(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Int] = ???
   def int_to_long(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Long] =
-    Wrap[Long](Adapter.g.reflect("toLong", Unwrap(lhs)))
+    Wrap[Long](Adapter.g.reflect("Int.toLong", Unwrap(lhs)))
   def int_to_float(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Float] =
-    Wrap[Float](Adapter.g.reflect("toFloat", Unwrap(lhs)))
+    Wrap[Float](Adapter.g.reflect("Int.toFloat", Unwrap(lhs)))
   def int_to_double(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Double] =
-    Wrap[Double](Adapter.g.reflect("toDouble", Unwrap(lhs)))
+    Wrap[Double](Adapter.g.reflect("Int.toDouble", Unwrap(lhs)))
   def int_leftshift(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_rightshiftarith(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_rightshiftlogical(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???

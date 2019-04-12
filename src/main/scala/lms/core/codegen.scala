@@ -237,6 +237,10 @@ class CompactScalaCodeGen extends CompactTraverser {
       s"${shallow(x)} == ${shallow(y)}"
     case n @ Node(s,"!=",List(x,y),_) => 
       s"${shallow(x)} != ${shallow(y)}"
+    case n @ Node(s,"<=",List(x,y),_) => 
+      s"${shallow(x)} <= ${shallow(y)}"
+    case n @ Node(s,">=",List(x,y),_) => 
+      s"${shallow(x)} >= ${shallow(y)}"
     case n @ Node(s,"var_get",List(x),_) => 
       s"${shallow(x)}"
     case n @ Node(s,"array_get",List(x,i),_) => 
@@ -726,6 +730,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case "Array[Int]" => "int*"
     case "Array[java.lang.String]" => "char**"
     case "Array[Float]" => "float*"
+    case "Nothing" | "Any" => ???
     case s => s
   }
   val nameMap = Map( // FIXME: tutorial specific
@@ -787,10 +792,10 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       // emit(s"$rhs;")
   }
   override def shallow(n: Node): String = n match {
-    case Node(s,"Char.toInt",List(a),_) =>
+    case Node(s, op, List(a), _) if op.endsWith("toInt") =>
       s"(int)${shallow1(a)}"
-    case Node(s,"Long.toInt",List(a),_) =>
-      s"(int)${shallow1(a)}"
+    case Node(s, op, List(a), _) if op.endsWith("toFloat") =>
+      s"(float)${shallow1(a)}"
     case Node(s,"String.charAt",List(a,i),_) =>
       s"${shallow1(a)}[${shallow(i)}]"
     case Node(s,"array_get",List(a,i),_) =>
@@ -835,6 +840,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //   emit(shallow(n))
     // case n @ Node(s,"W",_,_) => // Unit result
     //   emit(shallow(n))
+    case n @ Node(s,"generate-comment",List(Const(x)),_) =>
+      emit(s"// $x")
     case n @ Node(s,"var_new",List(x),_) => 
       emitVarDef(s, shallow(x))
     case n @ Node(s,"var_set",List(x,y),_) => 
