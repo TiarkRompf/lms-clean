@@ -160,9 +160,9 @@ trait UtilOpsExp extends UtilOps with BaseExp { this: DslExp =>
 // @virtualize
 trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString with LiftPrimitives with LiftNumeric with LiftBoolean with IfThenElse with Equal with RangeOps with OrderingOps with MiscOps with ArrayOps with StringOps with SeqOps with Functions with While with StaticData with Variables with LiftVariables with ObjectOps with UtilOps {
   implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
-  implicit class BooleanOps2(lhs: Rep[Boolean]) {
-    def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
-    __ifThenElse(lhs, rhs, unit(false)) }
+  // implicit class BooleanOps2(lhs: Rep[Boolean]) {
+  //   def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
+  //   __ifThenElse(lhs, rhs, unit(false)) }
 //  override def boolean_and(lhs: Rep[Boolean], rhs: Rep[Boolean])(implicit pos: SourceContext): Rep[Boolean] = __ifThenElse(lhs, rhs, unit(false))
   def generate_comment(l: String): Rep[Unit]
   def comment[A:Typ](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A]
@@ -513,6 +513,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   def emitValDef(sym: Sym[Any], rhs: String): Unit = ???
 
+  // Former Ops:
+
 /*
   def FUN(f: INT => INT): INT => INT = FUN((_,x) => f(x))
 
@@ -544,6 +546,55 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
 
 
+  // def compile[A,B](f: Rep[A] => Rep[B]): A=>B = ???
+  // def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
+  //   val (src, statics) = Adapter.emitScala("Snippet")(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
+  //   val fc = time("scalac") { Global.sc.compile[A,B]("Snippet", src, statics.toList) }
+  //   fc
+  // }
+
+  class SeqOpsCls[T](x: Rep[Seq[Char]])
+
+  // implemented in trait Equal
+  def equals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean]
+  def notequals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean]
+
+  // ArrayOps
+  // XXX HACK for generic type!
+  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(xs))(Adapter.STORE))
+  implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
+    def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+    def update(i: Rep[Int], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("Array.length", Unwrap(x)))
+    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
+  }
+
+  trait LongArray[+T]
+  def NewLongArray[T:Manifest](x: Rep[Long]): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int], tpe: String = ""): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
+    def apply(i: Rep[Long]): Rep[A] = Wrap(Adapter.g.reflectEffect("longarray_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+    def update(i: Rep[Long], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("longarray_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("LongArray.length", Unwrap(x)))
+    def slice(s: Rep[Long], e: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("LongArray.slice", Unwrap(s), Unwrap(e)))
+  }
+
+  // BooleanOps
+  implicit def bool2boolOps(lhs: Boolean) = new BoolOps(lhs)
+  implicit def var2boolOps(lhs: Var[Boolean]) = new BoolOps(lhs)
+  implicit class BoolOps(lhs: Rep[Boolean]) {
+    def unary_!(implicit pos: SourceContext): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.!", Unwrap(lhs)))
+    def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
+    __ifThenElse(lhs, rhs, unit(false))
+    // def &&(rhs: => Rep[Boolean]): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.&&", Unwrap(lhs), Unwrap(rhs)))
+    // def ||(rhs: => Rep[Boolean]): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.||", Unwrap(lhs), Unwrap(rhs)))
+    def ||(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
+      __ifThenElse(lhs, unit(true), rhs)
+  }
+
+
+  // Functions
   def fun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
     Wrap[A=>B](__fun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
 
@@ -555,7 +606,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
     Wrap[(A,B)=>C](__fun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1))))))
-  
+
   def doLambda[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = fun(f)
   implicit class FunOps2[A:Manifest,B:Manifest,C:Manifest](f: Rep[(A,B) => C]) {
     def apply(x: Rep[A], y: Rep[B]): Rep[C] =
@@ -603,70 +654,43 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     }
   }
 
-
-  // def compile[A,B](f: Rep[A] => Rep[B]): A=>B = ???
-  // def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
-  //   val (src, statics) = Adapter.emitScala("Snippet")(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
-  //   val fc = time("scalac") { Global.sc.compile[A,B]("Snippet", src, statics.toList) }
-  //   fc
-  // }
-
-  class SeqOpsCls[T](x: Rep[Seq[Char]])
-
-  // XXX HACK for generic type!
-  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
-  def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(xs))(Adapter.STORE))
-  implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
-    def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Int], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
-    def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("Array.length", Unwrap(x)))
-    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
+  // IfThenElse
+  def __ifThenElse[T:Manifest](c: Rep[Boolean], a: => Rep[T], b: => Rep[T])(implicit pos: SourceContext): Rep[T] = c match {
+    case Wrap(Backend.Const(true))  => a
+    case Wrap(Backend.Const(false)) => b
+    case _ =>
+      Wrap(Adapter.IF(Adapter.BOOL(Unwrap(c)))
+                     (Adapter.INT(Unwrap(a)))
+                     (Adapter.INT(Unwrap(b))).x)
   }
 
-  trait LongArray[+T]
-  def NewLongArray[T:Manifest](x: Rep[Long]): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
-  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int], tpe: String = ""): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
-  implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
-    def apply(i: Rep[Long]): Rep[A] = Wrap(Adapter.g.reflectEffect("longarray_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Long], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("longarray_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
-    def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("LongArray.length", Unwrap(x)))
-    def slice(s: Rep[Long], e: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("LongArray.slice", Unwrap(s), Unwrap(e)))
+  // ImplicitOps
+  def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
+
+  // MiscOps
+  def exit(res: Rep[Int]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("exit", Unwrap(res))(Adapter.CTRL))
+  def println(x: Rep[Any]): Unit =
+    Adapter.g.reflectEffect("P",Unwrap(x))(Adapter.CTRL)
+
+  def printf(f: String, x: Rep[Any]*): Unit = {
+    Adapter.g.reflectEffect("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
   }
 
-  implicit def readVar[T:Manifest](x: Var[T]): Rep[T] = Wrap(Adapter.g.reflectEffect("var_get", UnwrapV(x))(UnwrapV(x)))
-  def var_new[T:Manifest](x: Rep[T]): Var[T] = WrapV[T](Adapter.g.reflectEffect("var_new", Unwrap(x))(Adapter.STORE))
-  def __assign[T:Manifest](lhs: Var[T], rhs: Rep[T]): Unit = Wrap[Unit](Adapter.g.reflectEffect("var_set", UnwrapV(lhs), Unwrap(rhs))(UnwrapV(lhs)))
-  def __assign[T:Manifest](lhs: Var[T], rhs: Var[T]): Unit = __assign(lhs,readVar(rhs))
-  def __assign[T:Manifest](lhs: Var[T], rhs: T): Unit = __assign(lhs,unit(rhs)) // shouldn't unit lift T to Rep[T] implicitly?
-
-
-  def numeric_plus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
-    Wrap((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
-  def numeric_minus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
-    Wrap((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
-  def numeric_mult[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
-    Wrap((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
-
-  implicit class OpsInfixVarT[T:Manifest:Numeric](lhs: Var[T]) {
-    def +=(rhs: T): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
-    def +=(rhs: Rep[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
-    def +=(rhs: Var[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),readVar(rhs)))
-    def -=(rhs: T): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
-    def -=(rhs: Rep[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
-    def -=(rhs: Var[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),readVar(rhs)))
-    def *=(rhs: T): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
-    def *=(rhs: Rep[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
-    def *=(rhs: Var[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),readVar(rhs)))
+  // case class GenerateComment(l: String) extends Def[Unit]
+  // case class Comment[A:Manifest](l: String, verbose: Boolean, b: Block[A]) extends Def[A]
+  def generate_comment(l: String): Rep[Unit] = {
+    Wrap(Adapter.g.reflectEffect("generate-comment", Backend.Const(l))(Adapter.CTRL))
+  }
+  def comment[A:Manifest](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A] = {
+    val g = Adapter.g
+    val bb = g.reify(Unwrap(b))
+    if (g.isPure(bb))
+      Wrap(g.reflect("comment",Backend.Const(l),Backend.Const(verbose),bb))
+    else
+      Wrap(g.reflectEffect("comment",Backend.Const(l),Backend.Const(verbose),bb)(g.getEffKeys(bb):_*))
   }
 
-
-  implicit class StringOps(lhs: Rep[String]) {
-    def charAt(i: Rep[Int]): Rep[Char] = Wrap(Adapter.g.reflect("String.charAt", Unwrap(lhs), Unwrap(i))) // XXX: may fail! effect?
-    def apply(i: Rep[Int]): Rep[Char] = charAt(i)
-    def length: Rep[Int] = Wrap(Adapter.g.reflect("String.length", Unwrap(lhs)))
-    def toInt: Rep[Int] = Wrap(Adapter.g.reflect("String.toInt", Unwrap(lhs))) // XXX: may fail!
-  }
-
+  // RangeOps
   // NOTE(trans): it has to be called 'intWrapper' to shadow the standard Range constructor
   implicit class intWrapper(start: Int) {
     // Note that these are ambiguous - need to use type ascription here (e.g. 1 until 10 : Rep[Range])
@@ -751,43 +775,15 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     }
   }
 
-  // implemented in trait Equal
-  def equals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean]
-  def notequals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean]
-
-
-  implicit def bool2boolOps(lhs: Boolean) = new BoolOps(lhs)
-  implicit def var2boolOps(lhs: Var[Boolean]) = new BoolOps(lhs)
-  implicit class BoolOps(lhs: Rep[Boolean]) {
-    def unary_!(implicit pos: SourceContext): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.!", Unwrap(lhs)))
-    def &&(rhs: => Rep[Boolean]): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.&&", Unwrap(lhs), Unwrap(rhs)))
-    def ||(rhs: => Rep[Boolean]): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.||", Unwrap(lhs), Unwrap(rhs)))
+  // StringOps
+  implicit class StringOps(lhs: Rep[String]) {
+    def charAt(i: Rep[Int]): Rep[Char] = Wrap(Adapter.g.reflect("String.charAt", Unwrap(lhs), Unwrap(i))) // XXX: may fail! effect?
+    def apply(i: Rep[Int]): Rep[Char] = charAt(i)
+    def length: Rep[Int] = Wrap(Adapter.g.reflect("String.length", Unwrap(lhs)))
+    def toInt: Rep[Int] = Wrap(Adapter.g.reflect("String.toInt", Unwrap(lhs))) // XXX: may fail!
   }
 
-
-  def println(x: Rep[Any]): Unit =
-    Adapter.g.reflectEffect("P",Unwrap(x))(Adapter.CTRL)
-
-  def printf(f: String, x: Rep[Any]*): Unit = {
-    Adapter.g.reflectEffect("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
-  }
-
-
-  def __ifThenElse[T:Manifest](c: Rep[Boolean], a: => Rep[T], b: => Rep[T])(implicit pos: SourceContext): Rep[T] = c match {
-    case Wrap(Backend.Const(true))  => a
-    case Wrap(Backend.Const(false)) => b
-    case _ =>
-      Wrap(Adapter.IF(Adapter.BOOL(Unwrap(c)))
-                     (Adapter.INT(Unwrap(a)))
-                     (Adapter.INT(Unwrap(b))).x)
-  }
-  def __whileDo(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
-      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
-  }
-  def __whileDoInternal(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
-      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
-  }
-
+  // UncheckedOps
   def unchecked[T:Manifest](xs: Any*): Rep[T] = {
     val strings = xs collect { case s: String => s } mkString "[ ]"
     val args = xs collect { case e: Exp[Any] => e }
@@ -799,23 +795,41 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap(Adapter.g.reflect(strings, args.map(Unwrap):_*))
   }
 
-  case class GenerateComment(l: String) extends Def[Unit]
-  case class Comment[A:Manifest](l: String, verbose: Boolean, b: Block[A]) extends Def[A]
-  def generate_comment(l: String): Rep[Unit] = {
-    Wrap(Adapter.g.reflectEffect("generate-comment", Backend.Const(l))(Adapter.CTRL))
-  }
-  def comment[A:Manifest](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A] = {
-    val g = Adapter.g
-    val bb = g.reify(Unwrap(b))
-    if (g.isPure(bb))
-      Wrap(g.reflect("comment",Backend.Const(l),Backend.Const(verbose),bb))
-    else
-      Wrap(g.reflectEffect("comment",Backend.Const(l),Backend.Const(verbose),bb)(g.getEffKeys(bb):_*))
+  // Variables
+  implicit def readVar[T:Manifest](x: Var[T]): Rep[T] = Wrap(Adapter.g.reflectEffect("var_get", UnwrapV(x))(UnwrapV(x)))
+  def var_new[T:Manifest](x: Rep[T]): Var[T] = WrapV[T](Adapter.g.reflectEffect("var_new", Unwrap(x))(Adapter.STORE))
+  def __assign[T:Manifest](lhs: Var[T], rhs: Rep[T]): Unit = Wrap[Unit](Adapter.g.reflectEffect("var_set", UnwrapV(lhs), Unwrap(rhs))(UnwrapV(lhs)))
+  def __assign[T:Manifest](lhs: Var[T], rhs: Var[T]): Unit = __assign(lhs,readVar(rhs))
+  def __assign[T:Manifest](lhs: Var[T], rhs: T): Unit = __assign(lhs,unit(rhs)) // shouldn't unit lift T to Rep[T] implicitly?
+
+
+  def numeric_plus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
+    Wrap((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
+  def numeric_minus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
+    Wrap((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
+  def numeric_mult[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
+    Wrap((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
+
+  implicit class OpsInfixVarT[T:Manifest:Numeric](lhs: Var[T]) {
+    def +=(rhs: T): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
+    def +=(rhs: Rep[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
+    def +=(rhs: Var[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),readVar(rhs)))
+    def -=(rhs: T): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
+    def -=(rhs: Rep[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
+    def -=(rhs: Var[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),readVar(rhs)))
+    def *=(rhs: T): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
+    def *=(rhs: Rep[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
+    def *=(rhs: Var[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),readVar(rhs)))
   }
 
-  def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
+  // While
+  def __whileDo(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
+      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
+  }
+  def __whileDoInternal(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
+      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
+  }
 
-  def exit(res: Rep[Int]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("exit", Unwrap(res))(Adapter.CTRL))
 }
 
 trait Compile
