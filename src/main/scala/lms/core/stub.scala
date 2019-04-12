@@ -785,14 +785,14 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // UncheckedOps
   def unchecked[T:Manifest](xs: Any*): Rep[T] = {
-    val strings = xs collect { case s: String => s } mkString "[ ]"
+    val strings = xs map { case s: String => s; case e: Exp[Any] => "[ ]" } mkString("")
     val args = xs collect { case e: Exp[Any] => e }
-    Wrap(Adapter.g.reflectEffect(strings, args.map(Unwrap):_*)(Adapter.CTRL))
+    Wrap(Adapter.g.reflectEffect("unchecked" + strings, args.map(Unwrap):_*)(Adapter.CTRL))
   }
   def uncheckedPure[T:Manifest](xs: Any*): Rep[T] = {
-    val strings = xs collect { case s: String => s } mkString "[ ]"
+    val strings = xs map { case s: String => s; case e: Exp[Any] => "[ ]" } mkString("")
     val args = xs collect { case e: Exp[Any] => e }
-    Wrap(Adapter.g.reflect(strings, args.map(Unwrap):_*))
+    Wrap(Adapter.g.reflect("unchecked" + strings, args.map(Unwrap):_*))
   }
 
   // Variables

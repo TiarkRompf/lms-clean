@@ -535,8 +535,8 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
     case n @ Node(s,op,List(x),_) if numTypeConv(op) =>
       shallow1(x); emit(s".$op")
 
-    case n @ Node(s,op,args,_) if op contains "[ ]" => // unchecked
-      var s = op
+    case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
+      var s = op.drop(9) // removed "unchecked" header
       for (a <- args) {
         val i = s.indexOf("[ ]")
         emit(s.substring(0,i))
@@ -687,8 +687,8 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
       s"${shallow1(a)} && ${shallow1(b)}"
     case n @ Node(s,"Boolean.||",List(a,b),_) =>
       s"${shallow1(a)} || ${shallow1(b)}"
-    case n @ Node(s,op,args,_) if op contains "[ ]" => // unchecked
-      var s = op
+    case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
+      var s = op.drop(9) // remove the unchecked header
       for (a <- args)
         s = s.replaceFirst("\\[ \\]",shallow(a))
       s
