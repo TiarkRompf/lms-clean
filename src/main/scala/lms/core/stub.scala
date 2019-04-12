@@ -544,106 +544,65 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
 
 
-  def fun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] = {
-    val can = canonicalize(f)
-    Adapter.funTable.find(_._2 == can) match {
-      case Some((funSym, _)) =>
-        Wrap[A=>B](funSym)
-      case _ =>
-        val fn = Backend.Sym(Adapter.g.fresh)
-        Adapter.funTable = (fn,can)::Adapter.funTable
+  def fun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
+    __fun(f, ((fn, fn1) => Wrap[A=>B](Adapter.g.reflect(fn1,"λ",Adapter.g.reify(xn => Unwrap(f(Wrap[A](xn)))))(fn)())))
 
-        val fn1 = Backend.Sym(Adapter.g.fresh)
-        Adapter.g.reflect(fn,"λforward",fn1)()()
-        //val xn = Sym(g.fresh)
-        //val f1 = (x: INT) => APP(fn,x)
-        // NOTE: lambda expression itself does not have
-        // an effect, so body block should not count as
-        // latent effect of the lambda
-        val res = Wrap[A=>B](Adapter.g.reflect(fn1,"λ",Adapter.g.reify(xn => Unwrap(f(Wrap[A](xn)))))(fn)())
-        Adapter.funTable = Adapter.funTable.map { case (fn2,can2) =>
-          if (can == can2) (fn1,can) else (fn2,can2)
-        }
-        res
-    }
-  }
   def doLambda[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] = fun(f)
   implicit class FunOps[A:Manifest,B:Manifest](f: Rep[A => B]) {
     def apply(x: Rep[A]): Rep[B] =
       Wrap[B](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x))(Adapter.CTRL))
   }
 
-  def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = {
-    val can = canonicalize(f)
-    Adapter.funTable.find(_._2 == can) match {
-      case Some((funSym, _)) =>
-        Wrap[(A, B) => C](funSym)
-      case _ =>
-        val fn = Backend.Sym(Adapter.g.fresh)
-        Adapter.funTable = (fn, can)::Adapter.funTable
+  def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
+    __fun(f, ((fn, fn1) => Wrap[(A,B)=>C](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2)))))(fn)())))
 
-        val fn1 = Backend.Sym(Adapter.g.fresh)
-        Adapter.g.reflect(fn, "λforward", fn1)()()
-        val res = Wrap[(A,B)=>C](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2)))))(fn)())
-        Adapter.funTable = Adapter.funTable.map {
-          case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
-        }
-        res
-    }
-  }
   def doLambda[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = fun(f)
   implicit class FunOps2[A:Manifest,B:Manifest,C:Manifest](f: Rep[(A,B) => C]) {
     def apply(x: Rep[A], y: Rep[B]): Rep[C] =
       Wrap[C](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y))(Adapter.CTRL))
   }
 
-  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = {
-    val can = canonicalize(f)
-    Adapter.funTable.find(_._2 == can) match {
-      case Some((funSym, _)) =>
-        Wrap[(A, B, C) => D](funSym)
-      case _ =>
-        val fn = Backend.Sym(Adapter.g.fresh)
-        Adapter.funTable = (fn, can)::Adapter.funTable
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
+    __fun(f, ((fn, fn1) => Wrap[(A,B,C)=>D](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3)))))(fn)())))
 
-        val fn1 = Backend.Sym(Adapter.g.fresh)
-        Adapter.g.reflect(fn, "λforward", fn1)()()
-        val res = Wrap[(A,B,C)=>D](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3)))))(fn)())
-        Adapter.funTable = Adapter.funTable.map {
-          case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
-        }
-        res
-    }
-  }
   def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = fun(f)
   implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
     def apply(x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =
       Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))(Adapter.CTRL))
   }
 
-  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = {
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
+    __fun(f, ((fn, fn1) => Wrap[(A,B,C,D)=>E](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3, xn4) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3), Wrap[D](xn4)))))(fn)())))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
+  implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D]): Rep[E] =
+      Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))(Adapter.CTRL))
+  }
+
+  def __fun[T:Manifest](f: AnyRef, wrap: (Backend.Sym, Backend.Sym) => Rep[T]) = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
-      case Some((funSym, _)) =>
-        Wrap[(A, B, C, D) => E](funSym)
+      case Some((funSym, _)) => Wrap[T](funSym)
       case _ =>
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
 
         val fn1 = Backend.Sym(Adapter.g.fresh)
         Adapter.g.reflect(fn, "λforward", fn1)()()
-        val res = Wrap[(A,B,C,D)=>E](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3, xn4) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3), Wrap[D](xn4)))))(fn)())
+        //val xn = Sym(g.fresh)
+        //val f1 = (x: INT) => APP(fn,x)
+        // NOTE: lambda expression itself does not have
+        // an effect, so body block should not count as
+        // latent effect of the lambda
+        val res = wrap(fn, fn1)
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }
-        res
+        res    
     }
   }
-  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
-  implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {
-    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D]): Rep[E] =
-      Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))(Adapter.CTRL))
-  }
+
 
   // def compile[A,B](f: Rep[A] => Rep[B]): A=>B = ???
   // def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
