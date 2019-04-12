@@ -197,13 +197,13 @@ class GraphBuilder {
   def reify(x: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => x(xs(0), xs(1), xs(2)))
   def reify(x: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => x(xs(0), xs(1), xs(2), xs(3)))
 
-  def reify(n: Int, x: List[Exp] => Exp): Block = {
+  def reify(arity: Int, x: List[Exp] => Exp): Block = {
     val save = curBlock
     val saveEffects = curEffects
     val saveLocalDefs = curLocalDefs
     try {
       val block = Sym(fresh)
-      val args = (0 until n).toList.map(_ => Sym(fresh))
+      val args = (0 until arity).toList.map(_ => Sym(fresh))
       curBlock = block
       curEffects = Map()
       curLocalDefs = Set()

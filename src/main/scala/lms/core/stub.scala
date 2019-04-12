@@ -545,7 +545,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
 
   def fun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
-    __fun(f, ((fn, fn1) => Wrap[A=>B](Adapter.g.reflect(fn1,"λ",Adapter.g.reify(xn => Unwrap(f(Wrap[A](xn)))))(fn)())))
+    Wrap[A=>B](__fun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
 
   def doLambda[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] = fun(f)
   implicit class FunOps[A:Manifest,B:Manifest](f: Rep[A => B]) {
@@ -554,8 +554,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
-    __fun(f, ((fn, fn1) => Wrap[(A,B)=>C](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2)))))(fn)())))
-
+    Wrap[(A,B)=>C](__fun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1))))))
+  
   def doLambda[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = fun(f)
   implicit class FunOps2[A:Manifest,B:Manifest,C:Manifest](f: Rep[(A,B) => C]) {
     def apply(x: Rep[A], y: Rep[B]): Rep[C] =
@@ -563,7 +563,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
-    __fun(f, ((fn, fn1) => Wrap[(A,B,C)=>D](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3)))))(fn)())))
+    Wrap[(A,B,C)=>D](__fun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2))))))
 
   def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = fun(f)
   implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
@@ -572,7 +572,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
-    __fun(f, ((fn, fn1) => Wrap[(A,B,C,D)=>E](Adapter.g.reflect(fn1,"λ",Adapter.g.reify((xn, xn2, xn3, xn4) => Unwrap(f(Wrap[A](xn), Wrap[B](xn2), Wrap[C](xn3), Wrap[D](xn4)))))(fn)())))
+    Wrap[(A,B,C,D)=>E](__fun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(3)), Wrap[D](xn(4))))))
 
   def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
   implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {
@@ -580,10 +580,10 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))(Adapter.CTRL))
   }
 
-  def __fun[T:Manifest](f: AnyRef, wrap: (Backend.Sym, Backend.Sym) => Rep[T]) = {
+  def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
-      case Some((funSym, _)) => Wrap[T](funSym)
+      case Some((funSym, _)) => funSym
       case _ =>
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
@@ -595,11 +595,11 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         // NOTE: lambda expression itself does not have
         // an effect, so body block should not count as
         // latent effect of the lambda
-        val res = wrap(fn, fn1)
+        val res = Adapter.g.reflect(fn1,"λ",Adapter.g.reify(arity, gf))(fn)()
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }
-        res    
+        res
     }
   }
 
@@ -815,7 +815,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
 
-  def exit(res: Rep[Int]): Rep[Unit] = Wrap[Unit](Adapter.g.reflect("exit", Unwrap(res)))
+  def exit(res: Rep[Int]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("exit", Unwrap(res))(Adapter.CTRL))
 }
 
 trait Compile

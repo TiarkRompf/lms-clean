@@ -679,6 +679,10 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
       s"${shallow1(a)} & ${shallow1(b)}"
     case n @ Node(s,"Boolean.!",List(a),_) => 
       s"!${shallow1(a)}"
+    case n @ Node(s,"Boolean.&&",List(a,b),_) =>
+      s"${shallow1(a)} && ${shallow1(b)}"
+    case n @ Node(s,"Boolean.||",List(a,b),_) =>
+      s"${shallow1(a)} || ${shallow1(b)}"
     case n @ Node(s,op,args,_) if op contains "[ ]" => // unchecked
       var s = op
       for (a <- args)
@@ -721,6 +725,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case "Array[Char]" => "char*"
     case "Array[Int]" => "int*"
     case "Array[java.lang.String]" => "char**"
+    case "Array[Float]" => "float*"
     case s => s
   }
   val nameMap = Map( // FIXME: tutorial specific
@@ -843,6 +848,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emitValDef(s, s"(char*)malloc(${shallow1(x)} * sizeof(char));")
     case n @ Node(s,"new Array[java.lang.String]",List(x),_) => 
       emitValDef(s, s"(char**)malloc(${shallow1(x)} * sizeof(char*));")
+    case n @ Node(s, "new Array[Float]",List(x),_) =>
+      emitValDef(s, s"(float*)malloc(${shallow1(x)} * sizeof(float));")
 
     // DCE: FIXME: 
     // (a) check that args have no side-effects 
