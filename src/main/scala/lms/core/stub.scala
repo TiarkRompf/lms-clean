@@ -600,7 +600,13 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // ArrayOps
   // XXX HACK for generic type!
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
-  def Array[T:Manifest](xs: T*): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(xs.toList), Unwrap(xs.length))(Adapter.STORE))
+  def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = {
+    // TOOD (Need help) this looks like Optimization, but it is actually necessary for correctness of static array in C
+    // The question is: can this be handled better? i.e. if Unwrap(List(Rep[T])) is passed reflect, can the codegen generate {1,2} instead of {Wrap(Const(1)), Wrap(Const(2))}
+    val allConst = xs forall {case Wrap(Backend.Const(_)) => true; case _ => false}
+    val data = if (allConst) xs.map{case Wrap(Backend.Const(s)) => s}.toList else xs.toList
+    Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(data), Unwrap(xs.length))(Adapter.STORE))
+  } 
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Int], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
@@ -827,6 +833,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       case s: String => s
       case e: Exp[Any] => "[ ]"
       case e: Var[Any] => "[ ]"
+      case e => e.toString
     } mkString(""),
     xs collect {
       case e: Exp[Any] => Unwrap(e)
@@ -1618,6 +1625,7 @@ trait PrimitiveOps extends Base with OverloadHack {
     def toLong(implicit pos: SourceContext) = int_to_long(self)
     def toDouble(implicit pos: SourceContext) = int_to_double(self)
     def toFloat(implicit pos: SourceContext) = int_to_float(self)
+    def toChar(implicit pos: SourceContext) = int_to_char(self)
   }
 
   def obj_integer_parseInt(s: Rep[String])(implicit pos: SourceContext): Rep[Int] = ???
@@ -1644,6 +1652,8 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Long](Adapter.g.reflect("Int.toLong", Unwrap(lhs)))
   def int_to_float(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Float] =
     Wrap[Float](Adapter.g.reflect("Int.toFloat", Unwrap(lhs)))
+  def int_to_char(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Char] =
+    Wrap[Char](Adapter.g.reflect("Int.toChar", Unwrap(lhs)))
   def int_to_double(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Double] =
     Wrap[Double](Adapter.g.reflect("Int.toDouble", Unwrap(lhs)))
   def int_leftshift(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
