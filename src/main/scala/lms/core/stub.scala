@@ -72,6 +72,16 @@ object Adapter extends FrontEnd {
 
   class MyGraphBuilder extends GraphBuilder {
 
+    // def num[T](m: Manifest[T]): Numeric[T] = m match {
+    //   case t: Manifest[Int] => implicitly[Numeric[Int]]
+    //   case t: Manifest[Float] => implicitly[Numeric[Float]]
+    //   case _ => ???
+    // }
+
+    // def wrap[T:Manifest](x: Any): T = x.asInstanceOf[T]
+
+    // def isNum(x: Any) = x.isInstanceOf[Int] || x.isInstanceOf[Float]
+
     override def rewrite(s: String, as: List[Def]): Option[Exp] = (s,as) match {
       // staticData(as)(i) => staticData(as(i))
       case ("array_get", List(Def("staticData", List(Const(as: Array[_]))), Const(i:Int))) =>
@@ -84,6 +94,34 @@ object Adapter extends FrontEnd {
       case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1, i1))))
         if as == as1 && i == i1 && curEffects.get(as) == Some(rs) =>
         Some(Const(()))
+      
+      case ("Boolean.!", List(Const(true))) => Some(Const(false))
+      case ("Boolean.!", List(Const(false))) => Some(Const(true))
+      case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
+      case ("!=", List(Const(a), Const(b))) => Some(Const(a != b))
+      case ("<=", List(Const(a: Int), Const(b: Int))) => Some(Const(a <= b))
+      case ("<=", List(Const(a: Float), Const(b: Float))) => Some(Const(a <= b))
+      case ("<=", List(Const(a: Long), Const(b: Long))) => Some(Const(a <= b))
+      case ("<=", List(Const(a: Double), Const(b: Double))) => Some(Const(a <= b))
+      // idea 1:
+      // case ("<=", List(Const(a), Const(b))) if isNum(a) => Some(Const(a.asInstanceOf[Double] <= b.asInstanceOf[Double])) 
+      // idea 2:
+      //   implicit val m: Manifest[Int] = typeMap(Const(a)).asInstanceOf[Manifest[Int]]
+      //   val tmp = num[Int](m).lteq(wrap[Int](a), wrap[Int](b))
+      //   Some(Const(tmp)) 
+      // }
+      case (">=", List(Const(a: Int), Const(b: Int))) => Some(Const(a >= b))
+      case (">=", List(Const(a: Long), Const(b: Long))) => Some(Const(a >= b))
+      case (">=", List(Const(a: Float), Const(b: Float))) => Some(Const(a >= b))
+      case (">=", List(Const(a: Double), Const(b: Double))) => Some(Const(a >= b))
+      case ("<", List(Const(a: Int), Const(b: Int))) => Some(Const(a < b))
+      case ("<", List(Const(a: Long), Const(b: Long))) => Some(Const(a < b))
+      case ("<", List(Const(a: Float), Const(b: Float))) => Some(Const(a < b))
+      case ("<", List(Const(a: Double), Const(b: Double))) => Some(Const(a < b))
+      case (">", List(Const(a: Int), Const(b: Int))) => Some(Const(a > b))
+      case (">", List(Const(a: Long), Const(b: Long))) => Some(Const(a > b))
+      case (">", List(Const(a: Float), Const(b: Float))) => Some(Const(a > b))
+      case (">", List(Const(a: Double), Const(b: Double))) => Some(Const(a > b))
 
       case _  =>
         super.rewrite(s,as)
