@@ -536,14 +536,16 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       shallow1(x); emit(s".$op")
 
     case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
-      var s = op.drop(9) // removed "unchecked" header
+      var next = 9 // skip unchecked
       for (a <- args) {
-        val i = s.indexOf("[ ]")
-        emit(s.substring(0,i))
+        val i = op.indexOf("[ ]", next)
+        assert(i >= next)
+        emit(op.substring(next,i))
         shallow(a)
-        s = s.substring(i+3)
+        next = i + 3
       }
-      emit(s)
+      emit(op.substring(next))
+
 
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
       val (recv::args1) = args
