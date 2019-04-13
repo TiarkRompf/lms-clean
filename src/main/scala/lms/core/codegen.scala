@@ -754,13 +754,17 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       "({})"
     } else res
   }*/
+
+  var nSyms = 0
+  def fresh = try s"tmp${nSyms}" finally nSyms += 1
+  val header = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>")
   // block of statements
   override def quoteBlock(f: => Unit) = {
     val ls = captureLines(f)
     if (ls.length != 1) {
       "{\n" + ls.mkString("\n") + "\n}"
     } else ls.mkString("\n")
-  }  
+  }
   // block of statements with result expression
   def quoteBlockP(f: => Unit) = {
     val ls = captureLines(f)
@@ -833,9 +837,15 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
         emit(";//#" + str)
       }
 
-    case n @ Node(s,"P",List(x),_) => 
+    case n @ Node(s,"P",List(x),_) =>
       s"printf(${"\"%s\\n\""}, ${shallow(x)})"
-    case n => 
+    case n @ Node(_, "timestamp", _, _) =>
+      header += "<sys/time.h>"
+      val tmp = fresh
+      emit(s"struct timeval $tmp;")
+      emit(s"gettimeofday(&$tmp, NULL);")
+      s"$tmp.t_sec * 1000000L + $tmp.tv_usec"
+    case n =>
       super.shallow(n)
   }
   override def traverse(n: Node): Unit = n match {
