@@ -675,6 +675,12 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
       emit(rhs)
   }
 
+  override def shallow(n: Def): String = n match {
+    case InlineSym(t: Node) => shallow(t)
+    case b:Block => quoteBlock1(b)
+    case _ => quote(n)
+  }
+
   override def shallow(n: Node): String = n match {
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
