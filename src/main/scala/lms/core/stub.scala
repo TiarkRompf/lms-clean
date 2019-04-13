@@ -1461,9 +1461,12 @@ trait PrimitiveOps extends Base with OverloadHack {
   def double_sqrt(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
     Wrap[Double]((Adapter.INT(Unwrap(rhs)).sqrt()).x)
 
-  def double_to_int(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Int] = ???
-  def double_to_float(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Float] = ???
-  def double_to_long(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Long] = ???
+  def double_to_int(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Int] =
+    Wrap[Int](Adapter.g.reflect("Double.toInt", Unwrap(lhs)))
+  def double_to_float(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Float] =
+    Wrap[Float](Adapter.g.reflect("Double.toFloat", Unwrap(lhs)))
+  def double_to_long(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Long] =
+    Wrap[Long](Adapter.g.reflect("Double.toLong", Unwrap(lhs)))
 
 
   /**
@@ -1642,7 +1645,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   def int_abs(lhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] =
     Wrap[Int](Adapter.INT(Unwrap(lhs)).abs().x)
 
-  def int_mod(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
+  def int_mod(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] =
+    Wrap[Int]((Adapter.INT(Unwrap(lhs)) % Adapter.INT(Unwrap(rhs))).x)
   def int_binaryor(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_binaryand(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] =
     Wrap[Int](Adapter.g.reflect("&", Unwrap(lhs), Unwrap(rhs)))

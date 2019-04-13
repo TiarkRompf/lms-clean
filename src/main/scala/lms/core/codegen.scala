@@ -809,6 +809,10 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       s"(int)${shallow1(a)}"
     case Node(s, op, List(a), _) if op.endsWith("toFloat") =>
       s"(float)${shallow1(a)}"
+    case Node(s, op, List(a), _) if op.endsWith("toDouble") =>
+      s"(double)${shallow1(a)}"
+    case Node(s, op, List(a), _) if op.endsWith("toLong") =>
+      s"(long)${shallow1(a)}"
     case Node(s,"String.charAt",List(a,i),_) =>
       s"${shallow1(a)}[${shallow(i)}]"
     case Node(s,"array_get",List(a,i),_) =>
@@ -878,8 +882,14 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emitValDef(s, s"(float*)malloc(${shallow1(x)} * sizeof(float));")
 
     // static array
+    case n @ Node(s, "Array[Int]",List(xs, size),_) =>
+      emit(s"int ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
+    case n @ Node(s, "Array[Long]",List(xs, size),_) =>
+      emit(s"long ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
     case n @ Node(s, "Array[Float]",List(xs, size),_) =>
       emit(s"float ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
+    case n @ Node(s, "Array[Double]",List(xs, size),_) =>
+      emit(s"double ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
 
     // DCE: FIXME:
     // (a) check that args have no side-effects
