@@ -600,7 +600,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // ArrayOps
   // XXX HACK for generic type!
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
-  def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(xs))(Adapter.STORE))
+  def Array[T:Manifest](xs: T*): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(xs.toList), Unwrap(xs.length))(Adapter.STORE))
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Int], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))

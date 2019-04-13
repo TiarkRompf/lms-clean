@@ -653,6 +653,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case Const(x) if x.isInstanceOf[Char] && x == '\t' => "'\\t'"
     case Const(x) if x.isInstanceOf[Char] && x == 0    => "'\\0'"
     case Const(x) if x.isInstanceOf[Long] => x.toString + "L"
+    case Const(x: List[_]) => "{" + x.mkString(", ") + "}" // translate a Scala List literal to C List literal
     case _ => super.quote(x)
   }
 
@@ -857,6 +858,10 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emitValDef(s, s"(char**)malloc(${shallow1(x)} * sizeof(char*));")
     case n @ Node(s, "new Array[Float]",List(x),_) =>
       emitValDef(s, s"(float*)malloc(${shallow1(x)} * sizeof(float));")
+
+    // static array
+    case n @ Node(s, "Array[Float]",List(xs, size),_) =>
+      emit(s"float ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
 
     // DCE: FIXME: 
     // (a) check that args have no side-effects 
