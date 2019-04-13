@@ -8,13 +8,13 @@ abstract class Traverser {
 
   // freq/block computation
   def symsFreq(x: Node): List[(Def,Double)] = x match {
-    case Node(f, "λ", List(Block(in, y, ein, eff)), _) => 
+    case Node(f, "λ", List(Block(in, y, ein, eff)), _) =>
       (y::eff.deps).map(e => (e,100.0))
-    // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) => 
+    // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
-    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) => 
+    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
       (c::eff.deps).map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
-    case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) => 
+    case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
       eff.deps.map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,100.0)) // XXX why eff.deps?
     case _ => syms(x) map (s => (s,1.0))
   }
@@ -36,7 +36,7 @@ abstract class Traverser {
 
     // a node is available if all bound vars
     // it depends on are in scope
-    def available(d: Node) = 
+    def available(d: Node) =
       bound.hm(d.n) -- path1 - d.n == Set()
 
     // find out which nodes are reachable on a
@@ -58,7 +58,7 @@ abstract class Traverser {
 
     for (d <- g.nodes.reverseIterator) {
       if ((reach contains d.n)) {
-        if (available(d)) { 
+        if (available(d)) {
           // node will be sched here, don't follow if branches!
           for ((e:Sym,f) <- symsFreq(d) if f > 0.5) reach += e
         } else {
@@ -73,10 +73,10 @@ abstract class Traverser {
     // E.g. from tutorials/AutomataTest:
     //    x2 = fwd; x23 = DFAState(x2); x2' = (λ ...); x23
 
-    // PROBLEM: Since we iterate over g.nodes in reverse order, the lambda (x2') 
+    // PROBLEM: Since we iterate over g.nodes in reverse order, the lambda (x2')
     // is initially not reachable (only the fwd node x2)!
 
-    // Ideally we would directly want to build something like 
+    // Ideally we would directly want to build something like
     //    x23 = fwd; x2 = (λ ...) ; x23 = DFAState(x2)
     // but this seems hard to achieve in general.
 
@@ -130,7 +130,7 @@ abstract class Traverser {
   }
 
   def traverse(n: Node): Unit = n match {
-    case n @ Node(f, "λ", List(y:Block), _) => 
+    case n @ Node(f, "λ", List(y:Block), _) =>
       // special case λ: add free var f
       traverse(y, f)
     case n @ Node(f, op, es, _) =>
@@ -188,7 +188,7 @@ class CompactTraverser extends Traverser {
     val hm = new mutable.HashMap[Sym,Int]
 
     // local successor nodes (incl blocks and effects)
-    val succ = new mutable.HashMap[Sym,List[Sym]]    
+    val succ = new mutable.HashMap[Sym,List[Sym]]
 
     // count how many times a node is used at the current level
     if (y.res.isInstanceOf[Sym]) hm(y.res.asInstanceOf[Sym]) = 1
@@ -224,7 +224,7 @@ class CompactTraverser extends Traverser {
       }
     }
 
-    def checkInline(res: Sym) = shouldInline(res) match { 
+    def checkInline(res: Sym) = shouldInline(res) match {
       case Some(n) =>
         // want to inline, now check that all successors are already there, else disable
         if (mayInline(n) && succ.getOrElse(n.n,Nil).forall(seen))
@@ -265,16 +265,16 @@ class CompactTraverser extends Traverser {
   def traverseShallow(n: Def): Unit = n match {
     case InlineSym(n) => traverseShallow(n)
     case b:Block => traverse(b)
-    case _ => 
+    case _ =>
   }
 
   def traverseShallow(n: Node): Unit = n match {
-    case n @ Node(_,op,args,_) => 
+    case n @ Node(_,op,args,_) =>
       args.foreach(traverseShallow)
   }
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(f,"λ",List(y:Block),_) => 
+    case n @ Node(f,"λ",List(y:Block),_) =>
       // special case λ: add free var f
       traverse(y,f)
     case n @ Node(f, op, es, _) =>
@@ -298,9 +298,9 @@ abstract class Transformer extends Traverser {
 
   def transform(b: Block): Block = b match {
     case b @ Block(Nil, res, block, eff) =>
-      g.reify { 
+      g.reify {
         //subst(block) = g.effectToExp(g.curBlock) //XXX
-        traverse(b); transform(res) 
+        traverse(b); transform(res)
       }
     case b @ Block(arg::Nil, res, block, eff) =>
       g.reify { e =>
@@ -322,16 +322,16 @@ abstract class Transformer extends Traverser {
       val s1 = Sym(g.fresh)
       subst(s) = s1
       g.reflect(s1, "λ", transform(b))()()
-    case Node(s,op,rs,es) => 
+    case Node(s,op,rs,es) =>
       // effect dependencies in target graph are managed by
       // graph builder, so we drop all effects here
       val (effects,pure) = (es.deps,rs)
       val args = pure.map {
         case b @ Block(_,_,_,_) =>
           transform(b)
-        case s : Exp => 
+        case s : Exp =>
           transform(s)
-        case a => 
+        case a =>
           a
       }
       // NOTE: we're not transforming 'effects' here (just the keys)
@@ -349,10 +349,10 @@ abstract class Transformer extends Traverser {
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
-    val block = g.reify { e => 
+    val block = g.reify { e =>
       assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
-      // subst(graph.block.ein) = g.curBlock.head // XXX 
+      // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph); transform(graph.block.res) }
     Graph(g.globalDefs,block)
   }

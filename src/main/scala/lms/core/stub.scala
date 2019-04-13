@@ -94,7 +94,7 @@ object Adapter extends FrontEnd {
       case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1, i1))))
         if as == as1 && i == i1 && curEffects.get(as) == Some(rs) =>
         Some(Const(()))
-      
+
       case ("Boolean.!", List(Const(true))) => Some(Const(false))
       case ("Boolean.!", List(Const(false))) => Some(Const(true))
       case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
@@ -104,11 +104,11 @@ object Adapter extends FrontEnd {
       case ("<=", List(Const(a: Long), Const(b: Long))) => Some(Const(a <= b))
       case ("<=", List(Const(a: Double), Const(b: Double))) => Some(Const(a <= b))
       // idea 1:
-      // case ("<=", List(Const(a), Const(b))) if isNum(a) => Some(Const(a.asInstanceOf[Double] <= b.asInstanceOf[Double])) 
+      // case ("<=", List(Const(a), Const(b))) if isNum(a) => Some(Const(a.asInstanceOf[Double] <= b.asInstanceOf[Double]))
       // idea 2:
       //   implicit val m: Manifest[Int] = typeMap(Const(a)).asInstanceOf[Manifest[Int]]
       //   val tmp = num[Int](m).lteq(wrap[Int](a), wrap[Int](b))
-      //   Some(Const(tmp)) 
+      //   Some(Const(tmp))
       // }
       case (">=", List(Const(a: Int), Const(b: Int))) => Some(Const(a >= b))
       case (">=", List(Const(a: Long), Const(b: Long))) => Some(Const(a >= b))

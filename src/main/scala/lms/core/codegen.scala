@@ -15,12 +15,12 @@ class CodeGen extends Traverser {
   }
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(f, "λ", List(y: Block), _) => 
+    case n @ Node(f, "λ", List(y: Block), _) =>
       emit(s"$f = (λ {")
       traverse(y, f)
       emit(s"})")
     case n @ Node(f, op, es, eff) =>
-      val ss = es map { 
+      val ss = es map {
         case e @ Block(_,_,_,_) => "{" + utils.captureOut(traverse(e)) + "}" // FIXME freq!!
         case e => e.toString
       }
@@ -46,55 +46,55 @@ class ScalaCodeGen extends Traverser {
   }
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(f,"λ",List(y:Block),_) => 
+    case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
       emit(s"def ${quote(f)}(${quote(x)}: Int): Int = {")
       // see what becomes available given new bound vars
       traverse(y, f)
       emit(s"}")
-    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) => 
+    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       emit(s"val $f = if (${quote(c)}) {")
       traverse(a)
       emit(s"} else {")
       traverse(b)
       emit(s"}")
-    case n @ Node(f,"W",List(c:Block,b:Block,e),_) => 
+    case n @ Node(f,"W",List(c:Block,b:Block,e),_) =>
       emit(s"while ({")
       traverse(c)
       emit(s"}) else {")
       traverse(b)
       emit(s"}")
-    case n @ Node(s,"+",List(x,y),_) => 
+    case n @ Node(s,"+",List(x,y),_) =>
       emit(s"val $s = ${quote(x)} + ${quote(y)}")
-    case n @ Node(s,"-",List(x,y),_) => 
+    case n @ Node(s,"-",List(x,y),_) =>
       emit(s"val $s = ${quote(x)} - ${quote(y)}")
-    case n @ Node(s,"*",List(x,y),_) => 
+    case n @ Node(s,"*",List(x,y),_) =>
       emit(s"val $s = ${quote(x)} * ${quote(y)}")
-    case n @ Node(s,"/",List(x,y),_) => 
+    case n @ Node(s,"/",List(x,y),_) =>
       emit(s"val $s = ${quote(x)} / ${quote(y)}")
-    case n @ Node(s,"%",List(x,y),_) => 
+    case n @ Node(s,"%",List(x,y),_) =>
       emit(s"val $s = ${quote(x)} % ${quote(y)}")
-    case n @ Node(s,"==",List(x,y),_) => 
+    case n @ Node(s,"==",List(x,y),_) =>
       emit(s"val $s = ${quote(x)} == ${quote(y)}")
-    case n @ Node(s,"!=",List(x,y),_) => 
+    case n @ Node(s,"!=",List(x,y),_) =>
       emit(s"val $s = ${quote(x)} != ${quote(y)}")
-    case n @ Node(s,"var_new",List(x),_) => 
+    case n @ Node(s,"var_new",List(x),_) =>
       emit(s"var $s = ${quote(x)}")
-    case n @ Node(s,"var_get",List(x),_) => 
+    case n @ Node(s,"var_get",List(x),_) =>
       emit(s"val $s = ${quote(x)}")
-    case n @ Node(s,"var_set",List(x,y),_) => 
+    case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = ${quote(y)}")
-    case n @ Node(s,"array_new",List(x),_) => 
+    case n @ Node(s,"array_new",List(x),_) =>
       emit(s"var $s = new Array[Int](${quote(x)})")
-    case n @ Node(s,"array_get",List(x,i),_) => 
+    case n @ Node(s,"array_get",List(x,i),_) =>
       emit(s"val $s = ${quote(x)}(${quote(i)})")
-    case n @ Node(s,"array_set",List(x,i,y),_) => 
+    case n @ Node(s,"array_set",List(x,i,y),_) =>
       emit(s"${quote(x)}(${quote(i)}) = ${quote(y)}")
-    case n @ Node(s,"@",x::y::_,_) => 
+    case n @ Node(s,"@",x::y::_,_) =>
       emit(s"val $s = ${quote(x)}(${quote(y)})")
-    case n @ Node(s,"P",List(x),_) => 
+    case n @ Node(s,"P",List(x),_) =>
       emit(s"val $s = println(${quote(x)})")
-    case n @ Node(_,_,_,_) => 
+    case n @ Node(_,_,_,_) =>
       emit(s"??? " + n.toString)
   }
 }
@@ -129,12 +129,12 @@ class CompactScalaCodeGen extends CompactTraverser {
     case _ => quote(n)
   }
 
-  def quoteEff(x: Def): String = 
-    if (!doPrintEffects) "" 
+  def quoteEff(x: Def): String =
+    if (!doPrintEffects) ""
     else " /* " + quote(x) + " */"
 
-  def quoteEff(x: List[Exp]): String = 
-    if (!doPrintEffects) "" 
+  def quoteEff(x: List[Exp]): String =
+    if (!doPrintEffects) ""
     else " /* " + x.map(quote).mkString("") + " */"
 
   def quoteEff(x: EffectSummary): String = quoteEff(x.deps)
@@ -147,7 +147,7 @@ class CompactScalaCodeGen extends CompactTraverser {
     }
   }
 
-  // def quoteEff(x: Effect) = 
+  // def quoteEff(x: Effect) =
   //   if (!doPrintEffects || x.isEmpty) ""
   //   else " /* " + quote(x) + " */"
 
@@ -207,49 +207,49 @@ class CompactScalaCodeGen extends CompactTraverser {
   // (either inline or as part of val def)
   // XXX TODO: precedence of nested expressions!!
   def shallow(n: Node): String = (n match {
-    case n @ Node(f,"λ",List(y:Block),_) => 
-      // XXX what should we do for functions? 
-      // proper inlining will likely work better 
+    case n @ Node(f,"λ",List(y:Block),_) =>
+      // XXX what should we do for functions?
+      // proper inlining will likely work better
       // as a separate phase b/c it may trigger
       // further optimizations
       quoteBlock1(y, true)
-    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) => 
+    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       s"if (${shallow(c)}) " +
       quoteBlock(traverse(a)) +
       s" else " +
       quoteBlock(traverse(b))
-    case n @ Node(f,"W",List(c:Block,b:Block),_) => 
+    case n @ Node(f,"W",List(c:Block,b:Block),_) =>
       s"while (" +
       quoteBlock(traverse(c)) +
       s") " +
       quoteBlock(traverse(b))
-    case n @ Node(s,"+",List(x,y),_) => 
+    case n @ Node(s,"+",List(x,y),_) =>
       s"${shallow(x)} + ${shallow(y)}"
-    case n @ Node(s,"-",List(x,y),_) => 
+    case n @ Node(s,"-",List(x,y),_) =>
       s"${shallow(x)} - ${shallow(y)}"
-    case n @ Node(s,"*",List(x,y),_) => 
+    case n @ Node(s,"*",List(x,y),_) =>
       s"${shallow(x)} * ${shallow(y)}"
-    case n @ Node(s,"/",List(x,y),_) => 
+    case n @ Node(s,"/",List(x,y),_) =>
       s"${shallow(x)} / ${shallow(y)}"
-    case n @ Node(s,"%",List(x,y),_) => 
+    case n @ Node(s,"%",List(x,y),_) =>
       s"${shallow(x)} % ${shallow(y)}"
-    case n @ Node(s,"==",List(x,y),_) => 
+    case n @ Node(s,"==",List(x,y),_) =>
       s"${shallow(x)} == ${shallow(y)}"
-    case n @ Node(s,"!=",List(x,y),_) => 
+    case n @ Node(s,"!=",List(x,y),_) =>
       s"${shallow(x)} != ${shallow(y)}"
-    case n @ Node(s,"<=",List(x,y),_) => 
+    case n @ Node(s,"<=",List(x,y),_) =>
       s"${shallow(x)} <= ${shallow(y)}"
-    case n @ Node(s,">=",List(x,y),_) => 
+    case n @ Node(s,">=",List(x,y),_) =>
       s"${shallow(x)} >= ${shallow(y)}"
-    case n @ Node(s,"var_get",List(x),_) => 
+    case n @ Node(s,"var_get",List(x),_) =>
       s"${shallow(x)}"
-    case n @ Node(s,"array_get",List(x,i),_) => 
+    case n @ Node(s,"array_get",List(x,i),_) =>
       s"${shallow(x)}(${shallow(i)})"
-    case n @ Node(s,"@",x::y::_,_) => 
+    case n @ Node(s,"@",x::y::_,_) =>
       s"${shallow(x)}(${shallow(y)})"
-    case n @ Node(s,"P",List(x),_) => 
+    case n @ Node(s,"P",List(x),_) =>
       s"println(${shallow(x)})"
-    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) => 
+    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
       quoteBlock {
         emit("//#" + str)
         if (verbose) {
@@ -261,12 +261,12 @@ class CompactScalaCodeGen extends CompactTraverser {
         emit("//#" + str)
       }
 
-    case n @ Node(_,op,args,_) => 
+    case n @ Node(_,op,args,_) =>
       s"$op(${args.map(shallow).mkString(", ")})"
   }) + quoteEff(n)
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(f,"λ",List(y:Block),_) => 
+    case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
       emit(s"def ${quote(f)}(${quote(x)}: Int): Int${quoteEff(y.ein)} = ${ quoteBlock(traverse(y,f)) }")
     // XXX: should not need these below!
@@ -274,16 +274,16 @@ class CompactScalaCodeGen extends CompactTraverser {
       emit(shallow(n))
     case n @ Node(s,"W",_,_) => // Unit result
       emit(shallow(n))
-    case n @ Node(s,"var_new",List(x),_) => 
+    case n @ Node(s,"var_new",List(x),_) =>
       emit(s"var ${quote(s)} = ${shallow(x)}")
-    case n @ Node(s,"var_set",List(x,y),_) => 
+    case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = ${shallow(y)}")
-    case n @ Node(s,"array_new",List(x),_) => 
+    case n @ Node(s,"array_new",List(x),_) =>
       emit(s"val ${quote(s)} = new Array[Int](${shallow(x)})")
-    case n @ Node(s,"array_set",List(x,i,y),_) => 
+    case n @ Node(s,"array_set",List(x,i,y),_) =>
       emit(s"${shallow(x)}(${shallow(i)}) = ${shallow(y)}")
-    case n @ Node(s,_,_,_) => 
-      // emit(s"val ${quote(s)} = " + shallow(n)) 
+    case n @ Node(s,_,_,_) =>
+      // emit(s"val ${quote(s)} = " + shallow(n))
       emitValDef(s, shallow(n))
   }
 
@@ -307,7 +307,7 @@ class CompactScalaCodeGen extends CompactTraverser {
 
 class DeadCodeElimCG {
 
-  def valueSyms(n: Node): List[Sym] = 
+  def valueSyms(n: Node): List[Sym] =
     directSyms(n) ++ blocks(n).collect { case Block(_,res:Sym,_,_) => res }
 
   var live: collection.Set[Sym] = _
@@ -326,7 +326,7 @@ class DeadCodeElimCG {
 
     if (g.block.res.isInstanceOf[Sym])
       live += g.block.res.asInstanceOf[Sym]
-    
+
     for (d <- g.nodes.reverseIterator) {
       if (reach(d.n)) {
         live ++= valueSyms(d)
@@ -472,28 +472,28 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
   // XXX TODO: precedence of nested expressions!!
   def shallow(n: Node): Unit = n match {
     case n @ Node(f,"λforward",List(y),_) => emit(quote(y))
-    case n @ Node(f,"λ",List(y:Block),_) => 
-      // XXX what should we do for functions? 
-      // proper inlining will likely work better 
+    case n @ Node(f,"λ",List(y:Block),_) =>
+      // XXX what should we do for functions?
+      // proper inlining will likely work better
       // as a separate phase b/c it may trigger
       // further optimizations
       // quoteBlock1(y, true)
       quoteBlockp(traverse(y))
-    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) => 
+    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) =>
       shallow1(c); emit(" && "); shallow1(a)
-    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) => 
+    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       emit(s"if ("); shallow(c); emit(") ")
       quoteBlockp(traverse(a))
       emit(s" else ")
       quoteBlockp(traverse(b))
-    case n @ Node(f,"W",List(c:Block,b:Block),_) => 
+    case n @ Node(f,"W",List(c:Block,b:Block),_) =>
       emit(s"while (")
       quoteBlockp(traverse(c))
       emit(s") ")
       quoteBlockp(traverse(b))
-    case n @ Node(s,"var_get",List(x),_) => 
+    case n @ Node(s,"var_get",List(x),_) =>
       shallow(x)
-    case n @ Node(s,"array_get",List(x,i),_) => 
+    case n @ Node(s,"array_get",List(x,i),_) =>
       shallow1(x); emit("("); shallow(i); emit(")")
     case n @ Node(s,"@",x::y,_) => {
       def emitArgs(y: List[Def]): Unit = y match {
@@ -502,9 +502,9 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       }
       shallow1(x); emit("("); emitArgs(y); emit(")")
     }
-    case n @ Node(s,"P",List(x),_) => 
+    case n @ Node(s,"P",List(x),_) =>
       emit("println"); emit("("); shallow(x); emit(")")
-    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) => 
+    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
       quoteBlockp {
         emitln("//#" + str)
         if (verbose) {
@@ -516,17 +516,17 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
         emitln("//#" + str)
       }
 
-    case n @ Node(s,"Boolean.!",List(a),_) => 
+    case n @ Node(s,"Boolean.!",List(a),_) =>
       emit("!"); shallow1(a)
 
-    case n @ Node(s,"staticData",List(Const(a)),_) => 
+    case n @ Node(s,"staticData",List(Const(a)),_) =>
       val q = a match { case x: Array[_] => "Array("+x.mkString(",")+")" case _ => a }
       emit("p"+quote(s)); emit(s" /* staticData $q */")
 
-    case n @ Node(s,op,args,_) if nameMap contains op => 
+    case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
 
-    case n @ Node(s,op,List(x,y),_) if binop(op) => 
+    case n @ Node(s,op,List(x,y),_) if binop(op) =>
       shallow1(x); emit(" "); emit(op); emit(" "); shallow1(y)
 
     case n @ Node(s,op,List(x),_) if scalaMath(op) =>
@@ -556,10 +556,10 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
         }
         emit(")")
       }
-  
-    case n @ Node(_,op,args,_) => 
-      emit(s"$op("); 
-      if (args.nonEmpty) { 
+
+    case n @ Node(_,op,args,_) =>
+      emit(s"$op(");
+      if (args.nonEmpty) {
         shallow(args.head)
         args.tail.foreach { a =>
           emit(", "); shallow(a)
@@ -570,7 +570,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(f,"λ",List(y:Block),_) => 
+    case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in
       val a = x.map(typeMap(_))
       val b = typeMap(y.res)
@@ -581,27 +581,27 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       quoteBlockp(traverse(y,f))
       emitln()
 
-    case n @ Node(s,"generate-comment",List(Const(x)),_) => 
+    case n @ Node(s,"generate-comment",List(Const(x)),_) =>
       emit("// "); emitln(x.toString)
 
-    case n @ Node(s,"var_new",List(x),_) => 
+    case n @ Node(s,"var_new",List(x),_) =>
       /*if (dce.live(s))*/
       if (!recursive) {
         emit(s"var ${quote(s)} = "); shallow(x); emitln()
       } else {
         emit(s"${quote(s)} = "); shallow(x); emitln()
       }
-    case n @ Node(s,"var_set",List(x,y),_) => 
+    case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = "); shallow(y); emitln()
-    case n @ Node(s,"array_new",List(x),_) => 
+    case n @ Node(s,"array_new",List(x),_) =>
       /*if (dce.live(s))*/ emit(s"val ${quote(s)} = "); emit("new Array[Int]("); shallow(x); emit(")"); emitln()
-    case n @ Node(s,"array_set",List(x,i,y),_) => 
+    case n @ Node(s,"array_set",List(x,i,y),_) =>
       shallow(x); emit("("); shallow(i); emit(") = "); shallow(y); emitln()
 
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
 
-    case n @ Node(s,_,_,_) => 
+    case n @ Node(s,_,_,_) =>
       if (!recursive) {
         if (dce.live(s)) emit(s"val ${quote(s)} = "); shallow(n); emitln()
       } else {
@@ -674,15 +674,15 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   }
 
   override def shallow(n: Node): String = n match {
-    case n @ Node(s,op,args,_) if nameMap contains op => 
+    case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
-    case n @ Node(s,"<",List(a,b),_) => 
+    case n @ Node(s,"<",List(a,b),_) =>
       s"${shallow(a)} < ${shallow(b)}"
-    case n @ Node(s,">",List(a,b),_) => 
+    case n @ Node(s,">",List(a,b),_) =>
       s"${shallow(a)} > ${shallow(b)}"
-    case n @ Node(s,"&",List(a,b),_) => 
+    case n @ Node(s,"&",List(a,b),_) =>
       s"${shallow1(a)} & ${shallow1(b)}"
-    case n @ Node(s,"Boolean.!",List(a),_) => 
+    case n @ Node(s,"Boolean.!",List(a),_) =>
       s"!${shallow1(a)}"
     case n @ Node(s,"Boolean.&&",List(a,b),_) =>
       s"${shallow1(a)} && ${shallow1(b)}"
@@ -691,7 +691,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
       var s = op.drop(9) // remove the unchecked header
       for (a <- args)
-        s = s.replaceFirst("\\[ \\]",shallow(a))
+        s = s.replaceFirst("\\[ \\]", shallow(a))
       s
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
       val (recv::args1) = args
@@ -699,15 +699,15 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
         s"${shallow1(recv)}.${op.drop(op.lastIndexOf('.')+1)}(${args1.map(shallow).mkString(",")})"
       else
         s"${shallow1(recv)}.${op.drop(op.lastIndexOf('.')+1)}"
-    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) => 
+    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) =>
       s"${shallow(c)} && ${shallow(a)}"
-    case n => 
+    case n =>
       super.shallow(n)
   }
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
-    case n @ Node(s,_,_,_) => 
+    case n @ Node(s,_,_,_) =>
       super.traverse(n)
   }
   override def apply(g: Graph): Unit = {
@@ -778,14 +778,14 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   //     emit(quoteEff(y.eff))
   // }
   override def emitValDef(s: Sym, rhs: =>String): Unit = {
-    // emit(s"val ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ") 
+    // emit(s"val ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     if (dce.live(s))
       emit(s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)} = $rhs;")
     else
       emit(s"$rhs;")
   }
   def emitVarDef(s: Sym, rhs: =>String): Unit = {
-    // emit(s"var ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ") 
+    // emit(s"var ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     // TODO: enable dce for vars ... but currently getting unused expression warnings ...
     // if (dce.live(s))
       emit(s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)} = $rhs;")
@@ -804,22 +804,22 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     // case Node(s,"var_get",List(a),_) =>
       // quote(a)+s"/*${quote(s)}*/"
 
-    // case n @ Node(s,"comment",_,_) => 
+    // case n @ Node(s,"comment",_,_) =>
       // s"(${super.shallow(n)})" // GNU C block expr
-    case n @ Node(s,"?",List(c,a:Block,b:Block),_) if b.isPure && b.res == Const(false) => 
+    case n @ Node(s,"?",List(c,a:Block,b:Block),_) if b.isPure && b.res == Const(false) =>
       s"${shallow(c)} && ${quoteBlockP(traverse(a))}"
-    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) => 
+    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       s"${shallow1(c)} ? " +
       quoteBlockP(traverse(a)) +
       s" : " +
       quoteBlockP(traverse(b)) + ""
 
-    case n @ Node(f,"W",List(c:Block,b:Block),_) => 
+    case n @ Node(f,"W",List(c:Block,b:Block),_) =>
       s"while (" +
       quoteBlockP(traverse(c)) +
       s") " +
       quoteBlock1(b)
-    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) => 
+    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
       quoteBlockP {
         emit("//#" + str)
         if (verbose) {
@@ -843,18 +843,18 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //   emit(shallow(n))
     case n @ Node(s,"generate-comment",List(Const(x)),_) =>
       emit(s"// $x")
-    case n @ Node(s,"var_new",List(x),_) => 
+    case n @ Node(s,"var_new",List(x),_) =>
       emitVarDef(s, shallow(x))
-    case n @ Node(s,"var_set",List(x,y),_) => 
+    case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = ${shallow(y)};")
 
-    case n @ Node(s,"array_new",List(x),_) => 
+    case n @ Node(s,"array_new",List(x),_) =>
       emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int));")
-    case n @ Node(s,"new Array[Int]",List(x),_) => 
+    case n @ Node(s,"new Array[Int]",List(x),_) =>
       emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int));")
-    case n @ Node(s,"new Array[Char]",List(x),_) => 
+    case n @ Node(s,"new Array[Char]",List(x),_) =>
       emitValDef(s, s"(char*)malloc(${shallow1(x)} * sizeof(char));")
-    case n @ Node(s,"new Array[java.lang.String]",List(x),_) => 
+    case n @ Node(s,"new Array[java.lang.String]",List(x),_) =>
       emitValDef(s, s"(char**)malloc(${shallow1(x)} * sizeof(char*));")
     case n @ Node(s, "new Array[Float]",List(x),_) =>
       emitValDef(s, s"(float*)malloc(${shallow1(x)} * sizeof(float));")
@@ -863,32 +863,35 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case n @ Node(s, "Array[Float]",List(xs, size),_) =>
       emit(s"float ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
 
-    // DCE: FIXME: 
-    // (a) check that args have no side-effects 
-    //      maybe this can be ensured by overriding InlineSym? 
+    // DCE: FIXME:
+    // (a) check that args have no side-effects
+    //      maybe this can be ensured by overriding InlineSym?
+    // DCE: FIXME:
+    // (a) check that args have no side-effects
+    //      maybe this can be ensured by overriding InlineSym?
     //      should never inline a live expr into something that's not live ...
     // (b) dce above should anticipate that these will be eliminated
     //      do not register dependencies as live!
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
 
-    case n @ Node(s,"array_set",List(x,i,y),_) => 
+    case n @ Node(s,"array_set",List(x,i,y),_) =>
       emit(s"${shallow1(x)}[${shallow(i)}] = ${shallow(y)};")
 
 
-    case n @ Node(s,"?",c::(a:Block)::(b:Block)::_,_) if !dce.live(s) => 
+    case n @ Node(s,"?",c::(a:Block)::(b:Block)::_,_) if !dce.live(s) =>
       emit(s"if (${shallow(c)}) " +
       quoteBlock(traverse(a)) +
       s" else " +
       quoteBlock(traverse(b)) + "")
 
-    case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) => 
+    case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) =>
       emit(s"while (" +
       quoteBlockP(traverse(c)) +
       s") " +
       quoteBlock(traverse(b)))
 
-    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_)  if !dce.live(s) => 
+    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_)  if !dce.live(s) =>
         emit("//#" + str)
         if (verbose) {
           emit("// generated code for " + str.replace('_', ' '))
@@ -897,9 +900,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
         }
         traverse(b)
         emit(";//#" + str)
-
-    case n @ Node(s,_,_,_) => 
-      // emit(s"val ${quote(s)} = " + shallow(n)) 
+    case n @ Node(s, op,_,_) =>
+      // emit(s"val ${quote(s)} = " + shallow(n))
       emitValDef(s, shallow(n))
   }
 
