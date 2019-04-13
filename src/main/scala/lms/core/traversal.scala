@@ -140,9 +140,7 @@ abstract class Traverser {
   }
 
   def apply(g: Graph): Unit = {
-
     bound(g)
-
     withScope(Nil, g.nodes) {
       traverse(g.block)
     }
@@ -203,7 +201,7 @@ class CompactTraverser extends Traverser {
     val dis = new mutable.HashSet[Sym]
 
     // should a definition be inlined or let-inserted?
-    shouldInline = { (n: Sym) => 
+    shouldInline = { (n: Sym) =>
       if ((df contains n) &&              // locally defined
           (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
           (!hmi(n)))                      // not used in nested scopes

@@ -739,6 +739,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case "Array[Int]" => "int*"
     case "Array[java.lang.String]" => "char**"
     case "Array[Float]" => "float*"
+    case s if s.endsWith("LongArray[Char]") => "char*"
     case "Nothing" | "Any" => ???
     case s => s
   }
@@ -763,7 +764,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
 
   var nSyms = 0
   def fresh = try s"tmp${nSyms}" finally nSyms += 1
-  val header = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>")
+  val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   // block of statements
   override def quoteBlock(f: => Unit) = {
     val ls = captureLines(f)
@@ -850,11 +851,11 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case n @ Node(s,"P",List(x),_) =>
       s"printf(${"\"%s\\n\""}, ${shallow(x)})"
     case n @ Node(_, "timestamp", _, _) =>
-      header += "<sys/time.h>"
+      headers += "<sys/time.h>"
       val tmp = fresh
       emit(s"struct timeval $tmp;")
       emit(s"gettimeofday(&$tmp, NULL);")
-      s"$tmp.t_sec * 1000000L + $tmp.tv_usec"
+      s"$tmp.tv_sec * 1000000L + $tmp.tv_usec"
     case n =>
       super.shallow(n)
   }

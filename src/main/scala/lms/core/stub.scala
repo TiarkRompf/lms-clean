@@ -618,10 +618,10 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def NewLongArray[T:Manifest](x: Rep[Long]): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
   def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int], tpe: String = ""): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
-    def apply(i: Rep[Long]): Rep[A] = Wrap(Adapter.g.reflectEffect("longarray_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Long], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("longarray_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
-    def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("LongArray.length", Unwrap(x)))
-    def slice(s: Rep[Long], e: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("LongArray.slice", Unwrap(s), Unwrap(e)))
+    def apply(i: Rep[Long]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+    def update(i: Rep[Long], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("Array.length", Unwrap(x)))
+    def slice(s: Rep[Long], e: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
   }
 
   // BooleanOps
