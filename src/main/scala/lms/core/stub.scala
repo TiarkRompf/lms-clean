@@ -615,8 +615,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   trait LongArray[+T]
-  def NewLongArray[T:Manifest](x: Rep[Long]): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
-  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int], tpe: String = ""): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new LongArray["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewLongArray[T:Manifest](x: Rep[Long]): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int], tpe: String = ""): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
     def apply(i: Rep[Long]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Long], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
@@ -1771,14 +1771,16 @@ trait PrimitiveOps extends Base with OverloadHack {
   def obj_long_max_value(implicit pos: SourceContext): Rep[Long] = ???
   def obj_long_min_value(implicit pos: SourceContext): Rep[Long] = ???
   def long_mod(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = ???
-  def long_binaryand(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = ???
+  def long_binaryand(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
+    Wrap[Long](Adapter.g.reflect("&", Unwrap(lhs), Unwrap(rhs)))
   def long_binaryor(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = ???
   def long_binaryxor(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = ???
-  def long_shiftleft(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
+  def long_shiftleft(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] =
+    Wrap[Long](Adapter.g.reflect("<<", Unwrap(lhs), Unwrap(rhs)))
   def long_shiftright_signed(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
   def long_shiftright_unsigned(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
   def long_to_int(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Int] =
-    Wrap(Adapter.g.reflect("Long.toInt", Unwrap(lhs)))
+    Wrap[Int](Adapter.g.reflect("Long.toInt", Unwrap(lhs)))
   def long_to_float(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Float] = ???
   def long_to_double(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Double] = ???
 }

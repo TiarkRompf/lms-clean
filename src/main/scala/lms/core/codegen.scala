@@ -463,7 +463,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
   }
 
 
-  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","!")
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","!","<<",">>") // TODO merge with CompactScalaCodeGen
   val scalaMath = Set("sin", "cos", "tanh", "exp", "sqrt")
   val numTypeConv = Set("toInt", "toLong", "toFloat", "toDouble")
 
@@ -681,16 +681,18 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case _ => quote(n)
   }
 
+  val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
+  def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
+
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","!","<<",">>")
   override def shallow(n: Node): String = n match {
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
     case n @ Node(f, "λforward",List(y),_) => quote(y)
-    case n @ Node(s,"<",List(a,b),_) =>
-      s"${shallow(a)} < ${shallow(b)}"
-    case n @ Node(s,">",List(a,b),_) =>
-      s"${shallow(a)} > ${shallow(b)}"
     case n @ Node(s,"&",List(a,b),_) =>
       s"${shallow1(a)} & ${shallow1(b)}"
+    case n @ Node(s, op,List(x,y),_) if binop(op) =>
+      s"${shallow(x)} $op ${shallow(y)}"
     case n @ Node(s,"Boolean.!",List(a),_) =>
       s"!${shallow1(a)}"
     case n @ Node(s,"Boolean.&&",List(a,b),_) =>
@@ -698,10 +700,22 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case n @ Node(s,"Boolean.||",List(a,b),_) =>
       s"${shallow1(a)} || ${shallow1(b)}"
     case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
-      var s = op.drop(9) // remove the unchecked header
-      for (a <- args)
-        s = s.replaceFirst("\\[ \\]", shallow(a))
-      s
+      var next = 9 // skip unchecked
+      var s = ""
+      for (a <- args) {
+        val i = op.indexOf("[ ]", next)
+        assert(i >= next)
+        s += op.substring(next,i)
+        s += shallow(a)
+        next = i + 3
+      }
+      s + op.substring(next)
+    case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
+      registerHeader("<string.h>")
+      (op.substring(7), args) match {
+        case ("equalsTo", List(lhs, rhs, len)) => s"strncmp(${shallow(lhs)}, ${shallow(rhs)}, ${shallow(len)}) == 0"
+        case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
+      }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
       val (recv::args1) = args
       if (args1.length > 0)
@@ -766,8 +780,6 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
 
   var nSyms = 0
   def fresh = try s"tmp${nSyms}" finally nSyms += 1
-  val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
-  def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
   // block of statements
   override def quoteBlock(f: => Unit) = {
     val ls = captureLines(f)
