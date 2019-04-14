@@ -21,3 +21,6 @@ project/plugins/project/
 
 # vim specific
 .*.sw*
+
+# test specific
+*.actual.*
