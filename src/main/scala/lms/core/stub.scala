@@ -606,7 +606,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     val allConst = xs forall {case Wrap(Backend.Const(_)) => true; case _ => false}
     val data = if (allConst) xs.map{case Wrap(Backend.Const(s)) => s}.toList else xs.toList
     Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(data), Unwrap(xs.length))(Adapter.STORE))
-  } 
+  }
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Int], y: Rep[A]): Unit = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))

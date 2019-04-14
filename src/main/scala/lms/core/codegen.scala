@@ -727,7 +727,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
 class Unknown // HACK: Sentinel for typeMap
 
 class ExtendedCCodeGen extends ExtendedCodeGen1 {
-  def remap(m: Manifest[_]): String = m.toString match {
+  def remap(m: String): String = m match {
     case "Unit" => "void"
     case "Boolean" => "bool"
     case "Char" => "char"
@@ -736,19 +736,15 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case "Float" => "float"
     case "Long" => "long"
     case "java.lang.String" => "char*"
-    case "Array[Char]" => "char*"
-    case "Array[Int]" => "int*"
-    case "Array[java.lang.String]" => "char**"
-    case "Array[Float]" => "float*"
-    case "Array[Array[Int]]" => "int**"
-    case "Array[Array[Char]]" => "char**"
-    case "Array[Array[Float]]" => "float**"
-    case "Array[Array[Double]]" => "double**"
-    case "Array[Array[Long]]" => "long**"
-    case s if s.endsWith("LongArray[Char]") => "char*"
     case "Nothing" | "Any" => ???
-    case s => s
+    case s =>
+      val idx = s.indexOf("Array[")
+      if (idx != -1)
+        remap(s.substring(idx + 6, s.length - 1)) + "*"
+      else
+        s
   }
+  def remap(m: Manifest[_]): String = remap(m.toString)
   val nameMap = Map( // FIXME: tutorial specific
     "ScannerNew"     -> "new scala.lms.tutorial.Scanner",
     "ScannerHasNext" -> "Scanner.hasNext",
