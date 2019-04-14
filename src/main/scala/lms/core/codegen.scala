@@ -202,6 +202,7 @@ class CompactScalaCodeGen extends CompactTraverser {
     // if (numStms > 0) emit("}")
   }
 
+   val forward = new scala.collection.mutable.HashMap[String,String]()
 
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
@@ -245,8 +246,9 @@ class CompactScalaCodeGen extends CompactTraverser {
       s"${shallow(x)}"
     case n @ Node(s,"array_get",List(x,i),_) =>
       s"${shallow(x)}(${shallow(i)})"
-    case n @ Node(s,"@",x::y::_,_) =>
-      s"${shallow(x)}(${shallow(y)})"
+    case n @ Node(s,"@",x::y,_) =>
+      val func = shallow(x)
+      s"${forward.getOrElse(func, func)}(${y.map(shallow(_)).mkString(", ")})"
     case n @ Node(s,"P",List(x),_) =>
       s"println(${shallow(x)})"
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
@@ -688,7 +690,9 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   override def shallow(n: Node): String = n match {
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
-    case n @ Node(f, "λforward",List(y),_) => quote(y)
+    case n @ Node(f, "λforward",List(y),_) =>
+      forward(quote(f)) = quote(y)
+      "NULL"
     case n @ Node(s,"&",List(a,b),_) =>
       s"${shallow1(a)} & ${shallow1(b)}"
     case n @ Node(s, op,List(x,y),_) if binop(op) =>
