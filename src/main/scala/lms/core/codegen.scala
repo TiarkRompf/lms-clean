@@ -779,23 +779,6 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       "{\n" + ls.mkString("\n") + "\n}"
     } else ls.mkString("\n")
   }
-  override def quoteBlock1(y: Block, argType: Boolean = false) = {
-    def eff = quoteEff(y.ein)
-    def typed(s:Backend.Sym) = if (argType) s"${quote(s)}: ${remap(typeMap(s))}" else quote(s)
-    def ltyped(xs:List[Backend.Sym]) = xs.map(typed(_)).mkString(", ")
-    def paren(s:String) = if (argType) "("+s+")" else s
-    if (y.in.length == 0) {
-      quoteBlock(traverse(y))
-    } else {
-      val xs = y.in
-      val l = captureLines(traverse(y))
-      val b = l.mkString("\n")
-      if (l.length != 1)
-        paren(s"{ ${ltyped(xs)}$eff => \n$b\n}")
-      else
-        s"(${paren(ltyped(xs))}$eff => $b)"
-    }
-  }
   // block of statements with result expression
   def quoteBlockP(f: => Unit) = {
     val ls = captureLines(f)
