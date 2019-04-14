@@ -684,6 +684,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   override def shallow(n: Node): String = n match {
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
+    case n @ Node(f, "λforward",List(y),_) => quote(y)
     case n @ Node(s,"<",List(a,b),_) =>
       s"${shallow(a)} < ${shallow(b)}"
     case n @ Node(s,">",List(a,b),_) =>
@@ -739,6 +740,11 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case "Array[Int]" => "int*"
     case "Array[java.lang.String]" => "char**"
     case "Array[Float]" => "float*"
+    case "Array[Array[Int]]" => "int**"
+    case "Array[Array[Char]]" => "char**"
+    case "Array[Array[Float]]" => "float**"
+    case "Array[Array[Double]]" => "double**"
+    case "Array[Array[Long]]" => "long**"
     case s if s.endsWith("LongArray[Char]") => "char*"
     case "Nothing" | "Any" => ???
     case s => s
@@ -771,6 +777,23 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     if (ls.length != 1) {
       "{\n" + ls.mkString("\n") + "\n}"
     } else ls.mkString("\n")
+  }
+  override def quoteBlock1(y: Block, argType: Boolean = false) = {
+    def eff = quoteEff(y.ein)
+    def typed(s:Backend.Sym) = if (argType) s"${quote(s)}: ${remap(typeMap(s))}" else quote(s)
+    def ltyped(xs:List[Backend.Sym]) = xs.map(typed(_)).mkString(", ")
+    def paren(s:String) = if (argType) "("+s+")" else s
+    if (y.in.length == 0) {
+      quoteBlock(traverse(y))
+    } else {
+      val xs = y.in
+      val l = captureLines(traverse(y))
+      val b = l.mkString("\n")
+      if (l.length != 1)
+        paren(s"{ ${ltyped(xs)}$eff => \n$b\n}")
+      else
+        s"(${paren(ltyped(xs))}$eff => $b)"
+    }
   }
   // block of statements with result expression
   def quoteBlockP(f: => Unit) = {
