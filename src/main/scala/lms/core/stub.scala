@@ -1773,7 +1773,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   def long_mod(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = ???
   def long_binaryand(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long](Adapter.g.reflect("&", Unwrap(lhs), Unwrap(rhs)))
-  def long_binaryor(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = ???
+  def long_binaryor(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
+    Wrap[Long](Adapter.g.reflect("|", Unwrap(lhs), Unwrap(rhs)))
   def long_binaryxor(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = ???
   def long_shiftleft(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long](Adapter.g.reflect("<<", Unwrap(lhs), Unwrap(rhs)))
