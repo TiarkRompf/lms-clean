@@ -875,25 +875,31 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emit(s"${quote(x)} = ${shallow(y)};")
 
     case n @ Node(s,"array_new",List(x),_) =>
-      emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int));")
-    case n @ Node(s,"new Array[Int]",List(x),_) =>
-      emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int));")
-    case n @ Node(s,"new Array[Char]",List(x),_) =>
-      emitValDef(s, s"(char*)malloc(${shallow1(x)} * sizeof(char));")
-    case n @ Node(s,"new Array[java.lang.String]",List(x),_) =>
-      emitValDef(s, s"(char**)malloc(${shallow1(x)} * sizeof(char*));")
-    case n @ Node(s, "new Array[Float]",List(x),_) =>
-      emitValDef(s, s"(float*)malloc(${shallow1(x)} * sizeof(float));")
+      emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int))")
+    // case n @ Node(s,"new Array[Int]",List(x),_) =>
+    //   emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int));")
+    // case n @ Node(s,"new Array[Char]",List(x),_) =>
+    //   emitValDef(s, s"(char*)malloc(${shallow1(x)} * sizeof(char));")
+    // case n @ Node(s,"new Array[java.lang.String]",List(x),_) =>
+    //   emitValDef(s, s"(char**)malloc(${shallow1(x)} * sizeof(char*));")
+    // case n @ Node(s, "new Array[Float]",List(x),_) =>
+    //   emitValDef(s, s"(float*)malloc(${shallow1(x)} * sizeof(float));")
+    case n @ Node(s, newArray ,List(x),_) if newArray.startsWith("new Array[") =>
+      val tpe = remap(newArray.substring(10, newArray.length - 1))
+      emitValDef(s, s"($tpe*)malloc(${shallow1(x)} * sizeof($tpe))")
 
     // static array
-    case n @ Node(s, "Array[Int]",List(xs, size),_) =>
-      emit(s"int ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
-    case n @ Node(s, "Array[Long]",List(xs, size),_) =>
-      emit(s"long ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
-    case n @ Node(s, "Array[Float]",List(xs, size),_) =>
-      emit(s"float ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
-    case n @ Node(s, "Array[Double]",List(xs, size),_) =>
-      emit(s"double ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
+    // case n @ Node(s, "Array[Int]",List(xs, size),_) =>
+    //   emit(s"int ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
+    // case n @ Node(s, "Array[Long]",List(xs, size),_) =>
+    //   emit(s"long ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
+    // case n @ Node(s, "Array[Float]",List(xs, size),_) =>
+    //   emit(s"float ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
+    // case n @ Node(s, "Array[Double]",List(xs, size),_) =>
+    //   emit(s"double ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
+    case n @ Node(s, array , xs,_) if array.startsWith("Array[") =>
+      val tpe = remap(array.substring(6, array.length - 1))
+      emit(s"$tpe ${quote(s)}[${xs.length}] = { ${xs.map(shallow).mkString(", ")} };");
 
     // DCE: FIXME:
     // (a) check that args have no side-effects

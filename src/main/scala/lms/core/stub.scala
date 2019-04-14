@@ -603,9 +603,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = {
     // TOOD (Need help) this looks like Optimization, but it is actually necessary for correctness of static array in C
     // The question is: can this be handled better? i.e. if Unwrap(List(Rep[T])) is passed reflect, can the codegen generate {1,2} instead of {Wrap(Const(1)), Wrap(Const(2))}
-    val allConst = xs forall {case Wrap(Backend.Const(_)) => true; case _ => false}
-    val data = if (allConst) xs.map{case Wrap(Backend.Const(s)) => s}.toList else xs.toList
-    Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", Unwrap(data), Unwrap(xs.length))(Adapter.STORE))
+    // val allConst = xs forall {case Wrap(Backend.Const(_)) => true; case _ => false}
+    // val data = if (allConst) xs.map{case Wrap(Backend.Const(s)) => s}.toList else xs.toList
+    Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", xs.map(Unwrap(_)):_*)(Adapter.STORE))
   }
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
