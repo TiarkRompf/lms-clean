@@ -717,7 +717,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
       registerHeader("<string.h>")
       (op.substring(7), args) match {
-        case ("equalsTo", List(lhs, rhs, len)) => s"strncmp(${shallow(lhs)}, ${shallow(rhs)}, ${shallow(len)}) == 0"
+        case ("equalsTo", List(lhs, rhs, len)) => s"(strncmp(${shallow(lhs)}, ${shallow(rhs)}, ${shallow(len)}) == 0)"
         case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
       }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
