@@ -609,7 +609,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   } 
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Int], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def update(i: Rep[Int], y: Rep[A]): Unit = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("Array.length", Unwrap(x)))
     def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
   }
