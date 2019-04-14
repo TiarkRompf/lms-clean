@@ -771,6 +771,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   var nSyms = 0
   def fresh = try s"tmp${nSyms}" finally nSyms += 1
   val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
+  def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
   // block of statements
   override def quoteBlock(f: => Unit) = {
     val ls = captureLines(f)
