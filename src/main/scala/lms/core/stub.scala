@@ -95,6 +95,11 @@ object Adapter extends FrontEnd {
         if as == as1 && i == i1 && curEffects.get(as) == Some(rs) =>
         Some(Const(()))
 
+      case ("Array.length", List(Def(op, List(Const(n))))) if op.startsWith("new Array[") =>
+        Some(Const(n))
+      case ("Array.length", List(Def(op, List(Const(as: Array[_]))))) if op.startsWith("Array[") =>
+        Some(Const(as.length))
+
       case ("Boolean.!", List(Const(true))) => Some(Const(false))
       case ("Boolean.!", List(Const(false))) => Some(Const(true))
       case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
@@ -667,7 +672,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
-    Wrap[(A,B,C,D)=>E](__fun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(3)), Wrap[D](xn(4))))))
+    Wrap[(A,B,C,D)=>E](__fun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3))))))
 
   def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
   implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {

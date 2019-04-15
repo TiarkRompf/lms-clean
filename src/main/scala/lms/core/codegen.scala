@@ -202,8 +202,6 @@ class CompactScalaCodeGen extends CompactTraverser {
     // if (numStms > 0) emit("}")
   }
 
-   val forward = new scala.collection.mutable.HashMap[String,String]()
-
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
   // XXX TODO: precedence of nested expressions!!
@@ -247,8 +245,7 @@ class CompactScalaCodeGen extends CompactTraverser {
     case n @ Node(s,"array_get",List(x,i),_) =>
       s"${shallow(x)}(${shallow(i)})"
     case n @ Node(s,"@",x::y,_) =>
-      val func = shallow(x)
-      s"${forward.getOrElse(func, func)}(${y.map(shallow(_)).mkString(", ")})"
+      s"${shallow(x)}(${y.map(shallow(_)).mkString(", ")})"
     case n @ Node(s,"P",List(x),_) =>
       s"println(${shallow(x)})"
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
@@ -465,7 +462,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
   }
 
 
-  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","!","<<",">>") // TODO merge with CompactScalaCodeGen
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","<<",">>","Boolean.&&","Boolean.||") // TODO merge with CompactScalaCodeGen
   val scalaMath = Set("sin", "cos", "tanh", "exp", "sqrt")
   val numTypeConv = Set("toInt", "toLong", "toFloat", "toDouble")
 
@@ -650,6 +647,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
 
   // val dce = new DeadCodeElim
   doRename = true
+  val forwardMap = new scala.collection.mutable.HashMap[Sym,Def]()
 
   override def quote(x: Def) = x match {
     case Const(s: String) => "\""+s.replace("\"", "\\\"").replace("\n","\\n").replace("\t","\\t")+"\"" // TODO: more escapes?
@@ -658,12 +656,32 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case Const(x) if x.isInstanceOf[Char] && x == 0    => "'\\0'"
     case Const(x) if x.isInstanceOf[Long] => x.toString + "L"
     case Const(x: List[_]) => "{" + x.mkString(", ") + "}" // translate a Scala List literal to C List literal
+    case a: Sym if forwardMap.contains(a) => quote(forwardMap(a))
     case _ => super.quote(x)
   }
 
+  def isAtom(op: String) = !binop.contains(op)
+  def precedence(op: String): Int = op match {
+    case "Boolean.||" | "?" => 1 // node: in case "?" is rewritten to "&&" or "||"
+    case "Boolean.&&" => 2
+    case "|" => 3
+    case "^" => 4
+    case "&" => 5
+    case "==" | "!=" => 6
+    case "<" | ">" | "<=" | ">=" => 7
+    case "<<" | ">>" => 8
+    case "+" | "-" => 9
+    case "*" | "/" | "%" => 10
+    // type casting is lower in precedence?
+    case b if b.endsWith("toFloat") || b.endsWith("toInt") || b.endsWith("toLong")
+           || b.endsWith("toDouble") || b.endsWith("toChar") || b.startsWith("new Array[") => 19
+    case b if isAtom(b) => 20
+    case _ => 0
+  }
+
   // XXX proper operator precedence
-  def shallow1(n: Def): String = n match {
-    case InlineSym(n) if n.op != "var_get" => s"(${shallow(n)})"
+  def shallow1(n: Def, pp: Int = 20): String = n match {
+    case InlineSym(n) if (precedence(n.op) < pp) => s"(${shallow(n)})"
     case _ => shallow(n)
   }
 
@@ -686,17 +704,15 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
 
-  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","!","<<",">>")
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","<<",">>", "Boolean.&&", "Boolean.||")
   override def shallow(n: Node): String = n match {
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
     case n @ Node(f, "λforward",List(y),_) =>
-      forward(quote(f)) = quote(y)
-      "NULL"
-    case n @ Node(s,"&",List(a,b),_) =>
-      s"${shallow1(a)} & ${shallow1(b)}"
+      forwardMap(f) = y
+      "MarkNoGen"
     case n @ Node(s, op,List(x,y),_) if binop(op) =>
-      s"${shallow(x)} $op ${shallow(y)}"
+      s"${shallow1(x, precedence(op))} $op ${shallow1(y, precedence(op)+1)}"
     case n @ Node(s,"Boolean.!",List(a),_) =>
       s"!${shallow1(a)}"
     case n @ Node(s,"Boolean.&&",List(a,b),_) =>
@@ -812,7 +828,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   override def emitValDef(s: Sym, rhs: =>String): Unit = {
     // emit(s"val ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     if (dce.live(s))
-      emit(s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)} = $rhs;")
+      emit(s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)} = ${if (rhs == "MarkNoGen") return else rhs};")
     else
       emit(s"$rhs;")
   }
