@@ -708,9 +708,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   override def shallow(n: Node): String = n match {
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
-    case n @ Node(f, "λforward",List(y),_) =>
-      forwardMap(f) = y
-      "MarkNoGen"
+    case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
     case n @ Node(s, op,List(x,y),_) if binop(op) =>
       s"${shallow1(x, precedence(op))} $op ${shallow1(y, precedence(op)+1)}"
     case n @ Node(s,"Boolean.!",List(a),_) =>
@@ -828,7 +826,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   override def emitValDef(s: Sym, rhs: =>String): Unit = {
     // emit(s"val ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     if (dce.live(s))
-      emit(s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)} = ${if (rhs == "MarkNoGen") return else rhs};")
+      emit(s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)} = $rhs;")
     else
       emit(s"$rhs;")
   }
@@ -970,6 +968,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
         }
         traverse(b)
         emit(";//#" + str)
+    case n @ Node(s, "λforward", List(y), _) =>
+      forwardMap(s) = y // for this case, adding (f, y) in forwardMap is all we need
     case n @ Node(s, op,_,_) =>
       // emit(s"val ${quote(s)} = " + shallow(n))
       emitValDef(s, shallow(n))
