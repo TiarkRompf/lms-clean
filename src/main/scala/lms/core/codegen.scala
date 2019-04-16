@@ -103,11 +103,6 @@ class ScalaCodeGen extends Traverser {
   }
 }
 
-
-
-
-
-
 class CompactScalaCodeGen extends CompactTraverser {
 
   val rename = new mutable.HashMap[Sym,String]
@@ -310,11 +305,19 @@ class CompactScalaCodeGen extends CompactTraverser {
 
 class DeadCodeElimCG {
 
-  def valueSyms(n: Node): List[Sym] =
-    directSyms(n) ++ blocks(n).collect { case Block(_,res:Sym,_,_) => res }
-
   var live: collection.Set[Sym] = _
   var reach: collection.Set[Sym] = _
+
+  def valueSyms(n: Node): List[Sym] =  n match {
+    case n @ Node(s, "?", List(Block(_,res:Sym,_,_),(a:Block),(b:Block)), _) if !live(s) => res :: directSyms(n)
+    case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) => directSyms(n)
+    case _ => directSyms(n) ++ blocks(n).collect { case Block(_,res:Sym,_,_) => res }
+  }
+
+  def mysyms(n: Node): List[Sym] = n match {
+    case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) => syms(n) diff List(a.res, b.res)
+    case _ => syms(n)
+  }
 
   // staticData -- not really a DCE task, but hey
   var statics: collection.Set[Node] = _
@@ -333,7 +336,7 @@ class DeadCodeElimCG {
     for (d <- g.nodes.reverseIterator) {
       if (reach(d.n)) {
         live ++= valueSyms(d)
-        reach ++= syms(d)
+        reach ++= mysyms(d)
         if (d.op == "staticData")
           statics += d
       }
@@ -859,17 +862,22 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       "({\n" + ls.mkString("\n") + ";\n})"
     } else ls.mkString("\n")
   }
-  // override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
-  //   // FIXME: ugly repetition
-  //   for (n <- ns) {
-  //     if (shouldInline(n.n).isEmpty)
-  //       traverse(n)
-  //   }
-  //   if (y.res != Const(()))
-  //     emit(shallow(y.res) + ";" + quoteEff(y.eff))
-  //   else
-  //     emit(quoteEff(y.eff))
-  // }
+
+
+  // FIXME: Can't call super
+  // case where y.res is Const(_) isn't tested. true doesn't seem correct
+  override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
+    // only emit statements if not inlined
+    for (n <- ns) {
+      if (shouldInline(n.n).isEmpty)
+        traverse(n)
+    }
+    if (y.res != Const(()) && (y.res match { case x@Sym(_) => dce.live(x); case _ => true }))
+      emit(shallow(y.res) + quoteEff(y.eff))
+    else
+      emit(quoteEff(y.eff))
+  }
+
   override def emitValDef(s: Sym, rhs: =>String): Unit = {
     // emit(s"val ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     if (dce.live(s))
@@ -1018,7 +1026,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emit(s"if (${shallow(c)}) " +
       quoteBlock(traverse(a)) +
       s" else " +
-      quoteBlock(traverse(b)) + "")
+      quoteBlock(traverse(b)))
 
     case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) =>
       emit(s"while (" +
