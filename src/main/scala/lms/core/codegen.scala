@@ -571,6 +571,8 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
 
   override def traverse(n: Node): Unit = n match {
+    case n @ Node(s, "exit", List(x) ,_) =>
+      emit("System.exit("); shallow(x); emitln(")")
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in
       val a = x.map(typeMap(_))
