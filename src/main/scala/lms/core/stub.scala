@@ -95,9 +95,9 @@ object Adapter extends FrontEnd {
         if as == as1 && i == i1 && curEffects.get(as) == Some(rs) =>
         Some(Const(()))
 
-      case ("Array.length", List(Def(op, List(Const(n))))) if op.startsWith("new Array[") =>
+      case ("Array.length", List(Def("NewArray", Const(n)::_))) =>
         Some(Const(n))
-      case ("Array.length", List(Def(op, List(Const(as: Array[_]))))) if op.startsWith("Array[") =>
+      case ("Array.length", List(Def("Array", List(Const(as: Array[_]))))) =>
         Some(Const(as.length))
 
       case ("Boolean.!", List(Const(b: Boolean))) => Some(Const(!b))
@@ -603,13 +603,13 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // ArrayOps
   // XXX HACK for generic type!
-  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("NewArray", Unwrap(x))(Adapter.STORE))
   def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = {
     // TOOD (Need help) this looks like Optimization, but it is actually necessary for correctness of static array in C
     // The question is: can this be handled better? i.e. if Unwrap(List(Rep[T])) is passed reflect, can the codegen generate {1,2} instead of {Wrap(Const(1)), Wrap(Const(2))}
     // val allConst = xs forall {case Wrap(Backend.Const(_)) => true; case _ => false}
     // val data = if (allConst) xs.map{case Wrap(Backend.Const(s)) => s}.toList else xs.toList
-    Wrap[Array[T]](Adapter.g.reflectEffect("Array["+manifest[T]+"]", xs.map(Unwrap(_)):_*)(Adapter.STORE))
+    Wrap[Array[T]](Adapter.g.reflectEffect("Array", xs.map(Unwrap(_)):_*)(Adapter.STORE))
   }
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
@@ -619,13 +619,12 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   trait LongArray[+T]
-  def NewLongArray[T:Manifest](x: Rep[Long]): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
-  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int], tpe: String = ""): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("new Array["+manifest[T]+"]", Unwrap(x))(Adapter.STORE))
+  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int] = None): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("NewArray", Unwrap(x))(Adapter.STORE))
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
     def apply(i: Rep[Long]): Rep[A] = Wrap(Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Long], y: Rep[A]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def update(i: Rep[Long], y: Rep[A]): Unit = Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
     def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("Array.length", Unwrap(x)))
-    def slice(s: Rep[Long], e: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
+    def slice(s: Rep[Long], e: Rep[Long] = unit(0L)): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("+", Unwrap(x), Unwrap(s)))
   }
 
   // BooleanOps

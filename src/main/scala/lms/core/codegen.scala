@@ -1,5 +1,7 @@
 package lms.core
 
+import lms.macros.RefinedManifest
+
 import scala.collection.mutable
 
 import java.io.{ByteArrayOutputStream, PrintStream}
@@ -602,6 +604,9 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       /*if (dce.live(s))*/ emit(s"val ${quote(s)} = "); emit("new Array[Int]("); shallow(x); emit(")"); emitln()
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       shallow(x); emit("("); shallow(i); emit(") = "); shallow(y); emitln()
+    case n @ Node(s, "NewArray" ,List(x), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit("val "); emit(quote(s)); emit(" = new Array["); emit(tpe); emit("]("); shallow(x); emitln(")")
 
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
@@ -689,7 +694,16 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case _ => shallow(n)
   }
 
-  def remap(m: Manifest[_]): String
+  def array(innerType: String): String
+  def primitive(rawType: String): String
+  def record(man: RefinedManifest[_]): String
+  def remap(m: Manifest[_]): String = m.typeArguments match {
+    case Nil => m match {
+      case ref: RefinedManifest[_] => record(ref)
+      case _ => primitive(m.toString)
+    }
+    case List(inner) => array(remap(inner) )
+  }
   def nameMap: Map[String, String]
 
   override def emitValDef(s: Sym, rhs: =>String): Unit = {
@@ -705,19 +719,26 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case _ => quote(n)
   }
 
-  val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
+  private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
+  def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
 
-  val functionsStream = new ByteArrayOutputStream()
-  val functionsWriter = new PrintStream(functionsStream)
+  private val functionsStream = new ByteArrayOutputStream()
+  private val functionsWriter = new PrintStream(functionsStream)
   def registerFunctions(f: => Unit) = {
     // utils.withOutput(functionsWriter)(f)
     captureLines(f).foreach(functionsWriter.println)
   }
-  def emitFunctions(out: PrintStream) = {
-    System.out.println(s"Functions: ${functionsStream.toString}")
-    functionsStream.writeTo(out)
+  def emitFunctions(out: PrintStream) = functionsStream.writeTo(out)
+
+  private val datastructures = mutable.HashSet[Long]()
+  private val datastructuresStream = new ByteArrayOutputStream()
+  private val datastructuresWriter = new PrintStream(datastructuresStream)
+  def registerDatastructures(id: Long)(f: => Unit) = if (!datastructures(id)){
+    datastructures += id
+    utils.withOutput(datastructuresWriter)(f)
   }
+  def emitDatastructures(out: PrintStream) = datastructuresStream.writeTo(out)
 
   val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", "Boolean.&&", "Boolean.||")
   override def shallow(n: Node): String = n match {
@@ -789,7 +810,9 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
 class Unknown // HACK: Sentinel for typeMap
 
 class ExtendedCCodeGen extends ExtendedCodeGen1 {
-  def remap(m: String): String = m match {
+
+  // Remap auxiliary function C specific
+  def primitive(rawType: String): String = rawType match {
     case "Unit" => "void"
     case "Boolean" => "bool"
     case "Char" => "char"
@@ -798,15 +821,21 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case "Float" => "float"
     case "Long" => "long"
     case "java.lang.String" => "char*"
-    case "Nothing" | "Any" => ???
-    case s =>
-      val idx = s.indexOf("Array[")
-      if (idx != -1)
-        remap(s.substring(idx + 6, s.length - 1)) + "*"
-      else
-        s
+    // case "Nothing" | "Any" => ???
+    case _ => rawType
   }
-  def remap(m: Manifest[_]): String = remap(m.toString)
+  def array(innerType: String) = innerType + "*"
+  def record(man: RefinedManifest[_]): String = {
+    val tpe = "struct " + man.toString
+    registerDatastructures(tpe.##) {
+      print(tpe); println(" {")
+      man.fields.foreach {
+        case (name, man) => println(remap(man) + " " + name + ";")
+      }
+      println("};")
+    }
+    tpe
+  }
   val nameMap = Map( // FIXME: tutorial specific
     "ScannerNew"     -> "new scala.lms.tutorial.Scanner",
     "ScannerHasNext" -> "Scanner.hasNext",
@@ -920,6 +949,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
         }
       }
       quote(s)
+    case n @ Node(s, "reffield_get", List(ptr, Const(field)), _) =>
+      s"${quote(ptr)}->$field"
     case n =>
       super.shallow(n)
   }
@@ -934,9 +965,12 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emitVarDef(s, shallow(x))
     case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = ${shallow(y)};")
-
+    case n @ Node(s, "reffield_set", List(ptr, Const(field), v), _) =>
+      emit(s"${quote(ptr)}->$field = ${shallow(v)};")
     case n @ Node(s,"array_new",List(x),_) =>
       emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int))")
+    case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
+      emitValDef(s, s"qsort(${shallow1(arr)}, ${shallow1(len)}, sizeof(*${shallow(arr2)}), (__compar_fn_t)${shallow(comp)})") // shallow(comp) to trigger generation of function
     // case n @ Node(s,"new Array[Int]",List(x),_) =>
     //   emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int));")
     // case n @ Node(s,"new Array[Char]",List(x),_) =>
@@ -945,9 +979,9 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //   emitValDef(s, s"(char**)malloc(${shallow1(x)} * sizeof(char*));")
     // case n @ Node(s, "new Array[Float]",List(x),_) =>
     //   emitValDef(s, s"(float*)malloc(${shallow1(x)} * sizeof(float));")
-    case n @ Node(s, newArray ,List(x),_) if newArray.startsWith("new Array[") =>
-      val tpe = remap(newArray.substring(10, newArray.length - 1))
-      emitValDef(s, s"($tpe*)malloc(${shallow1(x)} * sizeof($tpe))")
+    case n @ Node(s, "NewArray" ,List(x), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emitValDef(s, s"($tpe*)malloc(${shallow(x)} * sizeof($tpe))")
 
     // static array
     // case n @ Node(s, "Array[Int]",List(xs, size),_) =>
@@ -958,8 +992,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //   emit(s"float ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
     // case n @ Node(s, "Array[Double]",List(xs, size),_) =>
     //   emit(s"double ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
-    case n @ Node(s, array , xs,_) if array.startsWith("Array[") =>
-      val tpe = remap(array.substring(6, array.length - 1))
+    case n @ Node(s, "Array" , xs,_) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"$tpe ${quote(s)}[${xs.length}] = { ${xs.map(shallow).mkString(", ")} };");
 
     // DCE: FIXME:
