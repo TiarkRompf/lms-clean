@@ -11,7 +11,7 @@ class ExitTest extends TutorialFunSuite {
   test("exit_rep1") {
     val driver = new DslDriverC[Int,Unit] {
 
-      def repExit(x: Rep[Int]): Rep[Unit] = Wrap[Unit](Adapter.g.reflect("exit", Unwrap(x)))
+      def repExit(x: Rep[Int]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("exit", Unwrap(x))(Adapter.CTRL))
       @virtualize
       def myassert(cond: Rep[Boolean], msg: String): Rep[Unit] = if (cond) { printf(msg); repExit(0) }
 
@@ -26,7 +26,7 @@ class ExitTest extends TutorialFunSuite {
   test("exit_rep2") {
     val driver = new DslDriverC[Int,Unit] {
 
-      def repExit(x: Rep[Int]): Rep[Unit] = Wrap[Unit](Adapter.g.reflect("exit", Unwrap(x)))
+      def repExit(x: Rep[Int]): Rep[Unit] = Wrap[Unit](Adapter.g.reflectEffect("exit", Unwrap(x))(Adapter.CTRL))
       @virtualize
       def myassert(cond: Rep[Boolean], msg: String): Unit = if (cond) { printf(msg); repExit(0) }
 

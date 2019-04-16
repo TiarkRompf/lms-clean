@@ -100,8 +100,7 @@ object Adapter extends FrontEnd {
       case ("Array.length", List(Def(op, List(Const(as: Array[_]))))) if op.startsWith("Array[") =>
         Some(Const(as.length))
 
-      case ("Boolean.!", List(Const(true))) => Some(Const(false))
-      case ("Boolean.!", List(Const(false))) => Some(Const(true))
+      case ("Boolean.!", List(Const(b: Boolean))) => Some(Const(!b))
       case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
       case ("!=", List(Const(a), Const(b))) => Some(Const(a != b))
       case ("<=", List(Const(a: Int), Const(b: Int))) => Some(Const(a <= b))
@@ -702,6 +701,26 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         res
     }
   }
+  // Top-Level Functions
+  val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Exp]()
+  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
+    val can = canonicalize(f)
+    topLevelFunctions.getOrElseUpdate(can, {
+      val fn = Backend.Sym(Adapter.g.fresh)
+      Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()()
+    })
+  }
+  def topFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
+    Wrap[A=>B](__topFun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
+
+  def topFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
+    Wrap[(A,B)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1))))))
+
+  def topFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
+    Wrap[(A,B,C)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2))))))
+
+  def topFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
+    Wrap[(A,B,C,D)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3))))))
 
   // IfThenElse
   def __ifThenElse[T:Manifest](c: Rep[Boolean], a: => Rep[T], b: => Rep[T])(implicit pos: SourceContext): Rep[T] = c match {

@@ -2,6 +2,8 @@ package lms.core
 
 import scala.collection.mutable
 
+import java.io.{ByteArrayOutputStream, PrintStream}
+
 import Backend._
 
 class CodeGen extends Traverser {
@@ -462,7 +464,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
   }
 
 
-  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","<<",">>","Boolean.&&","Boolean.||") // TODO merge with CompactScalaCodeGen
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>","Boolean.&&","Boolean.||") // TODO merge with CompactScalaCodeGen
   val scalaMath = Set("sin", "cos", "tanh", "exp", "sqrt")
   val numTypeConv = Set("toInt", "toLong", "toFloat", "toDouble")
 
@@ -706,7 +708,18 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
 
-  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","<<",">>", "Boolean.&&", "Boolean.||")
+  val functionsStream = new ByteArrayOutputStream()
+  val functionsWriter = new PrintStream(functionsStream)
+  def registerFunctions(f: => Unit) = {
+    // utils.withOutput(functionsWriter)(f)
+    captureLines(f).foreach(functionsWriter.println)
+  }
+  def emitFunctions(out: PrintStream) = {
+    System.out.println(s"Functions: ${functionsStream.toString}")
+    functionsStream.writeTo(out)
+  }
+
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", "Boolean.&&", "Boolean.||")
   override def shallow(n: Node): String = n match {
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
@@ -753,8 +766,23 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case n @ Node(s,_,_,_) =>
       super.traverse(n)
   }
+
+  // Needs to be C dependent
   override def apply(g: Graph): Unit = {
-    utils.withOutput(stream)(super.apply(g))
+    utils.withOutput(stream) {
+      val ls = captureLines {
+        bound(g)
+        withScope(Nil, g.nodes) {
+           traverse(g.block)
+        }
+      }
+      if (g.block.res == Const(())) {
+        ls.foreach(println)
+      } else {
+        ls.init.foreach(println)
+        println(s"return ${ls.last};")
+      }
+    }
   }
 }
 
@@ -787,19 +815,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     "ObjHashCode"    -> "Object.hashCode",
     "StrSubHashCode" -> "hash"
   )
-  /*override def quoteBlock1(y: Block, argType: Boolean = false) = {
-    val res = super.quoteBlock1(y, argType)
-    if (res contains "\n") {
-      assert(res.take(2) == "{\n" && res.takeRight(2) == "\n}")
-      val res1 = res.drop(2).dropRight(2)
-      s"({\n$res1;\n})" // GNU C understands ({ ... ; }), (note the semicolon); TCC will need more unravelling ...
-    } else if (res == "()" ){
-      "({})"
-    } else res
-  }*/
 
-  var nSyms = 0
-  def fresh = try s"tmp${nSyms}" finally nSyms += 1
   // block of statements
   override def quoteBlock(f: => Unit) = {
     val ls = captureLines(f)
@@ -885,12 +901,25 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
 
     case n @ Node(s,"P",List(x),_) =>
       s"printf(${"\"%s\\n\""}, ${shallow(x)})"
-    case n @ Node(_, "timestamp", _, _) =>
-      headers += "<sys/time.h>"
-      val tmp = fresh
-      emit(s"struct timeval $tmp;")
-      emit(s"gettimeofday(&$tmp, NULL);")
-      s"$tmp.tv_sec * 1000000L + $tmp.tv_usec"
+    case n @ Node(s, "timestamp", _, _) =>
+      registerHeader("<sys/time.h>")
+      emit(s"struct timeval ${quote(s)}_t;")
+      emit(s"gettimeofday(&${quote(s)}_t, NULL);")
+      s"${quote(s)}_t.tv_sec * 1000000L + ${quote(s)}_t.tv_usec"
+    case n @ Node(s, op, List(struct), _) if op.startsWith("read")=>
+      s"${quote(struct)}->${op.substring(5)}"
+    case n @ Node(s, "λtop", List(block@Block(args, res, _, _)), _) =>
+      registerFunctions {
+        emit(s"${remap(typeMap.getOrElse(res, ???))} ${quote(s)}(${args map(s => s"${remap(typeMap.getOrElse(s, ???))} ${quote(s)}") mkString(", ")}) {")
+        if (res == Const(())) {
+          traverse(block)
+        } else {
+          val ls = captureLines(traverse(block))
+          ls.init.foreach(emit)
+          emit(s"return ${ls.last};\n}")
+        }
+      }
+      quote(s)
     case n =>
       super.shallow(n)
   }
@@ -944,6 +973,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //      do not register dependencies as live!
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
+    case n @ Node(s, op, List(struct, v), _) if op.startsWith("write")=>
+      emit(s"${quote(struct)}->${op.substring(6)} = ${quote(v)};")
 
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       emit(s"${shallow1(x)}[${shallow(i)}] = ${shallow(y)};")
@@ -972,6 +1003,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
         emit(";//#" + str)
     case n @ Node(s, "λforward", List(y), _) =>
       forwardMap(s) = y // for this case, adding (f, y) in forwardMap is all we need
+    case n @ Node(s, "λtop", List(block@Block(args, res, _, _)), _) => ??? // shouldn't be possible in C
     case n @ Node(s, op,_,_) =>
       // emit(s"val ${quote(s)} = " + shallow(n))
       emitValDef(s, shallow(n))
