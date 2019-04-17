@@ -961,6 +961,13 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       quote(s)
     case n @ Node(s, "reffield_get", List(ptr, Const(field)), _) =>
       s"${quote(ptr)}->$field"
+    case n @ Node(s, "NewArray" ,List(x), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      s"($tpe*)malloc(${shallow(x)} * sizeof($tpe))"
+    case n @ Node(s,"array_new",List(x),_) =>
+      s"(int*)malloc(${shallow1(x)} * sizeof(int))"
+    case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
+      s"qsort(${shallow1(arr)}, ${shallow1(len)}, sizeof(*${shallow(arr2)}), (__compar_fn_t)${shallow(comp)})" // shallow(comp) to trigger generation of function
     case n =>
       super.shallow(n)
   }
@@ -975,31 +982,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emit(s"${quote(x)} = ${shallow(y)};")
     case n @ Node(s, "reffield_set", List(ptr, Const(field), v), _) =>
       emit(s"${quote(ptr)}->$field = ${shallow(v)};")
-    case n @ Node(s,"array_new",List(x),_) =>
-      emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int))")
-    case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
-      emitValDef(s, s"qsort(${shallow1(arr)}, ${shallow1(len)}, sizeof(*${shallow(arr2)}), (__compar_fn_t)${shallow(comp)})") // shallow(comp) to trigger generation of function
-    // case n @ Node(s,"new Array[Int]",List(x),_) =>
-    //   emitValDef(s, s"(int*)malloc(${shallow1(x)} * sizeof(int));")
-    // case n @ Node(s,"new Array[Char]",List(x),_) =>
-    //   emitValDef(s, s"(char*)malloc(${shallow1(x)} * sizeof(char));")
-    // case n @ Node(s,"new Array[java.lang.String]",List(x),_) =>
-    //   emitValDef(s, s"(char**)malloc(${shallow1(x)} * sizeof(char*));")
-    // case n @ Node(s, "new Array[Float]",List(x),_) =>
-    //   emitValDef(s, s"(float*)malloc(${shallow1(x)} * sizeof(float));")
-    case n @ Node(s, "NewArray" ,List(x), _) =>
-      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emitValDef(s, s"($tpe*)malloc(${shallow(x)} * sizeof($tpe))")
-
     // static array
-    // case n @ Node(s, "Array[Int]",List(xs, size),_) =>
-    //   emit(s"int ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
-    // case n @ Node(s, "Array[Long]",List(xs, size),_) =>
-    //   emit(s"long ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
-    // case n @ Node(s, "Array[Float]",List(xs, size),_) =>
-    //   emit(s"float ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
-    // case n @ Node(s, "Array[Double]",List(xs, size),_) =>
-    //   emit(s"double ${quote(s)}[${shallow(size)}] = ${shallow(xs)};");
     case n @ Node(s, "Array" , xs,_) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"$tpe ${quote(s)}[${xs.length}] = { ${xs.map(shallow).mkString(", ")} };");
@@ -1017,7 +1000,6 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
     case n @ Node(s, op, List(struct, v), _) if op.startsWith("write")=>
       emit(s"${quote(struct)}->${op.substring(6)} = ${quote(v)};")
-
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       emit(s"${shallow1(x)}[${shallow(i)}] = ${shallow(y)};")
 
