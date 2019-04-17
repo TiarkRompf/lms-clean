@@ -588,7 +588,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in
       val a = x.map(typeMap(_))
-      val b = typeMap(y.res)
+      val b = typeMap.getOrElse(y.res, manifest[Unit])
       val e = quoteEff(y.ein)
 
       val args = (x zip a).map{case (x, a) => s"${quote(x)}:$a"}.mkString(", ")
