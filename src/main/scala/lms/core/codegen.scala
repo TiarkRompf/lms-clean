@@ -867,7 +867,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   def emitFunction(name: String, body: Block) = {
     val res = body.res
     val args = body.in
-    emit(s"${remap(typeMap.getOrElse(res, manifest[Unknown]))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}") mkString(", ")}) {")
+    emit(s"${remap(typeMap.getOrElse(res, manifest[Unit]))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unit]))} ${quote(s)}") mkString(", ")}) {")
     if (res == Const(())) {
       traverse(body)
       emit("}")
