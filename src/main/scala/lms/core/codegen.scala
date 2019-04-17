@@ -687,8 +687,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case "+" | "-" => 9
     case "*" | "/" | "%" => 10
     // type casting is lower in precedence?
-    case b if b.endsWith("toFloat") || b.endsWith("toInt") || b.endsWith("toLong")
-           || b.endsWith("toDouble") || b.endsWith("toChar") || b.startsWith("new Array[") => 19
+    case "NewArray" => 19 // there might be type conversion before array access, which should be put in parenthesis
     case b if isAtom(b) => 20
     case _ => 0
   }
