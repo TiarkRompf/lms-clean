@@ -729,7 +729,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
 
   private val functionsStream = new ByteArrayOutputStream()
   private val functionsWriter = new PrintStream(functionsStream)
-  def registerFunctions(f: => Unit) = {
+  def registerTopLevelFunction(f: => Unit) = {
     // utils.withOutput(functionsWriter)(f)
     captureLines(f).foreach(functionsWriter.println)
   }
@@ -864,6 +864,20 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     } else ls.mkString("\n")
   }
 
+  def emitFunction(name: String, body: Block) = {
+    val res = body.res
+    val args = body.in
+    emit(s"${remap(typeMap.getOrElse(res, manifest[Unknown]))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}") mkString(", ")}) {")
+    if (res == Const(())) {
+      traverse(body)
+      emit("}")
+    } else {
+      val ls = captureLines(traverse(body))
+      ls.init.foreach(emit)
+      emit(s"return ${ls.last};\n}")
+    }
+  }
+
 
   // FIXME: Can't call super
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
@@ -947,16 +961,9 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       s"${quote(s)}_t.tv_sec * 1000000L + ${quote(s)}_t.tv_usec"
     case n @ Node(s, op, List(struct), _) if op.startsWith("read")=>
       s"${quote(struct)}->${op.substring(5)}"
-    case n @ Node(s, "λtop", List(block@Block(args, res, _, _)), _) =>
-      registerFunctions {
-        emit(s"${remap(typeMap.getOrElse(res, ???))} ${quote(s)}(${args map(s => s"${remap(typeMap.getOrElse(s, ???))} ${quote(s)}") mkString(", ")}) {")
-        if (res == Const(())) {
-          traverse(block)
-        } else {
-          val ls = captureLines(traverse(block))
-          ls.init.foreach(emit)
-          emit(s"return ${ls.last};\n}")
-        }
+    case n @ Node(s, "λtop", List(block: Block), _) =>
+      registerTopLevelFunction {
+        emitFunction(quote(s), block)
       }
       quote(s)
     case n @ Node(s, "reffield_get", List(ptr, Const(field)), _) =>

@@ -1806,5 +1806,6 @@ trait PrimitiveOps extends Base with OverloadHack {
   def long_to_int(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Int] =
     Wrap[Int](Adapter.g.reflect("Long.toInt", Unwrap(lhs)))
   def long_to_float(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Float] = ???
-  def long_to_double(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Double] = ???
+  def long_to_double(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Double] =
+    Wrap[Int](Adapter.g.reflect("Long.toDouble", Unwrap(lhs)))
 }

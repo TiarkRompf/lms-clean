@@ -20,7 +20,7 @@ trait RefinedManifest[T] extends Manifest[T] {
   }
   override def hashCode = this.erasure.##
 
-  override def toString = s"Anon${fields.##}"
+  override def toString = s"Anon${(0xdeadbeef /: fields.zipWithIndex) { case (agg, ((name, man), idx)) => (agg * 5) + (1 + idx) * (name.## + man.##) }.abs}"
   def fields: List[(String, Manifest[_])]
 }
 
