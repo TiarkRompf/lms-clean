@@ -47,12 +47,11 @@ Emitting C Generated Code
 #include <string.h>
 #include <stdbool.h>
 void Snippet(int x0) {
-  return (x0 > 0) ? ({
+  if (x0 > 0) {
     printf("fail");
     exit(0);
-  }) : ({
-    ;
-  });
+  } else {
+  }
 }
 /*****************************************
 End of C Generated Code

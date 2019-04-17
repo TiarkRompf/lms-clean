@@ -73,12 +73,21 @@ object Backend {
       case _ => Nil
     }
 
-  def syms(x: Node): List[Sym] =
+  def filterSym(x: List[Exp]): List[Sym] = x collect { case s: Sym => s }
+  def symsAndEffectSyms(x: Node): (List[Sym], List[Sym]) = ((List[Sym](), filterSym(x.eff.deps)) /: x.rhs) {
+    case ((syms, symsEffect), s: Sym) => (s::syms, symsEffect)
+    case ((syms, symsEffect), Block(_, res: Sym, _, eff)) => (res::syms, filterSym(eff.deps) ++ symsEffect)
+    case ((syms, symsEffect), Block(_, _, _, eff)) => (syms, filterSym(eff.deps) ++ symsEffect)
+    case (agg, _) => agg
+  }
+
+  def syms(x: Node): List[Sym] = {
     x.rhs.flatMap {
       case s: Sym => List(s)
       case b: Block => b.used
       case _ => Nil
     } ++ x.eff.deps.collect { case s: Sym => s }
+  }
 }
 
 import Backend._

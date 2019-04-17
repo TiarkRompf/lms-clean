@@ -314,9 +314,11 @@ class DeadCodeElimCG {
     case _ => directSyms(n) ++ blocks(n).collect { case Block(_,res:Sym,_,_) => res }
   }
 
-  def mysyms(n: Node): List[Sym] = n match {
-    case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) => syms(n) diff List(a.res, b.res)
-    case _ => syms(n)
+  def mysyms(n: Node): Set[Sym] = n match {
+    case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) =>
+      val (s, e) = symsAndEffectSyms(n)
+      (s.toSet -- List(a.res, b.res).collect { case s: Sym => s}) ++ e.toSet
+    case _ => syms(n).toSet
   }
 
   // staticData -- not really a DCE task, but hey
@@ -797,7 +799,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
       val ls = captureLines {
         bound(g)
         withScope(Nil, g.nodes) {
-           traverse(g.block)
+          traverse(g.block)
         }
       }
       if (g.block.res == Const(())) {
@@ -865,14 +867,13 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
 
 
   // FIXME: Can't call super
-  // case where y.res is Const(_) isn't tested. true doesn't seem correct
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
     // only emit statements if not inlined
     for (n <- ns) {
       if (shouldInline(n.n).isEmpty)
         traverse(n)
     }
-    if (y.res != Const(()) && (y.res match { case x@Sym(_) => dce.live(x); case _ => true }))
+    if (y.res != Const(()))
       emit(shallow(y.res) + quoteEff(y.eff))
     else
       emit(quoteEff(y.eff))
@@ -1024,9 +1025,9 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
 
     case n @ Node(s,"?",c::(a:Block)::(b:Block)::_,_) if !dce.live(s) =>
       emit(s"if (${shallow(c)}) " +
-      quoteBlock(traverse(a)) +
+      quoteBlock(traverse(a.copy(res = Const(())))) +
       s" else " +
-      quoteBlock(traverse(b)))
+      quoteBlock(traverse(b.copy(res = Const(())))))
 
     case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) =>
       emit(s"while (" +
