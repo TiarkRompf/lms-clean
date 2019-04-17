@@ -503,6 +503,9 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       shallow(x)
     case n @ Node(s,"array_get",List(x,i),_) =>
       shallow1(x); emit("("); shallow(i); emit(")")
+    case n @ Node(s, "NewArray" ,List(x), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit("new Array["); emit(tpe); emit("]("); shallow(x); emit(")")
     case n @ Node(s,"@",x::y,_) => {
       def emitArgs(y: List[Def]): Unit = y match {
         case t::Nil => shallow(t)
@@ -609,9 +612,6 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       /*if (dce.live(s))*/ emit(s"val ${quote(s)} = "); emit("new Array[Int]("); shallow(x); emit(")"); emitln()
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       shallow(x); emit("("); shallow(i); emit(") = "); shallow(y); emitln()
-    case n @ Node(s, "NewArray" ,List(x), _) =>
-      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit("val "); emit(quote(s)); emit(" = new Array["); emit(tpe); emit("]("); shallow(x); emitln(")")
 
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
@@ -925,6 +925,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       quoteBlockP(traverse(c)) +
       s") " +
       quoteBlock1(b)
+    case n @ Node(s,"generate-comment",List(Const(x)),_) =>
+      s"// $x"
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
       quoteBlockP {
         emit("//#" + str)
@@ -968,8 +970,6 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //   emit(shallow(n))
     // case n @ Node(s,"W",_,_) => // Unit result
     //   emit(shallow(n))
-    case n @ Node(s,"generate-comment",List(Const(x)),_) =>
-      emit(s"// $x")
     case n @ Node(s,"var_new",List(x),_) =>
       emitVarDef(s, shallow(x))
     case n @ Node(s,"var_set",List(x,y),_) =>
