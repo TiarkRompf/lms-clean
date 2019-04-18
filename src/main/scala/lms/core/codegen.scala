@@ -733,7 +733,10 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     // utils.withOutput(functionsWriter)(f)
     captureLines(f).foreach(functionsWriter.println)
   }
-  def emitFunctions(out: PrintStream) = functionsStream.writeTo(out)
+  def emitFunctions(out: PrintStream) = if (functionsStream.size > 0){
+    out.println("\n/************* Functions **************/")
+    functionsStream.writeTo(out)
+  }
 
   private val datastructures = mutable.HashSet[Long]()
   private val datastructuresStream = new ByteArrayOutputStream()
@@ -742,7 +745,10 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     datastructures += id
     utils.withOutput(datastructuresWriter)(f)
   }
-  def emitDatastructures(out: PrintStream) = datastructuresStream.writeTo(out)
+  def emitDatastructures(out: PrintStream) = if (datastructuresStream.size > 0) {
+    out.println("\n/*********** Datastructures ***********/")
+    datastructuresStream.writeTo(out)
+  }
 
   val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", "Boolean.&&", "Boolean.||")
   override def shallow(n: Node): String = n match {
@@ -1040,72 +1046,44 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emitValDef(s, shallow(n))
   }
 
+  def run(name: String, g: Graph): List[String] = {
+    captureLines {
+      bound(g)
+      withScope(Nil, g.nodes) {
+        emitFunction(name, g.block)
+      }
+    }
+  }
+
+  def convert(arg: String, man: Manifest[_]): String = {
+    if (man == manifest[Int]) s"atoi($arg)"
+    else "" // manifest[Unit]
+  }
+
   def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit = {
     init(g)
-    val arg = quote(g.block.in.head)
     val efs = "" //quoteEff(g.block.ein)
     val stt = dce.statics.toList.map(quoteStatic).mkString(", ")
-    val (ms1, ms2) = (remap(m1), remap(m2))
-    val functionName = name
     stream.println("""
-    #include <fcntl.h>
-    #include <errno.h>
-    #include <err.h>
-    #include <sys/mman.h>
-    #include <sys/stat.h>
-    #include <stdio.h>
-    #include <stdint.h>
-    #include <unistd.h>
-    #ifndef MAP_FILE
-    #define MAP_FILE MAP_SHARED
-    #endif
-    int fsize(int fd) {
-      struct stat stat;
-      int res = fstat(fd,&stat);
-      return stat.st_size;
-    }
-    int printll(char* s) {
-      while (*s != '\n' && *s != ',' && *s != '\t') {
-        putchar(*s++);
-      }
-      return 0;
-    }
-    long hash(char *str0, int len)
-    {
-      unsigned char* str = (unsigned char*)str0;
-      unsigned long hash = 5381;
-      int c;
-
-      while ((c = *str++) && len--)
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-
-      return hash;
-    }
-    void Snippet(char*);
-    int main(int argc, char *argv[])
-    {
-      if (argc != 2) {
-        printf("usage: query <filename>\n");
-        return 0;
-      }
-      Snippet(argv[1]);
-      return 0;
-    }
     /*****************************************
     Emitting C Generated Code
     *******************************************/
-    #include <stdio.h>
-    #include <stdlib.h>
-    #include <string.h>
-    #include <stdbool.h>
     """)
-    stream.println(s"$ms2 $functionName($ms1 $arg) {")
-    apply(g)
-    stream.println("}")
+    val src = run(name, g)
+    emitHeaders(stream)
+    emitDatastructures(stream)
+    emitFunctions(stream)
+    stream.println(s"\n/**************** $name ****************/")
+    src.foreach(stream.println)
     stream.println("""
-    /*****************************************
-    End of C Generated Code
-    *******************************************/
-    """)
+    |/*****************************************
+    |End of C Generated Code
+    |*******************************************/
+    |int main(int argc, char *argv[]) {
+    |  if (argc != 2) {
+    |    printf("usage: %s <arg>\n", argv[0]);
+    |    return 0;
+    |  }""".stripMargin)
+    stream.println(s"  $name(${convert("argv[1]", m1)});\n  return 0;\n}")
   }
 }

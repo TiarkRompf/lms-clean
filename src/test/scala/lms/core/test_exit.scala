@@ -1,9 +1,8 @@
 package lms
 package core
 
-import lms.core.stub._
-import lms.core.virtualize
-import lms.macros.SourceContext
+import stub._
+import macros.SourceContext
 
 class ExitTest extends TutorialFunSuite {
   val under = "core/"
