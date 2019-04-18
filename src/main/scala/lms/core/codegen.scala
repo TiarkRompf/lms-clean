@@ -317,7 +317,7 @@ class DeadCodeElimCG {
   def mysyms(n: Node): Set[Sym] = n match {
     case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) =>
       val (s, e) = symsAndEffectSyms(n)
-      (s.toSet -- List(a.res, b.res).collect { case s: Sym => s}) ++ e.toSet
+      (s -- List(a.res, b.res).collect { case s: Sym => s}) ++ e
     case _ => syms(n).toSet
   }
 
@@ -351,6 +351,17 @@ class DeadCodeElimCG {
 trait ExtendedCodeGen extends CompactTraverser {
 
   var typeMap: collection.Map[lms.core.Backend.Exp, Manifest[_]] = _
+  def typeBlockRes(x: lms.core.Backend.Exp) = x match {
+    case Const(()) => manifest[Unit]
+    case Const(x: Int) => manifest[Int]
+    case Const(x: Long) => manifest[Long]
+    case Const(x: Float) => manifest[Float]
+    case Const(x: Double) => manifest[Double]
+    case Const(x: Char) => manifest[Char]
+    case Const(x: String) => manifest[String]
+    case Const(_) => ???
+    case _ => typeMap.getOrElse(x, manifest[Unknown])
+  }
 
   val dce = new DeadCodeElimCG
 
@@ -681,13 +692,14 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case "|" => 3
     case "^" => 4
     case "&" => 5
-    case "==" | "!=" => 6
+    case "==" | "!=" | "String.equalsTo" => 6
     case "<" | ">" | "<=" | ">=" => 7
     case "<<" | ">>" => 8
     case "+" | "-" => 9
     case "*" | "/" | "%" => 10
     // type casting is lower in precedence?
     case "NewArray" => 19 // there might be type conversion before array access, which should be put in parenthesis
+    case _ if op.startsWith("unchecked") => 0 // force parenthesis if nested: 3 * unchecked(5 + 4)
     case b if isAtom(b) => 20
     case _ => 0
   }
@@ -727,10 +739,12 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
   def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
 
+  private val registeredFunctions = mutable.HashSet[String]()
   private val functionsStream = new ByteArrayOutputStream()
   private val functionsWriter = new PrintStream(functionsStream)
-  def registerTopLevelFunction(f: => Unit) = {
+  def registerTopLevelFunction(id: String)(f: => Unit) = if (!registeredFunctions(id)) {
     // utils.withOutput(functionsWriter)(f)
+    registeredFunctions += id
     captureLines(f).foreach(functionsWriter.println)
   }
   def emitFunctions(out: PrintStream) = if (functionsStream.size > 0){
@@ -738,11 +752,11 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     functionsStream.writeTo(out)
   }
 
-  private val datastructures = mutable.HashSet[Long]()
+  private val registeredDatastructures = mutable.HashSet[String]()
   private val datastructuresStream = new ByteArrayOutputStream()
   private val datastructuresWriter = new PrintStream(datastructuresStream)
-  def registerDatastructures(id: Long)(f: => Unit) = if (!datastructures(id)){
-    datastructures += id
+  def registerDatastructures(id: String)(f: => Unit) = if (!registeredDatastructures(id)) {
+    registeredDatastructures += id
     utils.withOutput(datastructuresWriter)(f)
   }
   def emitDatastructures(out: PrintStream) = if (datastructuresStream.size > 0) {
@@ -777,7 +791,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
       registerHeader("<string.h>")
       (op.substring(7), args) match {
-        case ("equalsTo", List(lhs, rhs, len)) => s"(strncmp(${shallow(lhs)}, ${shallow(rhs)}, ${shallow(len)}) == 0)"
+        case ("equalsTo", List(lhs, rhs)) => s"(strcmp(${shallow(lhs)}, ${shallow(rhs)}) == 0)"
         case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
       }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
@@ -837,7 +851,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   def array(innerType: String) = innerType + "*"
   def record(man: RefinedManifest[_]): String = {
     val tpe = "struct " + man.toString
-    registerDatastructures(tpe.##) {
+    registerDatastructures(tpe) {
       print(tpe); println(" {")
       man.fields.foreach {
         case (name, man) => println(remap(man) + " " + name + ";")
@@ -873,7 +887,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   def emitFunction(name: String, body: Block) = {
     val res = body.res
     val args = body.in
-    emit(s"${remap(typeMap.getOrElse(res, manifest[Unit]))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unit]))} ${quote(s)}") mkString(", ")}) {")
+    emit(s"${remap(typeBlockRes(res))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}") mkString(", ")}) {")
     if (res == Const(())) {
       traverse(body)
       emit("}")
@@ -882,20 +896,6 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       ls.init.foreach(emit)
       emit(s"return ${ls.last};\n}")
     }
-  }
-
-
-  // FIXME: Can't call super
-  override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
-    // only emit statements if not inlined
-    for (n <- ns) {
-      if (shouldInline(n.n).isEmpty)
-        traverse(n)
-    }
-    if (y.res != Const(()))
-      emit(shallow(y.res) + quoteEff(y.eff))
-    else
-      emit(quoteEff(y.eff))
   }
 
   override def emitValDef(s: Sym, rhs: =>String): Unit = {
@@ -968,12 +968,14 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case n @ Node(s, op, List(struct), _) if op.startsWith("read")=>
       s"${quote(struct)}->${op.substring(5)}"
     case n @ Node(s, "λtop", List(block: Block), _) =>
-      registerTopLevelFunction {
+      registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
       }
       quote(s)
     case n @ Node(s, "reffield_get", List(ptr, Const(field)), _) =>
       s"${quote(ptr)}->$field"
+    case n @ Node(s, "ref_new", List(v), _) =>
+      s"&${quote(v)}"
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       s"($tpe*)malloc(${shallow(x)} * sizeof($tpe))"
@@ -991,6 +993,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //   emit(shallow(n))
     case n @ Node(s,"var_new",List(x),_) =>
       emitVarDef(s, shallow(x))
+    case n @ Node(s, "local_struct", Nil, _) =>
+      emitValDef(s, "{ 0 }") // FIXME: uninitialized? or add it as argument?
     case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = ${shallow(y)};")
     case n @ Node(s, "reffield_set", List(ptr, Const(field), v), _) =>
@@ -1011,8 +1015,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //      do not register dependencies as live!
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
-    case n @ Node(s, op, List(struct, v), _) if op.startsWith("write")=>
-      emit(s"${quote(struct)}->${op.substring(6)} = ${quote(v)};")
+
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       emit(s"${shallow1(x)}[${shallow(i)}] = ${shallow(y)};")
 

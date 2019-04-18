@@ -509,7 +509,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     if (manifest[A] == manifest[Unit]) Const(()).asInstanceOf[Exp[A]]
     else new Wrap[A](x)
   }
-  private case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
+  case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
     Adapter.typeMap(x) = manifest[A]
   }
   def Unwrap(x: Exp[Any]) = x match {

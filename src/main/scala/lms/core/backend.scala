@@ -73,10 +73,10 @@ object Backend {
       case _ => Nil
     }
 
-  def filterSym(x: List[Exp]): List[Sym] = x collect { case s: Sym => s }
-  def symsAndEffectSyms(x: Node): (List[Sym], List[Sym]) = ((List[Sym](), filterSym(x.eff.deps)) /: x.rhs) {
-    case ((syms, symsEffect), s: Sym) => (s::syms, symsEffect)
-    case ((syms, symsEffect), Block(_, res: Sym, _, eff)) => (res::syms, filterSym(eff.deps) ++ symsEffect)
+  def filterSym(x: List[Exp]): Set[Sym] = x collect { case s: Sym => s } toSet
+  def symsAndEffectSyms(x: Node): (Set[Sym], Set[Sym]) = ((Set[Sym](), filterSym(x.eff.deps)) /: x.rhs) {
+    case ((syms, symsEffect), s: Sym) => (syms + s, symsEffect)
+    case ((syms, symsEffect), Block(_, res: Sym, _, eff)) => (syms + res, filterSym(eff.deps) ++ symsEffect)
     case ((syms, symsEffect), Block(_, _, _, eff)) => (syms, filterSym(eff.deps) ++ symsEffect)
     case (agg, _) => agg
   }
