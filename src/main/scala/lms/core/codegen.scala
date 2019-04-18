@@ -1060,6 +1060,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
 
   def convert(arg: String, man: Manifest[_]): String = {
     if (man == manifest[Int]) s"atoi($arg)"
+    else if (man == manifest[String]) arg
     else "" // manifest[Unit]
   }
 
