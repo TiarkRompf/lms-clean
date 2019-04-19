@@ -914,6 +914,9 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       // emit(s"$rhs;")
   }
   override def shallow(n: Node): String = n match {
+    case n @ Node(f,"λ",List(y:Block),_) =>
+      emitValDef(f, quoteBlock1(y, true))
+      quote(f)
     case Node(s, op, List(a), _) if op.endsWith("toInt") =>
       s"(int)${shallow1(a)}"
     case Node(s, op, List(a), _) if op.endsWith("toFloat") =>
@@ -991,6 +994,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //   emit(shallow(n))
     // case n @ Node(s,"W",_,_) => // Unit result
     //   emit(shallow(n))
+    case n @ Node(f,"λ",List(y:Block),_) =>
+      emitValDef(f, quoteBlock1(y, true))
     case n @ Node(s,"var_new",List(x),_) =>
       emitVarDef(s, shallow(x))
     case n @ Node(s, "local_struct", Nil, _) =>
@@ -1042,6 +1047,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
         traverse(b)
         emit(";//#" + str)
     case n @ Node(s, "λforward", List(y), _) =>
+      emit("//# lambda forward is here!")
       forwardMap(s) = y // for this case, adding (f, y) in forwardMap is all we need
     case n @ Node(s, "λtop", List(block@Block(args, res, _, _)), _) => ??? // shouldn't be possible in C
     case n @ Node(s, op,_,_) =>
