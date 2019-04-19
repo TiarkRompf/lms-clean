@@ -686,7 +686,60 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   }
 
   def isAtom(op: String) = !binop.contains(op)
-  def precedence(op: String): Int = op match {
+
+  // The following table lists the precedence and associativity of C operators. Operators are listed
+  // top to bottom, in descending precedence. (https://en.cppreference.com/w/c/language/operator_precedence)
+  // Precedence Operator  Description Associativity
+  // 1 | ++ --       | Suffix/postfix increment and decrement|  Left-to-right
+  //   | ()          | Function call
+  //   | []          | Array subscripting
+  //   | .           | Structure and union member access
+  //   | ->          | Structure and union member access through pointer
+  //   | (type){list}| Compound literal(C99)
+  //
+  // 2 | ++ --       | Prefix increment and decrement[note 1]|  Right-to-left
+  //   | + -         | Unary plus and minus
+  //   | ! ~         | Logical NOT and bitwise NOT
+  //   | (type)      | Type cast
+  //   | *           | Indirection (dereference)
+  //   | &           | Address-of
+  //   | sizeof      | Size-of[note 2]
+  //   | _Alignof    | Alignment requirement(C11)
+  //
+  // 3 | * / %       | Multiplication, division, and remainder|  Left-to-right
+  //
+  // 4 | + -         | Addition and subtraction
+  //
+  // 5 | << >>       | Bitwise left shift and right shift
+  //
+  // 6 | < <=        | For relational operators < and ≤ respectively
+  //   | > >=        | For relational operators > and ≥ respectively
+  //
+  // 7 | == !=       | For relational = and ≠ respectively
+  //
+  // 8 | &           | Bitwise AND
+  //
+  // 9 | ^           | Bitwise XOR (exclusive or)
+  //
+  // 10| |           | Bitwise OR (inclusive or)
+  //
+  // 11| &&          | Logical AND
+  //
+  // 12| ||          | Logical OR
+  //
+  // 13| ?:          | Ternary conditional[note 3]|  Right-to-Left
+  //
+  // 14| =           | Simple assignment
+  //   | += -=       | Assignment by sum and difference
+  //   | *= /= %=    | Assignment by product, quotient, and remainder
+  //   | <<= >>=     | Assignment by bitwise left shift and right shift
+  //   | &= ^= |=    | Assignment by bitwise AND, XOR, and OR
+  //
+  // 15|,            | Comma|  Left-to-right
+
+
+  // TODO: should make it language specific and move it down to ExtendedCCode
+  final def precedence(op: String): Int = op match {
     case "Boolean.||" | "?" => 1 // node: in case "?" is rewritten to "&&" or "||"
     case "Boolean.&&" => 2
     case "|" => 3
@@ -697,6 +750,8 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case "<<" | ">>" => 8
     case "+" | "-" => 9
     case "*" | "/" | "%" => 10
+    case "ref_new" => 11 // & address of
+    case "reffield_get" => 12 // -> pointer member access
     // type casting is lower in precedence?
     case "NewArray" => 19 // there might be type conversion before array access, which should be put in parenthesis
     case _ if op.startsWith("unchecked") => 0 // force parenthesis if nested: 3 * unchecked(5 + 4)
@@ -769,14 +824,10 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
     case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
-    case n @ Node(s, op,List(x,y),_) if binop(op) =>
+    case n @ Node(s, op,List(x,y),_) if binop(op) => // associativity??
       s"${shallow1(x, precedence(op))} $op ${shallow1(y, precedence(op)+1)}"
     case n @ Node(s,"Boolean.!",List(a),_) =>
       s"!${shallow1(a)}"
-    case n @ Node(s,"Boolean.&&",List(a,b),_) =>
-      s"${shallow1(a)} && ${shallow1(b)}"
-    case n @ Node(s,"Boolean.||",List(a,b),_) =>
-      s"${shallow1(a)} || ${shallow1(b)}"
     case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
       var next = 9 // skip unchecked
       var s = ""
@@ -791,7 +842,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
       registerHeader("<string.h>")
       (op.substring(7), args) match {
-        case ("equalsTo", List(lhs, rhs)) => s"(strcmp(${shallow(lhs)}, ${shallow(rhs)}) == 0)"
+        case ("equalsTo", List(lhs, rhs)) => s"strcmp(${shallow(lhs)}, ${shallow(rhs)}) == 0"
         case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
       }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
@@ -968,17 +1019,18 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emit(s"struct timeval ${quote(s)}_t;")
       emit(s"gettimeofday(&${quote(s)}_t, NULL);")
       s"${quote(s)}_t.tv_sec * 1000000L + ${quote(s)}_t.tv_usec"
-    case n @ Node(s, op, List(struct), _) if op.startsWith("read")=>
-      s"${quote(struct)}->${op.substring(5)}"
     case n @ Node(s, "λtop", List(block: Block), _) =>
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
       }
       quote(s)
     case n @ Node(s, "reffield_get", List(ptr, Const(field)), _) =>
-      s"${quote(ptr)}->$field"
+      s"${shallow1(ptr, precedence("reffield_get"))}->$field"
+    case n @ Node(s, "local_struct", Nil, _) =>
+      emitValDef(s, "{ 0 }") // FIXME: uninitialized? or add it as argument?
+      quote(s)
     case n @ Node(s, "ref_new", List(v), _) =>
-      s"&${quote(v)}"
+      s"&${shallow1(v, precedence("ref_new"))}"
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       s"($tpe*)malloc(${shallow(x)} * sizeof($tpe))"
@@ -1003,7 +1055,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = ${shallow(y)};")
     case n @ Node(s, "reffield_set", List(ptr, Const(field), v), _) =>
-      emit(s"${quote(ptr)}->$field = ${shallow(v)};")
+      emit(s"${shallow1(ptr, precedence("reffield_get"))}->$field = ${shallow(v)};")
     // static array
     case n @ Node(s, "Array" , xs,_) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
