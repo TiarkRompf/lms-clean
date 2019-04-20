@@ -571,8 +571,11 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
     case n @ Node(s,op,List(x),_) if scalaMath(op) =>
       emit(s"scala.math.$op("); shallow1(x); emit(")")
 
-    case n @ Node(s,op,List(x),_) if numTypeConv(op) =>
-      shallow1(x); emit(s".$op")
+    // case n @ Node(s,op,List(x),_) if numTypeConv(op) =>
+    //   shallow1(x); emit(s".$op")
+    case n @ Node(s, "cast", List(a), _) =>
+      val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
+      shallow1(a); emit(s".to$tpe")
 
     case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
       var next = 9 // skip unchecked
@@ -786,7 +789,6 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case _ => shallow(n)
   }
   var generateReturn = false
-  var three = 0
   // block of statements
   override def quoteBlock(f: => Unit) = quoteBlockHelp(None, false)(f)
   //  block of statements with result expression
@@ -810,7 +812,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
    */
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
     val paren = currentPrec.map(prec => numStms > 0 || lastNode.map(n => { precedence(n) < prec}).getOrElse(false)).getOrElse(false)
-    if (paren) emit(s"(")
+    if (paren) emit("(")
     /*
      * n > 1                       n > 1                      n > 1
      * || n == 0 && res == () ==>  || n == 0 && res == () ==> || n == 0 && res == ()
@@ -982,11 +984,11 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   def record(man: RefinedManifest[_]): String = {
     val tpe = "struct " + man.toString
     registerDatastructures(tpe) {
-      print(tpe); println(" {")
+      emit(tpe); emitln(" {")
       man.fields.foreach {
-        case (name, man) => println(remap(man) + " " + name + ";")
+        case (name, man) => emitln(remap(man) + " " + name + ";")
       }
-      println("};")
+      emitln("};")
     }
     tpe
   }
@@ -1023,7 +1025,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       // emit(s"$rhs;")
   }
   override def shallow(n: Node): Unit = n match {
-    case Node(s, op, List(a), _) if op.contains(".to") => // FIXME
+    case Node(s, "cast", List(a), _) => // FIXME
       val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
       emit(s"($tpe)"); shallow1(a)
     case Node(s,"String.charAt",List(a,i),_) =>
@@ -1111,7 +1113,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     // (b) dce above should anticipate that these will be eliminated
     //      do not register dependencies as live!
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
-    case n @ Node(s,"array_get",_,_) if !dce.live(s) => emitln("// dead array look up")// no-op
+    case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
 
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       shallow1(x); emit("["); shallow(i); emit("] = "); shallow(y); emitln(";")
