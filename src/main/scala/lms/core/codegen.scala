@@ -768,12 +768,14 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   def array(innerType: String): String
   def primitive(rawType: String): String
   def record(man: RefinedManifest[_]): String
+  def function(sig: List[Manifest[_]]): String
   def remap(m: Manifest[_]): String = m.typeArguments match {
     case Nil => m match {
       case ref: RefinedManifest[_] => record(ref)
       case _ => primitive(m.toString)
     }
-    case List(inner) => array(remap(inner) )
+    case List(inner) => array(remap(inner))
+    case sig => function(sig)
   }
   def nameMap: Map[String, String]
 
@@ -900,6 +902,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case _ => rawType
   }
   def array(innerType: String) = innerType + "*"
+  def function(sig: List[Manifest[_]]): String = ???
   def record(man: RefinedManifest[_]): String = {
     val tpe = "struct " + man.toString
     registerDatastructures(tpe) {
@@ -965,9 +968,6 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       // emit(s"$rhs;")
   }
   override def shallow(n: Node): String = n match {
-    case n @ Node(f,"λ",List(y:Block),_) =>
-      emitValDef(f, quoteBlock1(y, true))
-      quote(f)
     case Node(s, op, List(a), _) if op.endsWith("toInt") =>
       s"(int)${shallow1(a)}"
     case Node(s, op, List(a), _) if op.endsWith("toFloat") =>
@@ -1046,8 +1046,6 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     //   emit(shallow(n))
     // case n @ Node(s,"W",_,_) => // Unit result
     //   emit(shallow(n))
-    case n @ Node(f,"λ",List(y:Block),_) =>
-      emitValDef(f, quoteBlock1(y, true))
     case n @ Node(s,"var_new",List(x),_) =>
       emitVarDef(s, shallow(x))
     case n @ Node(s, "local_struct", Nil, _) =>
