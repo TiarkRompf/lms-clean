@@ -29,7 +29,7 @@ object Adapter extends FrontEnd {
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
-  var forwardMap: mutable.Map[lms.core.Backend.Sym, lms.core.Backend.Sym] = mutable.Map()
+  var forwardMap: mutable.Map[lms.core.Backend.Sym, lms.core.Backend.Sym] = _
 
   def emitCommon1(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) =
     emitCommon(name, cg, verbose, alt, eff)(m1, m2)(g.reify(prog))
@@ -39,6 +39,7 @@ object Adapter extends FrontEnd {
   def emitCommon(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: => Block) = {
     typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
     funTable = Nil
+    forwardMap = mutable.Map()
 
     var g = time("staging") { program(prog) }
 
