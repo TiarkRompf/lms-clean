@@ -636,8 +636,16 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def unary_!(implicit pos: SourceContext): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.!", Unwrap(lhs)))
     def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
     __ifThenElse(lhs, rhs, unit(false))
-    // def &&(rhs: => Rep[Boolean]): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.&&", Unwrap(lhs), Unwrap(rhs)))
-    // def ||(rhs: => Rep[Boolean]): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.||", Unwrap(lhs), Unwrap(rhs)))
+    // def &&(rhs: => Rep[Boolean])(implicit pos: SourceContext): Rep[Boolean] = lhs match {
+    //   case Wrap(Backend.Const(true))  => rhs
+    //   case Wrap(Backend.Const(false)) => unit(false)
+    //   case _ => Wrap[Boolean](Adapter.g.reflect("&&", Unwrap(lhs), Unwrap(rhs)))
+    // }
+    // def ||(rhs: => Rep[Boolean])(implicit pos: SourceContext): Rep[Boolean] = lhs match {
+    //   case Wrap(Backend.Const(true))  => unit(true)
+    //   case Wrap(Backend.Const(false)) => rhs
+    //   case _ => Wrap[Boolean](Adapter.g.reflect("||", Unwrap(lhs), Unwrap(rhs)))
+    // }
     def ||(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
       __ifThenElse(lhs, unit(true), rhs)
   }

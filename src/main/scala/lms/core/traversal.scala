@@ -154,11 +154,14 @@ class CompactTraverser extends Traverser {
 
   def mayInline(n: Node): Boolean = n match {
     case Node(s, "var_new", _, _) => false
+    case Node(s, "local_struct", _, _) => false
+    case Node(s, "timestamp", _, _) => false
     case _ => true
   }
 
   var shouldInline: Sym => Option[Node] = (_ => None)
   var numStms = 0
+  var lastNode: Option[Node] = None
 
   object InlineSym {
     def unapply(x: Sym) = shouldInline(x)
@@ -167,7 +170,8 @@ class CompactTraverser extends Traverser {
   override def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
     val save = shouldInline
     val save1 = numStms
-    try super.withScope(p, ns)(b) finally { shouldInline = save; numStms = save1 }
+    val save2 = lastNode
+    try super.withScope(p, ns)(b) finally { shouldInline = save; numStms = save1; lastNode = save2 }
   }
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
@@ -243,12 +247,13 @@ class CompactTraverser extends Traverser {
 
     numStms = 0
 
-    for (n <- ns.reverse) {
+    val revNs = ns.reverse
+    lastNode = revNs.headOption // not
+    for (n <- revNs) {
       if (shouldInline(n.n).isEmpty) {
         processNodeHere(n); numStms += 1
       }
     }
-
 
     // ----- forward pass -----
 

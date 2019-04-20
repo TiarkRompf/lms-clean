@@ -8,7 +8,7 @@ import Backend._
 
 
 trait FFT extends FrontEnd {
-  
+
   // boilerplate, should go in core
   case class DOUBLE(x: Exp) {
     def +(y: DOUBLE): DOUBLE = DOUBLE(g.reflect("+",x,y.x))
@@ -189,7 +189,7 @@ class FFTTest extends TutorialFunSuite {
           }
 
           val className = mkClassName(name)
-          s"def ${className}($arg: Array[Double]): Unit$efs = {\n $src\n }"
+          s"def ${className}($arg: Array[Double]): Unit$efs = $src"
         }
 
         println("// Initial code:")
@@ -237,9 +237,9 @@ class FFTTest extends TutorialFunSuite {
 /*
 
 class TestFFT extends FileDiffSuite {
-  
+
   val prefix = home + "test-out/epfl/test2-"
-  
+
   def testFFT1 = {
     withOutFile(prefix+"fft1") {
       val o = new FFT with ArithExp with TrigExpOpt with FlatResult with DisableCSE //with DisableDCE
@@ -248,7 +248,7 @@ class TestFFT extends FileDiffSuite {
       val r = fft(List.tabulate(4)(_ => Complex(fresh[Double], fresh[Double])))
       println(globalDefs.mkString("\n"))
       println(r)
-      
+
       val p = new ExportGraph with DisableDCE { val IR: o.type = o }
       p.emitDepGraph(result[Unit](r), prefix+"fft1-dot", true)
     }
@@ -284,12 +284,12 @@ class TestFFT extends FileDiffSuite {
           // make a new array for now - doing in-place update would be better
           makeArray(r.flatMap { case Complex(re,im) => List(re,im) })
         }
-        
+
         val codegen = new ScalaGenFlat with ScalaGenArith with ScalaGenArrays { val IR: FooBar.this.type = FooBar.this } // TODO: find a better way...
       }
       val o = new FooBar
       import o._
-    
+
       val fft4 = (input: Rep[Array[Double]]) => ffts(input, 4)
       codegen.emitSource(fft4, "FFT4", new PrintWriter(System.out))
       val fft4c = compile(fft4)
@@ -298,4 +298,4 @@ class TestFFT extends FileDiffSuite {
     assertFileEqualsCheck(prefix+"fft3")
   }
 
-*/  
+*/

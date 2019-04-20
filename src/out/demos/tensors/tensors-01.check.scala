@@ -8,24 +8,24 @@ def tensors_01(x0: Int): Int = {
 }
 // After Tensor lowering:
 def tensors_01(x0: Int): Int = {
-  val x1 = tensor(List(3, 4, 5), (x2 => 1))
-  val x3 = tensor(List(3, 4, 5), { x5 =>
-    val x4 = tensor_apply(x1, x5)
-    x4 + x4
+  val x1 = tensor(List(3, 4, 5), x2 => 1)
+  val x3 = tensor(List(3, 4, 5), { x4 =>
+    val x5 = tensor_apply(x1, x4)
+    x5 + x5
   })
   println(x3)
-  println(tensor(List(3, 4, 5), (x6 => tensor_apply(x3, x6) + tensor_apply(x1, x6))))
+  println(tensor(List(3, 4, 5), x6 => tensor_apply(x3, x6) + tensor_apply(x1, x6)))
   0
 }
 // After Tensor fusion V:
 def tensors_01(x0: Int): Int = {
-  println(tensor(List(3, 4, 5), (x1 => 2)))
-  println(tensor(List(3, 4, 5), (x2 => 3)))
+  println(tensor(List(3, 4, 5), x1 => 2))
+  println(tensor(List(3, 4, 5), x2 => 3))
   0
 }
 // After Tensor fusion H:
 def tensors_01(x0: Int): Int = {
-  val x1 = multiloop(List(3, 4, 5), List(tensor, tensor), (x2 => List(2, 3)))
+  val x1 = multiloop(List(3, 4, 5), List(tensor, tensor), x2 => List(2, 3))
   println(seq_apply(x1, 0))
   println(seq_apply(x1, 1))
   0
@@ -62,9 +62,9 @@ def tensors_01(x0: Int): Int = {
 def tensors_01(x0: Int): Int = {
   val x1 = tensor_builder_new(List(3, 4, 5))
   val x2 = tensor_builder_new(List(3, 4, 5))
-  foreach(List(3, 4, 5), { x5 =>
-    tensor_builder_add(x1, x5, 2)
-    tensor_builder_add(x2, x5, 3)
+  foreach(List(3, 4, 5), { x4 =>
+    tensor_builder_add(x1, x4, 2)
+    tensor_builder_add(x2, x4, 3)
   })
   val x7 = tensor_builder_get(x1)
   val x8 = tensor_builder_get(x2)
@@ -76,14 +76,14 @@ def tensors_01(x0: Int): Int = {
 def tensors_01(x0: Int): Int = {
   val x1 = new Array[Int](60)
   val x2 = new Array[Int](60)
-  foreach(3, { x5 =>
-    val x4 = x5 * 20
-    foreach(4, { x8 =>
-      val x7 = x8 * 5
-      foreach(5, { x11 =>
-        val x10 = x4 + x7 + x11
-        x1(x10) = 2
-        x2(x10) = 3
+  foreach(3, { x4 =>
+    val x5 = x4 * 20
+    foreach(4, { x7 =>
+      val x8 = x7 * 5
+      foreach(5, { x10 =>
+        val x11 = x5 + x8 + x10
+        x1(x11) = 2
+        x2(x11) = 3
       })
     })
   })

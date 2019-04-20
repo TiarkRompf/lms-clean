@@ -110,8 +110,9 @@ class CompactScalaCodeGen extends CompactTraverser {
   var doRename = false
   var doPrintEffects = false
 
-  var lines: List[String] = Nil
-  def emit(s: String) = if (s != "") lines = s::lines
+  def emit(s: String): Unit = print(s)
+  def emit(buf: ByteArrayOutputStream): Unit = buf.writeTo(Console.out)
+  def emitln(s: String = "") = println(s)
 
   def quote(s: Def): String = s match {
     case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
@@ -122,10 +123,17 @@ class CompactScalaCodeGen extends CompactTraverser {
     // case Eff(x) => x.map(quote).mkString("")
   }
 
-  def shallow(n: Def): String = n match {
+  def capture(f: => Unit) = {
+    val buf = new ByteArrayOutputStream()
+    val bufWriter = new PrintStream(buf)
+    utils.withOutput(bufWriter)(f)
+    buf
+  }
+
+  def shallow(n: Def): Unit = n match {
     case InlineSym(n) => shallow(n)
     case b:Block => quoteBlock1(b)
-    case _ => quote(n)
+    case _ => emit(quote(n))
   }
 
   def quoteEff(x: Def): String =
@@ -150,61 +158,74 @@ class CompactScalaCodeGen extends CompactTraverser {
   //   if (!doPrintEffects || x.isEmpty) ""
   //   else " /* " + quote(x) + " */"
 
-
-  // XXX NOTE: performance implications of capture + concat !!!
-  // XXX TODO: what if block is empty?
-  def captureLines(f: => Unit): List[String] = {
-    val save = lines
-    try {
-      lines = Nil
-      f
-      lines.reverse
-    } finally { lines = save }
-  }
-
-  def quoteBlock(f: => Unit) = {
-    val ls = captureLines(f)
-    if (ls.length != 1) {
-      "{\n" + ls.mkString("\n") + "\n}"
-    } else ls.mkString("\n")
-  }
+  var blockHeader: String = ""
+  var currentPrec: Option[Int] = None
+  def quoteBlock(f: => Unit): Unit = quoteBlockHelper("", None)(f)
+  def quoteBlock(header: String)(f: => Unit): Unit = quoteBlockHelper(header, None)(f)
+  def quoteBlockP(f: => Unit): Unit = quoteBlockHelper("", Some(0))(f)
   def quoteBlock1(y: Block, argType: Boolean = false) = {
     def eff = quoteEff(y.ein)
     if (y.in.length == 0) {
-      val b = quoteBlock(traverse(y))
+      quoteBlock(traverse(y))
       // if (b contains '\n')
         // s"{$eff\n" + eff + b + "\n}"
       // else
-        b
+      //  b
     } else if (y.in.length == 1) {
       val x = y.in.head
-      val l = captureLines(traverse(y))
-      val b = l.mkString("\n")
       def typed(s:String) = if (argType) s+": Int" else s //FIXME hardcoded
       def paren(s:String) = if (argType) "("+s+")" else s
-      if (l.length != 1)
-        paren(s"{ ${typed(quote(x))}$eff => \n$b\n}")
-      else
-        s"(${paren(typed(quote(x)))}$eff => $b)"
+      quoteBlock(s"${paren(typed(quote(x)))}$eff => ")(traverse(y))
     } else (???) //FIXME
+  }
+
+  def quoteBlockHelper(header: String, prec: Option[Int])(f: => Unit) = {
+    val save = blockHeader
+    val save1 = currentPrec
+    blockHeader = header
+    currentPrec = prec
+    f
+    blockHeader = save
+    currentPrec = save1
   }
 
 
   // process and print block results
+  // TODO handle precedence in in scala correctly
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
-    // if (numStms > 0) emit("{")
+    // val paren = numStms == 0 && currentPrec.map(_ > 0).getOrElse(true)
+    if (numStms > 0) {
+      emit("{ "); emitln(blockHeader)
+    } else {
+      // if (paren) emit("(")
+      emit(blockHeader)
+    }
     super.traverseCompact(ns, y)
-    if (y.res != Const(()))
-      emit(shallow(y.res) + quoteEff(y.eff))
-    else
+    if (y.res != Const(())) {
+      shallow(y.res); emit(quoteEff(y.eff))
+    } else {
       emit(quoteEff(y.eff))
-    // if (numStms > 0) emit("}")
+    }
+    if (numStms > 0) {
+      emit("\n}")
+    // } else {
+    //   if (paren) emit(")")
+    }
+  }
+
+  def precendence(n: Node) = n match {
+    case _ => 0
+  }
+
+  def shallow1(n: Def, prec: Int = 20): Unit = n match {
+    case InlineSym(n) if n.op != "var_get" && precendence(n) < prec => emit("("); shallow(n); emit(")")
+    case _ => shallow(n)
   }
 
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
   // XXX TODO: precedence of nested expressions!!
-  def shallow(n: Node): String = (n match {
+  def shallow(n: Node): Unit = { n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
       // XXX what should we do for functions?
       // proper inlining will likely work better
@@ -212,88 +233,84 @@ class CompactScalaCodeGen extends CompactTraverser {
       // further optimizations
       quoteBlock1(y, true)
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
-      s"if (${shallow(c)}) " +
-      quoteBlock(traverse(a)) +
-      s" else " +
-      quoteBlock(traverse(b))
+      emit("if ("); shallow(c); emit(") ")
+      quoteBlockP(traverse(a))
+      emit(" else ")
+      quoteBlockP(traverse(b))
     case n @ Node(f,"W",List(c:Block,b:Block),_) =>
-      s"while (" +
-      quoteBlock(traverse(c)) +
-      s") " +
+      emit("while ("); quoteBlockP(traverse(c)); emit(") ")
       quoteBlock(traverse(b))
     case n @ Node(s,"+",List(x,y),_) =>
-      s"${shallow(x)} + ${shallow(y)}"
+      shallow(x); emit(" + "); shallow(y)
     case n @ Node(s,"-",List(x,y),_) =>
-      s"${shallow(x)} - ${shallow(y)}"
+      shallow(x); emit(" - "); shallow(y)
     case n @ Node(s,"*",List(x,y),_) =>
-      s"${shallow(x)} * ${shallow(y)}"
+      shallow(x); emit(" * "); shallow(y)
     case n @ Node(s,"/",List(x,y),_) =>
-      s"${shallow(x)} / ${shallow(y)}"
+      shallow(x); emit(" / "); shallow(y)
     case n @ Node(s,"%",List(x,y),_) =>
-      s"${shallow(x)} % ${shallow(y)}"
+      shallow(x); emit(" % "); shallow(y)
     case n @ Node(s,"==",List(x,y),_) =>
-      s"${shallow(x)} == ${shallow(y)}"
+      shallow(x); emit(" == "); shallow(y)
     case n @ Node(s,"!=",List(x,y),_) =>
-      s"${shallow(x)} != ${shallow(y)}"
+      shallow(x); emit(" != "); shallow(y)
     case n @ Node(s,"<=",List(x,y),_) =>
-      s"${shallow(x)} <= ${shallow(y)}"
+      shallow(x); emit(" <= "); shallow(y)
     case n @ Node(s,">=",List(x,y),_) =>
-      s"${shallow(x)} >= ${shallow(y)}"
+      shallow(x); emit(" >= "); shallow(y)
     case n @ Node(s,"var_get",List(x),_) =>
-      s"${shallow(x)}"
+      shallow(x)
     case n @ Node(s,"array_get",List(x,i),_) =>
-      s"${shallow(x)}(${shallow(i)})"
+      shallow(x); emit("("); shallow(i); emit(")")
     case n @ Node(s,"@",x::y,_) =>
-      s"${shallow(x)}(${y.map(shallow(_)).mkString(", ")})"
+      shallow1(x); emit("("); y.headOption.foreach(h => { shallow1(h, 0); y.tail.foreach(a => { emit(", "); shallow1(a, 0) }) }); emit(")")
     case n @ Node(s,"P",List(x),_) =>
-      s"println(${shallow(x)})"
+      emit("println("); shallow(x); emit(")")
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
       quoteBlock {
-        emit("//#" + str)
+        emitln("//#" + str)
         if (verbose) {
-          emit("// generated code for " + str.replace('_', ' '))
+          emitln("// generated code for " + str.replace('_', ' '))
         } else {
-          emit("// generated code")
+          emitln("// generated code")
         }
         traverse(b)
-        emit("//#" + str)
+        emitln("//#" + str)
       }
 
     case n @ Node(_,op,args,_) =>
-      s"$op(${args.map(shallow).mkString(", ")})"
-  }) + quoteEff(n)
+      emit(op); emit("("); args.headOption.foreach(h => { shallow1(h, 0); args.tail.foreach(a => { emit(", "); shallow1(a, 0) }) }); emit(")")
+  }; emit(quoteEff(n)) }
 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
-      emit(s"def ${quote(f)}(${quote(x)}: Int): Int${quoteEff(y.ein)} = ${ quoteBlock(traverse(y,f)) }")
+      emit(s"def ${quote(f)}(${quote(x)}: Int): Int${quoteEff(y.ein)} = "); quoteBlockP(traverse(y,f)); emitln("")
     // XXX: should not need these below!
     case n @ Node(s,"P",_,_) => // Unit result
-      emit(shallow(n))
+      shallow(n); emitln("")
     case n @ Node(s,"W",_,_) => // Unit result
-      emit(shallow(n))
+      shallow(n); emitln("")
     case n @ Node(s,"var_new",List(x),_) =>
-      emit(s"var ${quote(s)} = ${shallow(x)}")
+      emit(s"var ${quote(s)} = "); shallow(x); emitln("")
     case n @ Node(s,"var_set",List(x,y),_) =>
-      emit(s"${quote(x)} = ${shallow(y)}")
+      emit(s"${quote(x)} = "); shallow(y); emitln("")
     case n @ Node(s,"array_new",List(x),_) =>
-      emit(s"val ${quote(s)} = new Array[Int](${shallow(x)})")
+      emit(s"val ${quote(s)} = new Array[Int]("); shallow(x); emitln(")")
     case n @ Node(s,"array_set",List(x,i,y),_) =>
-      emit(s"${shallow(x)}(${shallow(i)}) = ${shallow(y)}")
-    case n @ Node(s,_,_,_) =>
+      shallow(x); emit("("); shallow(i); emit(") = "); shallow(y); emitln("")
+    case _ =>
       // emit(s"val ${quote(s)} = " + shallow(n))
-      emitValDef(s, shallow(n))
+      emitValDef(n)
   }
 
-  def emitValDef(s: Sym, rhs: => String): Unit = {
-    emit(s"val ${quote(s)} = " + rhs)
+  def emitValDef(n: Node): Unit = {
+    emit(s"val ${quote(n.n)} = "); shallow(n); emitln("")
   }
 
-
-
-  override def apply(g: Graph) = {
-    val ls = captureLines(super.apply(g))
-    ls.foreach(println)
+  override def apply(g: Graph): Unit = {
+    super.apply(g)
+    emitln("")
   }
 }
 
@@ -620,7 +637,7 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
     case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = "); shallow(y); emitln()
     case n @ Node(s,"array_new",List(x),_) =>
-      /*if (dce.live(s))*/ emit(s"val ${quote(s)} = "); emit("new Array[Int]("); shallow(x); emit(")"); emitln()
+      /*if (dce.live(s))*/ emit(s"val ${quote(s)} = new Array[Int]("); shallow(x); emit(")"); emitln()
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       shallow(x); emit("("); shallow(i); emit(") = "); shallow(y); emitln()
 
@@ -685,8 +702,6 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case _ => super.quote(x)
   }
 
-  def isAtom(op: String) = !binop.contains(op)
-
   // The following table lists the precedence and associativity of C operators. Operators are listed
   // top to bottom, in descending precedence. (https://en.cppreference.com/w/c/language/operator_precedence)
   // Precedence Operator  Description Associativity
@@ -739,30 +754,87 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
 
 
   // TODO: should make it language specific and move it down to ExtendedCCode
+  def precedence(n: Node): Int = n match {
+    case Node(s,"?",List(c,a:Block,b:Block),_) if b.isPure && b.res == Const(false) => precedence("&&")
+    case Node(s,"?",List(c,a:Block,b:Block),_) if a.isPure && a.res == Const(true) => precedence("||")
+    case _ => precedence(n.op)
+  }
+  final def unaryPrecedence(op: String): Int = 12
   final def precedence(op: String): Int = op match {
-    case "Boolean.||" | "?" => 1 // node: in case "?" is rewritten to "&&" or "||"
-    case "Boolean.&&" => 2
-    case "|" => 3
-    case "^" => 4
-    case "&" => 5
-    case "==" | "!=" | "String.equalsTo" => 6
-    case "<" | ">" | "<=" | ">=" => 7
-    case "<<" | ">>" => 8
-    case "+" | "-" => 9
-    case "*" | "/" | "%" => 10
-    case "ref_new" => 11 // & address of
-    case "reffield_get" => 12 // -> pointer member access
+    case "?" => 1
+    case "||" => 2
+    case "&&" => 3
+    case "|" => 4
+    case "^" => 5
+    case "&" => 6
+    case "==" | "!=" | "String.equalsTo" => 7
+    case "<" | ">" | "<=" | ">=" => 8
+    case "<<" | ">>" => 9
+    case "+" | "-" => 10
+    case "*" | "/" | "%" => 11
+    case "ref_new" => 13 // & address of
+    case "reffield_get" => 14 // -> pointer member access
     // type casting is lower in precedence?
     case "NewArray" => 19 // there might be type conversion before array access, which should be put in parenthesis
     case _ if op.startsWith("unchecked") => 0 // force parenthesis if nested: 3 * unchecked(5 + 4)
-    case b if isAtom(b) => 20
-    case _ => 0
+    case _ => 20
   }
 
   // XXX proper operator precedence
-  def shallow1(n: Def, pp: Int = 20): String = n match {
-    case InlineSym(n) if (precedence(n.op) < pp) => s"(${shallow(n)})"
+  override def shallow1(n: Def, pp: Int = 20): Unit = n match {
+    case InlineSym(n) if precedence(n) < pp => emit("("); shallow(n); emit(")")
     case _ => shallow(n)
+  }
+  var generateReturn = false
+  var three = 0
+  // block of statements
+  override def quoteBlock(f: => Unit) = quoteBlockHelp(None, false)(f)
+  //  block of statements with result expression
+  def quoteBlockPReturn(f: => Unit) = quoteBlockHelp(None, true)(f)
+  override def quoteBlockP(f: => Unit) = quoteBlockHelp(Some(0), false)(f)
+  def quoteBlockP(prec: Int)(f: => Unit) = quoteBlockHelp(Some(prec), false)(f)
+  def quoteBlockHelp(prec: Option[Int], genRet: Boolean)(f: => Unit) = {
+    val save = currentPrec
+    val save1 = generateReturn
+    currentPrec = prec
+    generateReturn = genRet
+    f
+    currentPrec = save
+    generateReturn = save1
+  }
+
+  /*
+   * Current precedence
+   *     None => not used as value
+   *     Some(n) => used in an expression, should have parenthesis if lastNode has lower precedence than n
+   */
+  override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
+    val paren = currentPrec.map(prec => numStms > 0 || lastNode.map(n => { precedence(n) < prec}).getOrElse(false)).getOrElse(false)
+    if (paren) emit(s"(")
+    /*
+     * n > 1                       n > 1                      n > 1
+     * || n == 0 && res == () ==>  || n == 0 && res == () ==> || n == 0 && res == ()
+     * || n > 0 && res != ()       || n == 1 && res != ()     || n != 0 && res != ()
+     *
+     * ==>
+     *
+     * n > 1 && (n == 0 & res != ())
+     */
+    val brace = generateReturn || numStms > 1 || (numStms == 0 ^ y.res != Const(()))
+    if (brace) emitln("{")
+    for (n <- ns) {
+      if (shouldInline(n.n).isEmpty)
+        traverse(n)
+    }
+    if (y.res != Const(())) {
+      if (generateReturn) emit("return ");
+      shallow(y.res); emit(quoteEff(y.eff));
+    } else {
+      emit(quoteEff(y.eff))
+    }
+    if (generateReturn && y.res != Const(()) || currentPrec != None && numStms > 0) emit(";")
+    if (brace) emit("\n}")
+    if (paren) emit(")")
   }
 
   def array(innerType: String): String
@@ -779,17 +851,18 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   }
   def nameMap: Map[String, String]
 
-  override def emitValDef(s: Sym, rhs: =>String): Unit = {
-    if (dce.live(s))
-      super.emitValDef(s,rhs)
-    else
-      emit(rhs)
+  override def emitValDef(n: Node): Unit = {
+    if (dce.live(n.n))
+      super.emitValDef(n)
+    else {
+      shallow(n)
+    }
   }
 
-  override def shallow(n: Def): String = n match {
+  override def shallow(n: Def): Unit = n match {
     case InlineSym(t: Node) => shallow(t)
     case b:Block => quoteBlock1(b)
-    case _ => quote(n)
+    case _ => emit(quote(n))
   }
 
   private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
@@ -800,9 +873,9 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   private val functionsStream = new ByteArrayOutputStream()
   private val functionsWriter = new PrintStream(functionsStream)
   def registerTopLevelFunction(id: String)(f: => Unit) = if (!registeredFunctions(id)) {
-    // utils.withOutput(functionsWriter)(f)
     registeredFunctions += id
-    captureLines(f).foreach(functionsWriter.println)
+    utils.withOutput(functionsWriter)(f)
+    // captureLines(f).foreach(functionsWriter.println)
   }
   def emitFunctions(out: PrintStream) = if (functionsStream.size > 0){
     out.println("\n/************* Functions **************/")
@@ -821,40 +894,43 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     datastructuresStream.writeTo(out)
   }
 
-  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", "Boolean.&&", "Boolean.||")
-  override def shallow(n: Node): String = n match {
+  val unaryop = Set("-","!","&")
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", "&&", "||")
+  override def shallow(n: Node): Unit = n match {
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
     case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
     case n @ Node(s, op,List(x,y),_) if binop(op) => // associativity??
-      s"${shallow1(x, precedence(op))} $op ${shallow1(y, precedence(op)+1)}"
+      shallow1(x, precedence(op)); emit(" "); emit(op); emit(" "); shallow1(y, precedence(op)+1)
     case n @ Node(s,"Boolean.!",List(a),_) =>
-      s"!${shallow1(a)}"
+      emit("!"); shallow1(a, unaryPrecedence("!"))
     case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
       var next = 9 // skip unchecked
-      var s = ""
       for (a <- args) {
         val i = op.indexOf("[ ]", next)
         assert(i >= next)
-        s += op.substring(next,i)
-        s += shallow(a)
+        emit(op.substring(next,i))
+        shallow(a)
         next = i + 3
       }
-      s + op.substring(next)
+      emit(op.substring(next))
     case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
       registerHeader("<string.h>")
       (op.substring(7), args) match {
-        case ("equalsTo", List(lhs, rhs)) => s"strcmp(${shallow(lhs)}, ${shallow(rhs)}) == 0"
+        case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
         case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
       }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
       val (recv::args1) = args
-      if (args1.length > 0)
-        s"${shallow1(recv)}.${op.drop(op.lastIndexOf('.')+1)}(${args1.map(shallow).mkString(",")})"
-      else
-        s"${shallow1(recv)}.${op.drop(op.lastIndexOf('.')+1)}"
-    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) =>
-      s"${shallow(c)} && ${shallow(a)}"
+      if (args1.length > 0) {
+        shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1)); emit("("); shallow(args1.head); args1.tail.foreach { emit(", "); shallow(_) }; emit(")")
+      } else {
+        shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1))
+      }
+    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) => ??? // I think there are unused
+      shallow1(c, precedence("&&")); emit(" && "); shallow1(a, precedence("&&")+1)
+    case n @ Node(s,"?",List(c,a:Block,b),_) if a.isPure && a.res == Const(true) => ???
+      shallow1(c, precedence("||")); emit(" || "); shallow1(b, precedence("||")+1)
     case n =>
       super.shallow(n)
   }
@@ -866,22 +942,22 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   }
 
   // Needs to be C dependent
-  override def apply(g: Graph): Unit = {
-    utils.withOutput(stream) {
-      val ls = captureLines {
-        bound(g)
-        withScope(Nil, g.nodes) {
-          traverse(g.block)
-        }
-      }
-      if (g.block.res == Const(())) {
-        ls.foreach(println)
-      } else {
-        ls.init.foreach(println)
-        println(s"return ${ls.last};")
-      }
-    }
-  }
+  // override def apply(g: Graph): Unit = {
+  //   utils.withOutput(stream) {
+  //     val ls = captureLines {
+  //       bound(g)
+  //       withScope(Nil, g.nodes) {
+  //         traverse(g.block)
+  //       }
+  //     }
+  //     if (g.block.res == Const(())) {
+  //       ls.foreach(println)
+  //     } else {
+  //       ls.init.foreach(println)
+  //       println(s"return ${ls.last};")
+  //     }
+  //   }
+  // }
 }
 
 class Unknown // HACK: Sentinel for typeMap
@@ -923,141 +999,107 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     "StrSubHashCode" -> "hash"
   )
 
-  // block of statements
-  override def quoteBlock(f: => Unit) = {
-    val ls = captureLines(f)
-    if (ls.length != 1) {
-      "{\n" + ls.mkString("\n") + "\n}"
-    } else ls.mkString("\n")
-  }
-  // block of statements with result expression
-  def quoteBlockP(f: => Unit) = {
-    val ls = captureLines(f)
-    if (ls.length != 1) {
-      "({\n" + ls.mkString("\n") + ";\n})"
-    } else ls.mkString("\n")
-  }
-
   def emitFunction(name: String, body: Block) = {
     val res = body.res
     val args = body.in
-    emit(s"${remap(typeBlockRes(res))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}") mkString(", ")}) {")
-    if (res == Const(())) {
-      traverse(body)
-      emit("}")
-    } else {
-      val ls = captureLines(traverse(body))
-      ls.init.foreach(emit)
-      emit(s"return ${ls.last};\n}")
-    }
+    emit(s"${remap(typeBlockRes(res))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}") mkString(", ")}) ")
+    quoteBlockPReturn(traverse(body))
   }
 
-  override def emitValDef(s: Sym, rhs: =>String): Unit = {
+  override def emitValDef(n: Node): Unit = {
     // emit(s"val ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
-    if (dce.live(s))
-      emit(s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)} = $rhs;")
-    else
-      emit(s"$rhs;")
+    if (dce.live(n.n)) {
+      emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = "); shallow(n); emitln(";")
+    } else {
+      shallow(n); emitln(";")
+    }
   }
-  def emitVarDef(s: Sym, rhs: =>String): Unit = {
+  def emitVarDef(n: Node): Unit = {
     // emit(s"var ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     // TODO: enable dce for vars ... but currently getting unused expression warnings ...
     // if (dce.live(s))
-      emit(s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)} = $rhs;")
+      emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = "); shallow(n.rhs.head); emitln(";")
     // else
       // emit(s"$rhs;")
   }
-  override def shallow(n: Node): String = n match {
-    case Node(s, op, List(a), _) if op.endsWith("toInt") =>
-      s"(int)${shallow1(a)}"
-    case Node(s, op, List(a), _) if op.endsWith("toFloat") =>
-      s"(float)${shallow1(a)}"
-    case Node(s, op, List(a), _) if op.endsWith("toDouble") =>
-      s"(double)${shallow1(a)}"
-    case Node(s, op, List(a), _) if op.endsWith("toLong") =>
-      s"(long)${shallow1(a)}"
+  override def shallow(n: Node): Unit = n match {
+    case Node(s, op, List(a), _) if op.contains(".to") => // FIXME
+      val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
+      emit(s"($tpe)"); shallow1(a)
     case Node(s,"String.charAt",List(a,i),_) =>
-      s"${shallow1(a)}[${shallow(i)}]"
+      shallow1(a); emit("["); shallow(i); emit("]")
     case Node(s,"array_get",List(a,i),_) =>
-      s"${shallow1(a)}[${shallow(i)}]"
+      shallow1(a); emit("["); shallow(i); emit("]")
     // case Node(s,"var_get",List(a),_) =>
       // quote(a)+s"/*${quote(s)}*/"
 
     // case n @ Node(s,"comment",_,_) =>
       // s"(${super.shallow(n)})" // GNU C block expr
     case n @ Node(s,"?",List(c,a:Block,b:Block),_) if b.isPure && b.res == Const(false) =>
-      s"${shallow(c)} && ${quoteBlockP(traverse(a))}"
+      shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
+    case n @ Node(s,"?",List(c,a:Block,b:Block),_) if a.isPure && a.res == Const(true) =>
+      shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
-      s"${shallow1(c)} ? " +
-      quoteBlockP(traverse(a)) +
-      s" : " +
-      quoteBlockP(traverse(b)) + ""
-
+      shallow1(c); emit(" ? ")
+      quoteBlockP(precedence("?"))(traverse(a))
+      emit(" : ")
+      quoteBlockP(precedence("?"))(traverse(b))
     case n @ Node(f,"W",List(c:Block,b:Block),_) =>
-      s"while (" +
-      quoteBlockP(traverse(c)) +
-      s") " +
+      emit("while (");
+      quoteBlockP(traverse(c))
+      emit(") ")
       quoteBlock1(b)
-    case n @ Node(s,"generate-comment",List(Const(x)),_) =>
-      s"// $x"
+      emitln()
+    case n @ Node(s,"generate-comment",List(Const(x: String)),_) =>
+      emit("// "); emitln(x)
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
+      ???
       quoteBlockP {
-        emit("//#" + str)
+        emitln("//#" + str)
         if (verbose) {
-          emit("// generated code for " + str.replace('_', ' '))
+          emitln("// generated code for " + str.replace('_', ' '))
         } else {
-          emit("// generated code")
+          emitln("// generated code")
         }
         traverse(b)
-        emit(";//#" + str)
+        emit("/*#" + str + "*/")
       }
 
     case n @ Node(s,"P",List(x),_) =>
-      s"printf(${"\"%s\\n\""}, ${shallow(x)})"
-    case n @ Node(s, "timestamp", _, _) =>
-      registerHeader("<sys/time.h>")
-      emit(s"struct timeval ${quote(s)}_t;")
-      emit(s"gettimeofday(&${quote(s)}_t, NULL);")
-      s"${quote(s)}_t.tv_sec * 1000000L + ${quote(s)}_t.tv_usec"
+      emit("""printf("%s\n", """); shallow(x); emit(")");
     case n @ Node(s, "λtop", List(block: Block), _) =>
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
       }
-      quote(s)
-    case n @ Node(s, "reffield_get", List(ptr, Const(field)), _) =>
-      s"${shallow1(ptr, precedence("reffield_get"))}->$field"
-    case n @ Node(s, "local_struct", Nil, _) =>
-      emitValDef(s, "{ 0 }") // FIXME: uninitialized? or add it as argument?
-      quote(s)
+      emit(quote(s))
+    case n @ Node(s, "reffield_get", List(ptr, Const(field: String)), _) =>
+      shallow1(ptr, precedence("reffield_get")); emit("->"); emit(field)
     case n @ Node(s, "ref_new", List(v), _) =>
-      s"&${shallow1(v, precedence("ref_new"))}"
+      emit("&"); shallow1(v, precedence("ref_new"))
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      s"($tpe*)malloc(${shallow(x)} * sizeof($tpe))"
+      emit(s"($tpe*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof($tpe))")
     case n @ Node(s,"array_new",List(x),_) =>
-      s"(int*)malloc(${shallow1(x)} * sizeof(int))"
+      emit(s"(int*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof(int))")
     case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
-      s"qsort(${shallow1(arr)}, ${shallow1(len)}, sizeof(*${shallow(arr2)}), (__compar_fn_t)${shallow(comp)})" // shallow(comp) to trigger generation of function
+      emit("qsort("); shallow1(arr); emit(" ,"); shallow1(len); emit(", sizeof(*"); shallow(arr2); emit("), (__compar_fn_t)"); shallow(comp); emit(")")
     case n =>
       super.shallow(n)
   }
   override def traverse(n: Node): Unit = n match {
-    // case n @ Node(s,"P",_,_) => // Unit result
-    //   emit(shallow(n))
-    // case n @ Node(s,"W",_,_) => // Unit result
-    //   emit(shallow(n))
     case n @ Node(s,"var_new",List(x),_) =>
-      emitVarDef(s, shallow(x))
+      emitVarDef(n)
     case n @ Node(s, "local_struct", Nil, _) =>
-      emitValDef(s, "{ 0 }") // FIXME: uninitialized? or add it as argument?
+      val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
+      emitln(s"$tpe ${quote(s)} = { 0 };") // FIXME: uninitialized? or add it as argument?
     case n @ Node(s,"var_set",List(x,y),_) =>
-      emit(s"${quote(x)} = ${shallow(y)};")
-    case n @ Node(s, "reffield_set", List(ptr, Const(field), v), _) =>
-      emit(s"${shallow1(ptr, precedence("reffield_get"))}->$field = ${shallow(v)};")
+      emit(s"${quote(x)} = "); shallow(y); emitln(";")
+    case n @ Node(s, "reffield_set", List(ptr, Const(field: String), v), _) =>
+      shallow1(ptr, precedence("reffield_get")); emit("->"); emit(field); emit(" = "); shallow(v); emitln(";")
     // static array
     case n @ Node(s, "Array" , xs,_) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"$tpe ${quote(s)}[${xs.length}] = { ${xs.map(shallow).mkString(", ")} };");
+      emit(s"$tpe ${quote(s)}[${xs.length}] = { "); shallow(xs.head); xs.tail.foreach { emit(", "); shallow(_) }; emitln(");")
 
     // DCE: FIXME:
     // (a) check that args have no side-effects
@@ -1069,44 +1111,56 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     // (b) dce above should anticipate that these will be eliminated
     //      do not register dependencies as live!
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
-    case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
+    case n @ Node(s,"array_get",_,_) if !dce.live(s) => emitln("// dead array look up")// no-op
 
     case n @ Node(s,"array_set",List(x,i,y),_) =>
-      emit(s"${shallow1(x)}[${shallow(i)}] = ${shallow(y)};")
+      shallow1(x); emit("["); shallow(i); emit("] = "); shallow(y); emitln(";")
 
 
     case n @ Node(s,"?",c::(a:Block)::(b:Block)::_,_) if !dce.live(s) =>
-      emit(s"if (${shallow(c)}) " +
-      quoteBlock(traverse(a.copy(res = Const(())))) +
-      s" else " +
-      quoteBlock(traverse(b.copy(res = Const(())))))
+      emit(s"if ("); shallow(c); emit(") ")
+      quoteBlock(traverse(a.copy(res = Const(()))))
+      emit(" else ")
+      quoteBlock(traverse(b.copy(res = Const(()))))
+      emitln()
 
     case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) =>
-      emit(s"while (" +
-      quoteBlockP(traverse(c)) +
-      s") " +
-      quoteBlock(traverse(b)))
+      emit("while (")
+      quoteBlockP(traverse(c))
+      emit(") ")
+      quoteBlock(traverse(b))
+      emitln()
 
-    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_)  if !dce.live(s) =>
-        emit("//#" + str)
-        if (verbose) {
-          emit("// generated code for " + str.replace('_', ' '))
-        } else {
-          emit("// generated code")
-        }
+    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
+      emitln("//# " + str)
+      if (verbose) {
+        emitln("// generated code for " + str.replace('_', ' '))
+      } else {
+        emitln("// generated code")
+      }
+      if (dce.live(s)) {
+        val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
+        emit(tpe); emit(" "); emit(quote(s)); emit(" = "); quoteBlockP(traverse(b))
+      } else {
         traverse(b)
-        emit(";//#" + str)
+      }
+      emitln(";\n//# " + str)
     case n @ Node(s, "λforward", List(y), _) =>
-      emit("//# lambda forward is here!")
+      emitln("//# lambda forward is here!")
       forwardMap(s) = y // for this case, adding (f, y) in forwardMap is all we need
     case n @ Node(s, "λtop", List(block@Block(args, res, _, _)), _) => ??? // shouldn't be possible in C
-    case n @ Node(s, op,_,_) =>
+    case n @ Node(s, "timestamp", _, _) =>
+      registerHeader("<sys/time.h>")
+      emitln(s"struct timeval ${quote(s)}_t;")
+      emitln(s"gettimeofday(&${quote(s)}_t, NULL);")
+      emitln(s"long ${quote(s)} = ${quote(s)}_t.tv_sec * 1000000L + ${quote(s)}_t.tv_usec;");
+    case _ =>
       // emit(s"val ${quote(s)} = " + shallow(n))
-      emitValDef(s, shallow(n))
+      emitValDef(n)
   }
 
-  def run(name: String, g: Graph): List[String] = {
-    captureLines {
+  def run(name: String, g: Graph) = {
+    capture {
       bound(g)
       withScope(Nil, g.nodes) {
         emitFunction(name, g.block)
@@ -1134,7 +1188,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     emitDatastructures(stream)
     emitFunctions(stream)
     stream.println(s"\n/**************** $name ****************/")
-    src.foreach(stream.println)
+    src.writeTo(stream)
     stream.println("""
     |/*****************************************
     |End of C Generated Code

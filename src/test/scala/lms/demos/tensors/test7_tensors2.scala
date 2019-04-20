@@ -18,7 +18,7 @@ class TensorFrontEnd2 extends FrontEnd {
   }
   def SEQ(x: INT*): SEQ = SEQ(g.reflect("seq", x.toList.map(_.x):_*))
 
-  
+
   abstract class Type[T] {
     def fromExp(x: Exp): T
     def toExp(x: T): Exp
@@ -79,7 +79,7 @@ class TensorFrontEnd2 extends FrontEnd {
   def unref[T:Type](x: Exp): T = implicitly[Type[T]].fromExp(x)
   object Reflect {
     def unapply(x: Any): Option[(String, List[Exp])] = x match {
-      case (s: String, rhs: List[_]) => 
+      case (s: String, rhs: List[_]) =>
         Some((s,rhs.filter(_.isInstanceOf[Exp]).map(_.asInstanceOf[Exp])))
       case s @ Sym(_) =>
         g.findDefinition(s).map(n => (n.op,n.rhs.filter(_.isInstanceOf[Exp]).map(_.asInstanceOf[Exp])))
@@ -91,7 +91,7 @@ class TensorFrontEnd2 extends FrontEnd {
 
 
   var name: String = ""
-  
+
   var rewrites: (String => Any => Option[Exp]) = (s => x => None)
 
   def rewriteAt[T:Type](key: Any)(f: PartialFunction[Any,T]) = {
@@ -113,7 +113,7 @@ class TensorFrontEnd2 extends FrontEnd {
   }
 
 
-  @ir("MultiLoopBuilderLowering") 
+  @ir("MultiLoopBuilderLowering")
   def foobar(arg: INT): INT = 2 * arg
 
   rewrite { case Mfoobar(Mfoobar(x)) => foobar(x) };
@@ -146,24 +146,24 @@ class TensorFrontEnd2 extends FrontEnd {
     g.reflectEffect("P",x.x)(CTRL)
 
 
-  @ir("TensorLowering") 
+  @ir("TensorLowering")
   def tensor_add1(a: Tensor1, b: Tensor1): Tensor1 = {
     Tensor1(tensor_shape(a), i => tensor_apply(a,i) + tensor_apply(b,i)) // XXX todo: same shape
   }
 
-  @ir("TensorLowering") 
+  @ir("TensorLowering")
   def tensor_apply(a: Tensor1, b: SEQ): INT
 
 
 
-  @ir("MultiLoopBuilderLowering") 
+  @ir("MultiLoopBuilderLowering")
   def Tensor1(shape: SEQ, f: SEQ => INT): Tensor1 = {
     val builder = TensorBuilder1(shape)
     forloops(shape, i => builder_add(builder,i,f(i)))
     builder_res(builder)
   }
 
-  @ir("MultiLoopBuilderLowering") 
+  @ir("MultiLoopBuilderLowering")
   def Sum(shape: SEQ, f: SEQ => INT): INT = {
     val builder = SumBuilder1(0)
     forloops(shape, i => sum_builder_add(builder,i,f(i)))
@@ -181,13 +181,13 @@ class TensorFrontEnd2 extends FrontEnd {
   @ir("MultiDimForeachLowering")
   def linearize(sh: SEQ, xs: SEQ): INT
 
-  rewrite { case Mlinearize(SEQ(Const(xs:List[Int])), ys) => 
+  rewrite { case Mlinearize(SEQ(Const(xs:List[Int])), ys) =>
     linearize1(xs.map(i => INT(Const(i))), ys.explode(xs.length))
   }
 
 
   // V-Fusion
-  rewriteAt("TensorFusionV") { case Mtensor_apply(MTensor1(shape, f), i) => 
+  rewriteAt("TensorFusionV") { case Mtensor_apply(MTensor1(shape, f), i) =>
     f(i)
   }
 
@@ -197,9 +197,9 @@ class TensorFrontEnd2 extends FrontEnd {
     case (s::sh, x::xs) => x * sh.reduce(_*_) + linearize1(sh,xs)
   }
 
-  @ir("MultiDimForeachLowering") 
+  @ir("MultiDimForeachLowering")
   def product(sh: SEQ): INT = sh match {
-    case SEQ(Const(xs: List[Int])) => xs.reduce(_*_) 
+    case SEQ(Const(xs: List[Int])) => xs.reduce(_*_)
   }
 
 
@@ -207,19 +207,19 @@ class TensorFrontEnd2 extends FrontEnd {
   def TensorBuilderWrap(shape: SEQ, data: ARRAY): TensorBuilder1
 
 
-  @ir("MultiDimForeachLowering") 
+  @ir("MultiDimForeachLowering")
   def TensorBuilder1(shape: SEQ): TensorBuilder1 @write = {
     val data = ARRAY(product(shape))
     TensorBuilderWrap(shape,data)
   }
 
-  @ir("MultiDimForeachLowering") 
+  @ir("MultiDimForeachLowering")
   def builder_add(@write builder: TensorBuilder1, i: SEQ, x: INT): Unit = {
     val MTensorBuilderWrap(shape,data) = builder
     data(linearize(shape, i)) = x
   }
 
-  @ir("MultiDimForeachLowering") 
+  @ir("MultiDimForeachLowering")
   def builder_res(@write builder: TensorBuilder1): Tensor1 = {
     val MTensorBuilderWrap(shape,data) = builder
     Tensor1(data.x) // could be: TensorWrap(array)
@@ -229,18 +229,18 @@ class TensorFrontEnd2 extends FrontEnd {
   def SumBuilderWrap(data: VAR): SumBuilder1
 
 
-  @ir("MultiDimForeachLowering") 
+  @ir("MultiDimForeachLowering")
   def SumBuilder1(x: INT): SumBuilder1 @write = {
     SumBuilderWrap(VAR(x))
   }
 
-  @ir("MultiDimForeachLowering") 
+  @ir("MultiDimForeachLowering")
   def sum_builder_add(@write builder: SumBuilder1, i: SEQ, x: INT): Unit = {
     val MSumBuilderWrap(data) = builder
     data() = data() + x
   }
 
-  @ir("MultiDimForeachLowering") 
+  @ir("MultiDimForeachLowering")
   def sum_builder_res(@write builder: SumBuilder1): INT = {
     val MSumBuilderWrap(data) = builder
     data()
@@ -262,14 +262,14 @@ class TensorFrontEnd2 extends FrontEnd {
   @ir("MultiDimForeachLowering")
   def forloop(sz: INT, f: INT => Unit): Unit /*= {
     val loopVar = VAR(0)
-    WHILE (loopVar() !== sz) { 
+    WHILE (loopVar() !== sz) {
       f(loopVar())
       loopVar() = loopVar() + 1
     }
   }*/
 
 
-  rewrite0 { 
+  rewrite0 {
     // NOTE: this will inline ALL function calls! (TODO: should have a more specific mechanism)
     case Reflect("@", List(f@Reflect("λ", Nil), x)) =>
       val Node(s,"λ",List(b@Block(List(in),out,ein,eout)),_) = g.findDefinition(f).get
@@ -285,7 +285,7 @@ class TensorFrontEnd2 extends FrontEnd {
       // println(s"nodes dependent on $in,$ein:")
       // nodes.foreach(println)
 
-      nodes.foreach { case Node(n,op,rhs,efs) => 
+      nodes.foreach { case Node(n,op,rhs,efs) =>
         val (effects,pure) = (efs.deps,rhs)
         val args = pure.map(a => subst.getOrElse(a,a)) // XXX TODO: Blocks!
         val efs1 = efs.keys.map(a => subst.getOrElse(a,a))
@@ -387,7 +387,7 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
       )
 
       val scc1 = scc.reverse
-      
+
       //scc1.foreach(println)
 
       scc1.foreach {
@@ -400,8 +400,8 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
         case List(xs) =>
           assert(xs == loops, s"$xs != $loops") //XXX TODO error message!
 
-          // emit the fused body ... 
-          val newBody = this.g.reify { e => 
+          // emit the fused body ...
+          val newBody = this.g.reify { e =>
             for (l <- loops) {
               val (Node(s,op,List(sh:Exp,f:Exp), _)) = l
               assert(transform(sh) == shape, "ERROR: fused loop shapes don't match (TODO!)")
@@ -476,7 +476,7 @@ class TensorTest2 extends TutorialFunSuite {
           }
 
           val className = mkClassName(name)
-          s"def ${className}($arg: Int): Int$efs = {\n $src\n }"
+          s"def ${className}($arg: Int): Int$efs = $src"
         }
 
         println("// Initial code:")
@@ -559,13 +559,13 @@ class TensorTest2 extends TutorialFunSuite {
     val constant = Tensor(100) { i => 1 }
     val linear   = Tensor(100) { i => 2*i(0) }
     val affine   = Tensor(100) { i => constant(i) + linear(i) }
-    
+
     def square(x: INT)      = x*x
     def mean(x: Tensor)     = Sum(x.shape) { i => x(i) } / x.shape(0)
     def variance(x: Tensor) = Sum(x.shape) { i => square(x(i)) } / x.shape(0) - square(mean(x))
-    
+
     val data = affine
-    
+
     val m = mean(data)
     val v = variance(data)
 
@@ -612,13 +612,13 @@ class TensorTest2 extends TutorialFunSuite {
     val constant = Tensor1(SEQ(100), { i => 1 })
     val linear   = Tensor1(SEQ(100), { i => 2*i(0) })
     val affine   = Tensor1(SEQ(100), { i => constant(i) + linear(i) })
-    
+
     def square(x: INT)       = x*x
     def mean(x: Tensor1)     = Sum(x.shape, { i => x(i) }) / x.shape(0)
     def variance(x: Tensor1) = Sum(x.shape, { i => square(x(i)) }) / x.shape(0) - square(mean(x))
-    
+
     val data = affine
-    
+
     val m = mean(data)
     val v = variance(data)
 

@@ -5,7 +5,7 @@ class backend_codemotion_06 extends (Int => Int) {
       println(7 + 9)
       0
     } else 0
-    ({ x2: Int =>
+    ({ (x2: Int) =>
       println(x1)
       0
     })(1)

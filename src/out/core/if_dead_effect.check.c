@@ -7,7 +7,8 @@ Emitting C Generated Code
 #include <stdbool.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  if (x0 == 0) printf("hkjfd\n"); else printf("fsgl");
+  if (x0 == 0) printf("hkjfd\n");
+  else printf("fsgl");
 }
 /*****************************************
 End of C Generated Code

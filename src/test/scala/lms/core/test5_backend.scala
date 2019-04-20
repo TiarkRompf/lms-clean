@@ -49,7 +49,7 @@ class BackendTest extends TutorialFunSuite {
         val className = mkClassName(name)
 
         val fc = sc.compile[Int,Int](className, {
-          s"// Generated code\nclass ${className} extends (Int => Int) {\n def apply($arg: Int): Int = {\n $src\n }\n }"
+          s"// Generated code\nclass ${className} extends (Int => Int) {\n def apply($arg: Int): Int = $src\n }"
         }, Nil)
 
         println("// Output:")
@@ -66,7 +66,7 @@ class BackendTest extends TutorialFunSuite {
   // basic scheduling and code motion tests
 
   testBE("fac-01", verbose = true) { x =>
-    val fac = FUN { (f, n) => 
+    val fac = FUN { (f, n) =>
       IF (n !== 0) {
         n * f(n-1)
       } {
@@ -77,7 +77,7 @@ class BackendTest extends TutorialFunSuite {
   }
 
   testBE("fac-02", verbose = true) { x =>
-    val fac = FUN { (f, n) => 
+    val fac = FUN { (f, n) =>
       IF (n !== 0) {
         n * f(n-((2:INT)-1)) // extra stm does not depend on n -> hoist out of fac
       } {
@@ -90,9 +90,9 @@ class BackendTest extends TutorialFunSuite {
   // nested additive frequency issue
 
   testBE("codemotion-00") { x =>
-  
+
     val f = FUN { x =>
-      IF(true) { 
+      IF(true) {
         (3:INT) + (4:INT)
       } {
         (5:INT) * (6:INT)
@@ -104,7 +104,7 @@ class BackendTest extends TutorialFunSuite {
   // Test cases from LMS repo follow
 
   testBE("codemotion-01") { x =>
-  
+
     val f = FUN { x =>
       val g = FUN { y =>
         PRINT("1337")
@@ -114,21 +114,21 @@ class BackendTest extends TutorialFunSuite {
     }
     f(2)
   }
-  
+
 
   /* Previously this program exhibited behavior that is likely undesired in many
   cases. The definition of f was moved *into* g and into the conditional.
   The doLambda in the else branch would not be hoisted out of g either.
-  
+
   Although there are situations where this particular kind of code motion
   is an improvement (namely, if the probability of y == true is very low
   and the else branch would be cheap).
   */
-  
-  
+
+
   testBE("codemotion-02") { x =>
     val f = FUN { x => 2 * x }
-    
+
     val g = FUN { y =>
       PRINT("1337")
       IF (y !== 0) {
@@ -139,12 +139,12 @@ class BackendTest extends TutorialFunSuite {
     }
     g(3)
   }
-  
+
   testBE("codemotion-03") { x =>
     // Both IFs hoisted, FUNs inside branches
 
     val f = IF (true) { (FUN { x => 2 * x })(1) } /*else*/ { (FUN { x => 4 * x })(2) }
-    
+
     val g = FUN { y =>
       PRINT("1337")
       IF (y !== 0) {
@@ -157,9 +157,9 @@ class BackendTest extends TutorialFunSuite {
     }
     g(5)
   }
-  
+
   testBE("codemotion-04") { x =>
-  
+
     val g = FUN { y =>
       IF (true) {
         val x = y + 1
@@ -171,7 +171,7 @@ class BackendTest extends TutorialFunSuite {
     }
     g(1)
   }
-  
+
 
   testBE("codemotion-05") { x =>
     IF (true) {
@@ -185,7 +185,7 @@ class BackendTest extends TutorialFunSuite {
     }
   }
 
-  
+
   // this one didn't work in LMS
   testBE("codemotion-06") { x =>
     val z = (7:INT) + (9:INT) // should move into the conditional (isn't in LMS)
@@ -195,16 +195,16 @@ class BackendTest extends TutorialFunSuite {
     } /*else*/ {
       0
     }
-    (FUN { y => 
+    (FUN { y =>
       PRINT(x)
       0
     })(1)
   }
-  
+
   testBE("codemotion-07") { x =>
-    val f = FUN { y  => 
+    val f = FUN { y  =>
       IF (y !== 0) {
-        val z = y + 9 // should stay inside conditional: 
+        val z = y + 9 // should stay inside conditional:
                       // apparently z was moved up because it is also used in the lambda (z+u)
         val g = FUN { u =>
           z + u
@@ -216,7 +216,7 @@ class BackendTest extends TutorialFunSuite {
     }
     f(1)
   }
-  
+
   // loops, vars, and arrays
 
   testBE("loops-01") { x =>

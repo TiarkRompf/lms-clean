@@ -83,7 +83,7 @@ abstract class TensorLowering extends Transformer {
   override def transform(n: Node): Exp = n match {
     case Node(s, "tensor_zeros", List(sh:Exp), _) => Tensor(SEQ(transform(sh)))(is => 0).x
     case Node(s, "tensor_ones",  List(sh:Exp), _) => Tensor(SEQ(transform(sh)))(is => 1).x
-    case Node(s, "tensor_add",  List(a:Exp,b:Exp), _) => 
+    case Node(s, "tensor_add",  List(a:Exp,b:Exp), _) =>
       val (a1,b1) = (Tensor(transform(a)), Tensor(transform(b)))
       val shape = same_shape(a1.shape, b1.shape)
       Tensor(shape)(is => a1(is) + b1(is)).x
@@ -105,17 +105,17 @@ abstract class TensorFusionV extends Transformer {
   // NOTE: fuse _all_ tensors expressions vertically
   // (produce/consume) if possible. This is quite likely overzealous.
   override def transform(n: Node): Exp = n match {
-    case Node(s, "tensor", List(sh:Exp, f:Block), _) => 
+    case Node(s, "tensor", List(sh:Exp, f:Block), _) =>
       tensors(s) = n
       super.transform(n)
-    case Node(s, "tensor_apply", List(a:Sym,b:Exp), _) if tensors contains a => 
+    case Node(s, "tensor_apply", List(a:Sym,b:Exp), _) if tensors contains a =>
       val Node(_, _, List(sh:Exp, f @ Block(arg::Nil, res, block, eff)), _) = tensors(a)
       if (subst contains arg) println(s"Warning: already have a subst for $arg")
-      try { 
+      try {
         subst(arg) = transform(b)
         traverse(f)
         transform(res)
-      } finally subst -= arg 
+      } finally subst -= arg
     case _ => super.transform(n)
   }
 }
@@ -158,30 +158,30 @@ abstract class TensorFusionH extends Transformer {
       val hereSyms = ns.map(_.n).toSet
       var loopsReached = false
 
-      // XXX FIXME: there are some bad performance issues here (g.nodes.find) 
+      // XXX FIXME: there are some bad performance issues here (g.nodes.find)
       // and the traversal algorithm is also too simple (need actual top-sort)
       def visit(s: Exp): Unit = s match {
-        case s: Sym if !loopSyms(s) && !reach(s) => 
+        case s: Sym if !loopSyms(s) && !reach(s) =>
           // we reached a normal statement. mark it,
           // process children, then emit transformed statement
           reach += s
-          g.nodes.find(_.n == s).foreach { n => 
+          g.nodes.find(_.n == s).foreach { n =>
             syms(n).foreach(visit)
             if (hereSyms(n.n))
               traverse(n)
           }
-        case s: Sym if loopSyms(s) && !loopsReached => 
+        case s: Sym if loopSyms(s) && !loopsReached =>
           // we reached the fused loops
           loopsReached = true
           for (s <- loopSyms) {
-            g.nodes.find(_.n == s).foreach { n => 
+            g.nodes.find(_.n == s).foreach { n =>
               syms(n).foreach(visit)
             }
           }
-          // emit the fused body ... 
+          // emit the fused body ...
           val loopResPos = new mutable.HashMap[Sym,Int] // local cse on loop results
           val buf = new mutable.ListBuffer[(String,Exp)]
-          val newBody = this.g.reify { e => 
+          val newBody = this.g.reify { e =>
             for ((Node(s,op,List(sh:Exp,b@Block(arg::Nil, res, block, eff)), _),i) <- loops.zipWithIndex) yield {
               assert(transform(sh) == shape, "ERROR: fused loop shapes don't match (TODO!)")
               subst(arg) = e
@@ -217,10 +217,10 @@ abstract class TensorFusionH extends Transformer {
 
 
   override def transform(n: Node): Exp = n match {
-    case Node(s, "tensor", List(sh:Exp, f:Block), _) => 
+    case Node(s, "tensor", List(sh:Exp, f:Block), _) =>
       tensors(s) = n
       super.transform(n)
-    case Node(s, "tensor_apply", List(a:Sym,b:Exp), _) if tensors contains a => 
+    case Node(s, "tensor_apply", List(a:Sym,b:Exp), _) if tensors contains a =>
       val Node(_, _, List(sh:Exp, f @ Block(arg::Nil, res, block, eff)), _) = tensors(a)
       subst(arg) = b
       traverse(f)
@@ -241,7 +241,7 @@ abstract class MultiLoopLowering extends Transformer {
   }
 
   override def transform(n: Node): Exp = n match {
-    case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block), _) => 
+    case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block), _) =>
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
 
@@ -271,7 +271,7 @@ abstract class MultiLoopLowering extends Transformer {
 
       def forloop(sz: INT)(f: INT => Unit) = {
         val loopVar = VAR(0)
-        WHILE (loopVar() !== sz) { 
+        WHILE (loopVar() !== sz) {
           f(loopVar())
           loopVar() = loopVar() + 1
         }
@@ -282,7 +282,7 @@ abstract class MultiLoopLowering extends Transformer {
         case s::sz => forloop(s) { i => forloops(sz) { is => f(i::is) } }
       }
 
-      forloops(shape) { e => 
+      forloops(shape) { e =>
         subst(f.in.head) = SEQ(e:_*).x
         traverse(f)
         val resTuple = transform(f.res)
@@ -296,7 +296,7 @@ abstract class MultiLoopLowering extends Transformer {
 
       g.reflect("seq", res:_*)
 
-    case Node(s, "multiloop", _, _) => 
+    case Node(s, "multiloop", _, _) =>
       println("TODO: implement lowering for multiloop shape "+n)
       super.transform(n)
     case _ => super.transform(n)
@@ -313,7 +313,7 @@ abstract class MultiLoopBuilderLowering extends Transformer {
   }
 
   override def transform(n: Node): Exp = n match {
-    case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block), _) => 
+    case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block), _) =>
       class Builder(op: String) { // TODO: proper subclasses?
         val state = g.reflectEffect(op+"_builder_new", sh)(STORE)
         def +=(i: SEQ, x: INT) = g.reflectEffect(op+"_builder_add", state, i.x, x.x)(state)
@@ -327,7 +327,7 @@ abstract class MultiLoopBuilderLowering extends Transformer {
         g.reflectEffect("foreach", sh, b)(g.getEffKeys(b):_*)
       }
 
-      foreach(SEQ(sh)) { e => 
+      foreach(SEQ(sh)) { e =>
         subst(f.in.head) = e.x
         traverse(f)
         val resTuple = transform(f.res)
@@ -340,7 +340,7 @@ abstract class MultiLoopBuilderLowering extends Transformer {
       val res = builders map (_.result())
       g.reflect("seq", res:_*)
 
-    case Node(s, "multiloop", _, _) => 
+    case Node(s, "multiloop", _, _) =>
       println("TODO: implement lowering for multiloop shape "+n)
       super.transform(n)
     case _ => super.transform(n)
@@ -359,7 +359,7 @@ abstract class MultiDimForeachLowering extends Transformer {
 
   override def transform(n: Node): Exp = n match {
 
-    case Node(s, "foreach", List(sh: Exp, f:Block), _) => 
+    case Node(s, "foreach", List(sh: Exp, f:Block), _) =>
 
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
@@ -374,7 +374,7 @@ abstract class MultiDimForeachLowering extends Transformer {
         case s::sz => foreach(s) { i => forloops(sz) { is => f(i::is) } }
       }
 
-      forloops(shape) { e => 
+      forloops(shape) { e =>
         subst(f.in.head) = SEQ(e:_*).x
         traverse(f)
         transform(f.res)
@@ -382,18 +382,18 @@ abstract class MultiDimForeachLowering extends Transformer {
 
       Const(())
 
-    case Node(s, "foreach", _, _) => 
+    case Node(s, "foreach", _, _) =>
       println("TODO: implement lowering for multiloop shape "+n)
       super.transform(n)
 
 
-    case Node(s, "tensor_builder_new", List(sh: Exp), _) => 
+    case Node(s, "tensor_builder_new", List(sh: Exp), _) =>
       builders(s) = n
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
       g.reflectEffect("array_new", shape.reduce(_*_).x)(STORE)
 
-    case Node(s, "tensor_builder_add", List(builder: Sym, i: Exp, x: Exp), _) => 
+    case Node(s, "tensor_builder_add", List(builder: Sym, i: Exp, x: Exp), _) =>
       val (Node(s, "tensor_builder_new", List(sh0: Exp), _)) = builders(builder)
       val sh = transform(sh0) // TODO: tensor_builder_shape
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
@@ -405,7 +405,7 @@ abstract class MultiDimForeachLowering extends Transformer {
       }
       g.reflectEffect("array_set", transform(builder), linearize(shape,idx).x, x)(transform(builder))
 
-    case Node(s, "tensor_builder_get", List(builder: Sym), _) => 
+    case Node(s, "tensor_builder_get", List(builder: Sym), _) =>
       val (Node(s, "tensor_builder_new", List(sh: Exp), _)) = builders(builder)
       transform(builder)
 
@@ -468,7 +468,7 @@ class TensorTest extends TutorialFunSuite {
           }
 
           val className = mkClassName(name)
-          s"def ${className}($arg: Int): Int$efs = {\n $src\n }"
+          s"def ${className}($arg: Int): Int$efs = $src"
         }
 
         println("// Initial code:")
@@ -557,13 +557,13 @@ class TensorTest extends TutorialFunSuite {
     val constant = Tensor(100) { i => 1 }
     val linear   = Tensor(100) { i => 2*i(0) }
     val affine   = Tensor(100) { i => constant(i) + linear(i) }
-    
+
     def square(x: INT)      = x*x
     def mean(x: Tensor)     = Sum(x.shape) { i => x(i) } / x.shape(0)
     def variance(x: Tensor) = Sum(x.shape) { i => square(x(i)) } / x.shape(0) - square(mean(x))
-    
+
     val data = affine
-    
+
     val m = mean(data)
     val v = variance(data)
 
