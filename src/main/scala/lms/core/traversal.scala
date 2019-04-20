@@ -3,6 +3,7 @@ package lms.core
 import scala.collection.mutable
 
 import Backend._
+import stub.Adapter
 
 abstract class Traverser {
 
@@ -208,7 +209,8 @@ class CompactTraverser extends Traverser {
     shouldInline = { (n: Sym) =>
       if ((df contains n) &&              // locally defined
           (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
-          (!hmi(n)))                      // not used in nested scopes
+          (!hmi(n)) &&                    // not used in nested scopes
+          Adapter.forwardMap.get(n).map(hmi(_)) != Some(true)) // if n is a lambda, n-forward is not used in nested scopes
           Some(df(n))
       else None }
     // (shouldInline is protected by withScope)
