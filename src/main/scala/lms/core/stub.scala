@@ -31,12 +31,12 @@ object Adapter extends FrontEnd {
   var funTable: List[(Backend.Exp, Any)] = _
   var forwardMap: mutable.Map[lms.core.Backend.Sym, lms.core.Backend.Sym] = _
 
-  def emitCommon1(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) =
-    emitCommon(name, cg, verbose, alt, eff)(m1, m2)(g.reify(prog))
-  def emitCommon2(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: (Exp, Exp) => Exp) =
-    emitCommon(name, cg, verbose, alt, eff)(m1, m2)(g.reify(prog))
+  def emitCommon1(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) =
+    emitCommon(name, cg, stream, verbose, alt, eff)(m1, m2)(g.reify(prog))
+  def emitCommon2(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: (Exp, Exp) => Exp) =
+    emitCommon(name, cg, stream, verbose, alt, eff)(m1, m2)(g.reify(prog))
 
-  def emitCommon(name: String, cg: ExtendedCodeGen, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: => Block) = {
+  def emitCommon(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: => Block) = {
     typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
     funTable = Nil
     forwardMap = mutable.Map()
@@ -57,16 +57,17 @@ object Adapter extends FrontEnd {
       (new ExtendedScalaCodeGen)(g)
     } else ""
 
-    time("codegen") {
-      val btstrm = new java.io.ByteArrayOutputStream()
-      val stream = new java.io.PrintStream(btstrm)
+    time("codegen", saveToFile=true) {
+      // val btstrm = new java.io.ByteArrayOutputStream((4 << 10) << 10) // 4MB
+      // val stream = new java.io.PrintStream(btstrm)
 
       cg.typeMap = typeMap
       cg.stream = stream
 
       cg.emitAll(g,name)(m1,m2)
 
-      (btstrm.toString, cg.extractAllStatics)
+      // (btstrm.toString, cg.extractAllStatics)
+      cg.extractAllStatics
     }
   }
 
@@ -467,8 +468,8 @@ abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with Dsl
   def eval(x: A): B = f(x)
 
   lazy val (code, statics) = {
-    val source = new java.io.StringWriter()
-    val statics = codegen.emitSource(snippet, "Snippet", new java.io.PrintWriter(source))(manifestTyp[A],manifestTyp[B])
+    val source = new java.io.ByteArrayOutputStream()
+    val statics = codegen.emitSource(snippet, "Snippet", new java.io.PrintStream(source))(manifestTyp[A],manifestTyp[B])
     (source.toString, statics)
   }
 }
@@ -480,13 +481,13 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     val IR: q.type = q
   }
   lazy val (code, statics) = {
-    val source = new java.io.StringWriter()
-    val statics = codegen.emitSource[A,B](snippet _, "Snippet", new java.io.PrintWriter(source))
+    val source = new java.io.ByteArrayOutputStream()
+    val statics = codegen.emitSource[A,B](snippet _, "Snippet", new java.io.PrintStream(source))
     (source.toString, statics)
   }
   lazy val f: A => Unit = {
     // TBD: should read result of type B?
-    val out = new java.io.PrintWriter("/tmp/snippet.c")
+    val out = new java.io.PrintStream("/tmp/snippet.c")
     out.println(code)
     out.close
     (new java.io.File("/tmp/snippet")).delete
@@ -933,12 +934,12 @@ trait ScalaGenBase extends ExtendedScalaCodeGen {
   // def remap[A](m: Manifest[A]): String = ???
   // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Class[_], Any)] = {
-    val (src,statics) = Adapter.emitCommon1(className,this)(manifest[A],manifest[B])(x => Unwrap(f(Wrap[A](x))))
-    stream.println(src)
+  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
+    val statics = Adapter.emitCommon1(className,this,stream)(manifest[A],manifest[B])(x => Unwrap(f(Wrap[A](x))))
+    // stream.println(src)
     statics.toList
   }
-  def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintWriter): List[(Sym[Any], Any)] = ???
+  def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
 }
 trait CGenBase extends ExtendedCCodeGen {
   val IR: Base
@@ -946,12 +947,12 @@ trait CGenBase extends ExtendedCCodeGen {
   // def remap[A](m: Manifest[A]): String = ???
   // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintWriter): List[(Class[_], Any)] = {
-    val (src,statics) = Adapter.emitCommon1(className,this)(manifest[A],manifest[B])(x => Unwrap(f(Wrap[A](x))))
-    stream.println(src)
+  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
+    val statics = Adapter.emitCommon1(className,this,stream)(manifest[A],manifest[B])(x => Unwrap(f(Wrap[A](x))))
+    // stream.println(src)
     statics.toList
   }
-  def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintWriter): List[(Sym[Any], Any)] = ???
+  def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
 }
 
 // trait PrimitiveOps

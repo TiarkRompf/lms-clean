@@ -3,17 +3,23 @@ package lms.core
 import java.io._
 
 object utils {
-  def time[A](key: String)(a: => A) = {
+  val profilerMap = new scala.collection.mutable.HashMap[String, PrintStream]()
+  def time[A](key: String, saveToFile: Boolean = false, append: Boolean = false)(a: => A) = {
     val now = System.nanoTime
     val result = a
     val micros = (System.nanoTime - now) / 1000
+    if (saveToFile) {
+      val file = profilerMap.getOrElseUpdate(key, new PrintStream(new FileOutputStream(new File(s"$key.timing"), append)))
+      file.println(micros)
+      file.flush
+    }
     println(s"$key: $micros µs")
     result
   }
   def captureOut(func: => Any): String = {
     val source = new java.io.ByteArrayOutputStream()
     withOutput(new java.io.PrintStream(source))(func)
-    source.toString    
+    source.toString
   }
   def withOutput[T](out: PrintStream)(f: => Unit): Unit = {
     scala.Console.withOut(out)(scala.Console.withErr(out)(f))
