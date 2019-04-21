@@ -792,9 +792,10 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     val save1 = generateReturn
     currentPrec = prec
     generateReturn = genRet
-    f
-    currentPrec = save
-    generateReturn = save1
+    try f finally {
+      currentPrec = save
+      generateReturn = save1
+    }
   }
 
   /*
