@@ -48,6 +48,44 @@ class InliningTest extends TutorialFunSuite {
     })
   }
 
+  test("branch_blocks_interfer") {
+    val driver = new DslDriverC[Int,Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val res = arg - 4
+        val y = if (arg > 4) res * 3 else res * 4
+        printf("%d\n", y)
+      }
+    }
+    val src = driver.code
+    checkOut("branch_blocks_interfer", "c", {
+      println(src)
+      println("// output:")
+      driver.eval(7)
+      driver.eval(3)
+    })
+  }
+
+  test("cond_branch_blocks_interfer") {
+    val driver = new DslDriverC[Int,Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val res = arg - 4
+        val y = if (if (arg > 0) res > 0 else res < 3) res else res + 1
+        printf("%d\n", y)
+      }
+    }
+    val src = driver.code
+    checkOut("cond_branch_blocks_interfer", "c", {
+      println(src)
+      println("// output:")
+      driver.eval(7)
+      driver.eval(3)
+    })
+  }
+
   test("recursion_1") {
     val driver = new DslDriver[Int,Int] {
 
