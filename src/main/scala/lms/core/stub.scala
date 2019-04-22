@@ -29,7 +29,6 @@ object Adapter extends FrontEnd {
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
-  var forwardMap: mutable.Map[lms.core.Backend.Sym, lms.core.Backend.Sym] = _
 
   def emitCommon1(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) =
     emitCommon(name, cg, stream, verbose, alt, eff)(m1, m2)(g.reify(prog))
@@ -39,7 +38,6 @@ object Adapter extends FrontEnd {
   def emitCommon(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: => Block) = {
     typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
     funTable = Nil
-    forwardMap = mutable.Map()
 
     var g = time("staging") { program(prog) }
 
@@ -699,7 +697,6 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
         val fn1 = Backend.Sym(Adapter.g.fresh)
         Adapter.g.reflect(fn, "λforward", fn1)()()
-        Adapter.forwardMap(fn1) = fn
         //val xn = Sym(g.fresh)
         //val f1 = (x: INT) => APP(fn,x)
         // NOTE: lambda expression itself does not have

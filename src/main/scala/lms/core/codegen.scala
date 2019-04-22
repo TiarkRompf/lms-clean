@@ -686,7 +686,6 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
 
   // val dce = new DeadCodeElim
   doRename = true
-  val forwardMap = new scala.collection.mutable.HashMap[Sym,Def]()
 
   override def quote(x: Def) = x match {
     case Const(s: String) => "\""+s.replace("\"", "\\\"").replace("\n","\\n").replace("\t","\\t")+"\"" // TODO: more escapes?
@@ -695,7 +694,6 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case Const(x) if x.isInstanceOf[Char] && x == 0    => "'\\0'"
     case Const(x) if x.isInstanceOf[Long] => x.toString + "L"
     case Const(x: List[_]) => "{" + x.mkString(", ") + "}" // translate a Scala List literal to C List literal
-    case a: Sym if forwardMap.contains(a) => quote(forwardMap(a))
     case _ => super.quote(x)
   }
 
@@ -1143,7 +1141,9 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emitln(";\n//# " + str)
     case n @ Node(s, "λforward", List(y), _) =>
       emitln("//# lambda forward is here!")
-      forwardMap(s) = y // for this case, adding (f, y) in forwardMap is all we need
+      // for this case, adding (f, y) in forwardMap is all we need
+      // XXX: this is most likely not enough in the general case
+      rename(s) = quote(y)
     case n @ Node(s, "λtop", List(block@Block(args, res, _, _)), _) => ??? // shouldn't be possible in C
     case n @ Node(s, "timestamp", _, _) =>
       registerHeader("<sys/time.h>")

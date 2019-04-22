@@ -3,7 +3,6 @@ package lms.core
 import scala.collection.mutable
 
 import Backend._
-import stub.Adapter
 
 abstract class Traverser {
 
@@ -182,8 +181,8 @@ class CompactTraverser extends Traverser {
       hmi ++= syms(n)
     }
     for (n <- ns) {
-      hmi ++= blocks(n).collect { case Block(_,res:Sym,_,_) => res }
-    }
+      hmi ++= filterSym(blocks(n).map(_.res)) // block results count as inner
+    }                                         // syms(n) -- directSyms(n)
 
     // ----- forward pass -----
 
@@ -200,12 +199,19 @@ class CompactTraverser extends Traverser {
     if (y.res.isInstanceOf[Sym]) hm(y.res.asInstanceOf[Sym]) = 1
     for (n <- ns) {
       df(n.n) = n
-      for (s <- directSyms(n) if df.contains(s) || n.op == "λforward") {// do not count refs through blocks or effects
+      for (s <- directSyms(n) if df.contains(s) || n.op == "λforward") // do not count refs through blocks or effects
         hm(s) = hm.getOrElse(s,0) + 1                                  // NOTE: λforward is to deal with recursive defs
-      }
       for (s <- syms(n) if df.contains(s))
         succ(s) = n.n::succ.getOrElse(s,Nil)
     }
+
+    // NOTE: Recursive lambdas cannot be inlined. To ensure this
+    // behavior, we count λforward as additional ref to the lambda
+    // in the _current_ scope. There must be at least one non-recursive
+    // ref to the lambda: if it is also in the current scope the hm
+    // count reaches 2, if it is in an inner scope it is accounted
+    // for in hmi. Either case will prevent inlining.
+    // An alternative would be to count λforward in hmi.
 
     val dis = new mutable.HashSet[Sym]
 
@@ -213,8 +219,7 @@ class CompactTraverser extends Traverser {
     shouldInline = { (n: Sym) =>
       if ((df contains n) &&              // locally defined
           (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
-          (!hmi(n)) &&                    // not used in nested scopes
-          Adapter.forwardMap.get(n).map(hmi(_)) != Some(true)) // if n is a lambda, n-forward is not used in nested scopes
+          (!hmi(n)))                      // not used in nested scopes
           Some(df(n))
       else None }
     // (shouldInline is protected by withScope)
