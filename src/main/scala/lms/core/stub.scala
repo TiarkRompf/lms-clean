@@ -744,7 +744,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   // ImplicitOps
-  def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
+  // TR: I'm concerned about this because it is overly general -- it doesn't appear to be used anyways?
+  // def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
 
   // MiscOps
   def exit(res: Rep[Int]): Unit = Adapter.g.reflectEffect("exit", Unwrap(res))(Adapter.CTRL)
