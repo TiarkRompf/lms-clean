@@ -115,7 +115,7 @@ class InliningTest extends TutorialFunSuite {
       }
     }
     val src = driver.code
-    // driver.precompile
+    driver.precompile
     checkOut("recursion_3", "scala", {
       println(src)
       println("// output:")

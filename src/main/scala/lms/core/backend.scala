@@ -313,17 +313,35 @@ class Bound extends Phase {
   def apply(g: Graph): Graph = {
     val bound = g.nodes.flatMap(boundSyms).toSet ++ g.block.bound
 
-    // for recursive syms, we don't want to force
+    // For recursive syms, we don't want to force
     // non-recursive deps into nested scopes
-    for (Node(b,"λ",_,_) <- g.nodes)
-      hm(b) = Set()
+    // for (Node(b,"λ",_,_) <- g.nodes)
+    //   hm(b) = Set()
+    //
+    // This explicit initialization was previously needed
+    // since we used hm.getOrElse(a,Set(a)) as default below
+    // (there is a choice whether undefined symbols should be
+    // treated as bound or not -- this case is typically only
+    // encountered for recursive lambda refs).
 
     for (b <- bound)
       hm(b) = Set(b)
 
-    for (d <- g.nodes) {
-      val b = boundSyms(d).toSet - d.n
-      hm(d.n) = syms(d).flatMap(a => hm.getOrElse(a,Set(a))).toSet -- b
+    // Convergence loop: we want to make sure that recursive
+    // refs via λforward nodes acquire the same bound information
+    // as the lambda itself (which comes later in the list) and
+    // hence get scheduled into the same block (see recursion_3 test).
+
+    var more = true
+    while (more) {
+      more = false
+
+      for (d <- g.nodes) {
+        val b = boundSyms(d).toSet - d.n
+        val newSyms = syms(d).flatMap(a => hm.getOrElse(a,Set())).toSet -- b
+        more ||= (d.op == "λforward" && hm.get(d.n) != Some(newSyms))
+        hm(d.n) = newSyms
+      }
     }
 
     //hm.foreach(println)
