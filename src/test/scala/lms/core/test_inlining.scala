@@ -96,4 +96,32 @@ class InliningTest extends TutorialFunSuite {
       driver.eval(5)
     })
   }
+
+  test("recursion_3") {
+    val driver = new DslDriver[Int,Unit] {
+
+      @virtualize
+      def snippet(a: Rep[Int]) = {
+        var i = 0
+        while (i < 10) {
+          var j = i
+          lazy val f: Rep[Int => Int] = fun { (x: Rep[Int]) =>
+            if (x > 0) j * f(x - a)
+            else 1
+          }
+          f(i)
+          i = i + 1
+        }
+      }
+    }
+    val src = driver.code
+    // driver.precompile
+    checkOut("recursion_3", "scala", {
+      println(src)
+      println("// output:")
+      driver.eval(4)
+      driver.eval(5)
+    })
+  }
+
 }
