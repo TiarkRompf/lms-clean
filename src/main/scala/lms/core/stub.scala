@@ -452,6 +452,7 @@ trait DslGenC extends CGenBase with CGenNumericOps
 
 // @virtualize
 abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
+  def wrapper(x: Rep[A]): Rep[B] = snippet(x)
   def snippet(x: Rep[A]): Rep[B]
 }
 
@@ -467,7 +468,7 @@ abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with Dsl
 
   lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
-    val statics = codegen.emitSource(snippet, "Snippet", new java.io.PrintStream(source))(manifestTyp[A],manifestTyp[B])
+    val statics = codegen.emitSource(wrapper, "Snippet", new java.io.PrintStream(source))(manifestTyp[A],manifestTyp[B])
     (source.toString, statics)
   }
 }
@@ -480,7 +481,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
   }
   lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
-    val statics = codegen.emitSource[A,B](snippet _, "Snippet", new java.io.PrintStream(source))
+    val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
     (source.toString, statics)
   }
   lazy val f: A => Unit = {
