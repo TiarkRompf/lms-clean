@@ -859,6 +859,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def apply(i: Rep[Int]): Rep[Char] = charAt(i)
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.length", Unwrap(lhs)))
     def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.toInt", Unwrap(lhs))) // XXX: may fail!
+    def toDouble: Rep[Double] = Wrap[Double](Adapter.g.reflect("String.toDouble", Unwrap(lhs))) // XXX: may fail!
   }
 
   // UncheckedOps
@@ -1151,6 +1152,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   implicit def varToPrimitiveMathOpsDoubleOpsCls(x: Var[Double])(implicit __pos: SourceContext) = new PrimitiveMathOpsDoubleOpsCls(readVar(x))(__pos)
 
   class PrimitiveMathOpsDoubleOpsCls(val self: Rep[Double])(implicit __pos: SourceContext) {
+    def unary_- = Wrap[Double](Adapter.g.reflect("-", Unwrap(self)))
+
     def +(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded9) = { double_plus(self, unit(rhs)) }
     def -(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded9) = { double_minus(self, unit(rhs)) }
     def *(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded9) = { double_times(self, unit(rhs)) }
@@ -1277,6 +1280,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   implicit def varToPrimitiveMathOpsIntOpsCls(x: Var[Int])(implicit __pos: SourceContext) = new PrimitiveMathOpsIntOpsCls(readVar(x))(__pos)
 
   class PrimitiveMathOpsIntOpsCls(val self: Rep[Int])(implicit __pos: SourceContext) {
+    def unary_- = Wrap[Int](Adapter.g.reflect("-", Unwrap(self)))
+
     def +(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded73) = { double_plus(self.toDouble, unit(rhs)) }
     def -(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded73) = { double_minus(self.toDouble, unit(rhs)) }
     def *(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded73) = { double_times(self.toDouble, unit(rhs)) }
@@ -1689,9 +1694,9 @@ trait PrimitiveOps extends Base with OverloadHack {
   def int_to_long(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Long] =
     Wrap[Long](Adapter.g.reflect("cast", Unwrap(lhs)))
   def int_to_float(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Float] =
-    Wrap[Float](Adapter.g.reflect("Int.toFloat", Unwrap(lhs)))
+    Wrap[Float](Adapter.g.reflect("cast", Unwrap(lhs)))
   def int_to_char(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Char] =
-    Wrap[Char](Adapter.g.reflect("Int.toChar", Unwrap(lhs)))
+    Wrap[Char](Adapter.g.reflect("cast", Unwrap(lhs)))
   def int_to_double(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Double] =
     Wrap[Double](Adapter.g.reflect("cast", Unwrap(lhs)))
   def int_leftshift(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
@@ -1819,5 +1824,5 @@ trait PrimitiveOps extends Base with OverloadHack {
   def long_to_float(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Float] =
     Wrap[Float](Adapter.g.reflect("cast", Unwrap(lhs)))
   def long_to_double(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Double] =
-    Wrap[Int](Adapter.g.reflect("cast", Unwrap(lhs)))
+    Wrap[Double](Adapter.g.reflect("cast", Unwrap(lhs)))
 }

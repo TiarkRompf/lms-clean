@@ -896,6 +896,8 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
     case n @ Node(s, op,List(x,y),_) if binop(op) => // associativity??
       shallow1(x, precedence(op)); emit(" "); emit(op); emit(" "); shallow1(y, precedence(op)+1)
+    case n @ Node(s, op,List(x),_) if unaryop(op) => // associativity??
+      emit(op); shallow1(x, unaryPrecedence(op))
     case n @ Node(s,"Boolean.!",List(a),_) =>
       emit("!"); shallow1(a, unaryPrecedence("!"))
     case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
@@ -912,6 +914,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
       registerHeader("<string.h>")
       (op.substring(7), args) match {
         case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
+        case ("toDouble", List(rhs)) => emit("atof("); shallow(rhs); emit(")")
         case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
       }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
@@ -1016,10 +1019,27 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     // else
       // emit(s"$rhs;")
   }
+
+  def compatibleType(m: Manifest[_], n: Manifest[_]) = {
+    m == manifest[Char] && (n == manifest[Long] || n == manifest[Int] || n == manifest[Short]) || m == manifest[Short] && (n == manifest[Long] || n == manifest[Int]) || m == manifest[Int] && n == manifest[Long]
+    // || m == manifest[Float] && n == manifest[Double]
+  }
+
+  def convert[T:Manifest](x: Any): T = x.asInstanceOf[T]
+
   override def shallow(n: Node): Unit = n match {
-    case Node(s, "cast", List(a), _) => // FIXME
-      val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
-      emit(s"($tpe)"); shallow1(a)
+    case Node(s, "cast", List(a), _) =>
+      val tpe = typeMap.getOrElse(s, manifest[Unknown])
+      a match {// FIXME should it be there?
+        case Const(n) =>
+          emit(quote(Const(convert(n)(tpe))))
+        case v@Sym(_) if compatibleType(typeMap.getOrElse(v, manifest[Unknown]), tpe) =>
+          shallow(a)
+        case b@Block(_, res, _, _) if compatibleType(typeMap.getOrElse(res, manifest[Unknown]), tpe) =>
+          shallow(a)
+        case _ =>
+          emit(s"(${remap(tpe)})"); shallow1(a)
+      }
     case Node(s,"String.charAt",List(a,i),_) =>
       shallow1(a); emit("["); shallow(i); emit("]")
     case Node(s,"array_get",List(a,i),_) =>
