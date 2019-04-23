@@ -55,7 +55,7 @@ object Adapter extends FrontEnd {
       (new ExtendedScalaCodeGen)(g)
     } else ""
 
-    time("codegen", saveToFile=true) {
+    time("codegen") {
       // val btstrm = new java.io.ByteArrayOutputStream((4 << 10) << 10) // 4MB
       // val stream = new java.io.PrintStream(btstrm)
 
@@ -458,13 +458,13 @@ abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
 
 // @virtualize
 abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl with CompileScala {
-  lazy val f = time("scalac") { Global.sc.compile[A,B]("Snippet", code, statics) }
+  lazy val f = { val (c1,s1) = (code,statics); time("scalac") { Global.sc.compile[A,B]("Snippet", c1, s1) }}
 
   def precompile: Unit = f
 
   def precompileSilently: Unit = utils.devnull(f)
 
-  def eval(x: A): B = f(x)
+  def eval(x: A): B = { val f1 = f; time("eval")(f1(x)) }
 
   lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
@@ -491,11 +491,10 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     out.close
     (new java.io.File("/tmp/snippet")).delete
     import scala.sys.process._
-    // TODO: would like to use time("cc") { .. }, but messes with captureOut
-    (s"cc -std=c99 -O3 /tmp/snippet.c -o /tmp/snippet": ProcessBuilder).lines.foreach(Console.println _)
+    time("gcc") { (s"cc -std=c99 -O3 /tmp/snippet.c -o /tmp/snippet": ProcessBuilder).lines.foreach(Console.println _) }
     (a: A) => (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
   }
-  def eval(a: A): Unit = f(a)
+  def eval(a: A): Unit = { val f1 = f; time("eval")(f1(a)) }
 }
 
 // STUB CODE

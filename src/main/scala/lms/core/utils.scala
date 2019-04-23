@@ -3,18 +3,27 @@ package lms.core
 import java.io._
 
 object utils {
-  val profilerMap = new scala.collection.mutable.HashMap[String, PrintStream]()
-  def time[A](key: String, saveToFile: Boolean = false, append: Boolean = false)(a: => A) = {
-    val now = System.nanoTime
-    val result = a
-    val micros = (System.nanoTime - now) / 1000
-    if (saveToFile) {
-      val file = profilerMap.getOrElseUpdate(key, new PrintStream(new FileOutputStream(new File(s"$key.timing"), append)))
-      file.println(micros)
-      file.flush
+  lazy val profileStream = new PrintStream(new FileOutputStream(new File(s"timing.log")))
+  lazy val profileInvStream = new PrintStream(new FileOutputStream(new File(s"timingInv.log")))
+  var scope = List[String]()
+  var timeInSub = 0L
+
+  def time[A](key: String)(a: => A) = {
+    val start = System.nanoTime
+    val saveTime = timeInSub
+    scope = key::scope
+    timeInSub = 0
+    try a finally { 
+      val timeElapsed = (System.nanoTime - start) / 1000
+      val timeHere = timeElapsed - timeInSub
+
+      profileStream.println(s"${scope.reverse.mkString(";")} $timeHere")
+      profileInvStream.println(s"${scope.mkString(";")} $timeHere")
+
+      scope = scope.tail; 
+      timeInSub = saveTime
+      timeInSub += timeElapsed // account for time spent here in parent
     }
-    println(s"$key: $micros µs")
-    result
   }
   def captureOut(func: => Any): String = {
     val source = new java.io.ByteArrayOutputStream()

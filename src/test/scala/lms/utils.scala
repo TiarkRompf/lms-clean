@@ -14,6 +14,9 @@ trait TutorialFunSuite extends LibSuite {
 
   val prefix = "src/out/"
   val under: String
+  override protected def test(testName: String,testTags: org.scalatest.Tag*)(testFun: => Any)(implicit pos: org.scalactic.source.Position): Unit = {
+    super.test(testName,testTags:_*)(utils.time(testName)(testFun))(pos)
+  }
   def readFile(name: String): String = {
     try {
       val buf = new Array[Byte](new File(name).length().toInt)
@@ -91,7 +94,7 @@ trait TutorialFunSuite extends LibSuite {
         indent += (open - close)
       }
     }
-    //assert (indent==0, "indentation sanity check")
+    assert (indent==0, "indentation sanity check")
   }
 
   def exec(label: String, code: String, suffix: String = "scala") = {
