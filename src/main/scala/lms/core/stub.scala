@@ -722,6 +722,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     }
   }
   // Top-Level Functions
+  // XXX: is this data structure needed? should it move elsewhere?
+  // could we use funTable instead?
   val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Exp]()
   def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
     val can = canonicalize(f)
@@ -764,6 +766,14 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def printf(f: String, x: Rep[Any]*): Unit = {
     Adapter.g.reflectEffect("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
   }
+
+  // TimingOps
+  def timeGeneratedCode[A: Manifest](f: => Rep[A], msg: Rep[String] = unit("")): Rep[A] = {
+    val ff = Adapter.g.reify(Unwrap(f))
+    Wrap[A](Adapter.g.reflectEffect("timeGenerated", Unwrap(msg), ff)(Adapter.g.getEffKeys(ff):_*))
+  }
+  def timestamp: Rep[Long] = Wrap[Long](Adapter.g.reflectEffect("timestamp")(Adapter.CTRL))
+
 
   // case class GenerateComment(l: String) extends Def[Unit]
   // case class Comment[A:Manifest](l: String, verbose: Boolean, b: Block[A]) extends Def[A]
@@ -989,6 +999,7 @@ trait Variables
 trait ObjectOps
 // trait UtilOps
 trait UncheckedOps
+trait Timing
 
 trait PrimitiveOpsExpOpt
 trait NumericOpsExpOpt
