@@ -456,8 +456,15 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
   var recursive = false
 
   // process and print block results
+  var blockHeader = ""
+  var currentPrec: Option[Int] = None // FIXME: currently used for the wrong purpose
+                                      // Some(_) force. Avoid too much change for now... :'(
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
-    // if (numStms > 0) emit("{\n")
+    if (!currentPrec.isEmpty) { // || numStms > 0) {
+      emit("{ "); emitln(blockHeader)
+    } else {
+      emit(blockHeader)
+    }
 
     // Are there any forward nodes? if yes, declare all variables before
     // assigning initial values to avoid "forward reference extends
@@ -476,14 +483,22 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
     if (y.res != Const(())) {
       shallow(y.res); emitln()
     }
-    // if (numStms > 0) emit("\n}")
+    if (!currentPrec.isEmpty) // || numStms > 0) {
+      emit("}")
+
     recursive = save
   }
 
-  def quoteBlockp(x: => Unit) {
-    emitln("{")
-    x
-    emit("}")
+  def quoteBlockp(header: String)(f: => Unit): Unit = quoteBlockHelper(header, Some(0))(f)
+  def quoteBlockp(x: => Unit) = quoteBlockHelper("", Some(0))(x) // force parenthesis to be coherent with previous implementation
+  def quoteBlockHelper(header: String, prec: Option[Int])(f: => Unit) = {
+    val save = blockHeader
+    val save1 = currentPrec
+    blockHeader = header
+    currentPrec = prec
+    f
+    blockHeader = save
+    currentPrec = save1
   }
 
   def shallow(n: Def): Unit = n match {
@@ -508,7 +523,8 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
       // as a separate phase b/c it may trigger
       // further optimizations
       // quoteBlock1(y, true)
-      quoteBlockp(traverse(y))
+      val argsTyped = (y.in map { arg => s"${quote(arg)}: ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" } mkString("(", ",", ")")) + " =>"
+      quoteBlockp(argsTyped)(traverse(y))
     case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) =>
       shallow1(c); emit(" && "); shallow1(a)
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
@@ -537,17 +553,17 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
     }
     case n @ Node(s,"P",List(x),_) =>
       emit("println"); emit("("); shallow(x); emit(")")
-    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
-      quoteBlockp {
-        emitln("//#" + str)
-        if (verbose) {
-          emitln("// generated code for " + str.replace('_', ' '))
-        } else {
-          emitln("// generated code")
-        }
-        traverse(b)
-        emitln("//#" + str)
+    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) => ??? // Comment shouldn't be inlined
+      emitln("//# " + str)
+      if (verbose) {
+        emitln("// generated code for " + str.replace('_', ' '))
+      } else {
+        emitln("// generated code")
       }
+      quoteBlockp {
+        traverse(b)
+      }
+      emitln("\n//# " + str)
 
     case n @ Node(s,"Boolean.!",List(a),_) =>
       emit("!"); shallow1(a)
@@ -623,6 +639,20 @@ class ExtendedScalaCodeGen extends ExtendedCodeGen {
 
     case n @ Node(s,"generate-comment",List(Const(x)),_) =>
       emit("// "); emitln(x.toString)
+
+    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
+      emitln("//# " + str)
+      if (verbose) {
+        emitln("// generated code for " + str.replace('_', ' '))
+      } else {
+        emitln("// generated code")
+      }
+      if (dce.live(s)) {
+        emit("val "); emit(quote(s)); emit(" = "); quoteBlockp(traverse(b))
+      } else {
+        traverse(b)
+      }
+      emitln("\n//# " + str)
 
     case n @ Node(s,"var_new",List(x),_) =>
       /*if (dce.live(s))*/
