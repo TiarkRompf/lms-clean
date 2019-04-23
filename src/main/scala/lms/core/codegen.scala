@@ -1071,14 +1071,11 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     // || m == manifest[Float] && n == manifest[Double]
   }
 
-  def convert[T:Manifest](x: Any): T = x.asInstanceOf[T]
-
   override def shallow(n: Node): Unit = n match {
     case Node(s, "cast", List(a), _) =>
       val tpe = typeMap.getOrElse(s, manifest[Unknown])
       a match {// FIXME should it be there?
-        case Const(n) =>
-          emit(quote(Const(convert(n)(tpe))))
+        case Const(n) => ??? // Constant cast should be resolved before
         case v@Sym(_) if compatibleType(typeMap.getOrElse(v, manifest[Unknown]), tpe) =>
           shallow(a)
         case b@Block(_, res, _, _) if compatibleType(typeMap.getOrElse(res, manifest[Unknown]), tpe) =>

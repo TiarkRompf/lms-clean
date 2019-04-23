@@ -1521,12 +1521,17 @@ trait PrimitiveOps extends Base with OverloadHack {
   def double_sqrt(rhs: Rep[Double])(implicit pos: SourceContext): Rep[Double] =
     Wrap[Double]((Adapter.INT(Unwrap(rhs)).sqrt()).x)
 
-  def double_to_int(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Int] =
-    Wrap[Int](Adapter.g.reflect("cast", Unwrap(lhs)))
-  def double_to_float(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Float] =
-    Wrap[Float](Adapter.g.reflect("cast", Unwrap(lhs)))
-  def double_to_long(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Long] =
-    Wrap[Long](Adapter.g.reflect("cast", Unwrap(lhs)))
+  def cast_helper[X,Y](x: Rep[X])(implicit c: X => Y, mX: Manifest[X], mY: Manifest[Y], pos: SourceContext) : Rep[Y] = x match {
+    case Wrap(Backend.Const(x: X)) => Wrap[Y](Backend.Const(c(x)))
+    case _ => Wrap[Y](Adapter.g.reflect("cast", Unwrap(x)))
+  }
+
+  implicit def doubleToInt(x: Double) = x.toInt
+  implicit def doubleToFloat(x: Double) = x.toFloat
+  implicit def doubleToLong(x: Double) = x.toLong
+  def double_to_int(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Int] = cast_helper[Double,Int](lhs)
+  def double_to_float(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Float] = cast_helper[Double,Float](lhs)
+  def double_to_long(lhs: Rep[Double])(implicit pos: SourceContext): Rep[Long] = cast_helper[Double,Long](lhs)
 
 
   /**
@@ -1605,10 +1610,9 @@ trait PrimitiveOps extends Base with OverloadHack {
   def float_abs(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Float] =
     Wrap[Float](Adapter.INT(Unwrap(lhs)).abs().x)
 
-  def float_to_int(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Int] =
-    Wrap[Int](Adapter.g.reflect("cast", Unwrap(lhs)))
-  def float_to_double(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Double] =
-    Wrap[Double](Adapter.g.reflect("cast", Unwrap(lhs)))
+  implicit def floatToInt(x: Float) = x.toInt
+  def float_to_int(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Int] = cast_helper[Float,Int](lhs)
+  def float_to_double(lhs: Rep[Float])(implicit pos: SourceContext): Rep[Double] = cast_helper[Float,Double](lhs)
 
 
   /**
@@ -1712,14 +1716,11 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Int](Adapter.g.reflect("&", Unwrap(lhs), Unwrap(rhs)))
   def int_binaryxor(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_bitwise_not(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Int] = ???
-  def int_to_long(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Long] =
-    Wrap[Long](Adapter.g.reflect("cast", Unwrap(lhs)))
-  def int_to_float(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Float] =
-    Wrap[Float](Adapter.g.reflect("cast", Unwrap(lhs)))
-  def int_to_char(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Char] =
-    Wrap[Char](Adapter.g.reflect("cast", Unwrap(lhs)))
-  def int_to_double(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Double] =
-    Wrap[Double](Adapter.g.reflect("cast", Unwrap(lhs)))
+  def int_to_long(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Long] = cast_helper[Int,Long](lhs)
+  def int_to_float(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Float] = cast_helper[Int,Float](lhs)
+  implicit def intToChar(x: Int) = x.toChar
+  def int_to_char(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Char] = cast_helper[Int,Char](lhs)
+  def int_to_double(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Double] = cast_helper[Int,Double](lhs)
   def int_leftshift(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_rightshiftarith(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
   def int_rightshiftlogical(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
@@ -1735,11 +1736,8 @@ trait PrimitiveOps extends Base with OverloadHack {
     def toLong(implicit pos: SourceContext) = char_toLong(self)
   }
 
-  def char_toInt(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Int] =
-    Wrap[Int](Adapter.g.reflect("cast", Unwrap(lhs)))
-
-  def char_toLong(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Long] =
-    Wrap[Long](Adapter.g.reflect("cast", Unwrap(lhs)))
+  def char_toInt(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Int] = cast_helper[Char,Int](lhs)
+  def char_toLong(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Long] = cast_helper[Char,Long](lhs)
 
   /**
    * Long
@@ -1840,10 +1838,9 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Long](Adapter.g.reflect("<<", Unwrap(lhs), Unwrap(rhs)))
   def long_shiftright_signed(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
   def long_shiftright_unsigned(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
-  def long_to_int(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Int] =
-    Wrap[Int](Adapter.g.reflect("cast", Unwrap(lhs)))
-  def long_to_float(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Float] =
-    Wrap[Float](Adapter.g.reflect("cast", Unwrap(lhs)))
-  def long_to_double(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Double] =
-    Wrap[Double](Adapter.g.reflect("cast", Unwrap(lhs)))
+
+  implicit def longToInt(x: Long) = x.toInt
+  def long_to_int(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Int] = cast_helper[Long,Int](lhs)
+  def long_to_float(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Float] = cast_helper[Long,Float](lhs)
+  def long_to_double(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Double] = cast_helper[Long,Double](lhs)
 }
