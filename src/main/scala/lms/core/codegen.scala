@@ -1114,7 +1114,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     // static array
     case n @ Node(s, "Array" , xs,_) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"$tpe ${quote(s)}[${xs.length}] = { "); shallow(xs.head); xs.tail.foreach { emit(", "); shallow(_) }; emitln(");")
+      emit(s"$tpe ${quote(s)}[${xs.length}] = { "); shallow(xs.head); xs.tail.foreach(x => {emit(", "); shallow(x)}); emitln(" };")
 
     // DCE: FIXME:
     // (a) check that args have no side-effects
