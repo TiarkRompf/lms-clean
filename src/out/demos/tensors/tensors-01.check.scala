@@ -36,21 +36,18 @@ def tensors_01(x0: Int): Int = {
   val x2 = new Array[Int](60)
   var x3 = 0
   while (x3 != 3) {
-    val x4 = x3
-    var x5 = 0
-    val x6 = x4 * 20
-    while (x5 != 4) {
-      val x7 = x5
-      var x8 = 0
-      val x9 = x7 * 5
-      while (x8 != 5) {
-        val x10 = x8
-        val x11 = x6 + x9 + x10
-        x1(x11) = 2
-        x2(x11) = 3
-        x8 = x8 + 1
+    var x4 = 0
+    val x5 = x3 * 20
+    while (x4 != 4) {
+      var x6 = 0
+      val x7 = x4 * 5
+      while (x6 != 5) {
+        val x8 = x5 + x7 + x6
+        x1(x8) = 2
+        x2(x8) = 3
+        x6 = x6 + 1
       }
-      x5 = x5 + 1
+      x4 = x4 + 1
     }
     x3 = x3 + 1
   }
@@ -66,10 +63,8 @@ def tensors_01(x0: Int): Int = {
     tensor_builder_add(x1, x4, 2)
     tensor_builder_add(x2, x4, 3)
   })
-  val x7 = tensor_builder_get(x1)
-  val x8 = tensor_builder_get(x2)
-  println(x7)
-  println(x8)
+  println(tensor_builder_get(x1))
+  println(tensor_builder_get(x2))
   0
 }
 // After MultiDim foreach lowering:

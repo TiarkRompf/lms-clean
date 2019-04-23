@@ -86,6 +86,32 @@ class InliningTest extends TutorialFunSuite {
     })
   }
 
+  test("variable_inlining") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 0
+        while (x < arg) {
+          val y: Rep[Int] = x
+          x += 1
+          printf("%d\n", y)
+        }
+        var z = 0
+        while (z < arg) {
+          val y: Rep[Int] = z
+          printf("%d\n", y)
+          z += 1
+        }
+      }
+    }
+    val src = driver.code
+    checkOut("variable_inlining", "c", {
+      println(src)
+      println("// output:")
+      driver.eval(4)
+    })
+  }
+
   test("recursion_1") {
     val driver = new DslDriver[Int,Int] {
 

@@ -175,15 +175,6 @@ class CompactTraverser extends Traverser {
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
 
-    // check if a node is used from some inner scope
-    val hmi = new mutable.HashSet[Sym]
-    for (n <- inner) {
-      hmi ++= syms(n)
-    }
-    for (n <- ns) {
-      hmi ++= filterSym(blocks(n).map(_.res)) // block results count as inner
-    }                                         // syms(n) -- directSyms(n)
-
     // ----- forward pass -----
 
     // lookup sym -> node for locally defined nodes
@@ -195,6 +186,9 @@ class CompactTraverser extends Traverser {
     // local successor nodes (incl blocks and effects)
     val succ = new mutable.HashMap[Sym,List[Sym]]
 
+    // check if a node is used from some inner scope
+    val hmi = new mutable.HashSet[Sym]
+
     // count how many times a node is used at the current level
     if (y.res.isInstanceOf[Sym]) hm(y.res.asInstanceOf[Sym]) = 1
     for (n <- ns) {
@@ -203,6 +197,11 @@ class CompactTraverser extends Traverser {
         hm(s) = hm.getOrElse(s,0) + 1                                  // NOTE: λforward is to deal with recursive defs
       for (s <- syms(n) if df.contains(s))
         succ(s) = n.n::succ.getOrElse(s,Nil)
+      blocks(n).foreach(hmi ++= _.used) // block results count as inner
+    }                                   // syms(n) -- directSyms(n)
+
+    for (n <- inner.reverseIterator) { // Only statements reachable from
+      if (hmi(n.n)) hmi ++= syms(n)    // the inner blocks count as inner
     }
 
     // NOTE: Recursive lambdas cannot be inlined. To ensure this
