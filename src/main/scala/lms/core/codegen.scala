@@ -804,9 +804,17 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
    *     Some(n) => used in an expression, should have parenthesis if lastNode has lower precedence than n
    */
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
+    /* Generate parenthesis if block used as value (currentPrec != None) AND:
+     *    - there is at least one statement
+     *    - the precendence of the inlined node (lastNode) is less than the precedence of the node in which the block is generated (currentPrec)
+     */
     val paren = currentPrec.map(prec => numStms > 0 || lastNode.map(n => { precedence(n) < prec}).getOrElse(false)).getOrElse(false)
     if (paren) emit("(")
-    /*
+    /* Generate braces:
+     *  - if there is no stetement and no return value (empty block)
+     *  - if there is at least one statement and a return value
+     *  - if there are more than one statement
+     *
      * n > 1                       n > 1                      n > 1
      * || n == 0 && res == () ==>  || n == 0 && res == () ==> || n == 0 && res == ()
      * || n > 0 && res != ()       || n == 1 && res != ()     || n != 0 && res != ()
@@ -867,10 +875,13 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   private val registeredFunctions = mutable.HashSet[String]()
   private val functionsStream = new ByteArrayOutputStream()
   private val functionsWriter = new PrintStream(functionsStream)
-  def registerTopLevelFunction(id: String)(f: => Unit) = if (!registeredFunctions(id)) {
+  private var ongoingFun = false
+  def registerTopLevelFunction(id: String)(f: => Unit) = if (!registeredFunctions(id)) { // FIXME: Can't be nested!
+    if (ongoingFun) ???
+    ongoingFun = true
     registeredFunctions += id
     utils.withOutput(functionsWriter)(f)
-    // captureLines(f).foreach(functionsWriter.println)
+    ongoingFun = false
   }
   def emitFunctions(out: PrintStream) = if (functionsStream.size > 0){
     out.println("\n/************* Functions **************/")
@@ -880,9 +891,13 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   private val registeredDatastructures = mutable.HashSet[String]()
   private val datastructuresStream = new ByteArrayOutputStream()
   private val datastructuresWriter = new PrintStream(datastructuresStream)
+  private var ongoingData = false
   def registerDatastructures(id: String)(f: => Unit) = if (!registeredDatastructures(id)) {
+    if (ongoingData) ???
+    ongoingData = true
     registeredDatastructures += id
     utils.withOutput(datastructuresWriter)(f)
+    ongoingData = false
   }
   def emitDatastructures(out: PrintStream) = if (datastructuresStream.size > 0) {
     out.println("\n/*********** Datastructures ***********/")
@@ -1139,7 +1154,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       quoteBlock(traverse(b.copy(res = Const(()))))
       emitln()
 
-    case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) =>
+    case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) => // is it necessary? the while value will always be dead.
       emit("while (")
       quoteBlockP(traverse(c))
       emit(") ")
