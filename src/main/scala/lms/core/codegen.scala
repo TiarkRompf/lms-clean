@@ -1139,7 +1139,9 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       a match {// FIXME should it be there?
         case Const(n) => ??? // Constant cast should be resolved before
         case v@Sym(_) if compatibleType(typeMap.getOrElse(v, manifest[Unknown]), tpe) =>
-          shallow1(a, precedence("cast")) // FIXME: should we force parenthesis??
+          shallow1(a, precedence("cast")) // FIXME: can we be smarter about parenthesis? Issue require to remember the precedence of the outer node
+                                          // x = x * 10 + (y - '0')   // useless parenthesis
+                                          // x = x + (y == z ? 1 : 0) // required
         case b@Block(_, res, _, _) if compatibleType(typeMap.getOrElse(res, manifest[Unknown]), tpe) =>
           ??? //  shallow(a) FIXME: quoteBlockP??
         case _ =>
