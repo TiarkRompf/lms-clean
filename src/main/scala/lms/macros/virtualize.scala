@@ -268,7 +268,7 @@ trait LanguageVirtualization extends MacroModule with TransformationUtils with D
           // equality where it shouldn't). For the moment it seems like 
           // just treating case classes as regular classes works fine.
           //println(tree)
-          c.warning(tree.pos, "virtualization of case classes is not fully supported.")
+          // c.warning(tree.pos, "virtualization of case classes is not fully supported.")
           super.transform(tree) 
         case _ =>
           super.transform(tree)
