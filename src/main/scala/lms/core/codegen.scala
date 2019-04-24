@@ -273,12 +273,12 @@ class CompactScalaCodeGen extends CompactTraverser {
     }
   }
 
-  def precendence(n: Node) = n match {
+  def precedence(n: Node) = n match {
     case _ => 0
   }
 
   def shallow1(n: Def, prec: Int = 20): Unit = n match {
-    case InlineSym(n) if n.op != "var_get" && precendence(n) < prec => emit("("); shallow(n); emit(")")
+    case InlineSym(n) if n.op != "var_get" && precedence(n) < prec => emit("("); shallow(n); emit(")")
     case _ => shallow(n)
   }
 
@@ -839,9 +839,10 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
 
 
   // TODO: should make it language specific and move it down to ExtendedCCode
-  def precedence(n: Node): Int = n match {
+  override def precedence(n: Node): Int = n match {
     case Node(s,"?",List(c,a:Block,b:Block),_) if b.isPure && b.res == Const(false) => precedence("&&")
     case Node(s,"?",List(c,a:Block,b:Block),_) if a.isPure && a.res == Const(true) => precedence("||")
+    case Node(s,op,List(x),_) if unaryop(op) => unaryPrecedence(op)
     case _ => precedence(n.op)
   }
   final def unaryPrecedence(op: String): Int = 12
@@ -857,6 +858,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
     case "<<" | ">>" => 9
     case "+" | "-" => 10
     case "*" | "/" | "%" => 11
+    case "cast" => 12
     case "ref_new" => 13 // & address of
     case "reffield_get" => 14 // -> pointer member access
     // type casting is lower in precedence?
@@ -866,8 +868,8 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   }
 
   // XXX proper operator precedence
-  override def shallow1(n: Def, pp: Int = 20): Unit = n match {
-    case InlineSym(n) if precedence(n) < pp => emit("("); shallow(n); emit(")")
+  override def shallow1(n: Def, previousPrecedence: Int = 20): Unit = n match {
+    case m@InlineSym(n) if precedence(n) < previousPrecedence => emit("("); shallow(n); emit(")")
     case _ => shallow(n)
   }
   var generateReturn = false
@@ -896,7 +898,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
     /* Generate parenthesis if block used as value (currentPrec != None) AND:
      *    - there is at least one statement
-     *    - the precendence of the inlined node (lastNode) is less than the precedence of the node in which the block is generated (currentPrec)
+     *    - the precedence of the inlined node (lastNode) is less than the precedence of the node in which the block is generated (currentPrec)
      */
     val paren = currentPrec.map(prec => numStms > 0 || lastNode.map(n => { precedence(n) < prec}).getOrElse(false)).getOrElse(false)
     if (paren) emit("(")
@@ -1137,11 +1139,11 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       a match {// FIXME should it be there?
         case Const(n) => ??? // Constant cast should be resolved before
         case v@Sym(_) if compatibleType(typeMap.getOrElse(v, manifest[Unknown]), tpe) =>
-          shallow(a)
+          shallow1(a, precedence("cast")) // FIXME: should we force parenthesis??
         case b@Block(_, res, _, _) if compatibleType(typeMap.getOrElse(res, manifest[Unknown]), tpe) =>
-          shallow(a)
+          ??? //  shallow(a) FIXME: quoteBlockP??
         case _ =>
-          emit(s"(${remap(tpe)})"); shallow1(a)
+          emit(s"(${remap(tpe)})"); shallow1(a, precedence("cast"))
       }
     case Node(s,"String.charAt",List(a,i),_) =>
       shallow1(a); emit("["); shallow(i); emit("]")
@@ -1157,7 +1159,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case n @ Node(s,"?",List(c,a:Block,b:Block),_) if a.isPure && a.res == Const(true) =>
       shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
-      shallow1(c); emit(" ? ")
+      shallow1(c, precedence("?")); emit(" ? ")
       quoteBlockP(precedence("?"))(traverse(a))
       emit(" : ")
       quoteBlockP(precedence("?"))(traverse(b))
