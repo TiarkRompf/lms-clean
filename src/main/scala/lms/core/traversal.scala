@@ -67,7 +67,7 @@ abstract class Traverser {
       }
     }
 
-/*
+    /*
     NOTES ON RECURSIVE SCHEDULES
 
     // E.g. from tutorials/AutomataTest:
@@ -89,7 +89,7 @@ abstract class Traverser {
 
     // We could improve this by using a proper call to SCC instead of just
     // iterating over g.nodes in reverse order. The performance implications
-    // aren't clear, to we decided to postponse this.
+    // aren't clear, to we decided to postpone this.
 
     // Code would look like this:
 
@@ -108,7 +108,7 @@ abstract class Traverser {
     // for (n <- inner) {
     //   println(s"// ${tb(available(n))} ${tb(reach(n.n))} $n ${symsFreq(n)}")
     // }
-*/
+    */
 
 
     // Should node d be scheduled here? It must be:
@@ -147,6 +147,60 @@ abstract class Traverser {
   }
 
 }
+
+abstract class CPSTraverser extends Traverser {
+
+  def traverse(y: Block, extra: Sym*)(k: => Unit): Unit = {
+    val path1 = y.bound ++ extra.toList ++ path
+    def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
+    val g = new Graph(inner, y)
+    val reach = new mutable.HashSet[Sym]
+    if (g.block.res.isInstanceOf[Sym]) reach += g.block.res.asInstanceOf[Sym]
+    for (e <- g.block.eff.deps)
+      if (e.isInstanceOf[Sym])
+        reach += e.asInstanceOf[Sym]
+    for (d <- g.nodes.reverseIterator) {
+      if ((reach contains d.n)) {
+        if (available(d)) {
+          // node will be sched here, don't follow if branches!
+          for ((e:Sym,f) <- symsFreq(d) if f > 0.5) reach += e
+        } else {
+          for ((e:Sym,f) <- symsFreq(d)) reach += e
+        }
+      }
+    }
+    def scheduleHere(d: Node) = available(d) && reach(d.n)
+    val (outer1, inner1) = inner.partition(scheduleHere)
+
+    val (path0, inner0) = (path, inner)
+    path = path1; inner = inner1;
+    traverse(outer1, y)({path = path0; inner = inner0; k})
+  }
+
+  def traverse(ns: Seq[Node], res: Block)(k: => Unit): Unit = {
+    if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, res)(k)) else k
+  }
+
+  def traverse(bs: List[Block])(k: => Unit): Unit = {
+    if (!bs.isEmpty) traverse(bs.head)(traverse(bs.tail)(k))
+  }
+
+  def traverse(n: Node)(k: => Unit): Unit = n match {
+    case n @ Node(f, "λ", List(y:Block), _) =>
+      traverse(y, f)(k)
+    case n @ Node(f, op, es, _) =>
+      val blocks = es.filter{case Block(_,_,_,_) => true; case _ => false}.map(_.asInstanceOf[Block])
+      traverse(blocks)(k)
+  }
+
+  override def apply(g: Graph): Unit = {
+    bound(g)
+    path = Nil; inner = g.nodes
+    traverse(g.block)(())
+  }
+
+}
+
 
 
 class CompactTraverser extends Traverser {

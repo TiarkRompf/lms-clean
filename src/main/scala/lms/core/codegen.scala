@@ -103,6 +103,66 @@ class ScalaCodeGen extends Traverser {
   }
 }
 
+class CPSScalaCodeGen extends CPSTraverser {
+  def emit(s: String) = println(s)
+  def quote(s: Def): String = s match {
+    case Sym(n) => s"x$n"
+    case Const(x: String) => "\""+x+"\""
+    case Const(x: Char) => "'"+x+"'"
+    case Const(x) => x.toString
+  }
+
+  override def traverse(ns: Seq[Node], y: Block)(k: => Unit): Unit = {
+    if (!ns.isEmpty) traverse(ns.head){traverse(ns.tail, y){k}} else {emit(quote(y.res)); k}
+  }
+
+  override def traverse(n: Node)(k: => Unit): Unit = n match {
+    case n @ Node(f,"λ",List(y:Block),_) =>
+      val x = y.in.head
+      emit(s"def ${quote(f)}(${quote(x)}: Int): Int = {")
+      // see what becomes available given new bound vars
+      traverse(y, f)({emit(s"}"); k})
+    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
+      emit(s"val $f = if (${quote(c)}) {")
+      traverse(a)({emit(s"} else {"); traverse(b)({emit(s"}"); k})})
+    case n @ Node(f,"W",List(c:Block,b:Block,e),_) =>
+      emit(s"while ({")
+      traverse(c)({ emit(s"}) {"); traverse(b)({emit(s"}"); k}) })
+    case n @ Node(s,"+",List(x,y),_) =>
+      emit(s"val $s = ${quote(x)} + ${quote(y)}"); k
+    case n @ Node(s,"-",List(x,y),_) =>
+      emit(s"val $s = ${quote(x)} - ${quote(y)}"); k
+    case n @ Node(s,"*",List(x,y),_) =>
+      emit(s"val $s = ${quote(x)} * ${quote(y)}"); k
+    case n @ Node(s,"/",List(x,y),_) =>
+      emit(s"val $s = ${quote(x)} / ${quote(y)}"); k
+    case n @ Node(s,"%",List(x,y),_) =>
+      emit(s"val $s = ${quote(x)} % ${quote(y)}"); k
+    case n @ Node(s,"==",List(x,y),_) =>
+      emit(s"val $s = ${quote(x)} == ${quote(y)}"); k
+    case n @ Node(s,"!=",List(x,y),_) =>
+      emit(s"val $s = ${quote(x)} != ${quote(y)}"); k
+    case n @ Node(s,"var_new",List(x),_) =>
+      emit(s"var $s = ${quote(x)}"); k
+    case n @ Node(s,"var_get",List(x),_) =>
+      emit(s"val $s = ${quote(x)}"); k
+    case n @ Node(s,"var_set",List(x,y),_) =>
+      emit(s"${quote(x)} = ${quote(y)}"); k
+    case n @ Node(s,"array_new",List(x),_) =>
+      emit(s"var $s = new Array[Int](${quote(x)})"); k
+    case n @ Node(s,"array_get",List(x,i),_) =>
+      emit(s"val $s = ${quote(x)}(${quote(i)})"); k
+    case n @ Node(s,"array_set",List(x,i,y),_) =>
+      emit(s"${quote(x)}(${quote(i)}) = ${quote(y)}"); k
+    case n @ Node(s,"@",x::y::_,_) =>
+      emit(s"val $s = ${quote(x)}(${quote(y)})"); k
+    case n @ Node(s,"P",List(x),_) =>
+      emit(s"val $s = println(${quote(x)})"); k
+    case n @ Node(_,_,_,_) =>
+      emit(s"??? " + n.toString); k
+  }
+}
+
 class CompactScalaCodeGen extends CompactTraverser {
 
   val rename = new mutable.HashMap[Sym,String]
