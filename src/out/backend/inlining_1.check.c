@@ -8,7 +8,7 @@ Emitting C Generated Code
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = x0 - 4;
-  printf("%d\n", (x1 == 0) ? x0 + 4 : x1);
+  printf("%d\n", x1 == 0 ? x0 + 4 : x1);
 }
 /*****************************************
 End of C Generated Code

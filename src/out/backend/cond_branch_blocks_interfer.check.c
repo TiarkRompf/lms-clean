@@ -7,7 +7,7 @@ Emitting C Generated Code
 #include <stdbool.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  printf("%d\n", ((x0 > 0) ? x0 - 4 > 0 : x0 - 4 < 3) ? x0 - 4 : x0 - 4 + 1);
+  printf("%d\n", (x0 > 0 ? x0 - 4 > 0 : x0 - 4 < 3) ? x0 - 4 : x0 - 4 + 1);
 }
 /*****************************************
 End of C Generated Code

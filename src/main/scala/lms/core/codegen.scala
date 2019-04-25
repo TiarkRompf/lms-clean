@@ -1071,6 +1071,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
       (op.substring(7), args) match {
         case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
         case ("toDouble", List(rhs)) => emit("atof("); shallow(rhs); emit(")")
+        case ("toInt", List(rhs)) => emit("atoi("); shallow(rhs); emit(")")
         case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
       }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
@@ -1209,7 +1210,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case n @ Node(s,"?",List(c,a:Block,b:Block),_) if a.isPure && a.res == Const(true) =>
       shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
-      shallow1(c, precedence("?")); emit(" ? ")
+      shallow1(c, precedence("?") + 1); emit(" ? ")
       quoteBlockP(precedence("?"))(traverse(a))
       emit(" : ")
       quoteBlockP(precedence("?"))(traverse(b))

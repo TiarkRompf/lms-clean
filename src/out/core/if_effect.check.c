@@ -7,7 +7,7 @@ Emitting C Generated Code
 #include <stdbool.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  printf(">> %d\n", (x0 == 0) ? ({
+  printf(">> %d\n", x0 == 0 ? ({
     printf("hkjfd\n");
     3;
   }) : ({
