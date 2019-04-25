@@ -150,7 +150,7 @@ abstract class Traverser {
 
 abstract class CPSTraverser extends Traverser {
 
-  def traverse(y: Block, extra: Sym*)(k: => Unit): Unit = {
+  def traverse(y: Block, extra: Sym*)(k: (=> Unit) => Unit): Unit = {
     val path1 = y.bound ++ extra.toList ++ path
     def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
     val g = new Graph(inner, y)
@@ -162,7 +162,6 @@ abstract class CPSTraverser extends Traverser {
     for (d <- g.nodes.reverseIterator) {
       if ((reach contains d.n)) {
         if (available(d)) {
-          // node will be sched here, don't follow if branches!
           for ((e:Sym,f) <- symsFreq(d) if f > 0.5) reach += e
         } else {
           for ((e:Sym,f) <- symsFreq(d)) reach += e
@@ -173,34 +172,38 @@ abstract class CPSTraverser extends Traverser {
     val (outer1, inner1) = inner.partition(scheduleHere)
 
     val (path0, inner0) = (path, inner)
-    path = path1; inner = inner1;
-    traverse(outer1, y)({path = path0; inner = inner0; k})
+    withScope(path1, inner1) {
+      traverse(outer1, y){ v => withScope(path0, inner0) { k(v) } }
+    }
   }
 
-  def traverse(ns: Seq[Node], res: Block)(k: => Unit): Unit = {
-    if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, res)(k)) else k
+  def traverse(ns: Seq[Node], res: Block)(k: (=> Unit) => Unit): Unit = {
+    if (!ns.isEmpty) traverse(ns.head){
+      traverse(ns.tail, res)(v => k)
+    } else k(())
   }
 
-  def traverse(bs: List[Block])(k: => Unit): Unit = {
-    if (!bs.isEmpty) traverse(bs.head)(traverse(bs.tail)(k))
+  def traverse(bs: List[Block])(k: (=> Unit) => Unit): Unit = {
+    if (!bs.isEmpty) traverse(bs.head){ v =>
+      traverse(bs.tail)(v => k)
+    } else k(())
   }
 
   def traverse(n: Node)(k: => Unit): Unit = n match {
     case n @ Node(f, "λ", List(y:Block), _) =>
-      traverse(y, f)(k)
+      traverse(y, f)(v => k)
     case n @ Node(f, op, es, _) =>
-      val blocks = es.filter{case Block(_,_,_,_) => true; case _ => false}.map(_.asInstanceOf[Block])
-      traverse(blocks)(k)
+      val blocks = es.filter{ case Block(_,_,_,_) => true; case _ => false}.map(_.asInstanceOf[Block])
+      traverse(blocks)(v => k)
   }
 
-  override def apply(g: Graph): Unit = {
+  def apply(g: Graph)(k: Int): Unit = {
     bound(g)
     path = Nil; inner = g.nodes
-    traverse(g.block)(())
+    traverse(g.block)(e => {})
   }
 
 }
-
 
 
 class CompactTraverser extends Traverser {

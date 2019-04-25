@@ -120,7 +120,7 @@ class FrontEnd {
     try {
       val block = body
       Graph(g.globalDefs, block)
-    } finally g = null
+    } finally {g = null}
   }
 
 

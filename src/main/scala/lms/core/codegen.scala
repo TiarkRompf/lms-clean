@@ -104,7 +104,11 @@ class ScalaCodeGen extends Traverser {
 }
 
 class CPSScalaCodeGen extends CPSTraverser {
-  def emit(s: String) = println(s)
+
+  var trace = 0
+  def fresh = try { trace } finally { trace += 1 }
+  def emit(s: String) = print(s)
+  def emitln(s: String) = println(s)
   def quote(s: Def): String = s match {
     case Sym(n) => s"x$n"
     case Const(x: String) => "\""+x+"\""
@@ -112,54 +116,98 @@ class CPSScalaCodeGen extends CPSTraverser {
     case Const(x) => x.toString
   }
 
-  override def traverse(ns: Seq[Node], y: Block)(k: => Unit): Unit = {
-    if (!ns.isEmpty) traverse(ns.head){traverse(ns.tail, y){k}} else {emit(quote(y.res)); k}
+  override def traverse(ns: Seq[Node], y: Block)(k: (=> Unit) => Unit): Unit = {
+    if (!ns.isEmpty) traverse(ns.head){traverse(ns.tail, y){k}}
+    else k(emit(quote(y.res)))
   }
 
   override def traverse(n: Node)(k: => Unit): Unit = n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
-      emit(s"def ${quote(f)}(${quote(x)}: Int): Int = {")
-      // see what becomes available given new bound vars
-      traverse(y, f)({emit(s"}"); k})
+      emitln(s"def ${quote(f)}(c: Int => Unit, ${quote(x)}: Int): Unit = {")
+      traverse(y, f){ v => emit("c("); v; emit(")") }
+      emitln("\n}")
+      k
+
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
-      emit(s"val $f = if (${quote(c)}) {")
-      traverse(a)({emit(s"} else {"); traverse(b)({emit(s"}"); k})})
-    case n @ Node(f,"W",List(c:Block,b:Block,e),_) =>
-      emit(s"while ({")
-      traverse(c)({ emit(s"}) {"); traverse(b)({emit(s"}"); k}) })
+      val index = fresh
+      emitln(s"def cIf$index($f: Int) = {"); k; emitln("\n}")
+      emitln(s"if (${quote(c)}) {")
+      traverse(a){ v => emit(s"cIf$index("); v; emit(")") }
+      emitln("\n} else {")
+      traverse(b){ v => emit(s"cIf$index("); v; emit(")") }
+      emitln("\n}")
+
+    case n @ Node(f,"W",(c:Block)::(b:Block)::e,_) =>
+      val index = fresh
+      emitln(s"def loop$index(): Unit = {")
+      traverse(c){ v => emit("if ("); v; emit(") ") }
+      emitln("{")
+      traverse(b) { v => emit(s"loop$index()") }
+      emitln("\n} else {")
+      k
+      emitln("\n}\n}")
+      emit(s"loop$index()")
+
     case n @ Node(s,"+",List(x,y),_) =>
-      emit(s"val $s = ${quote(x)} + ${quote(y)}"); k
+      emitln(s"val $s = ${quote(x)} + ${quote(y)}"); k
     case n @ Node(s,"-",List(x,y),_) =>
-      emit(s"val $s = ${quote(x)} - ${quote(y)}"); k
+      emitln(s"val $s = ${quote(x)} - ${quote(y)}"); k
     case n @ Node(s,"*",List(x,y),_) =>
-      emit(s"val $s = ${quote(x)} * ${quote(y)}"); k
+      emitln(s"val $s = ${quote(x)} * ${quote(y)}"); k
     case n @ Node(s,"/",List(x,y),_) =>
-      emit(s"val $s = ${quote(x)} / ${quote(y)}"); k
+      emitln(s"val $s = ${quote(x)} / ${quote(y)}"); k
     case n @ Node(s,"%",List(x,y),_) =>
-      emit(s"val $s = ${quote(x)} % ${quote(y)}"); k
+      emitln(s"val $s = ${quote(x)} % ${quote(y)}"); k
     case n @ Node(s,"==",List(x,y),_) =>
-      emit(s"val $s = ${quote(x)} == ${quote(y)}"); k
+      emitln(s"val $s = ${quote(x)} == ${quote(y)}"); k
     case n @ Node(s,"!=",List(x,y),_) =>
-      emit(s"val $s = ${quote(x)} != ${quote(y)}"); k
+      emitln(s"val $s = ${quote(x)} != ${quote(y)}"); k
     case n @ Node(s,"var_new",List(x),_) =>
-      emit(s"var $s = ${quote(x)}"); k
+      emitln(s"var $s = ${quote(x)}"); k
     case n @ Node(s,"var_get",List(x),_) =>
-      emit(s"val $s = ${quote(x)}"); k
+      emitln(s"val $s = ${quote(x)}"); k
     case n @ Node(s,"var_set",List(x,y),_) =>
-      emit(s"${quote(x)} = ${quote(y)}"); k
+      emitln(s"${quote(x)} = ${quote(y)}"); k
     case n @ Node(s,"array_new",List(x),_) =>
-      emit(s"var $s = new Array[Int](${quote(x)})"); k
+      emitln(s"var $s = new Array[Int](${quote(x)})"); k
     case n @ Node(s,"array_get",List(x,i),_) =>
-      emit(s"val $s = ${quote(x)}(${quote(i)})"); k
+      emitln(s"val $s = ${quote(x)}(${quote(i)})"); k
     case n @ Node(s,"array_set",List(x,i,y),_) =>
-      emit(s"${quote(x)}(${quote(i)}) = ${quote(y)}"); k
+      emitln(s"${quote(x)}(${quote(i)}) = ${quote(y)}"); k
+
     case n @ Node(s,"@",x::y::_,_) =>
-      emit(s"val $s = ${quote(x)}(${quote(y)})"); k
+      val index = fresh
+      emitln(s"def cApp$index($s: Int) {"); k; emitln("\n}")
+      emitln(s"${quote(x)}(cApp$index, ${quote(y)})")
+
     case n @ Node(s,"P",List(x),_) =>
-      emit(s"val $s = println(${quote(x)})"); k
+      emitln(s"val $s = println(${quote(x)})"); k
+    case n @ Node(s,">",List(x,y), _) =>
+      emitln(s"val $s = ${quote(x)} > ${quote(y)}"); k
+    case n @ Node(s,"<",List(x,y), _) =>
+      emitln(s"val $s = ${quote(x)} < ${quote(y)}"); k
+    case n @ Node(s,">=",List(x,y), _) =>
+      emitln(s"val $s = ${quote(x)} >= ${quote(y)}"); k
+    case n @ Node(s,"<=",List(x,y), _) =>
+      emitln(s"val $s = ${quote(x)} <= ${quote(y)}"); k
+    case n @ Node(s,"λforward",List(x), _) =>
+      emitln(s"lazy val $s = ${quote(x)} _"); k
     case n @ Node(_,_,_,_) =>
-      emit(s"??? " + n.toString); k
+      emitln(s"??? " + n.toString); k
+  }
+
+  override def apply(g: Graph)(k: Int): Unit = {
+    bound(g)
+    path = Nil; inner = g.nodes
+    traverse(g.block){e => emit("assert("); e; emit(s""" == $k, "wants $k, gets " + """); e; emit(")")}
+  }
+
+  def emitAll(g: Graph, k: Int)(m1:Manifest[_],m2:Manifest[_]): Unit = {
+    val arg = quote(g.block.in.head)
+    emitln(s"class Snippet extends (${m1.toString} => ${m2.toString}) {\ndef apply($arg: Int): Int = {")
+    apply(g)(k)
+    emitln("\n1\n}\n}")
   }
 }
 
