@@ -100,20 +100,22 @@ abstract class TensorFusionV extends Transformer {
     g = frontEnd.g
   }
 
-  val tensors = new mutable.HashMap[Sym, Node]
+  val tensors = new mutable.HashMap[Sym, (Node, List[Sym], Seq[Node])]
 
   // NOTE: fuse _all_ tensors expressions vertically
   // (produce/consume) if possible. This is quite likely overzealous.
   override def transform(n: Node): Exp = n match {
     case Node(s, "tensor", List(sh:Exp, f:Block), _) =>
-      tensors(s) = n
+      tensors(s) = (n, path, inner)
       super.transform(n)
     case Node(s, "tensor_apply", List(a:Sym,b:Exp), _) if tensors contains a =>
-      val Node(_, _, List(sh:Exp, f @ Block(arg::Nil, res, block, eff)), _) = tensors(a)
+      val (Node(_, _, List(sh:Exp, f @ Block(arg::Nil, res, block, eff)), _), path0, inner0) = tensors(a)
       if (subst contains arg) println(s"Warning: already have a subst for $arg")
       try {
         subst(arg) = transform(b)
-        traverse(f)
+        withScope(path0, inner0) {
+          traverse(f)
+        }
         transform(res)
       } finally subst -= arg
     case _ => super.transform(n)

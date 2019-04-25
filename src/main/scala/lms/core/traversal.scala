@@ -31,7 +31,7 @@ abstract class Traverser {
     try b finally { path = path0; inner = inner0 }
   }
 
-  def traverse(y: Block, extra: Sym*): Unit = {
+  def focus[T](y: Block, extra: Sym*)(f: (Seq[Node], Block) => T): T = {
     val path1 = y.bound ++ extra.toList ++ path
 
     // a node is available if all bound vars
@@ -44,13 +44,9 @@ abstract class Traverser {
     val g = new Graph(inner, y)
 
     val reach = new mutable.HashSet[Sym]
+    val reachInner = new mutable.HashSet[Sym]
 
-    if (g.block.res.isInstanceOf[Sym])
-      reach += g.block.res.asInstanceOf[Sym]
-
-    for (e <- g.block.eff.deps)
-      if (e.isInstanceOf[Sym])
-        reach += e.asInstanceOf[Sym]
+    reach ++= y.used
 
     // for (d <- g.nodes) {
     //   println("check "+d + " " + bound.hm(d.n) + " " + path1.toSet + " " + reach(d.n) + " " + available(d))
@@ -60,10 +56,14 @@ abstract class Traverser {
       if ((reach contains d.n)) {
         if (available(d)) {
           // node will be sched here, don't follow if branches!
-          for ((e:Sym,f) <- symsFreq(d) if f > 0.5) reach += e
+          // other statement will be scheduled in an inner block
+          for ((e:Sym,f) <- symsFreq(d))
+            if (f > 0.5) reach += e else reachInner += e
         } else {
-          for ((e:Sym,f) <- symsFreq(d)) reach += e
+          reach ++= syms(d)
         }
+      } else {
+        if (reachInner(d.n)) reachInner ++= syms(d)
       }
     }
 
@@ -118,15 +118,24 @@ abstract class Traverser {
     def scheduleHere(d: Node) =
       available(d) && reach(d.n)
 
-    val (outer1, inner1) = inner.partition(scheduleHere)
+    val (outer1, inner1) = ((Seq[Node](), Seq[Node]()) /: inner) {
+      case ((outer1 , inner1), n) if reach(n.n) =>
+        if (available(n)) (n +: outer1, inner1) else (outer1, n +: inner1)
+      case ((outer1 , inner1), n) if reachInner(n.n) => (outer1, n +: inner1)
+      case (agg, _) => agg
+    }
 
-    withScope(path1, inner1) {
-      traverse(outer1, y)
+    withScope(path1, inner1.reverse) {
+      f(outer1.reverse, y)
     }
   }
 
   def traverse(ns: Seq[Node], res: Block): Unit = {
     ns.foreach(traverse)
+  }
+
+  def traverse(b: Block, extra: Sym*): Unit = {
+    focus(b, extra:_*)(traverse)
   }
 
   def traverse(n: Node): Unit = n match {
@@ -257,9 +266,7 @@ class CompactTraverser extends Traverser {
       blocks(n).foreach(hmi ++= _.used) // block results count as inner
     }                                   // syms(n) -- directSyms(n)
 
-    for (n <- inner.reverseIterator) { // Only statements reachable from
-      if (hmi(n.n)) hmi ++= syms(n)    // the inner blocks count as inner
-    }
+    for (n <- inner) hmi ++= syms(n)
 
     // NOTE: Recursive lambdas cannot be inlined. To ensure this
     // behavior, we count λforward as additional ref to the lambda
