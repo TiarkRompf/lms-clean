@@ -64,9 +64,16 @@ class CPSTest extends TutorialFunSuite {
         z
       }
     }
+    // test by running
     for (i <- 0 until 10) {
       driver.eval(i+1, 1)
     }
+    // test source
+    val src = driver.code(5)
+    checkOut("simple", "scala", {
+      println(src)
+      println("// output:")
+    })
   }
 
   test("if") {
@@ -83,9 +90,16 @@ class CPSTest extends TutorialFunSuite {
         }
       }
     }
+    // test by running
     for (i <- 1 until 10) {
       driver.eval(i, if ((i+i)>2){(i+i)*i+i}else{(i+i)/i-i} )
     }
+    // test source
+    val src = driver.code(5)
+    checkOut("if", "scala", {
+      println(src)
+      println("// output:")
+    })
   }
 
   test("while") {
@@ -103,9 +117,16 @@ class CPSTest extends TutorialFunSuite {
         res
       }
     }
+    // test by running
     for (i <- 1 until 11) {
       driver.eval(i, (2*i + 1)*i )
     }
+    // test source
+    val src = driver.code(5)
+    checkOut("while", "scala", {
+      println(src)
+      println("// output:")
+    })
   }
 
   test("lambda") {
@@ -118,9 +139,16 @@ class CPSTest extends TutorialFunSuite {
         double(double(a))
       }
     }
+    // test by running
     for(i <- 0 until 10) {
       driver.eval(i, i*4)
     }
+    // test source
+    val src = driver.code(5)
+    checkOut("lambda", "scala", {
+      println(src)
+      println("// output:")
+    })
   }
 
   test("recursion") {
@@ -136,9 +164,16 @@ class CPSTest extends TutorialFunSuite {
         f(arg)
       }
     }
+    // test by running
     for (i <- 1 until 5) {
       driver.eval(i, (1 until i+1).toSeq.fold(1:Int){_*_} )
     }
+    // test source
+    val src = driver.code(5)
+    checkOut("recursion", "scala", {
+      println(src)
+      println("// output:")
+    })
   }
 
   test("recursionWhile") {
@@ -160,8 +195,15 @@ class CPSTest extends TutorialFunSuite {
         res
       }
     }
+    // test by running
     for (arg <- 1 until 5)
       driver.eval(arg, (9 until 0 by (-arg)).toSeq.fold(1:Int)(_*_))
+    // test source
+    val src = driver.code(5)
+    checkOut("recursionWhile", "scala", {
+      println(src)
+      println("// output:")
+    })
   }
 
   test("ifWhile") {
@@ -188,12 +230,19 @@ class CPSTest extends TutorialFunSuite {
         }
       }
     }
+    // test by running
     for (arg <- 1 until 10) {
       val x = arg * 2
       val bound = if (x > 10) x - 10 else x + 10
       val result = (bound - 1) * bound / 2
       driver.eval(arg, result)
     }
+    // test source
+    val src = driver.code(5)
+    checkOut("ifWhile", "scala", {
+      println(src)
+      println("// output:")
+    })
   }
 
   test("whileLambda") {
@@ -209,8 +258,15 @@ class CPSTest extends TutorialFunSuite {
         res
       }
     }
+    // test by running
     for(arg <- 1 until 10) {
       driver.eval(arg, (arg - 1) * arg)
     }
+    // test source
+    val src = driver.code(5)
+    checkOut("whileLambda", "scala", {
+      println(src)
+      println("// output:")
+    })
   }
 }

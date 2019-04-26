@@ -159,43 +159,51 @@ abstract class Traverser {
 
 abstract class CPSTraverser extends Traverser {
 
-  def traverse(y: Block, extra: Sym*)(k: (=> Unit) => Unit): Unit = {
+  // this function is adapted from focus() in Traverser. Check that function of comments
+  def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = {
     val path1 = y.bound ++ extra.toList ++ path
     def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
     val g = new Graph(inner, y)
     val reach = new mutable.HashSet[Sym]
-    if (g.block.res.isInstanceOf[Sym]) reach += g.block.res.asInstanceOf[Sym]
-    for (e <- g.block.eff.deps)
-      if (e.isInstanceOf[Sym])
-        reach += e.asInstanceOf[Sym]
+    val reachInner = new mutable.HashSet[Sym]
+    reach ++= y.used
     for (d <- g.nodes.reverseIterator) {
       if ((reach contains d.n)) {
         if (available(d)) {
-          for ((e:Sym,f) <- symsFreq(d) if f > 0.5) reach += e
+          for ((e:Sym,f) <- symsFreq(d)) if (f > 0.5) reach += e else reachInner += e
         } else {
-          for ((e:Sym,f) <- symsFreq(d)) reach += e
+          reach ++= syms(d)
         }
+      } else {
+        if (reachInner(d.n)) reachInner ++= syms(d)
       }
     }
-    def scheduleHere(d: Node) = available(d) && reach(d.n)
-    val (outer1, inner1) = inner.partition(scheduleHere)
+    val (outer1, inner1) = ((Seq[Node](), Seq[Node]()) /: inner) {
+      case ((outer1, inner1), n) if reach(n.n) =>
+        if (available(n)) (n +: outer1, inner1) else (outer1, n +: inner1)
+      case ((outer1, inner1), n) if reachInner(n.n) => (outer1, n +: inner1)
+      case (agg, _) => agg
+    }
 
-    val (path0, inner0) = (path, inner)
-    withScope(path1, inner1) {
-      traverse(outer1, y){ v => withScope(path0, inner0) { k(v) } }
+    withScope(path1, inner1.reverse) {
+      traverse(outer1.reverse, y){ v => withScope(path, inner) { k(v) } }
     }
   }
 
-  def traverse(ns: Seq[Node], res: Block)(k: (=> Unit) => Unit): Unit = {
+  // def traverse(y: Block, extra: Sym*)(k: (=> Unit) => Unit): Unit = {
+  //   focus(y, extra){(ns, y) => traverse(ns, y){ v => withScope(path, inner){k(v)} }}
+  // }
+
+  def traverse(ns: Seq[Node], res: Block)(k: Exp => Unit): Unit = {
     if (!ns.isEmpty) traverse(ns.head){
-      traverse(ns.tail, res)(v => k)
-    } else k(())
+      traverse(ns.tail, res)(v => k(v))
+    } else k(Const(()))
   }
 
-  def traverse(bs: List[Block])(k: (=> Unit) => Unit): Unit = {
+  def traverse(bs: List[Block])(k: Exp => Unit): Unit = {
     if (!bs.isEmpty) traverse(bs.head){ v =>
-      traverse(bs.tail)(v => k)
-    } else k(())
+      traverse(bs.tail)(v => k(v))
+    } else k(Const(()))
   }
 
   def traverse(n: Node)(k: => Unit): Unit = n match {

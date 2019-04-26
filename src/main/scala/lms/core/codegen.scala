@@ -116,16 +116,16 @@ class CPSScalaCodeGen extends CPSTraverser {
     case Const(x) => x.toString
   }
 
-  override def traverse(ns: Seq[Node], y: Block)(k: (=> Unit) => Unit): Unit = {
-    if (!ns.isEmpty) traverse(ns.head){traverse(ns.tail, y){k}}
-    else k(emit(quote(y.res)))
+  override def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit = {
+    if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k))
+    else k(y.res)
   }
 
   override def traverse(n: Node)(k: => Unit): Unit = n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
       emitln(s"def ${quote(f)}(c: Int => Unit, ${quote(x)}: Int): Unit = {")
-      traverse(y, f){ v => emit("c("); v; emit(")") }
+      traverse(y, f){ v => emit("c("); emit(quote(v)); emit(")") }
       emitln("\n}")
       k
 
@@ -133,15 +133,15 @@ class CPSScalaCodeGen extends CPSTraverser {
       val index = fresh
       emitln(s"def cIf$index($f: Int) = {"); k; emitln("\n}")
       emitln(s"if (${quote(c)}) {")
-      traverse(a){ v => emit(s"cIf$index("); v; emit(")") }
+      traverse(a){ v => emit(s"cIf$index("); emit(quote(v)); emit(")") }
       emitln("\n} else {")
-      traverse(b){ v => emit(s"cIf$index("); v; emit(")") }
+      traverse(b){ v => emit(s"cIf$index("); emit(quote(v)); emit(")") }
       emitln("\n}")
 
     case n @ Node(f,"W",(c:Block)::(b:Block)::e,_) =>
       val index = fresh
       emitln(s"def loop$index(): Unit = {")
-      traverse(c){ v => emit("if ("); v; emit(") ") }
+      traverse(c){ v => emit("if ("); emit(quote(v)); emit(") ") }
       emitln("{")
       traverse(b) { v => emit(s"loop$index()") }
       emitln("\n} else {")
@@ -200,7 +200,7 @@ class CPSScalaCodeGen extends CPSTraverser {
   override def apply(g: Graph)(k: Int): Unit = {
     bound(g)
     path = Nil; inner = g.nodes
-    traverse(g.block){e => emit("assert("); e; emit(s""" == $k, "wants $k, gets " + """); e; emit(")")}
+    traverse(g.block){e => emit("assert("); emit(quote(e)); emit(s""" == $k, "wants $k, gets " + """); emit(quote(e)); emit(")")}
   }
 
   def emitAll(g: Graph, k: Int)(m1:Manifest[_],m2:Manifest[_]): Unit = {
