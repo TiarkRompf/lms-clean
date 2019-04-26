@@ -484,6 +484,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
     (source.toString, statics)
   }
+  var compilerCommand = "cc -std=c99 -O3"
   lazy val f: A => Unit = {
     // TBD: should read result of type B?
     val out = new java.io.PrintStream("/tmp/snippet.c")
@@ -491,7 +492,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     out.close
     (new java.io.File("/tmp/snippet")).delete
     import scala.sys.process._
-    time("gcc") { (s"cc -std=c99 -O3 /tmp/snippet.c -o /tmp/snippet": ProcessBuilder).lines.foreach(Console.println _) }
+    time("gcc") { (s"$compilerCommand /tmp/snippet.c -o /tmp/snippet": ProcessBuilder).lines.foreach(Console.println _) }
     (a: A) => (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
   }
   def eval(a: A): Unit = { val f1 = f; time("eval")(f1(a)) }
