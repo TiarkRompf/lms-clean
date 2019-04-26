@@ -163,24 +163,18 @@ abstract class CPSTraverser extends Traverser {
     traverse(ns, y){ v => withScope(path, inner)(k(v)) }
   }
 
-  def traverse(ns: Seq[Node], res: Block)(k: Exp => Unit): Unit = {
-    if (!ns.isEmpty) traverse(ns.head){
-      traverse(ns.tail, res)(v => k(v))
-    } else k(Const(()))
-  }
+  def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit =
+    if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(y.res)
 
-  def traverse(bs: List[Block])(k: Exp => Unit): Unit = {
-    if (!bs.isEmpty) traverse(bs.head){ v =>
-      traverse(bs.tail)(v => k(v))
-    } else k(Const(()))
-  }
+  def traverse(bs: List[Block])(k: => Unit): Unit =
+    if (!bs.isEmpty) traverse(bs.head)(v => traverse(bs.tail)(k)) else k
 
   def traverse(n: Node)(k: => Unit): Unit = n match {
     case n @ Node(f, "λ", List(y:Block), _) =>
       traverse(y, f)(v => k)
     case n @ Node(f, op, es, _) =>
       val blocks = es.filter{ case Block(_,_,_,_) => true; case _ => false}.map(_.asInstanceOf[Block])
-      traverse(blocks)(v => k)
+      traverse(blocks)(k)
   }
 
   def apply(g: Graph)(k: Int): Unit = {
@@ -188,7 +182,6 @@ abstract class CPSTraverser extends Traverser {
     path = Nil; inner = g.nodes
     traverse(g.block)(e => {})
   }
-
 }
 
 

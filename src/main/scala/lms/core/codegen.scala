@@ -116,11 +116,6 @@ class CPSScalaCodeGen extends CPSTraverser {
     case Const(x) => x.toString
   }
 
-  override def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit = {
-    if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k))
-    else k(y.res)
-  }
-
   override def traverse(n: Node)(k: => Unit): Unit = n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
