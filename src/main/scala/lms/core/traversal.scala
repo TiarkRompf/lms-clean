@@ -159,40 +159,9 @@ abstract class Traverser {
 
 abstract class CPSTraverser extends Traverser {
 
-  // this function is adapted from focus() in Traverser. Check that function of comments
-  def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = {
-    val path1 = y.bound ++ extra.toList ++ path
-    def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
-    val g = new Graph(inner, y)
-    val reach = new mutable.HashSet[Sym]
-    val reachInner = new mutable.HashSet[Sym]
-    reach ++= y.used
-    for (d <- g.nodes.reverseIterator) {
-      if ((reach contains d.n)) {
-        if (available(d)) {
-          for ((e:Sym,f) <- symsFreq(d)) if (f > 0.5) reach += e else reachInner += e
-        } else {
-          reach ++= syms(d)
-        }
-      } else {
-        if (reachInner(d.n)) reachInner ++= syms(d)
-      }
-    }
-    val (outer1, inner1) = ((Seq[Node](), Seq[Node]()) /: inner) {
-      case ((outer1, inner1), n) if reach(n.n) =>
-        if (available(n)) (n +: outer1, inner1) else (outer1, n +: inner1)
-      case ((outer1, inner1), n) if reachInner(n.n) => (outer1, n +: inner1)
-      case (agg, _) => agg
-    }
-
-    withScope(path1, inner1.reverse) {
-      traverse(outer1.reverse, y){ v => withScope(path, inner) { k(v) } }
-    }
+  def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = focus(y, extra:_*){ (ns, y) =>
+    traverse(ns, y){ v => withScope(path, inner)(k(v)) }
   }
-
-  // def traverse(y: Block, extra: Sym*)(k: (=> Unit) => Unit): Unit = {
-  //   focus(y, extra){(ns, y) => traverse(ns, y){ v => withScope(path, inner){k(v)} }}
-  // }
 
   def traverse(ns: Seq[Node], res: Block)(k: Exp => Unit): Unit = {
     if (!ns.isEmpty) traverse(ns.head){
