@@ -113,7 +113,7 @@ abstract class TensorFusionV extends Transformer {
       if (subst contains arg) println(s"Warning: already have a subst for $arg")
       try {
         subst(arg) = transform(b)
-        withScope(path0, inner0) {
+        withResetScope(path0, inner0) {
           traverse(f)
         }
         transform(res)
@@ -130,7 +130,7 @@ abstract class TensorFusionH extends Transformer {
     g = frontEnd.g
   }
 
-  val tensors = new mutable.HashMap[Sym, Node]
+  val tensors = new mutable.HashMap[Sym, (Node, List[Sym], Seq[Node])]
 
   // NOTE: fuse loops horizontally within a local scope.
   // highly highly preliminary!
@@ -153,7 +153,7 @@ abstract class TensorFusionH extends Transformer {
       // println("bound:")
       // bound.hm.foreach(println)
 
-      val g = new Graph(inner++ns, y)
+      val g = new Graph(inner++ns, y, null)
       val reach = new mutable.HashSet[Sym]
 
       val loopSyms = loops.map(_.n).toSet
@@ -220,12 +220,14 @@ abstract class TensorFusionH extends Transformer {
 
   override def transform(n: Node): Exp = n match {
     case Node(s, "tensor", List(sh:Exp, f:Block), _) =>
-      tensors(s) = n
+      tensors(s) = (n, path, inner)
       super.transform(n)
     case Node(s, "tensor_apply", List(a:Sym,b:Exp), _) if tensors contains a =>
-      val Node(_, _, List(sh:Exp, f @ Block(arg::Nil, res, block, eff)), _) = tensors(a)
+      val (Node(_, _, List(sh:Exp, f @ Block(arg::Nil, res, block, eff)), _), path0, inner0) = tensors(a)
       subst(arg) = b
-      traverse(f)
+      withResetScope(path0, inner0) {
+        traverse(f)
+      }
       transform(res)
     case _ => super.transform(n)
   }

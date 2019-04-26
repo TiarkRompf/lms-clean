@@ -662,6 +662,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   // Functions
+  def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]) = (x1: Backend.Exp) => Unwrap(f(Wrap[A](x1)))
+  def unwrapFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A],Rep[B]) => Rep[C]) = (x1: Backend.Exp, x2: Backend.Exp) => Unwrap(f(Wrap[A](x1), Wrap[B](x2)))
+
   def fun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
     Wrap[A=>B](__fun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
 
@@ -723,12 +726,13 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // Top-Level Functions
   // XXX: is this data structure needed? should it move elsewhere?
   // could we use funTable instead?
-  val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Exp]()
+  val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
   def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
     val can = canonicalize(f)
     topLevelFunctions.getOrElseUpdate(can, {
       val fn = Backend.Sym(Adapter.g.fresh)
       Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()()
+      fn
     })
   }
   def topFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =

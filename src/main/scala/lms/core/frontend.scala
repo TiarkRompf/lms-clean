@@ -119,7 +119,7 @@ class FrontEnd {
     g = mkGraphBuilder()
     try {
       val block = body
-      Graph(g.globalDefs, block)
+      Graph(g.globalDefs, block, g.globalDefsCache.toMap)
     } finally {g = null}
   }
 

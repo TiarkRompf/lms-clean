@@ -1,7 +1,7 @@
 package lms.core
 
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 
 object Backend {
 
@@ -124,27 +124,27 @@ class GraphBuilder {
       case Some(e) => e
       case None =>
 
-      // latent effects? closures, mutable vars, ... (these are the keys!)
-      val efKeys2 = (if (s == "λ") efKeys else // NOTE: block in lambda is a latent effect for app, not declaration
-        (as.toList.flatMap(getLatentEffect) ++ efKeys)).distinct
+        // latent effects? closures, mutable vars, ... (these are the keys!)
+        val efKeys2 = (if (s == "λ") efKeys else // NOTE: block in lambda is a latent effect for app, not declaration
+          (as.toList.flatMap(getLatentEffect) ++ efKeys)).distinct
 
-      // effects or pure?
-      if (efKeys2.nonEmpty) {
-        val sm = Sym(fresh)
-        // gather effect dependencies
-        def latest(e1: Exp, e2: Exp) = if (curLocalDefs(e1)) e1 else e2
-        val prev = efKeys2.map(e => curEffects.getOrElse(e,latest(e,curBlock))).distinct
-        val res = reflect(sm, s, as:_*)(prev:_*)(efKeys2:_*)
-        for (e <- efKeys2) curEffects = curEffects + (e -> res)
-        res
-      } else {
-        // cse? never for effectful stm
-        findDefinition(s,as) match {
-          case Some(n) => n.n
-          case None =>
-            reflect(Sym(fresh), s, as:_*)()()
+        // effects or pure?
+        if (efKeys2.nonEmpty) {
+          val sm = Sym(fresh)
+          // gather effect dependencies
+          def latest(e1: Exp, e2: Exp) = if (curLocalDefs(e1)) e1 else e2
+          val prev = efKeys2.map(e => curEffects.getOrElse(e,latest(e,curBlock))).distinct
+          val res = reflect(sm, s, as:_*)(prev:_*)(efKeys2:_*)
+          for (e <- efKeys2) curEffects = curEffects + (e -> res)
+          res
+        } else {
+          // cse? never for effectful stm
+          findDefinition(s,as) match {
+            case Some(n) => n.n
+            case None =>
+              reflect(Sym(fresh), s, as:_*)()()
+          }
         }
-      }
     }
   }
 
@@ -193,7 +193,7 @@ class GraphBuilder {
 
   def getInnerNodes(b: Block): List[Node] = {
     val bound = new Bound
-    bound(Graph(globalDefs.toList,b))
+    bound(Graph(globalDefs.toList,b, globalDefsCache.toMap))
     val ins = b.ein::b.in
     globalDefs.toList.filter(n => ins.exists(bound.hm.getOrElse(n.n,Set())))
   }
@@ -229,12 +229,10 @@ class GraphBuilder {
       curLocalDefs = saveLocalDefs
     }
   }
-
-
 }
 
 
-case class Graph(val nodes: Seq[Node], val block: Block) {
+case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: immutable.Map[Sym,Node]) {
   // contract: nodes is sorted topologically
 }
 
@@ -256,7 +254,7 @@ class DeadCodeElim extends Phase {
     for (d <- g.nodes.reverseIterator)
       if (live(d.n)) live ++= syms(d)
 
-    Graph(g.nodes.filter(d => live(d.n)), g.block)
+    g.copy(nodes = g.nodes.filter(d => live(d.n)))
   }
 }
 

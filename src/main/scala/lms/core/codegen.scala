@@ -1326,12 +1326,21 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emitValDef(n)
   }
 
+  // FIXME Too ugly!!!!
+  var graphCache: Map[Sym,Node] = _
+  def isWritableSym(w: Sym): Boolean = graphCache.get(w) match {
+    case Some(Node(_, "var_new", _, _)) => true // ok
+    case _ => false
+  }
+
   def run(name: String, g: Graph) = {
     capture {
+      graphCache = g.globalDefsCache
       bound(g)
       withScope(Nil, g.nodes) {
         emitFunction(name, g.block)
       }
+      graphCache = null
     }
   }
 

@@ -31,6 +31,14 @@ abstract class Traverser {
     try b finally { path = path0; inner = inner0 }
   }
 
+  def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
+    assert(path.takeRight(p.length) == p, s"$path -- $p")
+    val inner0 = inner
+    inner = ns
+    try b finally { inner = inner0 }
+
+  }
+
   def focus[T](y: Block, extra: Sym*)(f: (Seq[Node], Block) => T): T = {
     val path1 = y.bound ++ extra.toList ++ path
 
@@ -41,7 +49,7 @@ abstract class Traverser {
 
     // find out which nodes are reachable on a
     // warm path (not only via if/else branches)
-    val g = new Graph(inner, y)
+    val g = new Graph(inner, y, null)
 
     val reach = new mutable.HashSet[Sym]
     val reachInner = new mutable.HashSet[Sym]
@@ -137,6 +145,25 @@ abstract class Traverser {
   def traverse(b: Block, extra: Sym*): Unit = {
     focus(b, extra:_*)(traverse)
   }
+
+  def getFreeVarBlock(y: Block, extra: Sym*): Set[Sym] = focus(y, extra:_*) { (ns: Seq[Node], res: Block) =>
+    val used = new mutable.HashSet[Sym]
+    val bound = new mutable.HashSet[Sym]
+    used ++= y.used
+    bound ++= path
+    for (n <- inner) {
+      used ++= syms(n)
+      bound += n.n
+      bound ++= boundSyms(n)
+    }
+    for (n <- ns) {
+      used ++= syms(n)
+      bound += n.n
+      bound ++= boundSyms(n)
+    }
+    (used diff bound).toSet
+  }
+
 
   def traverse(n: Node): Unit = n match {
     case n @ Node(f, "λ", List(y:Block), _) =>
@@ -401,7 +428,7 @@ abstract class Transformer extends Traverser {
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph); transform(graph.block.res) }
-    Graph(g.globalDefs,block)
+    Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
 
 }

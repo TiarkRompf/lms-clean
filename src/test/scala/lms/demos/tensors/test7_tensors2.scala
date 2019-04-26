@@ -275,7 +275,7 @@ class TensorFrontEnd2 extends FrontEnd {
       val Node(s,"λ",List(b@Block(List(in),out,ein,eout)),_) = g.findDefinition(f).get
 
       val bound = new Bound
-      bound(Graph(g.globalDefs.toList,b))
+      bound(Graph(g.globalDefs.toList,b, g.globalDefsCache.toMap))
 
       val subst = new mutable.HashMap[Def,Exp]
       subst(in) = x
@@ -365,7 +365,7 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
       // println("bound:")
       // bound.hm.foreach(println)
 
-      val g = new Graph(inner++ns, y)
+      val g = new Graph(inner++ns, y, null) // FIXME: null?
       val reach = new mutable.HashSet[Sym]
 
       val loopSyms = loops.map(_.n).toSet
