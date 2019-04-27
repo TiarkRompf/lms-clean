@@ -997,6 +997,7 @@ abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen
         case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
         case ("toDouble", List(rhs)) => emit("atof("); shallow(rhs); emit(")")
         case ("toInt", List(rhs)) => emit("atoi("); shallow(rhs); emit(")")
+        case ("length", List(rhs)) => emit("strlen("); shallow(rhs); emit(")")
         case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
       }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
