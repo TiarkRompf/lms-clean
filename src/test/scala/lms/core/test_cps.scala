@@ -168,7 +168,7 @@ class CPSTest extends TutorialFunSuite {
       println(src)
       println("// output:")
     })
-    val src2 = driver.code
+    val src2 = driver.code2
     checkOut("lambdaTrans", "scala", {
       println(src2)
       println("// output:")
@@ -199,7 +199,7 @@ class CPSTest extends TutorialFunSuite {
       println(src)
       println("// output:")
     })
-    val src2 = driver.code
+    val src2 = driver.code2
     checkOut("recursionTrans", "scala", {
       println(src2)
       println("// output:")
@@ -236,7 +236,7 @@ class CPSTest extends TutorialFunSuite {
       println(src)
       println("// output:")
     })
-    val src2 = driver.code
+    val src2 = driver.code2
     checkOut("recursionWhileTrans", "scala", {
       println(src2)
       println("// output:")
@@ -280,7 +280,7 @@ class CPSTest extends TutorialFunSuite {
       println(src)
       println("// output:")
     })
-    val src2 = driver.code
+    val src2 = driver.code2
     checkOut("ifWhileTrans", "scala", {
       println(src2)
       println("// output:")
@@ -310,7 +310,7 @@ class CPSTest extends TutorialFunSuite {
       println(src)
       println("// output:")
     })
-    val src2 = driver.code
+    val src2 = driver.code2
     checkOut("whileLambdaTrans", "scala", {
       println(src2)
       println("// output:")

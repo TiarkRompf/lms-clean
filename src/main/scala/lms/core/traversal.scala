@@ -545,7 +545,7 @@ abstract class CPSTransformer extends Transformer {
 
     case Node(f,"?",c::(a:Block)::(b:Block)::_,es) =>
       val sIf = g.reflectEffect("λ", g.reify(e => withSubstScope(f)(e)(k)))(Adapter.CTRL) // XXX without this Effect, If branch is repeated!!
-      val kIf = v => g.reflectEffect("@",sIf,v)(Adapter.CTRL)
+      val kIf = (v:Exp) => g.reflectEffect("@",sIf,v)(Adapter.CTRL)
       withSubst(f) {
         reflectHelper(es, "?", c match {case c: Exp => transform(c); case c => ???},
           transform(a)(kIf), transform(b)(kIf))

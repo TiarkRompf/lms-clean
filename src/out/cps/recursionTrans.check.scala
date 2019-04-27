@@ -1,27 +1,33 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
     def exit(res: Int): Int = return res
-    lazy val x2 = x3 _
-    def x3(c: Int => Int, x5: Int): Int = {
-      val x6 = x5 > 0
-      def cIf0(x12: Int) = {
-        c(x12)
+    lazy val x3 = x4 _
+    def x4(x5: Int => Int, x7: Int): Int = {
+      val x8 = x7 > 0
+      def x12(x10: Int): Int = {
+        val x11 = x5(x10)
+        x11
       }
-      if (x6) {
-        val x8 = x5 - 1
-        def cApp1(x9: Int) = {
-          val x10 = x5 * x9
-          cIf0(x10)
+      val x23 = if (x8) {
+        val x14 = x7 - 1
+        def x19(x16: Int): Int = {
+          val x17 = x7 * x16
+          val x18 = x12(x17)
+          x18
         }
-        x2(cApp1, x8)
+        val x20 = x3(x19, x14)
+        x20
       } else {
-        cIf0(1)
+        val x22 = x12(1)
+        x22
       }
+      x23
     }
-    def cApp2(x13: Int) = {
-      exit(x13)
+    def x27(x25: Int): Int = {
+      exit(x25)
     }
-    x3(cApp2, x1)
+    val x28 = x4(x27, x1)
+    x28
   }
 }
 // output:
