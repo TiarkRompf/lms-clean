@@ -11,9 +11,8 @@ import java.io.PrintWriter
 abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl with CompileScala {
   Adapter.typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
   Adapter.funTable = Nil
-  var filename: String = _
 
-  lazy val g = time("staging") {Adapter.program(Adapter.g.reify(x => Unwrap(wrapper(Wrap[A](x)))))}
+  lazy val g: Graph = time("staging") {Adapter.program(Adapter.g.reify(x => Unwrap(wrapper(Wrap[A](x)))))}
 
   def extra(x: A): Unit = {
     val source = new java.io.ByteArrayOutputStream()
@@ -35,13 +34,7 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
     }
   }
 
-  lazy val code: String = {
-    val temp = utils.captureOut{ (new CPSScalaCodeGen).emitAll(g)(manifest[A],manifest[B]) }
-    val outFile = new PrintWriter(new File(filename))
-    outFile.println(temp)
-    outFile.flush()
-    temp
-  }
+  lazy val code: String = utils.captureOut{ (new CPSScalaCodeGen).emitAll(g)(manifest[A],manifest[B]) }
 
   def eval(x: A): B = {val f1 = f; time("eval")(f1(x))}
 
@@ -54,7 +47,6 @@ class CPSTest extends TutorialFunSuite {
 
   test("simple") {
     val driver = new CPSDslDriver[Int,Int] {
-      filename = "/tmp/simple.scala"
 
       @virtualize
       def snippet(a: Rep[Int]): Rep[Int] = {
@@ -78,7 +70,6 @@ class CPSTest extends TutorialFunSuite {
 
   test("if") {
     val driver = new CPSDslDriver[Int, Int] {
-      filename = "/tmp/if.scala"
 
       @virtualize
       def snippet(a: Rep[Int]): Rep[Int] = {
@@ -105,7 +96,6 @@ class CPSTest extends TutorialFunSuite {
 
   test("while") {
     val driver = new CPSDslDriver[Int,Int] {
-      filename = "/tmp/while.scala"
 
       @virtualize
       def snippet(a: Rep[Int]): Rep[Int] = {
@@ -132,7 +122,6 @@ class CPSTest extends TutorialFunSuite {
 
   test("lambda") {
     val driver = new CPSDslDriver[Int, Int] {
-      filename = "/tmp/lambda.scala"
 
       @virtualize
       def snippet(a: Rep[Int]): Rep[Int] = {
@@ -154,7 +143,6 @@ class CPSTest extends TutorialFunSuite {
 
   test("recursion") {
     val driver = new CPSDslDriver[Int,Int] {
-      filename = "/tmp/recursion.scala"
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Int] = {
@@ -179,7 +167,6 @@ class CPSTest extends TutorialFunSuite {
 
   test("recursionWhile") {
     val driver = new CPSDslDriver[Int,Int] {
-      filename = "/tmp/recursionWhile.scala"
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Int] = {
@@ -210,7 +197,6 @@ class CPSTest extends TutorialFunSuite {
 
   test("ifWhile") {
     val driver = new CPSDslDriver[Int,Int] {
-      filename = "/tmp/ifWhile.scala"
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Int] = {
@@ -249,7 +235,6 @@ class CPSTest extends TutorialFunSuite {
 
   test("whileLambda") {
     val driver = new CPSDslDriver[Int, Int] {
-      filename = "/tmp/whileLambda.scala"
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Int] = {
