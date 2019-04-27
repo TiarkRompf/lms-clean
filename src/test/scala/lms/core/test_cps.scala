@@ -15,7 +15,7 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
 
   lazy val g = time("staging") {Adapter.program(Adapter.g.reify(x => Unwrap(wrapper(Wrap[A](x)))))}
 
-  def extra(x: A, k: Int): Unit = {
+  def extra(x: A): Unit = {
     val source = new java.io.ByteArrayOutputStream()
     // var g = time("staging") {Adapter.program(Adapter.g.reify(x => Unwrap(wrapper(Wrap[A](x)))))}
 
@@ -31,21 +31,21 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
       (new ScalaCodeGen)(g)
     }
     show("// CPS Scala CodeGen") {
-      (new CPSScalaCodeGen)(g)(k)
+      (new CPSScalaCodeGen)(g)
     }
   }
 
-  def code(k: Int): String = {
-    val temp = utils.captureOut{ (new CPSScalaCodeGen).emitAll(g, k)(manifest[A],manifest[B]) }
+  lazy val code: String = {
+    val temp = utils.captureOut{ (new CPSScalaCodeGen).emitAll(g)(manifest[A],manifest[B]) }
     val outFile = new PrintWriter(new File(filename))
     outFile.println(temp)
     outFile.flush()
     temp
   }
 
-  def eval(x: A, k: Int): B = {val f1 = f(k); time("eval")(f1(x))}
+  def eval(x: A): B = {val f1 = f; time("eval")(f1(x))}
 
-  def f(k: Int) = { val c1 = code(k); time("scalac") { Global.sc.compile[A,B]("Snippet", c1, Nil) }}
+  lazy val f = { val c1 = code; time("scalac") { Global.sc.compile[A,B]("Snippet", c1, Nil) }}
 
 }
 
@@ -66,10 +66,10 @@ class CPSTest extends TutorialFunSuite {
     }
     // test by running
     for (i <- 0 until 10) {
-      driver.eval(i+1, 1)
+      assert(driver.eval(i+1) == 1)
     }
     // test source
-    val src = driver.code(5)
+    val src = driver.code
     checkOut("simple", "scala", {
       println(src)
       println("// output:")
@@ -92,10 +92,11 @@ class CPSTest extends TutorialFunSuite {
     }
     // test by running
     for (i <- 1 until 10) {
-      driver.eval(i, if ((i+i)>2){(i+i)*i+i}else{(i+i)/i-i} )
+      val expect = if (i > 1) 2*i*i+i else 2-i
+      assert(driver.eval(i) ==  expect)
     }
     // test source
-    val src = driver.code(5)
+    val src = driver.code
     checkOut("if", "scala", {
       println(src)
       println("// output:")
@@ -119,10 +120,10 @@ class CPSTest extends TutorialFunSuite {
     }
     // test by running
     for (i <- 1 until 11) {
-      driver.eval(i, (2*i + 1)*i )
+      assert(driver.eval(i) == (2*i + 1)*i )
     }
     // test source
-    val src = driver.code(5)
+    val src = driver.code
     checkOut("while", "scala", {
       println(src)
       println("// output:")
@@ -141,10 +142,10 @@ class CPSTest extends TutorialFunSuite {
     }
     // test by running
     for(i <- 0 until 10) {
-      driver.eval(i, i*4)
+      assert(driver.eval(i) == i*4)
     }
     // test source
-    val src = driver.code(5)
+    val src = driver.code
     checkOut("lambda", "scala", {
       println(src)
       println("// output:")
@@ -166,10 +167,10 @@ class CPSTest extends TutorialFunSuite {
     }
     // test by running
     for (i <- 1 until 5) {
-      driver.eval(i, (1 until i+1).toSeq.fold(1:Int){_*_} )
+      assert(driver.eval(i) == (1 until i+1).toSeq.fold(1:Int){_*_} )
     }
     // test source
-    val src = driver.code(5)
+    val src = driver.code
     checkOut("recursion", "scala", {
       println(src)
       println("// output:")
@@ -196,10 +197,11 @@ class CPSTest extends TutorialFunSuite {
       }
     }
     // test by running
-    for (arg <- 1 until 5)
-      driver.eval(arg, (9 until 0 by (-arg)).toSeq.fold(1:Int)(_*_))
+    for (arg <- 1 until 5) {
+      assert(driver.eval(arg) == (9 until 0 by (-arg)).toSeq.fold(1:Int)(_*_))
+    }
     // test source
-    val src = driver.code(5)
+    val src = driver.code
     checkOut("recursionWhile", "scala", {
       println(src)
       println("// output:")
@@ -235,10 +237,10 @@ class CPSTest extends TutorialFunSuite {
       val x = arg * 2
       val bound = if (x > 10) x - 10 else x + 10
       val result = (bound - 1) * bound / 2
-      driver.eval(arg, result)
+      assert(driver.eval(arg) == result)
     }
     // test source
-    val src = driver.code(5)
+    val src = driver.code
     checkOut("ifWhile", "scala", {
       println(src)
       println("// output:")
@@ -260,10 +262,10 @@ class CPSTest extends TutorialFunSuite {
     }
     // test by running
     for(arg <- 1 until 10) {
-      driver.eval(arg, (arg - 1) * arg)
+      assert(driver.eval(arg) == (arg - 1) * arg)
     }
     // test source
-    val src = driver.code(5)
+    val src = driver.code
     checkOut("whileLambda", "scala", {
       println(src)
       println("// output:")

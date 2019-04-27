@@ -1,14 +1,15 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
+    def exit(res: Int): Int = return res
     lazy val x2 = x3 _
-    def x3(c: Int => Unit, x5: Int): Unit = {
+    def x3(c: Int => Int, x5: Int): Int = {
       val x6 = x5 > 0
       def cIf0(x12: Int) = {
         c(x12)
       }
       if (x6) {
         val x8 = x5 - 1
-        def cApp1(x9: Int) {
+        def cApp1(x9: Int) = {
           val x10 = x5 * x9
           cIf0(x10)
         }
@@ -17,11 +18,10 @@ class Snippet extends (Int => Int) {
         cIf0(1)
       }
     }
-    def cApp2(x13: Int) {
-      assert(x13 == 5, "wants 5, gets " + x13)
+    def cApp2(x13: Int) = {
+      exit(x13)
     }
     x3(cApp2, x1)
-    1
   }
 }
 // output:

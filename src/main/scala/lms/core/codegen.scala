@@ -119,7 +119,7 @@ class CPSScalaCodeGen extends CPSTraverser {
   override def traverse(n: Node)(k: => Unit): Unit = n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
-      emitln(s"def ${quote(f)}(c: Int => Unit, ${quote(x)}: Int): Unit = {")
+      emitln(s"def ${quote(f)}(c: Int => Int, ${quote(x)}: Int): Int = {")
       traverse(y, f){ v => emit("c("); emit(quote(v)); emit(")") }
       emitln("\n}")
       k
@@ -135,7 +135,7 @@ class CPSScalaCodeGen extends CPSTraverser {
 
     case n @ Node(f,"W",(c:Block)::(b:Block)::e,_) =>
       val index = fresh
-      emitln(s"def loop$index(): Unit = {")
+      emitln(s"def loop$index(): Int = {")
       traverse(c){ v => emit("if ("); emit(quote(v)); emit(") ") }
       emitln("{")
       traverse(b) { v => emit(s"loop$index()") }
@@ -173,7 +173,7 @@ class CPSScalaCodeGen extends CPSTraverser {
 
     case n @ Node(s,"@",x::y::_,_) =>
       val index = fresh
-      emitln(s"def cApp$index($s: Int) {"); k; emitln("\n}")
+      emitln(s"def cApp$index($s: Int) = {"); k; emitln("\n}")
       emitln(s"${quote(x)}(cApp$index, ${quote(y)})")
 
     case n @ Node(s,"P",List(x),_) =>
@@ -192,17 +192,22 @@ class CPSScalaCodeGen extends CPSTraverser {
       emitln(s"??? " + n.toString); k
   }
 
-  override def apply(g: Graph)(k: Int): Unit = {
+  override def apply(g: Graph): Unit = {
     bound(g)
     path = Nil; inner = g.nodes
-    traverse(g.block){e => emit("assert("); emit(quote(e)); emit(s""" == $k, "wants $k, gets " + """); emit(quote(e)); emit(")")}
+    traverse(g.block){ e => emit(s"exit(${quote(e)})") }
   }
 
-  def emitAll(g: Graph, k: Int)(m1:Manifest[_],m2:Manifest[_]): Unit = {
+  def emitAll(g: Graph)(m1:Manifest[_],m2:Manifest[_]): Unit = {
     val arg = quote(g.block.in.head)
-    emitln(s"class Snippet extends (${m1.toString} => ${m2.toString}) {\ndef apply($arg: Int): Int = {")
-    apply(g)(k)
-    emitln("\n1\n}\n}")
+    emitln(
+      s"""
+        |class Snippet extends (${m1.toString} => ${m2.toString}) {
+        |  def apply($arg: Int): Int = {
+        |    def exit(res: Int): Int = return res
+       """.stripMargin)
+    apply(g)
+    emitln("\n}\n}")
   }
 }
 

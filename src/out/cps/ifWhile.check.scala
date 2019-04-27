@@ -1,15 +1,16 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
+    def exit(res: Int): Int = return res
     val x2 = x1 + x1
     var x3 = 0
     var x4 = 0
     val x5 = x2 > 10
     def cIf0(x36: Int) = {
-      assert(x36 == 5, "wants 5, gets " + x36)
+      exit(x36)
     }
     if (x5) {
       val x9 = x2 - 10
-      def loop1(): Unit = {
+      def loop1(): Int = {
         val x8 = x3
         val x10 = x8 < x9
         if (x10) {
@@ -29,7 +30,7 @@ class Snippet extends (Int => Int) {
       loop1()
     } else {
       val x24 = x2 + 10
-      def loop2(): Unit = {
+      def loop2(): Int = {
         val x23 = x3
         val x25 = x23 < x24
         if (x25) {
@@ -48,7 +49,6 @@ class Snippet extends (Int => Int) {
       }
       loop2()
     }
-    1
   }
 }
 // output:
