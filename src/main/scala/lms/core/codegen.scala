@@ -44,15 +44,21 @@ class ScalaCodeGen extends Traverser {
     case Const(x) => x.toString
   }
 
+  var printRes = true
   override def traverse(ns: Seq[Node], y: Block): Unit = {
     super.traverse(ns, y)
-    emit(quote(y.res))
+    if (printRes) emit(quote(y.res))
+    else printRes = true
   }
 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
-      val x = y.in.head
-      emit(s"def ${quote(f)}(${quote(x)}: Int): Int = {")
+      val para = y.in.length match {
+        case 0 => ""
+        case 1 => s"${quote(y.in.head)}: Int"
+        case 2 => s"${quote(y.in.head)}: Int => Int, ${quote(y.in.tail.head)}: Int"
+      }
+      emit(s"def ${quote(f)}($para): Int = {")
       // see what becomes available given new bound vars
       traverse(y, f)
       emit(s"}")
@@ -94,12 +100,43 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)}(${quote(i)})")
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       emit(s"${quote(x)}(${quote(i)}) = ${quote(y)}")
-    case n @ Node(s,"@",x::y::_,_) =>
-      emit(s"val $s = ${quote(x)}(${quote(y)})")
+    case n @ Node(s,"@",x::y,_) =>
+      emit(s"val $s = ${quote(x)}(${y.map(quote).mkString(", ")})")
     case n @ Node(s,"P",List(x),_) =>
       emit(s"val $s = println(${quote(x)})")
+    case n @ Node(s,">",List(x,y), _) =>
+      emit(s"val $s = ${quote(x)} > ${quote(y)}")
+    case n @ Node(s,"<",List(x,y), _) =>
+      emit(s"val $s = ${quote(x)} < ${quote(y)}")
+    case n @ Node(s,">=",List(x,y), _) =>
+      emit(s"val $s = ${quote(x)} >= ${quote(y)}")
+    case n @ Node(s,"<=",List(x,y), _) =>
+      emit(s"val $s = ${quote(x)} <= ${quote(y)}")
+    case n @ Node(s,"λforward",List(x), _) =>
+      emit(s"lazy val $s = ${quote(x)} _")
+    case n @ Node(s, "define_exit", _, _) =>
+      emit(s"def exit(res: Int): Int = return res")
+    case n @ Node(s, "exit", List(x), _) =>
+      emit(s"exit(${quote(x)})")
+      printRes = false
     case n @ Node(_,_,_,_) =>
       emit(s"??? " + n.toString)
+  }
+
+  override def apply(g: Graph): Unit = {
+    bound(g)
+    withScope(Nil, g.nodes) { traverse(g.block) }
+  }
+
+  def emitAll(g: Graph)(m1:Manifest[_],m2:Manifest[_]): Unit = {
+    val arg = quote(g.block.in.head)
+    emit(
+      s"""
+        |class Snippet extends (${m1.toString} => ${m2.toString}) {
+        |  def apply($arg: Int): Int = {
+       """.stripMargin)
+    apply(g)
+    emit("\n}\n}")
   }
 }
 

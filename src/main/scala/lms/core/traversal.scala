@@ -3,6 +3,7 @@ package lms.core
 import scala.collection.mutable
 
 import Backend._
+import lms.core.stub.Adapter
 
 abstract class Traverser {
 
@@ -29,6 +30,12 @@ abstract class Traverser {
     val (path0, inner0) = (path, inner)
     path = p; inner = ns;
     try b finally { path = path0; inner = inner0 }
+  }
+
+  def withScope1[T](p: List[Sym], ns: Seq[Node])(b: (List[Sym], Seq[Node]) => T): T = {
+    val (path0, inner0) = (path, inner)
+    path = p; inner = ns;
+    try b(path0, inner0) finally { path = path0; inner = inner0 }
   }
 
   def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
@@ -186,9 +193,39 @@ abstract class Traverser {
 
 abstract class CPSTraverser extends Traverser {
 
-  def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = focus(y, extra:_*){ (ns, y) =>
-    traverse(ns, y){ v => withScope(path, inner)(k(v)) }
+  def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = {
+    val path1 = y.bound ++ extra.toList ++ path
+    def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
+    val g = new Graph(inner, y, null)
+    val reach = new mutable.HashSet[Sym]
+    val reachInner = new mutable.HashSet[Sym]
+    reach ++= y.used
+    for (d <- g.nodes.reverseIterator) {
+      if ((reach contains d.n)) {
+        if (available(d)) {
+          for ((e:Sym,f) <- symsFreq(d))
+            if (f > 0.5) reach += e else reachInner += e
+        } else {
+          reach ++= syms(d)
+        }
+      } else {
+        if (reachInner(d.n)) reachInner ++= syms(d)
+      }
+    }
+    val (outer1, inner1) = ((Seq[Node](), Seq[Node]()) /: inner) {
+      case ((outer1 , inner1), n) if reach(n.n) =>
+        if (available(n)) (n +: outer1, inner1) else (outer1, n +: inner1)
+      case ((outer1 , inner1), n) if reachInner(n.n) => (outer1, n +: inner1)
+      case (agg, _) => agg
+    }
+    withScope1(path1, inner1.reverse) { (path0, inner0) =>
+      traverse(outer1.reverse, y){ v => withScope(path0, inner0)(k(v)) }
+    }
   }
+
+  // def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = focus(y, extra:_*){ (ns, y) =>
+  //   traverse(ns, y){ v => withScope(path, inner)(k(v)) }  // WRONG!
+  // }
 
   def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit =
     if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(y.res)
@@ -431,4 +468,132 @@ abstract class Transformer extends Traverser {
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
 
+}
+
+abstract class CPSTransformer extends Transformer {
+
+  val forwardMap = mutable.Map[Sym, Sym]()
+
+  def withSubstScope(args: Sym*)(actuals: Exp*)(k: => Exp) = {
+    args foreach { arg => if (subst contains arg) println(s"Warning: already have a subst for $arg") }
+    try {
+      args.zip(actuals).foreach{ case (arg, e) => subst(arg) = e}; k
+    } finally args.foreach{ arg => subst -= arg }
+  }
+
+  def traverse(y: Block, extra: Sym*)(k: Exp => Exp): Exp = {
+    val path1 = y.bound ++ extra.toList ++ path
+    def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
+    val g = new Graph(inner, y, null)
+    val reach = new mutable.HashSet[Sym]
+    val reachInner = new mutable.HashSet[Sym]
+    reach ++= y.used
+    for (d <- g.nodes.reverseIterator) {
+      if ((reach contains d.n)) {
+        if (available(d)) {
+          for ((e:Sym,f) <- symsFreq(d))
+            if (f > 0.5) reach += e else reachInner += e
+        } else {
+          reach ++= syms(d)
+        }
+      } else {
+        if (reachInner(d.n)) reachInner ++= syms(d)
+      }
+    }
+    val (outer1, inner1) = ((Seq[Node](), Seq[Node]()) /: inner) {
+      case ((outer1 , inner1), n) if reach(n.n) =>
+        if (available(n)) (n +: outer1, inner1) else (outer1, n +: inner1)
+      case ((outer1 , inner1), n) if reachInner(n.n) => (outer1, n +: inner1)
+      case (agg, _) => agg
+    }
+    withScope1(path1, inner1.reverse) { (path0, inner0) =>
+      traverse(outer1.reverse, y){ v => withScope(path0, inner0)(k(v)) }
+    }
+  }
+
+  def traverse(ns: Seq[Node], y: Block)(k: Exp => Exp): Exp =
+    if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(transform(y.res))
+
+  def transform(b: Block)(k: Exp => Exp): Block =
+    g.reify(b.in.length, (es: List[Exp]) =>
+      withSubstScope(b.in:_*)(es:_*){
+        traverse(b)(k)
+      })
+
+  // need to add additional input to the block, XXX CAN SIMPLIFY ?
+  def transformLambda(b: Block): Block = {
+    val c = Sym(g.fresh)
+    val block = transform(b)(v => g.reflectEffect("@",c,v)(Adapter.CTRL))
+    Block(c::block.in, block.res, block.ein, block.eff)
+  }
+
+  def reflectHelper(es: EffectSummary, op: String, args: Def*): Exp =
+    if (es.deps.nonEmpty) g.reflectEffect(op, args: _*)(es.keys.map(transform):_*) else g.reflect(op, args:_*)
+
+  def withSubst(s: Sym)(e: => Exp) = { subst(s) = e; subst(s) }
+
+  def traverse(n: Node)(k: => Exp): Exp = n match {
+
+    case Node(s,"λ", List(b: Block),_) =>
+      if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
+        val s1: Sym = subst(s).asInstanceOf[Sym]
+        g.reflect(s1, "λ", transformLambda(b))(forwardMap(s1))()
+      } else {
+        subst(s) = g.reflect("λ", transformLambda(b))
+      }
+      k
+
+    case Node(f,"?",c::(a:Block)::(b:Block)::_,es) =>
+      val sIf = g.reflectEffect("λ", g.reify(e => withSubstScope(f)(e)(k)))(Adapter.CTRL) // XXX without this Effect, If branch is repeated!!
+      val kIf = v => g.reflectEffect("@",sIf,v)(Adapter.CTRL)
+      withSubst(f) {
+        reflectHelper(es, "?", c match {case c: Exp => transform(c); case c => ???},
+          transform(a)(kIf), transform(b)(kIf))
+      }
+
+    case Node(f,"W",(c:Block)::(b:Block)::e, es) =>
+      val sLoop = Sym(g.fresh)
+      g.reflect(sLoop, "λ", transform(c)(v =>
+        reflectHelper(es, "?", v, transform(b)(v =>
+          g.reflectEffect("@", sLoop)(Adapter.CTRL)), g.reify(k))))()(Adapter.CTRL)
+      withSubst(f)(reflectHelper(es, "@", sLoop))
+
+    case n @ Node(s,"@",(x:Exp)::(y:Exp)::_,es) =>
+      val cont = reflectHelper(es, "λ", g.reify{e => subst(s) = e; k})
+      withSubst(s)(reflectHelper(es, "@", transform(x), cont, transform(y)))
+
+    case Node(s,"λforward",List(y:Sym), _) =>
+      assert(!(subst contains y), "should not have handled lambda yet")
+      val sFrom = Sym(g.fresh); val sTo = Sym(g.fresh)
+      subst(s) = sFrom; subst(y) = sTo
+      forwardMap(sTo) = sFrom
+      g.reflect(sFrom, "λforward", sTo)()()
+      k
+
+    case Node(s,op,rs,es) =>
+      subst(s) = reflectHelper(es, op, rs.map {
+        case b: Block => transform(b)(v => k)   // FIXME
+        case s: Exp => transform(s)
+        case a => a
+      }:_*); k
+  }
+
+  def applyExp(graph: Graph): Exp = {
+    bound(graph)
+    withScope(Nil, graph.nodes) {
+      val exit = g.reflectEffect("define_exit")(Adapter.STORE) // Note: had to use this key to make sure it is generated
+      traverse(graph.block)(v => g.reflectEffect("exit", v)(Adapter.CTRL))
+    }
+  }
+
+  override def transform(graph: Graph): Graph = {
+    // XXX unfortunate code duplication, either
+    // with traverser or with transform(Block)
+    val block = g.reify { e =>
+      assert(graph.block.in.length == 1)
+      subst(graph.block.in(0)) = e
+      applyExp(graph)
+    }
+    Graph(g.globalDefs, block, g.globalDefsCache.toMap)
+  }
 }
