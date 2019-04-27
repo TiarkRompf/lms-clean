@@ -25,7 +25,7 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
     }
 
     show("// Generic CodeGen") {
-      (new CodeGen)(g)
+      (new GenericCodeGen)(g)
     }
     show("// Scala CodeGen") {
       (new ScalaCodeGen)(g)

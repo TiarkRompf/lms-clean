@@ -86,7 +86,7 @@ def tensors_05(x0: Int): Int /* x1 */ = {
       val x13 = forloop(5, { (x14: Int) /* x15 */ =>
         val x16 = x11 + x14
         val x17 = x16 + x16
-        val x18 = x7 + x12 + x14
+        val x18 = x7 + (x12 + x14)
         x2(x18) = x17
         x3(x18) = x17 + x16
         /* x19x20 */

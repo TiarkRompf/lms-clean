@@ -447,7 +447,7 @@ class TensorTest2 extends TutorialFunSuite {
           g.nodes.foreach(println)
 
           println("// Generic Codegen:")
-          (new CodeGen)(g)
+          (new GenericCodeGen)(g)
 
           println("// Scala Codegen:")
           (new ScalaCodeGen)(g)

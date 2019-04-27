@@ -10,7 +10,6 @@ void Snippet(int x0) {
   if (x0 > 0) {
     printf("fail");
     exit(0);
-  } else {
   }
 }
 /*****************************************

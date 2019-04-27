@@ -59,7 +59,7 @@ def tensors_04(x0: Int): Int = {
       val x8 = x6 * 5
       forloop(5, { (x10: Int) =>
         val x11 = x7 + x10
-        x1(x4 + x8 + x10) = x11 + x11
+        x1(x4 + (x8 + x10)) = x11 + x11
       })
     })
   })

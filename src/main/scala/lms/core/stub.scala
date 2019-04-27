@@ -46,7 +46,7 @@ object Adapter extends FrontEnd {
       g.nodes.foreach(println)
 
       println("// Generic Codegen:")
-      (new CodeGen)(g)
+      (new GenericCodeGen)(g)
 
       println("// Scala Codegen:")
       (new ScalaCodeGen)(g)
@@ -101,7 +101,7 @@ object Adapter extends FrontEnd {
       case ("Array.length", List(Def("Array", List(Const(as: Array[_]))))) =>
         Some(Const(as.length))
 
-      case ("Boolean.!", List(Const(b: Boolean))) => Some(Const(!b))
+      case ("!", List(Const(b: Boolean))) => Some(Const(!b))
       case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
       case ("!=", List(Const(a), Const(b))) => Some(Const(a != b))
       case ("<=", List(Const(a: Int), Const(b: Int))) => Some(Const(a <= b))
@@ -633,7 +633,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   implicit def bool2boolOps(lhs: Boolean) = new BoolOps(lhs)
   implicit def var2boolOps(lhs: Var[Boolean]) = new BoolOps(lhs)
   implicit class BoolOps(lhs: Rep[Boolean]) {
-    def unary_!(implicit pos: SourceContext): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("Boolean.!", Unwrap(lhs)))
+    def unary_!(implicit pos: SourceContext): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("!", Unwrap(lhs)))
     def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
     __ifThenElse(lhs, rhs, unit(false))
     // def &&(rhs: => Rep[Boolean])(implicit pos: SourceContext): Rep[Boolean] = lhs match {

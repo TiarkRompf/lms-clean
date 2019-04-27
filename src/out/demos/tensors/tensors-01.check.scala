@@ -42,7 +42,7 @@ def tensors_01(x0: Int): Int = {
       var x6 = 0
       val x7 = x4 * 5
       while (x6 != 5) {
-        val x8 = x5 + x7 + x6
+        val x8 = x5 + (x7 + x6)
         x1(x8) = 2
         x2(x8) = 3
         x6 = x6 + 1
@@ -76,7 +76,7 @@ def tensors_01(x0: Int): Int = {
     foreach(4, { x7 =>
       val x8 = x7 * 5
       foreach(5, { x10 =>
-        val x11 = x5 + x8 + x10
+        val x11 = x5 + (x8 + x10)
         x1(x11) = 2
         x2(x11) = 3
       })
