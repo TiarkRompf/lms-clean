@@ -1132,6 +1132,8 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
   }
 
   override def shallow(n: Node): Unit = n match {
+    case Node(s, op, List(a), _) if math.contains(op) =>
+      emit(s"$op("); shallow(a); emit(")")
     case Node(s, "cast", List(a), _) =>
       val tpe = typeMap.getOrElse(s, manifest[Unknown])
       a match {// FIXME should it be there?
