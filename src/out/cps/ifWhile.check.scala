@@ -1,6 +1,6 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def exit(res: Int): Int = return res
+    def exit(res: Int): Int = res
     val x2 = x1 + x1
     var x3 = 0
     var x4 = 0

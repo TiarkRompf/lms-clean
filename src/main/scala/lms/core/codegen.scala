@@ -115,7 +115,7 @@ class ScalaCodeGen extends Traverser {
     case n @ Node(s,"λforward",List(x), _) =>
       emit(s"lazy val $s = ${quote(x)} _")
     case n @ Node(s, "define_exit", _, _) =>
-      emit(s"def exit(res: Int): Int = return res")
+      emit(s"def exit(res: Int): Int = res")
     case n @ Node(s, "exit", List(x), _) =>
       emit(s"exit(${quote(x)})")
       printRes = false
@@ -154,6 +154,7 @@ class CPSScalaCodeGen extends CPSTraverser {
   }
 
   override def traverse(n: Node)(k: => Unit): Unit = n match {
+
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
       emitln(s"def ${quote(f)}(c: Int => Int, ${quote(x)}: Int): Int = {")
@@ -241,7 +242,7 @@ class CPSScalaCodeGen extends CPSTraverser {
       s"""
         |class Snippet extends (${m1.toString} => ${m2.toString}) {
         |  def apply($arg: Int): Int = {
-        |    def exit(res: Int): Int = return res
+        |    def exit(res: Int): Int = res
        """.stripMargin)
     apply(g)
     emitln("\n}\n}")

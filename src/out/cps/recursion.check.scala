@@ -1,6 +1,6 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def exit(res: Int): Int = return res
+    def exit(res: Int): Int = res
     lazy val x2 = x3 _
     def x3(c: Int => Int, x5: Int): Int = {
       val x6 = x5 > 0
