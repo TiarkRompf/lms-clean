@@ -58,7 +58,7 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
 class CPSTest extends TutorialFunSuite {
   val under = "cps/"
 
-  test("reset1") {
+  test("dc") {
     val driver = new CPSDslDriver[Int, Int] {
 
       @virtualize
@@ -89,17 +89,535 @@ class CPSTest extends TutorialFunSuite {
     }
     // test source
     val src = driver.code
-    checkOut("reset1", "scala", {
+    checkOut("dc", "scala", {
       println(src)
       println("// output:")
     })
-    // test source
     val src2 = driver.code2
-    checkOut("reset1Trans", "scala", {
+    checkOut("dcTrans", "scala", {
       println(src2)
       println("// output:")
     })
   }
+
+  test("dcIf") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        val x1 = reset1 {
+          1 + shift1[Int, Int] { k =>
+            3 + (if (arg > 5) k(k(arg))
+                 else k(arg) + 5)
+          } * 2
+        } + 4
+        x1 + 10
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = {
+        val x1 = reset {
+          1 + shift { (k: Int => Int) =>
+            3 + (if (arg > 5) k(k(arg))
+                 else k(arg) + 5)
+          } * 2
+        } + 4
+        x1 + 10
+      }
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("dcIf", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("dcIfTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("ifDc") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        val x1 = reset1 {
+          def s(x: Rep[Int]) = shift1[Int, Int] { k => k(k(x)) + 7 }
+          if (arg > 5) {
+            s(arg - 5) * 3
+          } else {
+            s(arg + 5) * 2
+          } + 2
+        } + 4
+        x1 + 10
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = {
+        val x1 = reset {
+          def s(x: Int) = shift{ (k: Int => Int) => k(k(x)) + 7 }
+          if (arg > 5) {
+            s(arg - 5) * 3
+          } else {
+            s(arg + 5) * 2
+          } + 2
+        } + 4
+        x1 + 10
+      }
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("ifDc", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("ifDcTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("ifDc1") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        val x1 = reset1 {
+          def s(x: Rep[Int]) = shift1[Int, Int] { k => k(k(x)) + 7 }
+          if (arg > 5) {
+            s(arg - 5) * 3
+          } else {
+            arg + 100
+          } + 2
+        } + 4
+        x1 + 10
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = {
+        val x1 = reset {
+          def s(x: Int) = shift{ (k: Int => Int) => k(k(x)) + 7 }
+          if (arg > 5) {
+            s(arg - 5) * 3
+          } else {
+            arg + 100
+          } + 2
+        } + 4
+        x1 + 10
+      }
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("ifDc1", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("ifDc1Trans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("dcWhile") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          shift1[Int, Int] { k =>
+            var i = 0
+            var res = 0
+            while (i < 5) {
+              res = k(res) + k(arg) + k(i)
+              i = i + 1
+            }
+            res
+          } * 2
+        } + 4
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = reset {
+        shift { (k: Int => Int) =>
+          var i = 0
+          var res = 0
+          while (i < 5) {
+            res = k(res) + k(arg) + k(i)
+            i = i + 1
+          }
+          res
+        } * 2
+      } + 4
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("dcWhile", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("dcWhileTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("whileDc") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          var i = 0
+          var res = 0
+          while (i < 5) {
+            shift1[Int, Int] { k =>
+              res = k(res) + k(arg) + k(i)
+              res
+            } * 2
+            i = i + 1
+          }
+          res
+        } + 4
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = reset {
+        var i = 0
+        var res = 0
+        while (i < 5) {
+          shift { (k: Int => Int) =>
+            res = k(res) + k(arg) + k(i)
+            res
+          } * 2
+          i = i + 1
+        }
+        res
+      } + 4
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("whileDc", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("whileDcTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("whileDc2") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        var i = 0
+        var res = 0
+        while (i < 5) {
+          i = i + 1
+          reset1 {
+            shift1[Int, Int] { k =>
+              res = k(res) + k(arg) + k(i)
+              res
+            } * 2
+          } + 4
+          ()
+        }
+        res
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = {
+        var i = 0
+        var res = 0
+        while (i < 5) {
+          i = i + 1
+          reset {
+            shift { (k: Int => Int) =>
+              res = k(res) + k(arg) + k(i)
+              res
+            } * 2
+          } + 4
+        }
+        res
+      }
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("whileDc2", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("whileDc2Trans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("dcLambda") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          shift1[Int, Int] { k =>
+            val double = fun { (x: Rep[Int]) => x * 2 }
+            double(k(double(k(arg))))
+          } + 2
+        } + 5
+      }
+    }
+    // test by running
+    for(arg <- 0 until 10) {
+      val expect = reset {
+        shift { (k: Int => Int) =>
+          val double = (x: Int) => x * 2
+          double(k(double(k(arg))))
+        } + 2
+      } + 5
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("dcLambda", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("dcLambdaTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("lambdaDc") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          val f = fun { (x: Rep[Int]) =>
+            shift1[Int, Int] { k =>
+              k(x) + k(arg)
+            }
+          }
+          f(arg + 2)
+        } + 5
+      }
+    }
+    // test by running
+    for(arg <- 0 until 10) {
+      val expect = reset {
+        val f = (x: Int) => shift { (k: Int => Int) =>
+          k(x) + k(arg)
+        }
+        f(arg + 2)
+      } + 5
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("lambdaDc", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("lambdaDcTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("lambdaDc2") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        val f = fun { (x: Rep[Int]) =>
+          reset1 {
+            shift1[Int, Int] { k =>
+              k(x) + k(arg)
+            } * 2
+          } + 5
+        }
+        f(arg + 2)
+      }
+    }
+    // test by running
+    for(arg <- 0 until 10) {
+      val expect = {
+        val f = (x: Int) => {
+          reset {
+            shift { (k: Int => Int) =>
+              k(x) + k(arg)
+            } * 2
+          } + 5
+        }
+        f(arg + 2)
+      }
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("lambdaDc2", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("lambdaDc2Trans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("DcRecursion") {
+    val driver = new CPSDslDriver[Int,Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          shift1[Int, Int] { k =>
+            lazy val f: Rep[Int => Int] = fun { (x: Rep[Int]) =>
+              if (x > 0) k(x) * f(x - 1)
+              else k(x)
+            }
+            f(arg)
+          } * 2 + 3
+        } + 10
+      }
+    }
+    // test by running
+    for (arg <- 1 until 5) {
+      val expect = reset {
+        shift { (k: Int => Int) =>
+          def f(x: Int): Int = if (x > 0) k(x) * f(x - 1) else k(x)
+          f(arg)
+        } * 2 + 3
+      } + 10
+      assert(driver.eval(arg) ==  expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("DcRecursion", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("DcRecursionTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  test("recursionDc") {
+    val driver = new CPSDslDriver[Int,Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        lazy val f: Rep[Int => Int] = fun { (x: Rep[Int]) =>
+          reset1 {
+            shift1[Int, Int] { k =>
+              if (x > 0) k(x) * f(x - 1) else k(x)
+            } * 2 + 3
+          } + 10
+        }
+        f(arg)
+      }
+    }
+    // test by running
+    for (arg <- 1 until 5) {
+      val expect = {
+        def f(x: Int): Int = reset {
+          shift { (k: Int => Int) =>
+            if (x > 0) k(x) * f(x - 1) else k(x)
+          } * 2 + 3
+        } + 10
+        f(arg)
+      }
+      assert(driver.eval(arg) ==  expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("recursionDc", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("RecursionDcTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
+
+  // An example of nested shift. the shift/reset compile plugin disallows it!
+  // test("recursionDc") {
+  //   val driver = new CPSDslDriver[Int,Int] {
+
+  //     @virtualize
+  //     def snippet(arg: Rep[Int]): Rep[Int] = {
+  //       reset1 {
+  //         lazy val f: Rep[Int => Int] = fun { (x: Rep[Int]) =>
+  //           shift1[Int, Int] { k =>
+  //             if (x > 0) k(x) * f(x - 1) else k(x)
+  //           } * 2 + 3
+  //         }
+  //         f(arg)
+  //       } + 10
+  //     }
+  //   }
+  //   // test by running
+  //   for (arg <- 1 until 10) {
+  //     val expect = reset {
+  //       def f(x: Int): Int = shift { (k: Int => Int) =>
+  //         if (x > 0) k(x) * f(x - 1) else k(x)
+  //       } * 2 + 3
+  //       f(arg)
+  //     } + 10
+  //     assert(driver.eval(arg) ==  expect)
+  //     assert(driver.eval2(arg) == expect)
+  //   }
+  //   // test source
+  //   val src = driver.code
+  //   checkOut("recursionDc", "scala", {
+  //     println(src)
+  //     println("// output:")
+  //   })
+  //   val src2 = driver.code2
+  //   checkOut("recursionDcTrans", "scala", {
+  //     println(src2)
+  //     println("// output:")
+  //   })
+  // }
 
   test("simple") {
     val driver = new CPSDslDriver[Int,Int] {
