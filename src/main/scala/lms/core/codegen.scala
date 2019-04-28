@@ -119,6 +119,8 @@ class ScalaCodeGen extends Traverser {
     case n @ Node(s, "exit", List(x), _) =>
       emit(s"exit(${quote(x)})")
       printRes = false
+    case n @ Node(s, "reset0", List(x:Block), _) =>
+      emit(s"val $s = {"); traverse(x); emit("\n}")
     case n @ Node(_,_,_,_) =>
       emit(s"??? " + n.toString)
   }
@@ -153,7 +155,20 @@ class CPSScalaCodeGen extends CPSTraverser {
     case Const(x) => x.toString
   }
 
+  val contSet = mutable.Set.empty[Exp]
+
   override def traverse(n: Node)(k: => Unit): Unit = n match {
+
+    case n @ Node(s,"shift1",List(y:Block),_) =>
+      contSet += y.in.head
+      emitln(s"def ${quote(y.in.head)}($s: Int) = {"); k; emitln("\n}")
+      traverse(y)(v => emitln(quote(v)))
+
+    case n @ Node(s,"reset1",List(y:Block),_) =>
+      emitln(s"val ${quote(s)} = {")
+      traverse(y){ v => emit(quote(v)) }
+      emitln("\n}")
+      k
 
     case n @ Node(f,"λ",List(y:Block),_) =>
       val x = y.in.head
@@ -210,9 +225,14 @@ class CPSScalaCodeGen extends CPSTraverser {
       emitln(s"${quote(x)}(${quote(i)}) = ${quote(y)}"); k
 
     case n @ Node(s,"@",x::y::_,_) =>
-      val index = fresh
-      emitln(s"def cApp$index($s: Int) = {"); k; emitln("\n}")
-      emitln(s"${quote(x)}(cApp$index, ${quote(y)})")
+      if (x.isInstanceOf[Sym] && contSet.contains(x.asInstanceOf[Sym])) {
+        emitln(s"val ${quote(s)} = ${quote(x)}(${quote(y)})"); k
+      }
+      else {
+        val index = fresh
+        emitln(s"def cApp$index($s: Int) = {"); k; emitln("\n}")
+        emitln(s"${quote(x)}(cApp$index, ${quote(y)})")
+      }
 
     case n @ Node(s,"P",List(x),_) =>
       emitln(s"val $s = println(${quote(x)})"); k

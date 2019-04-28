@@ -651,15 +651,15 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   // shift/reset
-  def shift1[A:Manifest](f: Rep[A => Unit] => Rep[Unit]): Rep[A] = {
-    val bBlock = Adapter.g.reify(x => Unwrap(f(Wrap[A => Unit](x))))
+  def shift1[A:Manifest, B:Manifest](f: Rep[A => B] => Rep[B]): Rep[A] = { // XXX is the type signature correct?
+    val bBlock = Adapter.g.reify(x => Unwrap(f(Wrap[A => B](x))))
     val efs = Adapter.g.getEffKeys(bBlock)
     Wrap[A](Adapter.g.reflectEffect("shift1", bBlock)(efs: _*))
   }
-  def reset1(f: => Rep[Unit]): Rep[Unit] = {
+  def reset1[A:Manifest](f: => Rep[A]): Rep[A] = { // XXX is the type signature correct?
     val rBlock = Adapter.g.reify(Unwrap(f))
     val efs = Adapter.g.getEffKeys(rBlock)
-    Wrap[Unit](Adapter.g.reflectEffect("reset1", rBlock)(efs: _*))
+    Wrap[A](Adapter.g.reflectEffect("reset1", rBlock)(efs: _*))
   }
 
   // Functions

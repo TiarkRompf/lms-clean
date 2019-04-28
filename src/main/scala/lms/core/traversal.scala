@@ -227,8 +227,9 @@ abstract class CPSTraverser extends Traverser {
   //   traverse(ns, y){ v => withScope(path, inner)(k(v)) }  // WRONG!
   // }
 
-  def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit =
+  def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit = {
     if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(y.res)
+  }
 
   def traverse(bs: List[Block])(k: => Unit): Unit =
     if (!bs.isEmpty) traverse(bs.head)(v => traverse(bs.tail)(k)) else k
@@ -511,8 +512,9 @@ abstract class CPSTransformer extends Transformer {
     }
   }
 
-  def traverse(ns: Seq[Node], y: Block)(k: Exp => Exp): Exp =
+  def traverse(ns: Seq[Node], y: Block)(k: Exp => Exp): Exp = {
     if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(transform(y.res))
+  }
 
   def transform(b: Block)(k: Exp => Exp): Block =
     g.reify(b.in.length, (es: List[Exp]) =>
@@ -532,7 +534,18 @@ abstract class CPSTransformer extends Transformer {
 
   def withSubst(s: Sym)(e: => Exp) = { subst(s) = e; subst(s) }
 
+  val contSet = mutable.Set.empty[Exp]
+
   def traverse(n: Node)(k: => Exp): Exp = n match {
+
+    case n @ Node(s,"shift1",List(y:Block),_) =>
+      contSet += y.in.head
+      subst(y.in.head) = g.reflectEffect("λ", g.reify(e => withSubstScope(s)(e)(k)))(Adapter.CTRL)
+      traverse(y)(v => v)
+
+    case n @ Node(s,"reset1",List(y:Block),_) =>
+      subst(s) = g.reflectEffect("reset0", transform(y)(v => v))(Adapter.CTRL)
+      k
 
     case Node(s,"λ", List(b: Block),_) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
@@ -559,8 +572,13 @@ abstract class CPSTransformer extends Transformer {
       withSubst(f)(reflectHelper(es, "@", sLoop))
 
     case n @ Node(s,"@",(x:Exp)::(y:Exp)::_,es) =>
-      val cont = reflectHelper(es, "λ", g.reify{e => subst(s) = e; k})
-      withSubst(s)(reflectHelper(es, "@", transform(x), cont, transform(y)))
+      if (contSet contains x) {
+        subst(s) = reflectHelper(es, "@", transform(x), transform(y))
+        k
+      } else {
+        val cont = reflectHelper(es, "λ", g.reify{e => subst(s) = e; k})
+        withSubst(s)(reflectHelper(es, "@", transform(x), cont, transform(y)))
+      }
 
     case Node(s,"λforward",List(y:Sym), _) =>
       assert(!(subst contains y), "should not have handled lambda yet")

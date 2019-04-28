@@ -8,6 +8,9 @@ import utils.time
 import java.io.File
 import java.io.PrintWriter
 
+import scala.util.continuations._
+import scala.util.continuations
+
 abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl with CompileScala {
   Adapter.typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
   Adapter.funTable = Nil
@@ -54,6 +57,49 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
 
 class CPSTest extends TutorialFunSuite {
   val under = "cps/"
+
+  test("reset1") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        val x1 = reset1 {
+          shift1[Int, Int]{ k =>
+            2 * k(arg)
+          } + shift1[Int, Int] { k =>
+            3 * k(arg)
+          } + 4
+        }
+        x1 * arg
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = {
+        arg * reset {
+          shift { (k: Int => Int) =>
+            2 * k(arg)
+          } + shift { (k: Int => Int) =>
+            3 * k(arg)
+          } + 4
+        }
+      }
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("reset1", "scala", {
+      println(src)
+      println("// output:")
+    })
+    // test source
+    val src2 = driver.code2
+    checkOut("reset1Trans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+  }
 
   test("simple") {
     val driver = new CPSDslDriver[Int,Int] {

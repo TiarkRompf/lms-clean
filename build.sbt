@@ -24,6 +24,13 @@ libraryDependencies += ("org.scala-lang" % "scala-compiler" % scalaVersion.value
 
 addCompilerPlugin("org.scalamacros" % "paradise" % paradiseVersion cross CrossVersion.full)
 
+addCompilerPlugin("org.scala-lang.plugins" % "scala-continuations-plugin_2.12.0" % "1.0.3")
+
+libraryDependencies += "org.scala-lang.plugins" % "scala-continuations-library_2.12" % "1.0.3"
+
+scalacOptions += "-P:continuations:enable"
+
+
 // --- testing ---
 
 // tests are not thread safe
