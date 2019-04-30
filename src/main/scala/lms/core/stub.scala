@@ -653,13 +653,11 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // shift/reset
   def shift1[A:Manifest, B:Manifest](f: Rep[A => B] => Rep[B]): Rep[A] = { // XXX is the type signature correct?
     val bBlock = Adapter.g.reify(x => Unwrap(f(Wrap[A => B](x))))
-    val efs = Adapter.g.getEffKeys(bBlock)
-    Wrap[A](Adapter.g.reflectEffect("shift1", bBlock)(efs: _*))
+    Wrap[A](Adapter.g.reflectEffect("shift1", bBlock)(Adapter.CPS))
   }
   def reset1[A:Manifest](f: => Rep[A]): Rep[A] = { // XXX is the type signature correct?
     val rBlock = Adapter.g.reify(Unwrap(f))
-    val efs = Adapter.g.getEffKeys(rBlock)
-    Wrap[A](Adapter.g.reflectEffect("reset1", rBlock)(efs: _*))
+    Wrap[A](Adapter.g.reflectEffect("reset1", rBlock)())
   }
 
   // Functions
@@ -717,7 +715,10 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         // NOTE: lambda expression itself does not have
         // an effect, so body block should not count as
         // latent effect of the lambda
-        val res = Adapter.g.reflect(fn1,"λ",Adapter.g.reify(arity, gf))(fn)()
+        val block = Adapter.g.reify(arity, gf)
+        val res = Adapter.g.reflect(fn1,"λ",block)(fn)(
+          Adapter.g.getLatentEffect(block).filter(_ == Adapter.CPS).distinct: _* // should capture CPS effect if the block has any
+        )
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }

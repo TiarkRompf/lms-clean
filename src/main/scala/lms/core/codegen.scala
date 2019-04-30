@@ -68,10 +68,10 @@ class ScalaCodeGen extends Traverser {
       emit(s"} else {")
       traverse(b)
       emit(s"}")
-    case n @ Node(f,"W",List(c:Block,b:Block,e),_) =>
+    case n @ Node(f,"W",List(c:Block,b:Block),_) =>
       emit(s"while ({")
       traverse(c)
-      emit(s"}) else {")
+      emit(s"}) {")
       traverse(b)
       emit(s"}")
     case n @ Node(s,"+",List(x,y),_) =>

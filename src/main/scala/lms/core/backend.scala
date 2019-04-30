@@ -125,8 +125,12 @@ class GraphBuilder {
       case None =>
 
         // latent effects? closures, mutable vars, ... (these are the keys!)
-        val efKeys2 = (if (s == "λ") efKeys else // NOTE: block in lambda is a latent effect for app, not declaration
+        val efKeys2_ = (if (s == "λ") efKeys else // NOTE: block in lambda is a latent effect for app, not declaration
           (as.toList.flatMap(getLatentEffect) ++ efKeys)).distinct
+        val efKeys2 = s match {
+          case "reset1" => efKeys2_ filter (_ != stub.Adapter.CPS)
+          case _ => efKeys2_
+        }
 
         // effects or pure?
         if (efKeys2.nonEmpty) {

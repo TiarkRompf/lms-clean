@@ -52,6 +52,17 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
 
   lazy val f2 = { val c1 = code2; time("scalac") { Global.sc.compile[A,B]("Snippet", c1, Nil) }}
 
+  // selective CPS Transformation
+  val sTransformer = new SelectiveCPSTransformer { g = Adapter.mkGraphBuilder() }
+
+  lazy val stg: Graph = time("selective transforming") { sTransformer.transform(g) }
+
+  lazy val code3: String = utils.captureOut{ (new ScalaCodeGen).emitAll(stg)(manifest[A],manifest[B]) }
+
+  def eval3(x: A): B = {val f1 = f3; time("eval")(f1(x))}
+
+  lazy val f3 = { val c1 = code3; time("scalac") { Global.sc.compile[A,B]("Snippet", c1, Nil) }}
+
 }
 
 
@@ -86,6 +97,7 @@ class CPSTest extends TutorialFunSuite {
       }
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -96,6 +108,11 @@ class CPSTest extends TutorialFunSuite {
     val src2 = driver.code2
     checkOut("dcTrans", "scala", {
       println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("dcTransSelective", "scala", {
+      println(src3)
       println("// output:")
     })
   }
@@ -127,6 +144,7 @@ class CPSTest extends TutorialFunSuite {
       }
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -137,6 +155,95 @@ class CPSTest extends TutorialFunSuite {
     val src2 = driver.code2
     checkOut("dcIfTrans", "scala", {
       println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("dcIfTransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
+  }
+
+  test("dc_if") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          var x = arg * 2
+          shift1[Int, Int] { k =>
+            k(k(arg)) + 3
+          } * (if (x > 5) arg - 5 else arg + 5)
+        } + 10
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = reset {
+        var x = arg * 2
+        shift { (k: Int => Int) =>
+          k(k(arg)) + 3
+        } * (if (x > 5) arg - 5 else arg + 5)
+      } + 10
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("dc_if", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("dc_ifTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("dc_ifTransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
+  }
+
+  test("if_outOf_dc") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        if (arg > 5) reset1 {
+          shift1[Int, Int] { k =>
+            k(k(arg)) + 3
+          } * 2
+        } + 10 else arg + 5
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = if (arg > 5) reset {
+        shift { (k: Int => Int) =>
+          k(k(arg)) + 3
+        } * 2
+      } + 10 else arg + 5
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("if_outOf_dc", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("if_outOf_dcTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("if_outOf_dcTransSelective", "scala", {
+      println(src3)
       println("// output:")
     })
   }
@@ -172,6 +279,7 @@ class CPSTest extends TutorialFunSuite {
       }
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -182,6 +290,11 @@ class CPSTest extends TutorialFunSuite {
     val src2 = driver.code2
     checkOut("ifDcTrans", "scala", {
       println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("ifDcTransSelective", "scala", {
+      println(src3)
       println("// output:")
     })
   }
@@ -217,6 +330,7 @@ class CPSTest extends TutorialFunSuite {
       }
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -227,6 +341,11 @@ class CPSTest extends TutorialFunSuite {
     val src2 = driver.code2
     checkOut("ifDc1Trans", "scala", {
       println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("ifDc1TransSelective", "scala", {
+      println(src3)
       println("// output:")
     })
   }
@@ -264,6 +383,7 @@ class CPSTest extends TutorialFunSuite {
       } + 4
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -274,6 +394,66 @@ class CPSTest extends TutorialFunSuite {
     val src2 = driver.code2
     checkOut("dcWhileTrans", "scala", {
       println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("dcWhileTransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
+  }
+
+  test("dc_while") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        var i = 0
+        var res = 0
+        reset1 {
+          while (i < 5) {
+            res = res + i
+            i = i + 1
+          }
+          res * shift1[Int, Int] { k =>
+            k(k(arg))
+          } * 2
+        } + 4
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = {
+        var i = 0
+        var res = 0
+        reset {
+          while (i < 5) {
+            res = res + i
+            i = i + 1
+          }
+          res * shift { (k: Int => Int) =>
+            k(k(arg))
+          } * 2
+        } + 4
+      }
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("dc_while", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("dc_whileTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("dc_whileTransSelective", "scala", {
+      println(src3)
       println("// output:")
     })
   }
@@ -313,6 +493,7 @@ class CPSTest extends TutorialFunSuite {
       } + 4
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -323,6 +504,11 @@ class CPSTest extends TutorialFunSuite {
     val src2 = driver.code2
     checkOut("whileDcTrans", "scala", {
       println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("whileDcTransSelective", "scala", {
+      println(src3)
       println("// output:")
     })
   }
@@ -365,6 +551,7 @@ class CPSTest extends TutorialFunSuite {
       }
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -377,8 +564,15 @@ class CPSTest extends TutorialFunSuite {
       println(src2)
       println("// output:")
     })
+    val src3 = driver.code3
+    checkOut("whileDc2TransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
   }
 
+  // both lambda and apply are contained in shift1
+  // both lambda and apply do not have CPS effect
   test("dcLambda") {
     val driver = new CPSDslDriver[Int, Int] {
 
@@ -402,6 +596,7 @@ class CPSTest extends TutorialFunSuite {
       } + 5
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -414,8 +609,116 @@ class CPSTest extends TutorialFunSuite {
       println(src2)
       println("// output:")
     })
+    val src3 = driver.code3
+    checkOut("dcLambdaTransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
   }
 
+  // lambda is defined outside of reset1 (no CPS effect)
+  // apply's argument contains shift1.
+  // apply does not have CPS effect, as long as the lambda doesn't have CPS effect
+  test("dcLambda01") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        val double = fun { (x: Rep[Int]) => x * 2 }
+        reset1 {
+          double {
+            shift1[Int, Int] { k =>
+              k(k(arg))
+            } + 2
+          } + 3
+        } + 5
+      }
+    }
+    // test by running
+    for(arg <- 0 until 10) {
+      val double = (x: Int) => x * 2
+      val expect = reset {
+        double {
+          shift { (k: Int => Int) =>
+            k(k(arg))
+          } + 2
+        } + 3
+      } + 5
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("dcLambda01", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("dcLambda01Trans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("dcLambda01TransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
+  }
+
+  // lambda is defined between shift1 and reset1, meaning the code should be CPS transformed
+  // lambda doesn't contain CPS effect, because the block of lambda doesn't contain CPS effect
+  // apply is between shift1 and reset1 as well. apply doesn't have CPS effect
+  // both lambda and apply are generated in direct style
+  test("dc_lambda") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          var x = arg * 2
+          val double = fun { (x: Rep[Int]) => x * 2 }
+          shift1[Int, Int] { k =>
+            k(k(arg))
+          } + double(double(x))
+        } + 5
+      }
+    }
+    // test by running
+    for(arg <- 0 until 10) {
+      val expect = reset {
+        var x = arg * 2
+        val double = (x: Int) => x * 2
+        shift { (k: Int => Int) =>
+          k(k(arg))
+        } + double(double(x))
+      } + 5
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("dc_lambda", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("dc_lambdaTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("dc_lambdaTransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
+  }
+
+  // lambda has shift1 in its function body. It should capture the CPS effect
+  // due to the CPS effect, lambda is generated as CPS function (with additional parameter "c")
+  // Once lambda has CPS effect, the apply will capture CPS effect as well (by collecting latentEffect)
+  // due to the CPS effect, apply is taking extra argument "c"
   test("lambdaDc") {
     val driver = new CPSDslDriver[Int, Int] {
 
@@ -441,6 +744,7 @@ class CPSTest extends TutorialFunSuite {
       } + 5
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -453,8 +757,15 @@ class CPSTest extends TutorialFunSuite {
       println(src2)
       println("// output:")
     })
+    val src3 = driver.code3
+    checkOut("lambdaDcTransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
   }
 
+  // lambda is surrounding reset1, hence it doesn't have CPS effect
+  // nor would the apply. So everything will be in direct style
   test("lambdaDc2") {
     val driver = new CPSDslDriver[Int, Int] {
 
@@ -484,6 +795,7 @@ class CPSTest extends TutorialFunSuite {
       }
       assert(driver.eval(arg) == expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -496,8 +808,14 @@ class CPSTest extends TutorialFunSuite {
       println(src2)
       println("// output:")
     })
+    val src3 = driver.code3
+    checkOut("lambdaDc2TransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
   }
 
+  // both lambda and apply are within shift1 (no CPS effect, both generated in direct style)
   test("DcRecursion") {
     val driver = new CPSDslDriver[Int,Int] {
 
@@ -524,6 +842,7 @@ class CPSTest extends TutorialFunSuite {
       } + 10
       assert(driver.eval(arg) ==  expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -536,8 +855,14 @@ class CPSTest extends TutorialFunSuite {
       println(src2)
       println("// output:")
     })
+    val src3 = driver.code3
+    checkOut("DcRecursionTransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
   }
 
+  // both lambda and apply are outside of reset1 (no CPS effect, both generated in direct style)
   test("recursionDc") {
     val driver = new CPSDslDriver[Int,Int] {
 
@@ -565,6 +890,7 @@ class CPSTest extends TutorialFunSuite {
       }
       assert(driver.eval(arg) ==  expect)
       assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
     }
     // test source
     val src = driver.code
@@ -575,6 +901,11 @@ class CPSTest extends TutorialFunSuite {
     val src2 = driver.code2
     checkOut("RecursionDcTrans", "scala", {
       println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("RecursionDcTransSelective", "scala", {
+      println(src3)
       println("// output:")
     })
   }

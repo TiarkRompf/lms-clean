@@ -571,14 +571,9 @@ abstract class CPSTransformer extends Transformer {
           g.reflectEffect("@", sLoop)(Adapter.CTRL)), g.reify(k))))()(Adapter.CTRL)
       withSubst(f)(reflectHelper(es, "@", sLoop))
 
-    case n @ Node(s,"@",(x:Exp)::(y:Exp)::_,es) =>
-      if (contSet contains x) {
-        subst(s) = reflectHelper(es, "@", transform(x), transform(y))
-        k
-      } else {
-        val cont = reflectHelper(es, "λ", g.reify{e => subst(s) = e; k})
-        withSubst(s)(reflectHelper(es, "@", transform(x), cont, transform(y)))
-      }
+    case n @ Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) =>
+      val cont = reflectHelper(es, "λ", g.reify{e => subst(s) = e; k})
+      withSubst(s)(reflectHelper(es, "@", transform(x), cont, transform(y)))
 
     case Node(s,"λforward",List(y:Sym), _) =>
       assert(!(subst contains y), "should not have handled lambda yet")
@@ -590,7 +585,7 @@ abstract class CPSTransformer extends Transformer {
 
     case Node(s,op,rs,es) =>
       subst(s) = reflectHelper(es, op, rs.map {
-        case b: Block => transform(b)(v => k)   // FIXME
+        case b: Block => transform(b)(v => v)
         case s: Exp => transform(s)
         case a => a
       }:_*); k
@@ -613,5 +608,38 @@ abstract class CPSTransformer extends Transformer {
       applyExp(graph)
     }
     Graph(g.globalDefs, block, g.globalDefsCache.toMap)
+  }
+}
+
+abstract class SelectiveCPSTransformer extends CPSTransformer {
+
+  override def traverse(n: Node)(k: => Exp): Exp = n match {
+
+    case Node(s,"shift1",List(y:Block),_) => super.traverse(n)(k)
+    case Node(s,"reset1",List(y:Block),_) => super.traverse(n)(k)
+    case Node(s,"λforward",List(y:Sym), _) => super.traverse(n)(k)
+    case Node(f,"?",c::(a:Block)::(b:Block)::_,es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
+    case Node(f,"W",(c:Block)::(b:Block)::e, es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
+    // the es.keys of "@" node may have Adapter.CPS, if and only if the lambda has Adapter.CPS
+    case Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) && (es.keys contains Adapter.CPS) => super.traverse(n)(k)
+    // lambda need to capture the CPS effect of its body block
+    case Node(s,"λ", List(b: Block),es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
+
+    case Node(s,"λ", List(b: Block),es) =>
+      if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
+        val s1: Sym = subst(s).asInstanceOf[Sym]
+        g.reflect(s1, "λ", transform(b)(v => v))(forwardMap(s1))()
+      } else {
+        subst(s) = g.reflect("λ", transform(b)(v => v))
+      }
+      k
+
+    case Node(s,op,rs,es) => // catch-all case is not calling super, but transforming everything without CPS
+      subst(s) = reflectHelper(es, op, rs.map {
+        case b: Block => transform(b)(v => v)
+        case s: Exp => transform(s)
+        case a => a
+      }:_*);
+      k
   }
 }

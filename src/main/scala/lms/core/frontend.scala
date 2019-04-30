@@ -8,6 +8,7 @@ class FrontEnd {
 
   val CTRL = Const("CTRL")
   val STORE = Const("STORE")
+  val CPS = Const("CPS")
 
   case class BOOL(x: Exp) {
     //def &&(y: => BOOL): BOOL = BOOL(g.reflect("&",x,y.x)) // should call if?
