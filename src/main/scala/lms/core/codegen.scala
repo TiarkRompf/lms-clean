@@ -1057,19 +1057,23 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
 
   private val registeredFunctions = mutable.HashSet[String]()
-  private val functionsStream = new ByteArrayOutputStream()
-  private val functionsWriter = new PrintStream(functionsStream)
-  private var ongoingFun = false
-  def registerTopLevelFunction(id: String)(f: => Unit) = if (!registeredFunctions(id)) { // FIXME: Can't be nested!
-    if (ongoingFun) ???
-    ongoingFun = true
+  private val functionsStreams = new mutable.HashMap[String, (PrintStream, ByteArrayOutputStream)]()
+  private val ongoingFun = new mutable.HashSet[String]()
+  def registerTopLevelFunction(id: String, streamId: String = "general")(f: => Unit) = if (!registeredFunctions(id)) {
+    if (ongoingFun(streamId)) ???
+    ongoingFun += streamId
     registeredFunctions += id
-    withStream(functionsWriter)(f)
-    ongoingFun = false
+    withStream(functionsStreams.getOrElseUpdate(streamId, {
+      val functionsStream = new ByteArrayOutputStream()
+      val functionsWriter = new PrintStream(functionsStream)
+      (functionsWriter, functionsStream)
+    })._1)(f)
+    ongoingFun -= streamId
   }
-  def emitFunctions(out: PrintStream) = if (functionsStream.size > 0){
+  def emitFunctions(out: PrintStream) = if (functionsStreams.size > 0){
     out.println("\n/************* Functions **************/")
-    functionsStream.writeTo(out)
+    for ((_, (_, functionsStream)) <- functionsStreams)
+      functionsStream.writeTo(out)
   }
 
   private val registeredDatastructures = mutable.HashSet[String]()
