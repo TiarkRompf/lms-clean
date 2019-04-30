@@ -1088,6 +1088,23 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     datastructuresStream.writeTo(out)
   }
 
+  private val registeredInit = mutable.HashSet[String]()
+  private val initStream = new ByteArrayOutputStream()
+  private val initWriter = new PrintStream(initStream)
+  private var ongoingInit = false
+  def registerInit(id: String)(f: => Unit) = if (!registeredInit(id)) {
+    if (ongoingInit) ???
+    ongoingInit = true
+    registeredInit += id
+    withStream(initWriter)(f)
+    ongoingInit = false
+  }
+  def emitInit(out: PrintStream) = {
+    out.println("\n/*********** Init ***********/")
+    out.println("inline int init() {")
+    initStream.writeTo(out)
+    out.println("  return 0;\n}")
+  }
 
   override def emitValDef(n: Node): Unit = {
     if (dce.live(n.n)) {
@@ -1318,6 +1335,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     emitHeaders(stream)
     emitDatastructures(stream)
     emitFunctions(stream)
+    emitInit(stream)
     emitln(s"\n/**************** $name ****************/")
     emit(src)
     emitln("""
@@ -1329,6 +1347,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     |    printf("usage: %s <arg>\n", argv[0]);
     |    return 0;
     |  }""".stripMargin)
+    if (initStream.size > 0) emitln("if (init()) return 0;")
     emitln(s"  $name(${convert("argv[1]", m1)});\n  return 0;\n}")
   }
 }
