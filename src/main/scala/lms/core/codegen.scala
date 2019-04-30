@@ -273,7 +273,7 @@ class CompactScalaCodeGen extends CompactTraverser {
 
   val rename = new mutable.HashMap[Sym,String]
 
-  var doRename = false
+  var doRename = true
   var doPrintEffects = false
 
   def emit(s: String): Unit = print(s)
@@ -384,6 +384,7 @@ class CompactScalaCodeGen extends CompactTraverser {
     case Node(s,op,List(x),_) if unaryop(op) => unaryPrecedence(op)
     case _ => precedence(n.op)
   }
+
   final def unaryPrecedence(op: String): Int = 12
   def precedence(op: String): Int = op match {
     case "?" => 1
@@ -624,6 +625,7 @@ trait ExtendedCodeGen {
 
   def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit
 
+  def nameMap: Map[String, String]
 }
 
 
@@ -632,13 +634,6 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   // val rename = new mutable.HashMap[Sym,String]
   override def emit(s: String): Unit = stream.print(s)
   override def emitln(s: String = "") = stream.println(s)
-
-
-  doRename = true
-  // var doPrintEffects = false
-
-
-  // def quoteEff(x: Def) = ""
 
   def array(innerType: String): String = ""
   def primitive(rawType: String): String = ""
@@ -873,179 +868,9 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
 }
 
-abstract class ExtendedCodeGen1 extends CompactScalaCodeGen with ExtendedCodeGen {
-
-  // var typeMap: collection.Map[lms.core.Backend.Exp, Manifest[_]] = _
-
-  // val dce = new DeadCodeElim
-  doRename = true
-
-
-  // block of statements
-  // override def quoteBlock(f: => Unit) = quoteBlockHelp(None, Some(false))(f)
-
-  //  block of statements with result expression
-  def quoteBlockPReturn(f: => Unit) = {
-    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      emitln("{")
-      f
-      if (y.res != Const(())) {
-        emit("return "); shallow(y.res); emit(";"); emitln(quoteEff(y.eff));
-      } else {
-        emitln(quoteEff(y.eff))
-      }
-      emit("}")
-    }
-    withWraper(wraper _)(f)
-  }
-  /* Generate braces:
-   *  - if there is no statement and no return value (empty block)
-   *  - if there is at least one statement and a return value
-   *  - if there are more than one statement
-   *
-   * n > 1                       n > 1                      n > 1
-   * || n == 0 && res == () ==>  || n == 0 && res == () ==> || n == 0 && res == ()
-   * || n > 0 && res != ()       || n == 1 && res != ()     || n != 0 && res != ()
-   *
-   * ==>
-   *
-   * n > 1 && (n == 0 & res != ())
-   */
-  override def quoteBlockP(f: => Unit) = quoteBlockP(0)(f)
-  override def quoteBlockP(prec: Int)(f: => Unit) = {
-    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      val paren = numStms > 0 || lastNode.map(n => precedence(n) < prec).getOrElse(false)
-      val brace = numStms > 1 || (numStms == 0 ^ y.res != Const(()))
-      if (paren) emit("(")
-      if (brace) emitln("{")
-      f
-      shallow(y.res); emit(quoteEff(y.eff));
-      if (numStms > 0) emitln(";")
-      if (brace) emit("}")
-      if (paren) emit(")")
-    }
-    withWraper(wraper _)(f)
-  }
-  override def quoteBlock(f: => Unit): Unit = {
-    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      if (numStms > 1) emitln("{ ") else if (numStms == 0) emit("{")
-      f
-      if (numStms > 1) emit("\n}") else if (numStms == 0) emit("}")
-    }
-    withWraper(wraper _)(f)
-  }
-  override def quoteElseBlock(f: => Unit) = {
-    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      if (numStms > 0 /* y.res == Const(()) should always be true for else */) {
-        emit(" else ")
-        if (numStms > 1) emitln("{")
-        f
-      if (numStms > 1) emit("}")
-      }
-    }
-    withWraper(wraper _)(f)
-  }
-
-  def nameMap: Map[String, String]
-
-  override def emitValDef(n: Node): Unit = {
-    if (dce.live(n.n))
-      super.emitValDef(n)
-    else {
-      shallow(n)
-    }
-  }
-
-  override def shallow(n: Def): Unit = n match {
-    case InlineSym(t: Node) => shallow(t)
-    case b:Block => quoteBlock(b)
-    case _ => emit(quote(n))
-  }
-
-  private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
-  def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
-  def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
-
-  private val registeredFunctions = mutable.HashSet[String]()
-  private val functionsStream = new ByteArrayOutputStream()
-  private val functionsWriter = new PrintStream(functionsStream)
-  private var ongoingFun = false
-  def registerTopLevelFunction(id: String)(f: => Unit) = if (!registeredFunctions(id)) { // FIXME: Can't be nested!
-    if (ongoingFun) ???
-    ongoingFun = true
-    registeredFunctions += id
-    withStream(functionsWriter)(f)
-    ongoingFun = false
-  }
-  def emitFunctions(out: PrintStream) = if (functionsStream.size > 0){
-    out.println("\n/************* Functions **************/")
-    functionsStream.writeTo(out)
-  }
-
-  private val registeredDatastructures = mutable.HashSet[String]()
-  private val datastructuresStream = new ByteArrayOutputStream()
-  private val datastructuresWriter = new PrintStream(datastructuresStream)
-  private var ongoingData = false
-  def registerDatastructures(id: String)(f: => Unit) = if (!registeredDatastructures(id)) {
-    if (ongoingData) ???
-    ongoingData = true
-    registeredDatastructures += id
-    withStream(datastructuresWriter)(f)
-    ongoingData = false
-  }
-  def emitDatastructures(out: PrintStream) = if (datastructuresStream.size > 0) {
-    out.println("\n/*********** Datastructures ***********/")
-    datastructuresStream.writeTo(out)
-  }
-
-  override def shallow(n: Node): Unit = n match {
-    case n @ Node(s,op,args,_) if nameMap contains op =>
-      shallow(n.copy(op = nameMap(n.op)))
-    case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
-    case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
-      var next = 9 // skip unchecked
-      for (a <- args) {
-        val i = op.indexOf("[ ]", next)
-        assert(i >= next)
-        emit(op.substring(next,i))
-        shallow(a)
-        next = i + 3
-      }
-      emit(op.substring(next))
-    case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
-      registerHeader("<string.h>")
-      (op.substring(7), args) match {
-        case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
-        case ("toDouble", List(rhs)) => emit("atof("); shallow(rhs); emit(")")
-        case ("toInt", List(rhs)) => emit("atoi("); shallow(rhs); emit(")")
-        case ("length", List(rhs)) => emit("strlen("); shallow(rhs); emit(")")
-        case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
-      }
-    case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
-      val (recv::args1) = args
-      if (args1.length > 0) {
-        shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1)); emit("("); shallow(args1.head); args1.tail.foreach { emit(", "); shallow(_) }; emit(")")
-      } else {
-        shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1))
-      }
-    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) => ??? // I think there are unused
-      shallow1(c, precedence("&&")); emit(" && "); shallow1(a, precedence("&&")+1)
-    case n @ Node(s,"?",List(c,a:Block,b),_) if a.isPure && a.res == Const(true) => ???
-      shallow1(c, precedence("||")); emit(" || "); shallow1(b, precedence("||")+1)
-    case n =>
-      super.shallow(n)
-  }
-  override def traverse(n: Node): Unit = n match {
-    case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
-    case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
-    case n @ Node(s,_,_,_) =>
-      super.traverse(n)
-  }
-}
-
 class Unknown // HACK: Sentinel for typeMap
 
-class ExtendedCCodeGen extends ExtendedCodeGen1 {
+class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
   override def emit(s: String): Unit = stream.print(s)
   override def emitln(s: String = "") = stream.println(s)
@@ -1054,7 +879,6 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     case Const(x: List[_]) => "{" + x.mkString(", ") + "}" // translate a Scala List literal to C List literal
     case _ => super.quote(x)
   }
-
 
   // Remap auxiliary function C specific
   def primitive(rawType: String): String = rawType match {
@@ -1082,7 +906,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     }
     tpe
   }
-  val nameMap = Map( // FIXME: tutorial specific
+  override val nameMap = Map( // FIXME: tutorial specific
     "ScannerNew"     -> "new scala.lms.tutorial.Scanner",
     "ScannerHasNext" -> "Scanner.hasNext",
     "ScannerNext"    -> "Scanner.next",
@@ -1168,8 +992,121 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
     quoteBlockPReturn(traverse(body))
   }
 
+  // block of statements
+  //  block of statements with result expression
+  def quoteBlockPReturn(f: => Unit) = {
+    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
+      emitln("{")
+      f
+      if (y.res != Const(())) {
+        emit("return "); shallow(y.res); emit(";"); emitln(quoteEff(y.eff));
+      } else {
+        emitln(quoteEff(y.eff))
+      }
+      emit("}")
+    }
+    withWraper(wraper _)(f)
+  }
+
+  // block of statements with produced value.
+  /* Generate braces:
+   *  - if there is no statement and no return value (empty block)  // only for quoteBlock?
+   *  - if there is at least one statement and a return value       // only for quoteBlockP?
+   *  - if there are more than one statement
+   *
+   * n > 1                       n > 1                      n > 1
+   * || n == 0 && res == () ==>  || n == 0 && res == () ==> || n == 0 && res == ()
+   * || n > 0 && res != ()       || n == 1 && res != ()     || n != 0 && res != ()
+   *
+   * ==>
+   *
+   * n > 1 && (n == 0 ^^ res != ())
+   */
+  override def quoteBlockP(f: => Unit) = quoteBlockP(0)(f)
+  override def quoteBlockP(prec: Int)(f: => Unit) = {
+    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
+      assert(y.res != Const(()), "You should use quoteBlock maybe?")
+      val paren = numStms > 0 || lastNode.map(n => precedence(n) < prec).getOrElse(false)
+      val brace = numStms > 0 // || (numStms == 0 ^ y.res != Const(()))
+      if (paren) emit("(")
+      if (brace) emitln("{")
+      f
+      shallow(y.res); emit(quoteEff(y.eff));
+      // if (numStms > 0) emitln(";")
+      if (brace) emit(";\n}")
+      if (paren) emit(")")
+    }
+    withWraper(wraper _)(f)
+  }
+  // block of statements without produced value -- effect only
+  override def quoteBlock(f: => Unit): Unit = {
+    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
+      assert(y.res == Const(()), "You should use quoteBlockP maybe?")
+      if (numStms > 1) emitln("{ ") else if (numStms == 0) emit("{")
+      f
+      if (numStms > 1) emit("\n}") else if (numStms == 0) emit("}")
+    }
+    withWraper(wraper _)(f)
+  }
+
+  // block of statement of an else branch
+  override def quoteElseBlock(f: => Unit) = {
+    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
+      if (numStms > 0 /* y.res == Const(()) should always be true for else */) {
+        assert(y.res == Const(()))
+        emit(" else ")
+        if (numStms > 1) emitln("{")
+        f
+        if (numStms > 1) emit("}")
+      }
+    }
+    withWraper(wraper _)(f)
+  }
+
+  override def shallow(n: Def): Unit = n match {
+    case InlineSym(t: Node) => shallow(t)
+    case b:Block => quoteBlock(b)
+    case _ => emit(quote(n))
+  }
+
+  private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
+  def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
+  def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
+
+  private val registeredFunctions = mutable.HashSet[String]()
+  private val functionsStream = new ByteArrayOutputStream()
+  private val functionsWriter = new PrintStream(functionsStream)
+  private var ongoingFun = false
+  def registerTopLevelFunction(id: String)(f: => Unit) = if (!registeredFunctions(id)) { // FIXME: Can't be nested!
+    if (ongoingFun) ???
+    ongoingFun = true
+    registeredFunctions += id
+    withStream(functionsWriter)(f)
+    ongoingFun = false
+  }
+  def emitFunctions(out: PrintStream) = if (functionsStream.size > 0){
+    out.println("\n/************* Functions **************/")
+    functionsStream.writeTo(out)
+  }
+
+  private val registeredDatastructures = mutable.HashSet[String]()
+  private val datastructuresStream = new ByteArrayOutputStream()
+  private val datastructuresWriter = new PrintStream(datastructuresStream)
+  private var ongoingData = false
+  def registerDatastructures(id: String)(f: => Unit) = if (!registeredDatastructures(id)) {
+    if (ongoingData) ???
+    ongoingData = true
+    registeredDatastructures += id
+    withStream(datastructuresWriter)(f)
+    ongoingData = false
+  }
+  def emitDatastructures(out: PrintStream) = if (datastructuresStream.size > 0) {
+    out.println("\n/*********** Datastructures ***********/")
+    datastructuresStream.writeTo(out)
+  }
+
+
   override def emitValDef(n: Node): Unit = {
-    // emit(s"val ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     if (dce.live(n.n)) {
       emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = "); shallow(n); emitln(";")
     } else {
@@ -1215,10 +1152,14 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
 
     // case n @ Node(s,"comment",_,_) =>
       // s"(${super.shallow(n)})" // GNU C block expr
-    case n @ Node(s,"?",List(c,a:Block,b:Block),_) if b.isPure && b.res == Const(false) =>
-      shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
-    case n @ Node(s,"?",List(c,a:Block,b:Block),_) if a.isPure && a.res == Const(true) =>
-      shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
+    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) => a match {
+      case a: Block => shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
+      case _ => ??? // shallow1(c, precedence("&&")); emit(" && "); shallow1(a, precedence("&&") + 1)
+    }
+    case n @ Node(s,"?",List(c,a:Block,b),_) if a.isPure && a.res == Const(true) => b match {
+      case b: Block => shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
+      case _ => ??? // shallow1(c, precedence("||")); emit(" || "); shallow1(b, precedence("||") + 1)
+    }
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       shallow1(c, precedence("?") + 1); emit(" ? ")
       quoteBlockP(precedence("?"))(traverse(a))
@@ -1230,20 +1171,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emit(") ")
       quoteBlock(traverse(b))
       emitln()
-    case n @ Node(s,"generate-comment",List(Const(x: String)),_) =>
-      emit("// "); emit(x)
-    case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
-      ???
-      quoteBlockP {
-        emitln("//#" + str)
-        if (verbose) {
-          emitln("// generated code for " + str.replace('_', ' '))
-        } else {
-          emitln("// generated code")
-        }
-        traverse(b)
-        emit("/*#" + str + "*/")
-      }
+    case n @ Node(s,"generate-comment",List(Const(x: String)),_) => ???
 
     case n @ Node(s,"P",List(x),_) =>
       emit("""printf("%s\n", """); shallow(x); emit(")");
@@ -1263,9 +1191,39 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emit(s"(int*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof(int))")
     case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
       emit("qsort("); shallow1(arr); emit(" ,"); shallow1(len); emit(", sizeof(*"); shallow(arr2); emit("), (__compar_fn_t)"); shallow(comp); emit(")")
+    case n @ Node(s,op,args,_) if nameMap contains op =>
+      shallow(n.copy(op = nameMap(n.op)))
+    case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
+    case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
+      var next = 9 // skip unchecked
+      for (a <- args) {
+        val i = op.indexOf("[ ]", next)
+        assert(i >= next)
+        emit(op.substring(next,i))
+        shallow(a)
+        next = i + 3
+      }
+      emit(op.substring(next))
+    case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
+      registerHeader("<string.h>")
+      (op.substring(7), args) match {
+        case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
+        case ("toDouble", List(rhs)) => emit("atof("); shallow(rhs); emit(")")
+        case ("toInt", List(rhs)) => emit("atoi("); shallow(rhs); emit(")")
+        case ("length", List(rhs)) => emit("strlen("); shallow(rhs); emit(")")
+        case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
+      }
+    case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
+      val (recv::args1) = args
+      if (args1.length > 0) {
+        shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1)); emit("("); shallow(args1.head); args1.tail.foreach { emit(", "); shallow(_) }; emit(")")
+      } else {
+        shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1))
+      }
     case n =>
       super.shallow(n)
   }
+
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s,"var_new",List(x),_) =>
       emitVarDef(n)
@@ -1309,6 +1267,9 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       emit(") ")
       quoteBlock(traverse(b))
       emitln()
+
+    case n @ Node(s,"generate-comment",List(Const(x: String)),_) =>
+      emit("// "); emitln(x)
 
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
       emitln("//# " + str)
