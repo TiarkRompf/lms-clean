@@ -1057,7 +1057,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
 
   private val registeredFunctions = mutable.HashSet[String]()
-  private val functionsStreams = new mutable.HashMap[String, (PrintStream, ByteArrayOutputStream)]()
+  private val functionsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
   private val ongoingFun = new mutable.HashSet[String]()
   def registerTopLevelFunction(id: String, streamId: String = "general")(f: => Unit) = if (!registeredFunctions(id)) {
     if (ongoingFun(streamId)) ???
@@ -1072,7 +1072,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   }
   def emitFunctions(out: PrintStream) = if (functionsStreams.size > 0){
     out.println("\n/************* Functions **************/")
-    for ((_, (_, functionsStream)) <- functionsStreams)
+    for ((_, functionsStream) <- functionsStreams.values.toSeq.reverse) // ensure dependencies
       functionsStream.writeTo(out)
   }
 
