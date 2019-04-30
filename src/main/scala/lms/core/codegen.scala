@@ -1231,7 +1231,7 @@ class ExtendedCCodeGen extends ExtendedCodeGen1 {
       quoteBlock(traverse(b))
       emitln()
     case n @ Node(s,"generate-comment",List(Const(x: String)),_) =>
-      emit("// "); emitln(x)
+      emit("// "); emit(x)
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
       ???
       quoteBlockP {
