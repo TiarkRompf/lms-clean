@@ -317,7 +317,6 @@ class CompactScalaCodeGen extends CompactTraverser {
   }
 
   type WrapFun = (Int, Option[Node], Block) => (=> Unit) =>Unit
-
   def withWraper(w: WrapFun)(f: => Unit) = {
     val save = wraper
     wraper = w
@@ -326,7 +325,6 @@ class CompactScalaCodeGen extends CompactTraverser {
   }
 
   def nowraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = f
-
   var wraper: WrapFun = nowraper _
 
   def quoteBlock(f: => Unit): Unit = quoteBlock("")(f)
@@ -511,8 +509,7 @@ class DeadCodeElimCG {
   var reach: collection.Set[Sym] = _
 
   def valueSyms(n: Node): List[Sym] =  n match {
-    case n @ Node(s, "?", List(Block(_,res:Sym,_,_),(a:Block),(b:Block)), _) if !live(s) => res :: directSyms(n)
-    case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) => directSyms(n)
+    case n @ Node(s, "?", _, _) if !live(s) => directSyms(n)
     case _ => directSyms(n) ++ blocks(n).collect { case Block(_,res:Sym,_,_) => res }
   }
 
@@ -692,14 +689,10 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       // quoteBlock1(y, true)
       val argsTyped = (y.in map { arg => s"${quote(arg)}: ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" } mkString("(", ",", ") => "))
       quoteBlock(argsTyped)(traverse(y))
-    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) => a match {
-      case a: Block => shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
-      case _ => shallow1(c, precedence("&&")); emit(" && "); shallow1(a, precedence("&&") + 1)
-    }
-    case n @ Node(s,"?",List(c,a:Block,b),_) if a.isPure && a.res == Const(true) => b match {
-      case b: Block => shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
-      case _ => shallow1(c, precedence("||")); emit(" || "); shallow1(b, precedence("||") + 1)
-    }
+    case n @ Node(s,"?",List(c, a: Block, b: Block),_) if b.isPure && b.res == Const(false) =>
+      shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
+    case n @ Node(s,"?",List(c, a: Block, b: Block),_) if a.isPure && a.res == Const(true) =>
+      shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       emit(s"if ("); shallow(c); emit(") ")
       quoteBlockP(traverse(a))
@@ -761,7 +754,6 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       }
       emit(op.substring(next))
 
-
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
       val (recv::args1) = args
       shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.')+1))
@@ -773,17 +765,8 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
         }
         emit(")")
       }
-    case _ => super.shallow(n)
 
-    // case n @ Node(_,op,args,_) =>
-    //   emit(s"$op(");
-    //   if (args.nonEmpty) {
-    //     shallow(args.head)
-    //     args.tail.foreach { a =>
-    //       emit(", "); shallow(a)
-    //     }
-    //   }
-    //   emit(")")
+    case _ => super.shallow(n)
   }
 
 
@@ -1152,14 +1135,11 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
     // case n @ Node(s,"comment",_,_) =>
       // s"(${super.shallow(n)})" // GNU C block expr
-    case n @ Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) => a match {
-      case a: Block => shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
-      case _ => ??? // shallow1(c, precedence("&&")); emit(" && "); shallow1(a, precedence("&&") + 1)
-    }
-    case n @ Node(s,"?",List(c,a:Block,b),_) if a.isPure && a.res == Const(true) => b match {
-      case b: Block => shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
-      case _ => ??? // shallow1(c, precedence("||")); emit(" || "); shallow1(b, precedence("||") + 1)
-    }
+     // Have to be duplicated to be bfore generic C version
+    case n @ Node(s,"?",List(c, a: Block, b: Block),_) if b.isPure && b.res == Const(false) =>
+      shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
+    case n @ Node(s,"?",List(c, a: Block, b: Block),_) if a.isPure && a.res == Const(true) =>
+      shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       shallow1(c, precedence("?") + 1); emit(" ? ")
       quoteBlockP(precedence("?"))(traverse(a))
