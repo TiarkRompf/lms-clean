@@ -910,6 +910,62 @@ class CPSTest extends TutorialFunSuite {
     })
   }
 
+  // lambda has shift1 in the block, so it has CPS effect
+  // apply will also have CPS effect.
+  // Note: this function is recursive, so that the forward lambda is applied in the function body
+  // Need to make sure that the forward lambda application also have CPS effect
+  test("recursionDc1") {
+    val driver = new CPSDslDriver[Int,Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          lazy val f: Rep[Int => Int] = fun { (x: Rep[Int]) =>
+            if (x > 0)
+              shift1[Int, Int] { k =>
+                k(k(x))
+              } + f(x - 1)
+            else 1
+          }
+          f(arg)
+        }
+      }
+    }
+    // test by running
+    for (arg <- 1 until 5) {
+      val expect = {
+        reset {
+          def f(x: Int): Int@cps[Int] =
+            if (x > 0)
+              shift { (k: Int => Int) =>
+                k(k(x))
+              } + f(x - 1)
+            else 1
+          f(arg)
+        }
+      }
+      assert(driver.eval(arg) ==  expect)
+      assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("recursionDc1", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("RecursionDc1Trans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("RecursionDc1TransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
+  }
+
   // An example of nested shift. the shift/reset compile plugin disallows it!
   // test("recursionDc") {
   //   val driver = new CPSDslDriver[Int,Int] {

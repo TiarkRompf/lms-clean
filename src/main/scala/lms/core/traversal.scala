@@ -193,6 +193,7 @@ abstract class Traverser {
 
 abstract class CPSTraverser extends Traverser {
 
+  // unfortunate code duplication (can we remove it?)
   def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = {
     val path1 = y.bound ++ extra.toList ++ path
     def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
@@ -473,8 +474,11 @@ abstract class Transformer extends Traverser {
 
 abstract class CPSTransformer extends Transformer {
 
-  val forwardMap = mutable.Map[Sym, Sym]()
+  val forwardMap = mutable.Map[Sym, Sym]()  // this Map set up connection for lambda-forward node (sTo -> sFrom)
+  val forwardCPSSet = mutable.Set[Sym]()    // this Set collect sFrom, whose sTo has CPS effect
+  val contSet = mutable.Set.empty[Exp]      // this Set collect all continuation captured by shift1 (so that their application doesn't take more continuations)
 
+  def withSubst(s: Sym)(e: => Exp) = { subst(s) = e; subst(s) }  // syntactic helper
   def withSubstScope(args: Sym*)(actuals: Exp*)(k: => Exp) = {
     args foreach { arg => if (subst contains arg) println(s"Warning: already have a subst for $arg") }
     try {
@@ -482,6 +486,7 @@ abstract class CPSTransformer extends Transformer {
     } finally args.foreach{ arg => subst -= arg }
   }
 
+  // unfortunate code duplication (can we remove it?)
   def traverse(y: Block, extra: Sym*)(k: Exp => Exp): Exp = {
     val path1 = y.bound ++ extra.toList ++ path
     def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
@@ -532,10 +537,6 @@ abstract class CPSTransformer extends Transformer {
   def reflectHelper(es: EffectSummary, op: String, args: Def*): Exp =
     if (es.deps.nonEmpty) g.reflectEffect(op, args: _*)(es.keys.map(transform):_*) else g.reflect(op, args:_*)
 
-  def withSubst(s: Sym)(e: => Exp) = { subst(s) = e; subst(s) }
-
-  val contSet = mutable.Set.empty[Exp]
-
   def traverse(n: Node)(k: => Exp): Exp = n match {
 
     case n @ Node(s,"shift1",List(y:Block),_) =>
@@ -547,8 +548,9 @@ abstract class CPSTransformer extends Transformer {
       subst(s) = g.reflectEffect("reset0", transform(y)(v => v))(Adapter.CTRL)
       k
 
-    case Node(s,"λ", List(b: Block),_) =>
+    case Node(s,"λ", List(b: Block),es) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
+        if (es.keys contains Adapter.CPS) forwardCPSSet += forwardMap(s)
         val s1: Sym = subst(s).asInstanceOf[Sym]
         g.reflect(s1, "λ", transformLambda(b))(forwardMap(s1))()
       } else {
@@ -621,7 +623,8 @@ abstract class SelectiveCPSTransformer extends CPSTransformer {
     case Node(f,"?",c::(a:Block)::(b:Block)::_,es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
     case Node(f,"W",(c:Block)::(b:Block)::e, es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
     // the es.keys of "@" node may have Adapter.CPS, if and only if the lambda has Adapter.CPS
-    case Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) && (es.keys contains Adapter.CPS) => super.traverse(n)(k)
+    case Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) &&
+      ((es.keys contains Adapter.CPS) || (forwardCPSSet contains x.asInstanceOf[Sym])) => super.traverse(n)(k)
     // lambda need to capture the CPS effect of its body block
     case Node(s,"λ", List(b: Block),es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
 
