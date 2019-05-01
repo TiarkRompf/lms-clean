@@ -24,6 +24,8 @@ object Backend {
   // distinguish may/must and read/write effects,
   // soft dependencies, ...
 
+  // case class EffectSummary(read: )
+
   case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
     override def toString = if (deps.nonEmpty || keys.nonEmpty)
       s"[${keys.mkString(" ")}: ${deps.mkString(" ")}]" else ""
@@ -132,14 +134,31 @@ class GraphBuilder {
           case _ => efKeys2_
         }
 
+        //
+
+
+
         // effects or pure?
         if (efKeys2.nonEmpty) {
           val sm = Sym(fresh)
           // gather effect dependencies
           def latest(e1: Exp, e2: Exp) = if (curLocalDefs(e1)) e1 else e2
           val prev = efKeys2.map(e => curEffects.getOrElse(e,latest(e,curBlock))).distinct
+// prevHard
+// prevSoft
+// e match {
+//   case Read(v) => curEffect.getOrElse(e, curBlock),  strong previous write
+//   case Alloc   => Nothing
+//   case Write(v)=> assert v is in curEffect,  strong dep on last write, soft deps on last read list
+//   case Other(s)=> CTRL STORE CPS (strong deps) curEffects.getOrElse(e,curBlock))
+// }
           val res = reflect(sm, s, as:_*)(prev:_*)(efKeys2:_*)
           for (e <- efKeys2) curEffects = curEffects + (e -> res)
+            // map { e match case { 
+              // Alloc   => res -> (res, Nil)
+              // Read(v) => curEffects,updateRead(v, res) // insert in read list
+              // case Write(v) => curEffect.updateWrite(v, res) // empty list and update last write )  } }
+              // case Other(v) => e -> (res, Nil)
           res
         } else {
           // cse? never for effectful stm
@@ -189,7 +208,7 @@ class GraphBuilder {
 
 
   var curBlock: Exp = _ // could this become an ExplodedStruct?
-  var curEffects: Map[Exp,Exp] = _ // map key to dep
+  var curEffects: Map[Exp,Exp] = _ // map key to dep // change !!!
   var curLocalDefs: Set[Exp] = _
 
   // NOTE/TODO: want to mask out purely local effects
