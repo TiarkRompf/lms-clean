@@ -128,6 +128,8 @@ object Adapter extends FrontEnd {
       case (">", List(Const(a: Float), Const(b: Float))) => Some(Const(a > b))
       case (">", List(Const(a: Double), Const(b: Double))) => Some(Const(a > b))
 
+      case ("?", List(c, Const(t), Const(e))) if t == e => Some(Const(t))
+
       case _  =>
         super.rewrite(s,as)
     }
@@ -148,6 +150,7 @@ object Adapter extends FrontEnd {
       case ("/", List(Const(a:Int),Const(b:Int))) => Const(a/b)
       case ("%", List(Const(a:Int),Const(b:Int))) => Const(a%b)
 
+      case ("?", List(c: Sym, Const(t: Boolean), Const(e: Boolean))) if t != e => if (t) c else reflect("!", c)
       // TBD: can't just rewrite, need to reflect block!
       // case ("?", List(Const(true),a:Block,b:Block)) => a
 

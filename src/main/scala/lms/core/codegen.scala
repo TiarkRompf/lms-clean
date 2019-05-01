@@ -1103,7 +1103,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     withStream(initWriter)(f)
     ongoingInit = false
   }
-  def emitInit(out: PrintStream) = {
+  def emitInit(out: PrintStream) = if (initStream.size > 0){
     out.println("\n/*********** Init ***********/")
     out.println("inline int init() {")
     initStream.writeTo(out)
