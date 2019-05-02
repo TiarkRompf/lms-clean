@@ -1034,7 +1034,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       assert(y.res == Const(()), "You should use quoteBlockP maybe?")
       if (numStms > 1) emitln("{ ") else if (numStms == 0) emit("{")
       f
-      if (numStms > 1) emit("\n}") else if (numStms == 0) emit("}")
+      if (numStms > 1) emit("}") else if (numStms == 0) emit("}")
     }
     withWraper(wraper _)(f)
   }
