@@ -77,9 +77,8 @@ abstract class Traverser {
         } else {
           reach ++= syms(d)
         }
-      } else {
-        if (reachInner(d.n)) reachInner ++= syms(d)
       }
+      if (reachInner(d.n)) reachInner ++= syms(d)
     }
 
     /*
@@ -133,15 +132,26 @@ abstract class Traverser {
     def scheduleHere(d: Node) =
       available(d) && reach(d.n)
 
-    val (outer1, inner1) = ((Seq[Node](), Seq[Node]()) /: inner) {
-      case ((outer1 , inner1), n) if reach(n.n) =>
-        if (available(n)) (n +: outer1, inner1) else (outer1, n +: inner1)
-      case ((outer1 , inner1), n) if reachInner(n.n) => (outer1, n +: inner1)
-      case (agg, _) => agg
+    val outer1 = new mutable.ListBuffer[Node]()
+    val inner1 = new mutable.ListBuffer[Node]()
+    for (n <- inner) {
+      if (reach(n.n)) {
+        if (available(n)) outer1 += n else inner1 += n
+      } else if (reachInner(n.n)) {
+          inner1 += n
+      }
     }
 
-    withScope(path1, inner1.reverse) {
-      f(outer1.reverse, y)
+    System.out.println(s"=== $y ===")
+    System.out.println("=== Inner ===")
+    for (n <- inner) System.out.println(s"\t$n")
+    System.out.println("=== Outer ===")
+    for (n <- outer1) System.out.println(s"\t$n")
+    System.out.println("=== New Inner ===")
+    for (n <- inner1) System.out.println(s"\t$n")
+
+    withScope(path1, inner1.toSeq) {
+      f(outer1.toSeq, y)
     }
   }
 
@@ -209,18 +219,20 @@ abstract class CPSTraverser extends Traverser {
         } else {
           reach ++= syms(d)
         }
-      } else {
-        if (reachInner(d.n)) reachInner ++= syms(d)
+      }
+      if (reachInner(d.n)) reachInner ++= syms(d)
+    }
+    val outer1 = new mutable.ListBuffer[Node]()
+    val inner1 = new mutable.ListBuffer[Node]()
+    for (n <- inner) {
+      if (reach(n.n)) {
+        if (available(n)) outer1 += n else inner1 += n
+      } else if (reachInner(n.n)) {
+          inner1 += n
       }
     }
-    val (outer1, inner1) = ((Seq[Node](), Seq[Node]()) /: inner) {
-      case ((outer1 , inner1), n) if reach(n.n) =>
-        if (available(n)) (n +: outer1, inner1) else (outer1, n +: inner1)
-      case ((outer1 , inner1), n) if reachInner(n.n) => (outer1, n +: inner1)
-      case (agg, _) => agg
-    }
-    withScope1(path1, inner1.reverse) { (path0, inner0) =>
-      traverse(outer1.reverse, y){ v => withScope(path0, inner0)(k(v)) }
+    withScope1(path1, inner1.toSeq) { (path0, inner0) =>
+      traverse(outer1.toSeq, y){ v => withScope(path0, inner0)(k(v)) }
     }
   }
 
