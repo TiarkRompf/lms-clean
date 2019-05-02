@@ -14,10 +14,10 @@ abstract class Traverser {
     // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
     case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
-      (c::eff.deps).map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
+      (c::eff.hdeps).map(e => (e,1.0)) ++ (ae::be::af.hdeps ++ bf.hdeps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
     case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
-      eff.deps.map(e => (e,1.0)) ++ (ae::be::af.deps ++ bf.deps).map(e => (e,100.0)) // XXX why eff.deps?
-    case _ => syms(x) map (s => (s,1.0))
+      eff.hdeps.map(e => (e,1.0)) ++ (ae::af.hdeps ++ bf.hdeps).map(e => (e,100.0)) // XXX why eff.deps?
+    case _ => hardSyms(x) map (s => (s,1.0))
   }
 
 
@@ -75,10 +75,10 @@ abstract class Traverser {
           for ((e:Sym,f) <- symsFreq(d))
             if (f > 0.5) reach += e else reachInner += e
         } else {
-          reach ++= syms(d)
+          reach ++= hardSyms(d)
         }
       }
-      if (reachInner(d.n)) reachInner ++= syms(d)
+      if (reachInner(d.n)) reachInner ++= hardSyms(d)
     }
 
     /*

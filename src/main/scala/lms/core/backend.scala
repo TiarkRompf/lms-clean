@@ -37,7 +37,7 @@ object Backend {
   case class Other(x: Const) extends Effect
 
 
-  case class EffectSummary(sdeps: List[Sym], hdeps: List[Sym], keys: List[Effect]) {
+  case class EffectSummary(sdeps: List[Sym], hdeps: List[Sym], keys: List[Effect], mayHdeps: Map[Sym,Sym]) {
   // case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
     lazy val deps = hdeps ++ sdeps
     override def toString = if (deps.nonEmpty || keys.nonEmpty)
@@ -72,7 +72,7 @@ object Backend {
   // inputs, result, effect input, effect output summary
   case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def {
     def bound = ein::in
-    def used = if (res.isInstanceOf[Sym] && !eff.deps.contains(res)) (res.asInstanceOf[Sym])::eff.deps else eff.deps
+    def used = if (res.isInstanceOf[Sym] && !eff.hdeps.contains(res)) (res.asInstanceOf[Sym])::eff.hdeps else eff.hdeps
     def isPure = eff.deps == List(ein)
   }
 
@@ -91,10 +91,10 @@ object Backend {
 
   // TODO: remove filter syms
   def filterSym(x: List[Exp]): Set[Sym] = x collect { case s: Sym => s } toSet
-  def symsAndEffectSyms(x: Node): (Set[Sym], Set[Sym]) = ((Set[Sym](), filterSym(x.eff.deps)) /: x.rhs) {
+  def symsAndEffectSyms(x: Node): (Set[Sym], Set[Sym]) = ((Set[Sym](), x.eff.hdeps.toSet) /: x.rhs) {
     case ((syms, symsEffect), s: Sym) => (syms + s, symsEffect)
-    case ((syms, symsEffect), Block(_, res: Sym, _, eff)) => (syms + res, filterSym(eff.deps) ++ symsEffect)
-    case ((syms, symsEffect), Block(_, _, _, eff)) => (syms, filterSym(eff.deps) ++ symsEffect)
+    case ((syms, symsEffect), Block(_, res: Sym, _, eff)) => (syms + res, symsEffect ++ eff.hdeps)
+    case ((syms, symsEffect), Block(_, _, _, eff)) => (syms, symsEffect ++ eff.hdeps)
     case (agg, _) => agg
   }
 
@@ -104,6 +104,14 @@ object Backend {
       case b: Block => b.used
       case _ => Nil
     } ++ x.eff.deps.collect { case s: Sym => s }
+  }
+
+  def hardSyms(x: Node): List[Sym] = {
+    x.rhs.flatMap {
+      case s: Sym => List(s)
+      case b: Block => b.used
+      case _ => Nil
+    } ++ x.eff.hdeps
   }
 }
 
@@ -175,7 +183,7 @@ class GraphBuilder {
             case Alloc   => prevHard += curBlock
             case Write(v)=>
               val (lw, lrs) = curEffects.getOrElse(v, (curBlock, Nil))
-              prevHard += lw // strong dep last write
+              prevSoft += lw // strong dep last write
               prevSoft ++= lrs // soft dep reads since last write
             case Other(s)=> // CTRL STORE CPS
               prevHard += getLastWrite(s)
@@ -206,7 +214,7 @@ class GraphBuilder {
   }
 
   def reflect(x: Sym, s: String, as: Def*)(sEfDeps: Sym*)(hEfDeps: Sym*)(efKeys: Effect*): Sym = {
-    val n = Node(x,s,as.toList,EffectSummary(sEfDeps.toList, hEfDeps.toList, efKeys.toList))
+    val n = Node(x,s,as.toList,EffectSummary(sEfDeps.toList, hEfDeps.toList, efKeys.toList, Map()))
     globalDefs += n
     globalDefsCache(x) = n
     globalDefsReverseCache((s,n.rhs)) = n
@@ -282,18 +290,33 @@ class GraphBuilder {
       // remove local definitions from visible effect keys
       // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
       // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
+      val soft = new mutable.HashSet[Sym]
       val hard = new mutable.HashSet[Sym]
       val keys = new mutable.ListBuffer[Effect]
+      var mayHdeps = Map[Sym,Sym]()
       for ((key, (lw, lrs)) <- curEffects) {
         if (!curLocalDefs(key)) key match {
-          case k: Const => keys += Other(k)
-          case s: Sym   => keys += (if (lw == curBlock) Read(s) else Write(s))
+          case k: Const =>
+            keys += Other(k)
+            hard += lw
+            hard ++= lrs
+          case s: Sym   =>
+            if (lw == curBlock) {
+              keys += Read(s)
+              soft += lw
+              soft ++= lrs // necessary?
+            } else {
+              keys += Write(s)
+              mayHdeps = mayHdeps + (s -> lw) // what about reads?
+            }
         }
-
-        hard += lw
-        hard ++= lrs
       }
-      Block(args, res, block, EffectSummary(Nil, if (hard.size == 0) List(block) else hard.toList, keys.toList))
+      if (curEffects contains res) {
+        val (lw, lrs) = curEffects(res)
+        hard += lw
+      }
+      // soft --= hard
+      Block(args, res, block, EffectSummary(soft.toList, if (hard.size == 0) List(block) else hard.toList, keys.toList, mayHdeps))
     } finally {
       curBlock = save
       curEffects = saveEffects

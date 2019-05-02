@@ -93,7 +93,8 @@ object Adapter extends FrontEnd {
 
       // as(i) = as(i) => ()   side condition: no write in-between!
       case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1: Exp, i1))))
-        if as == as1 && i == i1 && getLastWrite(as) == getLastWrite(as1) =>
+        if as == as1 && i == i1 && {
+          curEffects.get(as).map { case (_, lrs) => lrs contains rs.asInstanceOf[Sym] } getOrElse(false) } =>
         Some(Const(()))
 
       case ("Array.length", List(Def("NewArray", Const(n)::_))) =>

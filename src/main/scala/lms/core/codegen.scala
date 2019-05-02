@@ -524,7 +524,7 @@ class DeadCodeElimCG {
     case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) =>
       val (s, e) = symsAndEffectSyms(n)
       (s -- List(a.res, b.res).collect { case s: Sym => s}) ++ e
-    case _ => syms(n).toSet
+    case _ => hardSyms(n).toSet
   }
 
   // staticData -- not really a DCE task, but hey
