@@ -51,7 +51,7 @@ object ir {
       // - 3. Extract meaningful arg annotation symbol?
 
       case q"def $name[..$t](..$args): $tpe" =>
-        val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: currently any ann counts as effect!
+        val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"Write(ref($x).asInstanceOf[Sym])" } //XXX FIXME: currently any ann counts as effect!
         val args1 = args map { case ValDef(_,x,_,_) => q"ref($x)" }
         val tpes = args map { case ValDef(_,x,t,_) => q"$t" }
         val name_extract = TermName("M"+name.toString)
@@ -68,8 +68,8 @@ object ir {
         """)
       case q"def $name[..$t](..$args): $tpe = $body" =>
         // TODO: strip by-name type (?)
-        var effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: any ann counts as effect!
-        var effects2 = args collect { case v@ValDef(m,x,t,y) if m.annotations.nonEmpty => q"ref($x)" }
+        var effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"Write(ref($x).asInstanceOf[Sym])" } //XXX FIXME: any ann counts as effect!
+        var effects2 = args collect { case v@ValDef(m,x,t,y) if m.annotations.nonEmpty => q"Write(ref($x).asInstanceOf[Sym])" }
         assert(effects.toString == effects2.toString, s"$effects != $effects2")
         if (tpe.toString.contains("@")) {
           println(tpe.getClass)
@@ -80,7 +80,7 @@ object ir {
           //XXX TODO cleanup!!
           // println(tpe.asInstanceOf[scala.reflect.internal.Trees$Tree].annotations)
           println("XXXXXXXXXXXXX "+tpe)
-          effects :+= q"Const(STORE)"
+          effects :+= q"Alloc" // q"Const(STORE)"
         }
 
         val args0 = args map { case ValDef(_,x,_,_) => q"$x" }

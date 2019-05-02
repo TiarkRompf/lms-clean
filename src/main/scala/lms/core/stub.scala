@@ -92,8 +92,8 @@ object Adapter extends FrontEnd {
         }
 
       // as(i) = as(i) => ()   side condition: no write in-between!
-      case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1, i1))))
-        if as == as1 && i == i1 && curEffects.get(as) == Some(rs) =>
+      case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1: Exp, i1))))
+        if as == as1 && i == i1 && getLastWrite(as) == getLastWrite(as1) =>
         Some(Const(()))
 
       case ("Array.length", List(Def("NewArray", Const(n)::_))) =>
@@ -559,7 +559,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def reflectWrite[T:Manifest](w: Rep[Any])(x: Def[T]): Exp[T] = {
     val p = x.asInstanceOf[Product]
     val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflectEffect(p.productPrefix, xs:_*)(Unwrap(w)))
+    Wrap[T](Adapter.g.reflectWrite(p.productPrefix, xs:_*)(Unwrap(w)))
   }
 
   def emitValDef(sym: Sym[Any], rhs: String): Unit = ???
@@ -576,7 +576,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     // NOTE: lambda expression itself does not have
     // an effect, so body block should not count as
     // latent effect of the lambda
-    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()
+    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()()
     f1
   }
 
@@ -617,8 +617,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap[Array[T]](Adapter.g.reflectEffect("Array", xs.map(Unwrap(_)):_*)(Adapter.STORE))
   }
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
-    def apply(i: Rep[Int]): Rep[A] = Wrap[A](Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Int], y: Rep[A]): Unit = Wrap[Unit](Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def apply(i: Rep[Int]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+    def update(i: Rep[Int], y: Rep[A]): Unit = Wrap[Unit](Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("Array.length", Unwrap(x)))
     def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
   }
@@ -626,8 +626,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   trait LongArray[+T]
   def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int] = None): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("NewArray", Unwrap(x))(Adapter.STORE))
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
-    def apply(i: Rep[Long]): Rep[A] = Wrap[A](Adapter.g.reflectEffect("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Long], y: Rep[A]): Unit = Adapter.g.reflectEffect("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
+    def apply(i: Rep[Long]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+    def update(i: Rep[Long], y: Rep[A]): Unit = Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
     def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("Array.length", Unwrap(x)))
     def slice(s: Rep[Long], e: Rep[Long] = unit(0L)): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("+", Unwrap(x), Unwrap(s)))
   }
@@ -712,14 +712,14 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         Adapter.funTable = (fn, can)::Adapter.funTable
 
         val fn1 = Backend.Sym(Adapter.g.fresh)
-        Adapter.g.reflect(fn, "λforward", fn1)()()
+        Adapter.g.reflect(fn, "λforward", fn1)()()()
         //val xn = Sym(g.fresh)
         //val f1 = (x: INT) => APP(fn,x)
         // NOTE: lambda expression itself does not have
         // an effect, so body block should not count as
         // latent effect of the lambda
         val block = Adapter.g.reify(arity, gf)
-        val res = Adapter.g.reflect(fn1,"λ",block)(fn)(
+        val res = Adapter.g.reflect(fn1,"λ",block)()(fn)(
           Adapter.g.getLatentEffect(block).filter(_ == Adapter.CPS).distinct: _* // should capture CPS effect if the block has any
         )
         Adapter.funTable = Adapter.funTable.map {
@@ -736,7 +736,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     val can = canonicalize(f)
     topLevelFunctions.getOrElseUpdate(can, {
       val fn = Backend.Sym(Adapter.g.fresh)
-      Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()()
+      Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()()()
       fn
     })
   }
@@ -914,9 +914,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   // Variables
-  implicit def readVar[T:Manifest](x: Var[T]): Rep[T] = Wrap[T](Adapter.g.reflectEffect("var_get", UnwrapV(x))(UnwrapV(x)))
+  implicit def readVar[T:Manifest](x: Var[T]): Rep[T] = Wrap[T](Adapter.g.reflectRead("var_get", UnwrapV(x))(UnwrapV(x)))
   def var_new[T:Manifest](x: Rep[T]): Var[T] = WrapV[T](Adapter.g.reflectEffect("var_new", Unwrap(x))(Adapter.STORE))
-  def __assign[T:Manifest](lhs: Var[T], rhs: Rep[T]): Unit = Wrap[Unit](Adapter.g.reflectEffect("var_set", UnwrapV(lhs), Unwrap(rhs))(UnwrapV(lhs)))
+  def __assign[T:Manifest](lhs: Var[T], rhs: Rep[T]): Unit = Wrap[Unit](Adapter.g.reflectWrite("var_set", UnwrapV(lhs), Unwrap(rhs))(UnwrapV(lhs)))
   def __assign[T:Manifest](lhs: Var[T], rhs: Var[T]): Unit = __assign(lhs,readVar(rhs))
   def __assign[T:Manifest](lhs: Var[T], rhs: T): Unit = __assign(lhs,unit(rhs)) // shouldn't unit lift T to Rep[T] implicitly?
 

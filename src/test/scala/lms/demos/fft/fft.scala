@@ -21,8 +21,8 @@ trait FFT extends FrontEnd {
   def cos(x: DOUBLE): DOUBLE = DOUBLE(g.reflect("cos", x.x))
 
   case class DARRAY(x: Exp) {
-    def apply(i: INT): DOUBLE = DOUBLE(g.reflectEffect("array_get",x,i.x)(x))
-    def update(i: INT, y: DOUBLE): Unit = g.reflectEffect("array_set",x,i.x,y.x)(x)
+    def apply(i: INT): DOUBLE = DOUBLE(g.reflectRead("array_get",x,i.x)(x))
+    def update(i: INT, y: DOUBLE): Unit = g.reflectWrite("array_set",x,i.x,y.x)(x)
   }
   object DARRAY {
     def apply(n: INT): DARRAY = DARRAY(g.reflectEffect("array_new",n.x)(STORE))

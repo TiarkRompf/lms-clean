@@ -261,14 +261,14 @@ abstract class MultiLoopLowering extends Transformer {
           g.reflectEffect("var_new", Const(0))(STORE)
 
         def +=(i: List[INT], x: INT) = if (op == "tensor")
-          g.reflectEffect("array_set", state, linearize(shape,i).x, x.x)(state)
+          g.reflectWrite("array_set", state, linearize(shape,i).x, x.x)(state)
         else
-          g.reflectEffect("var_set", state, g.reflect("+", g.reflectEffect("var_get", state)(state), x.x))(state)
+          g.reflectWrite("var_set", state, g.reflect("+", g.reflectRead("var_get", state)(state), x.x))(state)
 
         def result() = if (op == "tensor")
           state
         else
-          g.reflectEffect("var_get", state)(state)
+          g.reflectRead("var_get", state)(state)
       }
 
       val builders = ops map (new Builder(_))
@@ -320,8 +320,8 @@ abstract class MultiLoopBuilderLowering extends Transformer {
     case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block), _) =>
       class Builder(op: String) { // TODO: proper subclasses?
         val state = g.reflectEffect(op+"_builder_new", sh)(STORE)
-        def +=(i: SEQ, x: INT) = g.reflectEffect(op+"_builder_add", state, i.x, x.x)(state)
-        def result() = g.reflectEffect(op+"_builder_get", state)(state)
+        def +=(i: SEQ, x: INT) = g.reflectWrite(op+"_builder_add", state, i.x, x.x)(state)
+        def result() = g.reflectRead(op+"_builder_get", state)(state)
       }
 
       val builders = ops map (new Builder(_))
@@ -407,7 +407,7 @@ abstract class MultiDimForeachLowering extends Transformer {
         case (s::Nil, x::Nil) => x
         case (s::sh, x::xs) => x * sh.reduce(_*_) + linearize(sh,xs)
       }
-      g.reflectEffect("array_set", transform(builder), linearize(shape,idx).x, x)(transform(builder))
+      g.reflectWrite("array_set", transform(builder), linearize(shape,idx).x, x)(transform(builder))
 
     case Node(s, "tensor_builder_get", List(builder: Sym), _) =>
       val (Node(s, "tensor_builder_new", List(sh: Exp), _)) = builders(builder)

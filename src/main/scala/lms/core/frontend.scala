@@ -6,9 +6,9 @@ class FrontEnd {
 
   var g: GraphBuilder = null
 
-  val CTRL = Const("CTRL")
-  val STORE = Const("STORE")
-  val CPS = Const("CPS")
+  val CTRL = Other(Const("CTRL"))
+  val STORE = Alloc // Other(Const("STORE"))
+  val CPS = Other(Const("CPS"))
 
   case class BOOL(x: Exp) {
     //def &&(y: => BOOL): BOOL = BOOL(g.reflect("&",x,y.x)) // should call if?
@@ -39,16 +39,16 @@ class FrontEnd {
   }
 
   case class ARRAY(x: Exp) {
-    def apply(i: INT): INT = INT(g.reflectEffect("array_get",x,i.x)(x))
-    def update(i: INT, y: INT): Unit = g.reflectEffect("array_set",x,i.x,y.x)(x)
+    def apply(i: INT): INT = INT(g.reflectRead("array_get",x,i.x)(x))
+    def update(i: INT, y: INT): Unit = g.reflectWrite("array_set",x,i.x,y.x)(x)
   }
   object ARRAY {
     def apply(n: INT): ARRAY = ARRAY(g.reflectEffect("array_new",n.x)(STORE))
   }
 
   case class VAR(x: Exp) {
-    def apply(): INT = INT(g.reflectEffect("var_get",x)(x))
-    def update(y: INT): Unit = g.reflectEffect("var_set",x,y.x)(x)
+    def apply(): INT = INT(g.reflectRead("var_get",x)(x))
+    def update(y: INT): Unit = g.reflectWrite("var_set",x,y.x)(x)
   }
   object VAR {
     def apply(x: INT): VAR = VAR(g.reflectEffect("var_new",x.x)(STORE))
@@ -103,7 +103,7 @@ class FrontEnd {
     // NOTE: lambda expression itself does not have
     // an effect, so body block should not count as
     // latent effect of the lambda
-    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()
+    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()()
     f1
   }
 

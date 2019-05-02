@@ -23,12 +23,26 @@ object Backend {
   // TOOD: this can be made more fine-grained, i.e.,
   // distinguish may/must and read/write effects,
   // soft dependencies, ...
+  abstract class Effect {
+    override def toString = this match {
+      case Read(x) => x.toString
+      case Write(x) => x.toString + "*"
+      case Alloc => "Store"
+      case Other(x) => x.toString
+    }
+  }
+  case class Read(x: Sym) extends Effect
+  case class Write(x: Sym) extends Effect
+  case object Alloc extends Effect
+  case class Other(x: Const) extends Effect
 
-  // case class EffectSummary(read: )
 
-  case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
+  case class EffectSummary(sdeps: List[Sym], hdeps: List[Sym], keys: List[Effect]) {
+  // case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
+    lazy val deps = hdeps ++ sdeps
     override def toString = if (deps.nonEmpty || keys.nonEmpty)
-      s"[${keys.mkString(" ")}: ${deps.mkString(" ")}]" else ""
+      keys.mkString("[", " ", ": ") + (if (sdeps.nonEmpty) sdeps.mkString("soft {", " ", "} ") else "") + (if (hdeps.nonEmpty) hdeps.mkString("hard {", " ", "}]") else "]")
+    else ""
   }
 
   // A node in a computation graph links a symbol with
@@ -58,7 +72,7 @@ object Backend {
   // inputs, result, effect input, effect output summary
   case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def {
     def bound = ein::in
-    def used = (res::eff.deps).distinct collect { case s: Sym => s }
+    def used = if (res.isInstanceOf[Sym] && !eff.deps.contains(res)) (res.asInstanceOf[Sym])::eff.deps else eff.deps
     def isPure = eff.deps == List(ein)
   }
 
@@ -75,6 +89,7 @@ object Backend {
       case _ => Nil
     }
 
+  // TODO: remove filter syms
   def filterSym(x: List[Exp]): Set[Sym] = x collect { case s: Sym => s } toSet
   def symsAndEffectSyms(x: Node): (Set[Sym], Set[Sym]) = ((Set[Sym](), filterSym(x.eff.deps)) /: x.rhs) {
     case ((syms, symsEffect), s: Sym) => (syms + s, symsEffect)
@@ -120,7 +135,15 @@ class GraphBuilder {
     reflectEffect(s, as:_*)()
   }
 
-  def reflectEffect(s: String, as: Def*)(efKeys: Exp*): Exp = {
+  def reflectRead(s: String, as: Def*)(efKeys: Exp) = efKeys match {
+    case key: Sym => reflectEffect(s, as:_*)(Read(key))
+    case _ => ???
+  }
+  def reflectWrite(s: String, as: Def*)(efKeys: Exp) = efKeys match {
+    case key: Sym => reflectEffect(s, as:_*)(Write(key))
+    case _ => ???
+  }
+  def reflectEffect(s: String, as: Def*)(efKeys: Effect*): Exp = {
     // rewrite?
     rewrite(s,as.toList) match {
       case Some(e) => e
@@ -138,41 +161,52 @@ class GraphBuilder {
 
 
 
-        // effects or pure?
+        // effects or pure? // FIXME: only reads?
         if (efKeys2.nonEmpty) {
           val sm = Sym(fresh)
           // gather effect dependencies
-          def latest(e1: Exp, e2: Exp) = if (curLocalDefs(e1)) e1 else e2
-          val prev = efKeys2.map(e => curEffects.getOrElse(e,latest(e,curBlock))).distinct
-// prevHard
-// prevSoft
-// e match {
-//   case Read(v) => curEffect.getOrElse(e, curBlock),  strong previous write
-//   case Alloc   => Nothing
-//   case Write(v)=> assert v is in curEffect,  strong dep on last write, soft deps on last read list
-//   case Other(s)=> CTRL STORE CPS (strong deps) curEffects.getOrElse(e,curBlock))
-// }
-          val res = reflect(sm, s, as:_*)(prev:_*)(efKeys2:_*)
-          for (e <- efKeys2) curEffects = curEffects + (e -> res)
-            // map { e match case { 
-              // Alloc   => res -> (res, Nil)
-              // Read(v) => curEffects,updateRead(v, res) // insert in read list
-              // case Write(v) => curEffect.updateWrite(v, res) // empty list and update last write )  } }
-              // case Other(v) => e -> (res, Nil)
+          // def latest(e1: Exp, e2: Exp) = if (curLocalDefs(e1)) e1 else e2
+          // val prev = efKeys2.map(e => curEffects.getOrElse(e,latest(e,curBlock))).distinct
+
+          val prevSoft = new mutable.HashSet[Sym]
+          val prevHard = new mutable.HashSet[Sym]
+          for (e <- efKeys2) e match {
+            case Read(v) => prevHard += getLastWrite(v) // still need curent block for loops!
+            case Alloc   => prevHard += curBlock
+            case Write(v)=>
+              val (lw, lrs) = curEffects.getOrElse(v, (curBlock, Nil))
+              prevHard += lw // strong dep last write
+              prevSoft ++= lrs // soft dep reads since last write
+            case Other(s)=> // CTRL STORE CPS
+              prevHard += getLastWrite(s)
+          }
+          // prevSoft --= prevHard
+          val res = reflect(sm, s, as:_*)(prevSoft.toSeq:_*)(prevHard.toSeq:_*)(efKeys2:_*)
+          for (e <- efKeys2) e match {
+            case Alloc    => curEffects = curEffects + (res -> (res, Nil))
+            case Read(v)  =>
+              val (lw, lrs) = curEffects.getOrElse(v, (curBlock, Nil)) // FIXME really?
+              curEffects = curEffects + (v -> (lw, res::lrs))
+            case Write(v) =>
+              val (lw, _) = curEffects.getOrElse(v, (curBlock, Nil)) // FIXME really?
+              curEffects = curEffects + (v -> (res, Nil))
+            case Other(v) =>
+              curEffects = curEffects + (v -> (res, Nil))
+          }
           res
         } else {
           // cse? never for effectful stm
           findDefinition(s,as) match {
             case Some(n) => n.n
             case None =>
-              reflect(Sym(fresh), s, as:_*)()()
+              reflect(Sym(fresh), s, as:_*)()()()
           }
         }
     }
   }
 
-  def reflect(x: Sym, s: String, as: Def*)(efDeps: Exp*)(efKeys: Exp*): Exp = {
-    val n = Node(x,s,as.toList,EffectSummary(efDeps.toList, efKeys.toList))
+  def reflect(x: Sym, s: String, as: Def*)(sEfDeps: Sym*)(hEfDeps: Sym*)(efKeys: Effect*): Sym = {
+    val n = Node(x,s,as.toList,EffectSummary(sEfDeps.toList, hEfDeps.toList, efKeys.toList))
     globalDefs += n
     globalDefsCache(x) = n
     globalDefsReverseCache((s,n.rhs)) = n
@@ -207,9 +241,14 @@ class GraphBuilder {
   }
 
 
-  var curBlock: Exp = _ // could this become an ExplodedStruct?
-  var curEffects: Map[Exp,Exp] = _ // map key to dep // change !!!
+  var curBlock: Sym = _ // could this become an ExplodedStruct?
+  var curEffects: Map[Exp,(Sym, List[Sym])] = _ // map key to write/read deps
   var curLocalDefs: Set[Exp] = _
+
+  def getLastWrite(x: Exp) = curEffects.get(x) match {
+    case Some((lw, _)) => lw
+    case _ => curBlock
+  }
 
   // NOTE/TODO: want to mask out purely local effects
   def isPure(b: Block) = b.eff.deps == List(b.ein)
@@ -221,7 +260,7 @@ class GraphBuilder {
     globalDefs.toList.filter(n => ins.exists(bound.hm.getOrElse(n.n,Set())))
   }
 
-  def getEffKeys(b: Block): List[Exp] = b.eff.keys
+  def getEffKeys(b: Block): List[Effect] = b.eff.keys
 
   def reify(x: => Exp): Block =  reify(0, xs => x )
   def reify(x: Exp => Exp): Block = reify(1, xs => x(xs(0)))
@@ -243,9 +282,18 @@ class GraphBuilder {
       // remove local definitions from visible effect keys
       // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
       // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
-      val keys = curEffects.keys.filterNot(curLocalDefs).toList
-      val deps = if (curEffects.nonEmpty) curEffects.values.toList.distinct else List(curBlock)
-      Block(args, res, block, EffectSummary(deps, keys))
+      val hard = new mutable.HashSet[Sym]
+      val keys = new mutable.ListBuffer[Effect]
+      for ((key, (lw, lrs)) <- curEffects) {
+        if (!curLocalDefs(key)) key match {
+          case k: Const => keys += Other(k)
+          case s: Sym   => keys += (if (lw == curBlock) Read(s) else Write(s))
+        }
+
+        hard += lw
+        hard ++= lrs
+      }
+      Block(args, res, block, EffectSummary(Nil, if (hard.size == 0) List(block) else hard.toList, keys.toList))
     } finally {
       curBlock = save
       curEffects = saveEffects

@@ -72,7 +72,7 @@ class TensorFrontEnd2 extends FrontEnd {
   }
 
 
-  def reflect[T:Type](s: String, xs: Exp*)(efs: Exp*): T = {
+  def reflect[T:Type](s: String, xs: Exp*)(efs: Effect*): T = {
     unref[T](g.reflectEffect(s, xs:_*)(efs:_*))
   }
   def ref[T:Type](x: T): Exp = implicitly[Type[T]].toExp(x)
@@ -280,6 +280,12 @@ class TensorFrontEnd2 extends FrontEnd {
       val subst = new mutable.HashMap[Def,Exp]
       subst(in) = x
       //subst(ein) = g.effectToExp(g.curBlock)
+      def substEff(x: Effect) = x match {
+        case Read(x) => Read(subst.getOrElse(x, x).asInstanceOf[Sym])
+        case Write(x) => Write(subst.getOrElse(x, x).asInstanceOf[Sym])
+        case Other(x) => Other(subst.getOrElse(x, x).asInstanceOf[Const])
+        case _ => x
+      }
 
       val nodes = g.globalDefs.filter(n => bound.hm.getOrElse(n.n,Set())(in) || bound.hm.getOrElse(n.n,Set())(ein))
       // println(s"nodes dependent on $in,$ein:")
@@ -288,7 +294,7 @@ class TensorFrontEnd2 extends FrontEnd {
       nodes.foreach { case Node(n,op,rhs,efs) =>
         val (effects,pure) = (efs.deps,rhs)
         val args = pure.map(a => subst.getOrElse(a,a)) // XXX TODO: Blocks!
-        val efs1 = efs.keys.map(a => subst.getOrElse(a,a))
+        val efs1 = efs.keys.map(substEff)
         // XXX losing effect stuff here !!!
         if (effects.nonEmpty)
           subst(n) = g.reflectEffect(op,args:_*)(efs1:_*)
