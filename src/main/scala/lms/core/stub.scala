@@ -720,9 +720,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         // an effect, so body block should not count as
         // latent effect of the lambda
         val block = Adapter.g.reify(arity, gf)
-        val res = Adapter.g.reflect(fn1,"λ",block)()(fn)(
-          Adapter.g.getLatentEffect(block).filter(_ == Adapter.CPS).distinct: _* // should capture CPS effect if the block has any
-        )
+        val res = Adapter.g.reflect(fn1,"λ",block)()(fn)()
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }

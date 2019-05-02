@@ -570,7 +570,7 @@ abstract class CPSTransformer extends Transformer {
 
     case Node(s,"λ", List(b: Block),es) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
-        if (es.keys contains Adapter.CPS) forwardCPSSet += forwardMap(s)
+        if (b.eff.keys contains Adapter.CPS) forwardCPSSet += forwardMap(s)
         val s1: Sym = subst(s).asInstanceOf[Sym]
         g.reflect(s1, "λ", transformLambda(b))()(forwardMap(s1))()
       } else {
@@ -646,7 +646,7 @@ abstract class SelectiveCPSTransformer extends CPSTransformer {
     case Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) &&
       ((es.keys contains Adapter.CPS) || (forwardCPSSet contains x.asInstanceOf[Sym])) => super.traverse(n)(k)
     // lambda need to capture the CPS effect of its body block
-    case Node(s,"λ", List(b: Block),es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
+    case Node(s,"λ", List(b: Block),es) if (b.eff.keys contains Adapter.CPS) => super.traverse(n)(k)
 
     case Node(s,"λ", List(b: Block),es) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"

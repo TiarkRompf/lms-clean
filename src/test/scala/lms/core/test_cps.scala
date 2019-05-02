@@ -117,6 +117,65 @@ class CPSTest extends TutorialFunSuite {
     })
   }
 
+  test("dcDeep") {
+    val driver = new CPSDslDriver[Int, Int] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Int] = {
+        reset1 {
+          shift1[Int, Int]{ k =>
+            2 * k(arg) * reset1 {
+              shift1[Int, Int] { k =>
+                k(k(arg)) + reset1 {
+                  11 + shift1[Int, Int] { k =>
+                    k(arg) + k(14)
+                  } * 2
+                }
+              } + 10
+            }
+          } + 4
+        } * arg
+      }
+    }
+    // test by running
+    for (arg <- 0 until 10) {
+      val expect = {
+        reset {
+          shift { (k: Int => Int) =>
+            2 * k(arg) * reset {
+              shift { (k: Int => Int) =>
+                k(k(arg)) + reset {
+                  11 + shift { (k: Int => Int) =>
+                    k(arg) + k(14)
+                  } * 2
+                }
+              } + 10
+            }
+          } + 4
+        } * arg
+      }
+      assert(driver.eval(arg) == expect)
+      assert(driver.eval2(arg) == expect)
+      assert(driver.eval3(arg) == expect)
+    }
+    // test source
+    val src = driver.code
+    checkOut("dcDeep", "scala", {
+      println(src)
+      println("// output:")
+    })
+    val src2 = driver.code2
+    checkOut("dcDeepTrans", "scala", {
+      println(src2)
+      println("// output:")
+    })
+    val src3 = driver.code3
+    checkOut("dcDeepTransSelective", "scala", {
+      println(src3)
+      println("// output:")
+    })
+  }
+
   test("dcIf") {
     val driver = new CPSDslDriver[Int, Int] {
 
