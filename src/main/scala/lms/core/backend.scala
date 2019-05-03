@@ -308,6 +308,8 @@ class GraphBuilder {
             } else {
               keys += Write(s)
               mayHdeps = mayHdeps + (s -> lw) // what about reads?
+              hard += lw
+              hard ++= lrs
             }
         }
       }
