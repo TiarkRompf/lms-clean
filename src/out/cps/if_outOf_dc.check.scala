@@ -1,9 +1,8 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def exit(res: Int): Int = res
     val x2 = x1 > 5
     def cIf0(x16: Int) = {
-      exit(x16)
+      x16 /*exit x16*/
     }
     if (x2) {
       val x12 = {

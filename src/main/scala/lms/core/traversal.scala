@@ -495,7 +495,7 @@ abstract class Transformer extends Traverser {
 abstract class CPSTransformer extends Transformer {
 
   val forwardMap = mutable.Map[Sym, Sym]()  // this Map set up connection for lambda-forward node (sTo -> sFrom)
-  val forwardCPSSet = mutable.Set[Sym]()    // this Set collect sFrom, whose sTo has CPS effect
+  val forwardCPSSet = mutable.Set[Exp]()    // this Set collect sFrom, whose sTo has CPS effect
   val contSet = mutable.Set.empty[Exp]      // this Set collect all continuation captured by shift1 (so that their application doesn't take more continuations)
 
   def withSubst(s: Sym)(e: => Exp) = { subst(s) = e; subst(s) }  // syntactic helper
@@ -559,9 +559,9 @@ abstract class CPSTransformer extends Transformer {
 
   def traverse(n: Node)(k: => Exp): Exp = n match {
 
-    case n @ Node(s,"shift1",List(y:Block),_) =>
+    case n @ Node(s,"shift1",List(y:Block),es) =>
       contSet += y.in.head
-      subst(y.in.head) = g.reflectEffect("λ", g.reify(e => withSubstScope(s)(e)(k)))(Adapter.CTRL)
+      subst(y.in.head) = g.reflectEffect("λ", g.reify(e => withSubstScope(s)(e)(k)))()
       traverse(y)(v => v)
 
     case n @ Node(s,"reset1",List(y:Block),_) =>
@@ -570,7 +570,7 @@ abstract class CPSTransformer extends Transformer {
 
     case Node(s,"λ", List(b: Block),es) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
-        if (b.eff.keys contains Adapter.CPS) forwardCPSSet += forwardMap(s)
+        if (b.eff.keys contains Adapter.CPS) forwardCPSSet += forwardMap(subst(s).asInstanceOf[Sym])
         val s1: Sym = subst(s).asInstanceOf[Sym]
         g.reflect(s1, "λ", transformLambda(b))()(forwardMap(s1))()
       } else {
@@ -616,7 +616,6 @@ abstract class CPSTransformer extends Transformer {
   def applyExp(graph: Graph): Exp = {
     bound(graph)
     withScope(Nil, graph.nodes) {
-      val exit = g.reflectEffect("define_exit")(Adapter.STORE) // Note: had to use this key to make sure it is generated
       traverse(graph.block)(v => g.reflectEffect("exit", v)(Adapter.CTRL))
     }
   }
@@ -643,8 +642,8 @@ abstract class SelectiveCPSTransformer extends CPSTransformer {
     case Node(f,"?",c::(a:Block)::(b:Block)::_,es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
     case Node(f,"W",(c:Block)::(b:Block)::e, es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
     // the es.keys of "@" node may have Adapter.CPS, if and only if the lambda has Adapter.CPS
-    case Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) &&
-      ((es.keys contains Adapter.CPS) || (forwardCPSSet contains x.asInstanceOf[Sym])) => super.traverse(n)(k)
+    case Node(s,"@",(x:Exp)::(y:Exp)::_,es) if (es.keys.contains(Adapter.CPS) ||
+      forwardCPSSet.contains(subst(x.asInstanceOf[Sym]))) => super.traverse(n)(k)
     // lambda need to capture the CPS effect of its body block
     case Node(s,"λ", List(b: Block),es) if (b.eff.keys contains Adapter.CPS) => super.traverse(n)(k)
 

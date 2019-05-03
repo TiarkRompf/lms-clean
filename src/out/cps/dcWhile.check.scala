@@ -1,6 +1,5 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def exit(res: Int): Int = res
     val x26 = {
       def x4(x24: Int) = {
         val x25 = x24 * 2
@@ -32,7 +31,7 @@ class Snippet extends (Int => Int) {
       loop0()
     }
     val x27 = x26 + 4
-    exit(x27)
+    x27 /*exit x27*/
   }
 }
 // output:

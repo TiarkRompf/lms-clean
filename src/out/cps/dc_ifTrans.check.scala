@@ -1,34 +1,33 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def exit(res: Int): Int = res
-    val x3 = x1 * 2
-    val x4 = x1 - 5
-    val x5 = x1 + 5
-    val x25 = {
-      var x7 = x3
-      def x21(x9: Int): Int = {
-        val x10 = x7
-        val x11 = x10 > 5
-        def x15(x13: Int): Int = {
-          val x14 = x9 * x13
-          x14
+    val x2 = x1 * 2
+    val x3 = x1 - 5
+    val x4 = x1 + 5
+    val x24 = {
+      var x6 = x2
+      def x20(x8: Int): Int = {
+        val x9 = x6
+        val x10 = x9 > 5
+        def x14(x12: Int): Int = {
+          val x13 = x8 * x12
+          x13
         }
-        val x20 = if (x11) {
-          val x17 = x15(x4)
-          x17
+        val x19 = if (x10) {
+          val x16 = x14(x3)
+          x16
         } else {
-          val x19 = x15(x5)
-          x19
+          val x18 = x14(x4)
+          x18
         }
-        x20
+        x19
       }
-      val x22 = x21(x1)
-      val x23 = x21(x22)
-      val x24 = x23 + 3
-      x24
+      val x21 = x20(x1)
+      val x22 = x20(x21)
+      val x23 = x22 + 3
+      x23
     }
-    val x26 = x25 + 10
-    exit(x26)
+    val x25 = x24 + 10
+    x25 /*exit: x25 */
   }
 }
 // output:

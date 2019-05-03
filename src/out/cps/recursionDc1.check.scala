@@ -1,6 +1,5 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def exit(res: Int): Int = res
     lazy val x3 = x4 _
     def x4(c: Int => Int, x6: Int): Int = {
       val x7 = x6 > 0
@@ -29,7 +28,7 @@ class Snippet extends (Int => Int) {
       }
       x4(cApp2, x1)
     }
-    exit(x20)
+    x20 /*exit x20*/
   }
 }
 // output:

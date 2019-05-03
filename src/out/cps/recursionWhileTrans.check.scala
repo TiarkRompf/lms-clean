@@ -1,53 +1,52 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def exit(res: Int): Int = res
+    var x2 = 0
     var x3 = 0
-    var x4 = 0
-    lazy val x5 = x6 _
-    def x6(x7: Int => Int, x9: Int): Int = {
-      val x10 = x9 > 0
-      def x14(x12: Int): Int = {
-        val x13 = x7(x12)
-        x13
+    lazy val x4 = x5 _
+    def x5(x6: Int => Int, x8: Int): Int = {
+      val x9 = x8 > 0
+      def x13(x11: Int): Int = {
+        val x12 = x6(x11)
+        x12
       }
-      val x25 = if (x10) {
-        val x16 = x9 - x1
-        def x21(x18: Int): Int = {
-          val x19 = x9 * x18
-          val x20 = x14(x19)
-          x20
+      val x24 = if (x9) {
+        val x15 = x8 - x1
+        def x20(x17: Int): Int = {
+          val x18 = x8 * x17
+          val x19 = x13(x18)
+          x19
         }
-        val x22 = x5(x21, x16)
-        x22
+        val x21 = x4(x20, x15)
+        x21
       } else {
-        val x24 = x14(1)
-        x24
+        val x23 = x13(1)
+        x23
       }
-      x25
+      x24
     }
-    def x26(): Int = {
-      val x28 = x3
-      val x29 = x28 < 10
-      val x44 = if (x29) {
-        val x31 = x3
-        def x39(x33: Int): Int = {
-          x4 = x33
-          val x35 = x3
-          val x36 = x35 + 1
-          x3 = x36
-          val x38 = x26()
-          x38
+    def x25(): Int = {
+      val x27 = x2
+      val x28 = x27 < 10
+      val x43 = if (x28) {
+        val x30 = x2
+        def x38(x32: Int): Int = {
+          x3 = x32
+          val x34 = x2
+          val x35 = x34 + 1
+          x2 = x35
+          val x37 = x25()
+          x37
         }
-        val x40 = x6(x39, x31)
-        x40
+        val x39 = x5(x38, x30)
+        x39
       } else {
-        val x42 = x4
-        exit(x42)
+        val x41 = x3
+        x41 /*exit: x41 */
       }
-      x44
+      x43
     }
-    val x45 = x26()
-    x45
+    val x44 = x25()
+    x44
   }
 }
 // output:

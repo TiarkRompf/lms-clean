@@ -1,14 +1,13 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def exit(res: Int): Int = res
     val x2 = x1 + x1
-    var x3 = 0
-    var x4 = 0
     val x5 = x2 > 10
     def cIf0(x36: Int) = {
-      exit(x36)
+      x36 /*exit x36*/
     }
     if (x5) {
+      var x3 = 0
+      var x4 = 0
       val x9 = x2 - 10
       def loop1(): Int = {
         val x8 = x3
@@ -29,6 +28,8 @@ class Snippet extends (Int => Int) {
       }
       loop1()
     } else {
+      var x3 = 0
+      var x4 = 0
       val x24 = x2 + 10
       def loop2(): Int = {
         val x23 = x3

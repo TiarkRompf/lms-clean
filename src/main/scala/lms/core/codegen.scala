@@ -117,7 +117,7 @@ class ScalaCodeGen extends Traverser {
     case n @ Node(s, "define_exit", _, _) =>
       emit(s"def exit(res: Int): Int = res")
     case n @ Node(s, "exit", List(x), _) =>
-      emit(s"exit(${quote(x)})")
+      emit(s"${quote(x)} /*exit: ${quote(x)} */")
       printRes = false
     case n @ Node(s, "reset0", List(x:Block), _) =>
       emit(s"val $s = {"); traverse(x); emit("\n}")
@@ -253,7 +253,7 @@ class CPSScalaCodeGen extends CPSTraverser {
   override def apply(g: Graph): Unit = {
     bound(g)
     path = Nil; inner = g.nodes
-    traverse(g.block){ e => emit(s"exit(${quote(e)})") }
+    traverse(g.block){ e => emit(s"${quote(e)} /*exit ${quote(e)}*/") }
   }
 
   def emitAll(g: Graph)(m1:Manifest[_],m2:Manifest[_]): Unit = {
@@ -262,7 +262,6 @@ class CPSScalaCodeGen extends CPSTraverser {
       s"""
         |class Snippet extends (${m1.toString} => ${m2.toString}) {
         |  def apply($arg: Int): Int = {
-        |    def exit(res: Int): Int = res
        """.stripMargin)
     apply(g)
     emitln("\n}\n}")
