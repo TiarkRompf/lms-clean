@@ -46,7 +46,14 @@ abstract class Traverser {
 
   }
 
-  def focus[T](y: Block, extra: Sym*)(f: (Seq[Node], Block) => T): T = {
+  def focus[T](y: Block, extra: Sym*)(f: (Seq[Node], Block) => T): T =
+    focus0(y, extra: _*) { (path1, inner1, outer1, y) =>
+      withScope(path1, inner1) {
+        f(outer1, y)
+      }
+    }
+
+  def focus0[T](y: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
     val path1 = y.bound ++ extra.toList ++ path
 
     // a node is available if all bound vars
@@ -151,9 +158,7 @@ abstract class Traverser {
     // for (n <- inner1) System.out.println(s"\t$n")
     // System.out.println("\n\n")
 
-    withScope(path1, inner1.toSeq) {
-      f(outer1.toSeq, y)
-    }
+    f(path1, inner1.toSeq, outer1.toSeq, y)
   }
 
   def traverse(ns: Seq[Node], res: Block): Unit = {
@@ -204,42 +209,12 @@ abstract class Traverser {
 
 abstract class CPSTraverser extends Traverser {
 
-  // unfortunate code duplication (can we remove it?)
-  def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = {
-    val path1 = y.bound ++ extra.toList ++ path
-    def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
-    val g = new Graph(inner, y, null)
-    val reach = new mutable.HashSet[Sym]
-    val reachInner = new mutable.HashSet[Sym]
-    reach ++= y.used
-    for (d <- g.nodes.reverseIterator) {
-      if ((reach contains d.n)) {
-        if (available(d)) {
-          for ((e:Sym,f) <- symsFreq(d))
-            if (f > 0.5) reach += e else reachInner += e
-        } else {
-          reach ++= syms(d)
-        }
-      }
-      if (reachInner(d.n)) reachInner ++= syms(d)
-    }
-    val outer1 = new mutable.ListBuffer[Node]()
-    val inner1 = new mutable.ListBuffer[Node]()
-    for (n <- inner) {
-      if (reach(n.n)) {
-        if (available(n)) outer1 += n else inner1 += n
-      } else if (reachInner(n.n)) {
-          inner1 += n
+  def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit =
+    focus0(y, extra: _*) { (path1, inner1, outer1, y) =>
+      withScope1(path1, inner1) { (path0, inner0) =>
+        traverse(outer1, y){ v => withScope(path0, inner0)(k(v)) }
       }
     }
-    withScope1(path1, inner1.toSeq) { (path0, inner0) =>
-      traverse(outer1.toSeq, y){ v => withScope(path0, inner0)(k(v)) }
-    }
-  }
-
-  // def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit = focus(y, extra:_*){ (ns, y) =>
-  //   traverse(ns, y){ v => withScope(path, inner)(k(v)) }  // WRONG!
-  // }
 
   def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit = {
     if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(y.res)
@@ -506,36 +481,12 @@ abstract class CPSTransformer extends Transformer {
     } finally args.foreach{ arg => subst -= arg }
   }
 
-  // unfortunate code duplication (can we remove it?)
-  def traverse(y: Block, extra: Sym*)(k: Exp => Exp): Exp = {
-    val path1 = y.bound ++ extra.toList ++ path
-    def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
-    val g = new Graph(inner, y, null)
-    val reach = new mutable.HashSet[Sym]
-    val reachInner = new mutable.HashSet[Sym]
-    reach ++= y.used
-    for (d <- g.nodes.reverseIterator) {
-      if ((reach contains d.n)) {
-        if (available(d)) {
-          for ((e:Sym,f) <- symsFreq(d))
-            if (f > 0.5) reach += e else reachInner += e
-        } else {
-          reach ++= syms(d)
-        }
-      } else {
-        if (reachInner(d.n)) reachInner ++= syms(d)
+  def traverse(y: Block, extra: Sym*)(k: Exp => Exp): Exp =
+    focus0(y, extra: _*) { (path1, inner1, outer1, y) =>
+      withScope1(path1, inner1) { (path0, inner0) =>
+        traverse(outer1, y){ v => withScope(path0, inner0)(k(v)) }
       }
     }
-    val (outer1, inner1) = ((Seq[Node](), Seq[Node]()) /: inner) {
-      case ((outer1 , inner1), n) if reach(n.n) =>
-        if (available(n)) (n +: outer1, inner1) else (outer1, n +: inner1)
-      case ((outer1 , inner1), n) if reachInner(n.n) => (outer1, n +: inner1)
-      case (agg, _) => agg
-    }
-    withScope1(path1, inner1.reverse) { (path0, inner0) =>
-      traverse(outer1.reverse, y){ v => withScope(path0, inner0)(k(v)) }
-    }
-  }
 
   def traverse(ns: Seq[Node], y: Block)(k: Exp => Exp): Exp = {
     if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(transform(y.res))
