@@ -509,6 +509,9 @@ class CompactScalaCodeGen extends CompactTraverser {
   }
 }
 
+/*
+ * Resolve may dependencies
+ */
 class DeadCodeElimCG {
 
   var live: collection.Set[Sym] = _

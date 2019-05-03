@@ -36,12 +36,17 @@ object Backend {
   case object Alloc extends Effect
   case class Other(x: Const) extends Effect
 
+  def readEff(x: Effect) = x match {
+    case Read(x) => Some(x)
+    case _ => None
+  }
+
 
   case class EffectSummary(sdeps: List[Sym], hdeps: List[Sym], keys: List[Effect], mayHdeps: Map[Sym,Sym]) {
   // case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
     lazy val deps = hdeps ++ sdeps
     override def toString = if (deps.nonEmpty || keys.nonEmpty)
-      keys.mkString("[", " ", ": ") + (if (sdeps.nonEmpty) sdeps.mkString("soft {", " ", "} ") else "") + (if (hdeps.nonEmpty) hdeps.mkString("hard {", " ", "}]") else "]")
+      keys.mkString("[", " ", ":") + (if (sdeps.nonEmpty) sdeps.mkString(" soft {", " ", "}") else "") + (if (hdeps.nonEmpty) hdeps.mkString(" hard {", " ", "}") else "") + (if (mayHdeps.nonEmpty) mayHdeps.mkString(" mayh {", " ", "}]") else "]")
     else ""
   }
 
@@ -180,13 +185,13 @@ class GraphBuilder {
           val prevHard = new mutable.HashSet[Sym]
           for (e <- efKeys2) e match {
             case Read(v) => prevHard += getLastWrite(v) // still need curent block for loops!
-            case Alloc   => prevHard += curBlock
+            case Alloc   => prevSoft += curBlock
             case Write(v)=>
               val (lw, lrs) = curEffects.getOrElse(v, (curBlock, Nil))
-              prevSoft += lw // strong dep last write
+              prevSoft += lw // soft dep last write:
               prevSoft ++= lrs // soft dep reads since last write
             case Other(s)=> // CTRL STORE CPS
-              prevHard += getLastWrite(s)
+              prevSoft += getLastWrite(s)
           }
           // prevSoft --= prevHard
           val res = reflect(sm, s, as:_*)(prevSoft.toSeq:_*)(prevHard.toSeq:_*)(efKeys2:_*)
@@ -290,6 +295,10 @@ class GraphBuilder {
       // remove local definitions from visible effect keys
       // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
       // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
+      // TODO:
+      //  - if tests
+      //  - while tests
+      //  - closure test
       val soft = new mutable.HashSet[Sym]
       val hard = new mutable.HashSet[Sym]
       val keys = new mutable.ListBuffer[Effect]
@@ -299,9 +308,8 @@ class GraphBuilder {
           case k: Const =>
             keys += Other(k)
             hard += lw
-            hard ++= lrs
           case s: Sym   =>
-            if (lw == curBlock) {
+            if (lw == curBlock) { // no write in this block
               keys += Read(s)
               soft += lw
               soft ++= lrs // necessary?
@@ -309,11 +317,11 @@ class GraphBuilder {
               keys += Write(s)
               mayHdeps = mayHdeps + (s -> lw) // what about reads?
               hard += lw
-              hard ++= lrs
+              // hard ++= lrs
             }
         }
       }
-      if (curEffects contains res) {
+      if (curEffects contains res) {  // if res is mutable (e.g. Array)
         val (lw, lrs) = curEffects(res)
         hard += lw
       }

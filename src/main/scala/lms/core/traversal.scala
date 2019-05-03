@@ -8,13 +8,23 @@ import lms.core.stub.Adapter
 abstract class Traverser {
 
   // freq/block computation
-  def symsFreq(x: Node): List[(Def,Double)] = x match {
+  def symsFreq(x: Node, effectPath: Set[Sym]): List[(Def,Double)] = x match {
     case Node(f, "λ", List(Block(in, y, ein, eff)), _) =>
       (y::eff.deps).map(e => (e,100.0))
     // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
     case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
-      (c::eff.hdeps).map(e => (e,1.0)) ++ (ae::be::af.hdeps ++ bf.hdeps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
+      val freqs = new mutable.ListBuffer[(Def,Double)]
+      for ((key, dep: Def) <- af.mayHdeps)
+        if (effectPath(key)) freqs += ((dep, 0.5))
+      for ((key, dep: Def) <- bf.mayHdeps)
+        if (effectPath(key)) freqs += ((dep, 0.5))
+      for (dep <- ae::be::af.hdeps ++ bf.hdeps)
+        freqs += ((dep, 0.5))
+      for (dep <- c::eff.hdeps)
+        freqs += ((dep, 1.0))
+      // (c::eff.hdeps).map(e => (e,1.0)) ++ (ae::be::af.hdeps ++ bf.hdeps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
+      freqs.toList
     case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
       eff.hdeps.map(e => (e,1.0)) ++ (ae::af.hdeps ++ bf.hdeps).map(e => (e,100.0)) // XXX why eff.deps?
     case _ => hardSyms(x) map (s => (s,1.0))
@@ -25,6 +35,7 @@ abstract class Traverser {
 
   var path = List[Sym]()
   var inner: Seq[Node] = _
+  val blockEffectPath = new mutable.HashMap[Block,Set[Sym]]
 
   def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
     val (path0, inner0) = (path, inner)
@@ -69,6 +80,9 @@ abstract class Traverser {
     val reachInner = new mutable.HashSet[Sym]
 
     reach ++= y.used
+    var effectReversePath = blockEffectPath.getOrElse(y, Set())
+    for ((key, dep) <- y.eff.mayHdeps)
+      if (effectReversePath(key)) { System.out.println(s"Add $dep!!"); reach += dep }
 
     // for (d <- g.nodes) {
     //   println("check "+d + " " + bound.hm(d.n) + " " + path1.toSet + " " + reach(d.n) + " " + available(d))
@@ -79,13 +93,19 @@ abstract class Traverser {
         if (available(d)) {
           // node will be sched here, don't follow if branches!
           // other statement will be scheduled in an inner block
-          for ((e:Sym,f) <- symsFreq(d))
+          for ((e:Sym,f) <- symsFreq(d, effectReversePath))
             if (f > 0.5) reach += e else reachInner += e
         } else {
-          reach ++= hardSyms(d)
+          for ((e: Sym, _) <- symsFreq(d, effectReversePath))
+            reach += e
         }
       }
-      if (reachInner(d.n)) reachInner ++= hardSyms(d)
+      if (reachInner(d.n)) {
+        for ((e: Sym, _) <- symsFreq(d, effectReversePath))
+          reachInner += e
+      }
+      for (block <- blocks(d)) blockEffectPath += block -> effectReversePath
+      effectReversePath = effectReversePath ++ d.eff.keys.flatMap(readEff)
     }
 
     /*
