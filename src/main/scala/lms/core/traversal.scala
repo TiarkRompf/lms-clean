@@ -8,7 +8,7 @@ import lms.core.stub.Adapter
 abstract class Traverser {
 
   // freq/block computation
-  def symsFreq(x: Node, effectPath: Set[Sym]): List[(Def,Double)] = x match {
+  def symsFreq(x: Node, effectPath: Set[Exp]): List[(Def,Double)] = x match {
     case Node(f, "λ", List(Block(in, y, ein, eff)), _) =>
       (y::eff.deps).map(e => (e,100.0))
     // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
@@ -35,7 +35,7 @@ abstract class Traverser {
 
   var path = List[Sym]()
   var inner: Seq[Node] = _
-  val blockEffectPath = new mutable.HashMap[Block,Set[Sym]]
+  val blockEffectPath = new mutable.HashMap[Block,Set[Exp]]
 
   def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
     val (path0, inner0) = (path, inner)
@@ -105,7 +105,7 @@ abstract class Traverser {
           reachInner += e
       }
       for (block <- blocks(d)) blockEffectPath += block -> effectReversePath
-      effectReversePath = effectReversePath ++ d.eff.keys.flatMap(readEff)
+      effectReversePath = effectReversePath ++ d.eff.rkeys
     }
 
     /*
@@ -411,13 +411,6 @@ abstract class Transformer extends Traverser {
 
   val subst = new mutable.HashMap[Sym,Exp]
 
-  def transform(s: Effect): Effect = s match {
-    case Read(s) if subst contains s => Read(subst(s).asInstanceOf[Sym])   // FIXME always safe??
-    case Write(s) if subst contains s => Write(subst(s).asInstanceOf[Sym])
-    case Read(_) | Write(_) => println(s"Warning: not found in subst $subst: "+s); s
-    case a => a // must be Alloc or Other(Const _)
-  }
-
   def transform(s: Exp): Exp = s match {
     case s @ Sym(_) if subst contains s => subst(s)
     case s @ Sym(_) => println(s"Warning: not found in subst $subst: "+s); s
@@ -449,7 +442,7 @@ abstract class Transformer extends Traverser {
       // need to deal with recursive binding!
       val s1 = Sym(g.fresh)
       subst(s) = s1
-      g.reflect(s1, "λ", transform(b))()()()
+      g.reflect(s1, "λ", transform(b))()()()()
     case Node(s,op,rs,es) =>
       // effect dependencies in target graph are managed by
       // graph builder, so we drop all effects here
@@ -464,7 +457,7 @@ abstract class Transformer extends Traverser {
       }
       // NOTE: we're not transforming 'effects' here (just the keys)
       if (effects.nonEmpty)
-        g.reflectEffect(op,args:_*)(es.keys.map(transform):_*)
+        g.reflectEffect(op,args:_*)(es.rkeys.map(transform):_*)(es.wkeys.map(transform):_*)
       else
         g.reflect(op,args:_*)
   }
@@ -521,37 +514,40 @@ abstract class CPSTransformer extends Transformer {
   // need to add additional input to the block, XXX CAN SIMPLIFY ?
   def transformLambda(b: Block): Block = {
     val c = Sym(g.fresh)
-    val block = transform(b)(v => g.reflectEffect("@",c,v)(Adapter.CTRL))
+    val block = transform(b)(v => g.reflectWrite("@",c,v)(Adapter.CTRL))
     Block(c::block.in, block.res, block.ein, block.eff)
   }
 
   def reflectHelper(es: EffectSummary, op: String, args: Def*): Exp =
-    if (es.deps.nonEmpty) g.reflectEffect(op, args: _*)(es.keys.map(transform):_*) else g.reflect(op, args:_*)
+    if (es.deps.nonEmpty)
+      g.reflectEffect(op, args: _*)(es.rkeys.map(transform):_*)(es.wkeys.map(transform):_*)
+    else
+      g.reflect(op, args:_*)
 
   def traverse(n: Node)(k: => Exp): Exp = n match {
 
     case n @ Node(s,"shift1",List(y:Block),es) =>
       contSet += y.in.head
-      subst(y.in.head) = g.reflectEffect("λ", g.reify(e => withSubstScope(s)(e)(k)))()
+      subst(y.in.head) = g.reflectEffect("λ", g.reify(e => withSubstScope(s)(e)(k)))()()
       traverse(y)(v => v)
 
     case n @ Node(s,"reset1",List(y:Block),_) =>
-      subst(s) = g.reflectEffect("reset0", transform(y)(v => v))(Adapter.CTRL)
+      subst(s) = g.reflectWrite("reset0", transform(y)(v => v))(Adapter.CTRL)
       k
 
     case Node(s,"λ", List(b: Block),es) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
         if (b.eff.keys contains Adapter.CPS) forwardCPSSet += forwardMap(subst(s).asInstanceOf[Sym])
         val s1: Sym = subst(s).asInstanceOf[Sym]
-        g.reflect(s1, "λ", transformLambda(b))()(forwardMap(s1))()
+        g.reflect(s1, "λ", transformLambda(b))()(forwardMap(s1))()()
       } else {
         subst(s) = g.reflect("λ", transformLambda(b))
       }
       k
 
     case Node(f,"?",c::(a:Block)::(b:Block)::_,es) =>
-      val sIf = g.reflectEffect("λ", g.reify(e => withSubstScope(f)(e)(k)))(Adapter.CTRL) // XXX without this Effect, If branch is repeated!!
-      val kIf = (v:Exp) => g.reflectEffect("@",sIf,v)(Adapter.CTRL)
+      val sIf = g.reflectWrite("λ", g.reify(e => withSubstScope(f)(e)(k)))(Adapter.CTRL) // XXX without this Effect, If branch is repeated!!
+      val kIf = (v:Exp) => g.reflectWrite("@",sIf,v)(Adapter.CTRL)
       withSubst(f) {
         reflectHelper(es, "?", c match {case c: Exp => transform(c); case c => ???},
           transform(a)(kIf), transform(b)(kIf))
@@ -561,7 +557,7 @@ abstract class CPSTransformer extends Transformer {
       val sLoop = Sym(g.fresh)
       g.reflect(sLoop, "λ", transform(c)(v =>
         reflectHelper(es, "?", v, transform(b)(v =>
-          g.reflectEffect("@", sLoop)(Adapter.CTRL)), g.reify(k))))()()(Adapter.CTRL)
+          g.reflectWrite("@", sLoop)(Adapter.CTRL)), g.reify(k))))()()()(Adapter.CTRL)
       withSubst(f)(reflectHelper(es, "@", sLoop))
 
     case n @ Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) =>
@@ -573,7 +569,7 @@ abstract class CPSTransformer extends Transformer {
       val sFrom = Sym(g.fresh); val sTo = Sym(g.fresh)
       subst(s) = sFrom; subst(y) = sTo
       forwardMap(sTo) = sFrom
-      g.reflect(sFrom, "λforward", sTo)()()()
+      g.reflect(sFrom, "λforward", sTo)()()()()
       k
 
     case Node(s,op,rs,es) =>
@@ -587,7 +583,7 @@ abstract class CPSTransformer extends Transformer {
   def applyExp(graph: Graph): Exp = {
     bound(graph)
     withScope(Nil, graph.nodes) {
-      traverse(graph.block)(v => g.reflectEffect("exit", v)(Adapter.CTRL))
+      traverse(graph.block)(v => g.reflectWrite("exit", v)(Adapter.CTRL))
     }
   }
 
@@ -621,7 +617,7 @@ abstract class SelectiveCPSTransformer extends CPSTransformer {
     case Node(s,"λ", List(b: Block),es) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
         val s1: Sym = subst(s).asInstanceOf[Sym]
-        g.reflect(s1, "λ", transform(b)(v => v))()(forwardMap(s1))()
+        g.reflect(s1, "λ", transform(b)(v => v))()(forwardMap(s1))()()
       } else {
         subst(s) = g.reflect("λ", transform(b)(v => v))
       }

@@ -291,13 +291,6 @@ class CompactScalaCodeGen extends CompactTraverser {
     case Const(x) => x.toString
   }
 
-  def quote(x: Effect): String = x match {
-    case Read(x) => quote(x)
-    case Write(x) => quote(x) + "*"
-    case Other(x) => quote(x)
-    case Alloc => "Const(STORE)"
-  }
-
   def shallow(n: Def): Unit = n match {
     case InlineSym(n) => shallow(n)
     case b:Block => quoteBlock(b, false)

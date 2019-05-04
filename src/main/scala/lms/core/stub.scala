@@ -550,12 +550,12 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def reflectEffect[T:Manifest](x: Def[T]): Exp[T] = {
     val p = x.asInstanceOf[Product]
     val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflectEffect(p.productPrefix, xs:_*)(Adapter.CTRL))
+    Wrap[T](Adapter.g.reflectWrite(p.productPrefix, xs:_*)(Adapter.CTRL))
   }
   def reflectMutable[T:Manifest](x: Def[T]): Exp[T] = {
     val p = x.asInstanceOf[Product]
     val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflectEffect(p.productPrefix, xs:_*)(Adapter.STORE))
+    Wrap[T](Adapter.g.reflectMutable(p.productPrefix, xs:_*))
   }
   def reflectWrite[T:Manifest](w: Rep[Any])(x: Def[T]): Exp[T] = {
     val p = x.asInstanceOf[Product]
@@ -613,9 +613,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // ArrayOps
   // XXX HACK for generic type!
-  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectEffect("NewArray", Unwrap(x))(Adapter.STORE))
+  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
   def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = {
-    Wrap[Array[T]](Adapter.g.reflectEffect("Array", xs.map(Unwrap(_)):_*)(Adapter.STORE))
+    Wrap[Array[T]](Adapter.g.reflectMutable("Array", xs.map(Unwrap(_)):_*))
   }
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
@@ -625,7 +625,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   trait LongArray[+T]
-  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int] = None): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectEffect("NewArray", Unwrap(x))(Adapter.STORE))
+  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int] = None): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
     def apply(i: Rep[Long]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Long], y: Rep[A]): Unit = Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
@@ -657,11 +657,11 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // shift/reset
   def shift1[A:Manifest, B:Manifest](f: Rep[A => B] => Rep[B]): Rep[A] = { // XXX is the type signature correct?
     val bBlock = Adapter.g.reify(x => Unwrap(f(Wrap[A => B](x))))
-    Wrap[A](Adapter.g.reflectEffect("shift1", bBlock)(Adapter.CPS))
+    Wrap[A](Adapter.g.reflectWrite("shift1", bBlock)(Adapter.CPS))
   }
   def reset1[A:Manifest](f: => Rep[A]): Rep[A] = { // XXX is the type signature correct?
     val rBlock = Adapter.g.reify(Unwrap(f))
-    Wrap[A](Adapter.g.reflectEffect("reset1", rBlock)())
+    Wrap[A](Adapter.g.reflectEffect("reset1", rBlock)()())
   }
 
   // Functions
@@ -674,7 +674,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def doLambda[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] = fun(f)
   implicit class FunOps[A:Manifest,B:Manifest](f: Rep[A => B]) {
     def apply(x: Rep[A]): Rep[B] =
-      Wrap[B](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x))(Adapter.CTRL))
+      Wrap[B](Adapter.g.reflectWrite("@",Unwrap(f),Unwrap(x))(Adapter.CTRL))
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
@@ -683,7 +683,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def doLambda[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = fun(f)
   implicit class FunOps2[A:Manifest,B:Manifest,C:Manifest](f: Rep[(A,B) => C]) {
     def apply(x: Rep[A], y: Rep[B]): Rep[C] =
-      Wrap[C](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y))(Adapter.CTRL))
+      Wrap[C](Adapter.g.reflectWrite("@",Unwrap(f),Unwrap(x),Unwrap(y))(Adapter.CTRL))
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
@@ -692,7 +692,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = fun(f)
   implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
     def apply(x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =
-      Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))(Adapter.CTRL))
+      Wrap[D](Adapter.g.reflectWrite("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))(Adapter.CTRL))
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
@@ -701,7 +701,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
   implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {
     def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D]): Rep[E] =
-      Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))(Adapter.CTRL))
+      Wrap[E](Adapter.g.reflectWrite("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))(Adapter.CTRL))
   }
 
   def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
@@ -713,14 +713,14 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         Adapter.funTable = (fn, can)::Adapter.funTable
 
         val fn1 = Backend.Sym(Adapter.g.fresh)
-        Adapter.g.reflect(fn, "λforward", fn1)()()()
+        Adapter.g.reflect(fn, "λforward", fn1)()()()()
         //val xn = Sym(g.fresh)
         //val f1 = (x: INT) => APP(fn,x)
         // NOTE: lambda expression itself does not have
         // an effect, so body block should not count as
         // latent effect of the lambda
         val block = Adapter.g.reify(arity, gf)
-        val res = Adapter.g.reflect(fn1,"λ",block)()(fn)()
+        val res = Adapter.g.reflect(fn1,"λ",block)()(fn)()()
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }
@@ -735,7 +735,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     val can = canonicalize(f)
     topLevelFunctions.getOrElseUpdate(can, {
       val fn = Backend.Sym(Adapter.g.fresh)
-      Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()()()
+      Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()()()()
       fn
     })
   }
@@ -766,34 +766,37 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
 
   // MiscOps
-  def exit(res: Rep[Int]): Unit = Adapter.g.reflectEffect("exit", Unwrap(res))(Adapter.CTRL)
+  def exit(res: Rep[Int]): Unit = Adapter.g.reflectWrite("exit", Unwrap(res))(Adapter.CTRL)
   def println(x: Rep[Any]): Unit =
-    Adapter.g.reflectEffect("P",Unwrap(x))(Adapter.CTRL)
+    Adapter.g.reflectWrite("P",Unwrap(x))(Adapter.CTRL)
 
   def printf(f: String, x: Rep[Any]*): Unit = {
-    Adapter.g.reflectEffect("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
+    Adapter.g.reflectWrite("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
   }
 
   // TimingOps
   def timeGeneratedCode[A: Manifest](f: => Rep[A], msg: Rep[String] = unit("")): Rep[A] = {
     val ff = Adapter.g.reify(Unwrap(f))
-    Wrap[A](Adapter.g.reflectEffect("timeGenerated", Unwrap(msg), ff)(Adapter.g.getEffKeys(ff):_*))
+    val (refs, wefs) = Adapter.g.getEffKeys(ff)
+    Wrap[A](Adapter.g.reflectEffect("timeGenerated", Unwrap(msg), ff)(refs:_*)(wefs:_*))
   }
-  def timestamp: Rep[Long] = Wrap[Long](Adapter.g.reflectEffect("timestamp")(Adapter.CTRL))
+  def timestamp: Rep[Long] = Wrap[Long](Adapter.g.reflectWrite("timestamp")(Adapter.CTRL))
 
 
   // case class GenerateComment(l: String) extends Def[Unit]
   // case class Comment[A:Manifest](l: String, verbose: Boolean, b: Block[A]) extends Def[A]
   def generate_comment(l: String): Rep[Unit] = {
-    Wrap[Unit](Adapter.g.reflectEffect("generate-comment", Backend.Const(l))(Adapter.CTRL))
+    Wrap[Unit](Adapter.g.reflectWrite("generate-comment", Backend.Const(l))(Adapter.CTRL))
   }
   def comment[A:Manifest](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A] = {
     val g = Adapter.g
     val bb = g.reify(Unwrap(b))
     if (g.isPure(bb))
       Wrap[A](g.reflect("comment",Backend.Const(l),Backend.Const(verbose),bb))
-    else
-      Wrap[A](g.reflectEffect("comment",Backend.Const(l),Backend.Const(verbose),bb)(g.getEffKeys(bb):_*))
+    else {
+      val (refs, wefs) = Adapter.g.getEffKeys(bb)
+      Wrap[A](g.reflectEffect("comment",Backend.Const(l),Backend.Const(verbose),bb)(refs:_*)(wefs:_*))
+    }
   }
 
   // RangeOps
@@ -905,7 +908,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
   def unchecked[T:Manifest](xs: Any*): Rep[T] = {
     val (strings, args) = uncheckedHelp(xs)
-    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(Adapter.CTRL))
+    Wrap[T](Adapter.g.reflectWrite("unchecked" + strings, args:_*)(Adapter.CTRL))
   }
   def uncheckedPure[T:Manifest](xs: Any*): Rep[T] = {
     val (strings, args) = uncheckedHelp(xs)
@@ -914,7 +917,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // Variables
   implicit def readVar[T:Manifest](x: Var[T]): Rep[T] = Wrap[T](Adapter.g.reflectRead("var_get", UnwrapV(x))(UnwrapV(x)))
-  def var_new[T:Manifest](x: Rep[T]): Var[T] = WrapV[T](Adapter.g.reflectEffect("var_new", Unwrap(x))(Adapter.STORE))
+  def var_new[T:Manifest](x: Rep[T]): Var[T] = WrapV[T](Adapter.g.reflectMutable("var_new", Unwrap(x)))
   def __assign[T:Manifest](lhs: Var[T], rhs: Rep[T]): Unit = Wrap[Unit](Adapter.g.reflectWrite("var_set", UnwrapV(lhs), Unwrap(rhs))(UnwrapV(lhs)))
   def __assign[T:Manifest](lhs: Var[T], rhs: Var[T]): Unit = __assign(lhs,readVar(rhs))
   def __assign[T:Manifest](lhs: Var[T], rhs: T): Unit = __assign(lhs,unit(rhs)) // shouldn't unit lift T to Rep[T] implicitly?

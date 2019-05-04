@@ -6,9 +6,9 @@ class FrontEnd {
 
   var g: GraphBuilder = null
 
-  val CTRL = Other(Const("CTRL"))
-  val STORE = Alloc // Other(Const("STORE"))
-  val CPS = Other(Const("CPS"))
+  val CTRL = Const("CTRL")
+  val STORE = Const("STORE")
+  val CPS = Const("CPS")
 
   case class BOOL(x: Exp) {
     //def &&(y: => BOOL): BOOL = BOOL(g.reflect("&",x,y.x)) // should call if?
@@ -43,7 +43,7 @@ class FrontEnd {
     def update(i: INT, y: INT): Unit = g.reflectWrite("array_set",x,i.x,y.x)(x)
   }
   object ARRAY {
-    def apply(n: INT): ARRAY = ARRAY(g.reflectEffect("array_new",n.x)(STORE))
+    def apply(n: INT): ARRAY = ARRAY(g.reflectMutable("array_new",n.x))
   }
 
   case class VAR(x: Exp) {
@@ -51,7 +51,7 @@ class FrontEnd {
     def update(y: INT): Unit = g.reflectWrite("var_set",x,y.x)(x)
   }
   object VAR {
-    def apply(x: INT): VAR = VAR(g.reflectEffect("var_new",x.x)(STORE))
+    def apply(x: INT): VAR = VAR(g.reflectMutable("var_new",x.x))
   }
 
   def IF(c: BOOL)(a: => INT)(b: => INT): INT = {
@@ -59,19 +59,19 @@ class FrontEnd {
     val bBlock = g.reify(b.x)
     // compute effect (aBlock || bBlock)
     val pure = g.isPure(aBlock) && g.isPure(bBlock)
-    val efs = (g.getEffKeys(aBlock) ++ g.getEffKeys(bBlock)).distinct
+    val (refs, wefs) = g.mergeEffKeys(aBlock, bBlock)
     if (pure)
       INT(g.reflect("?",c.x,aBlock,bBlock))
     else
-      INT(g.reflectEffect("?",c.x,aBlock,bBlock)(efs:_*))
+      INT(g.reflectEffect("?",c.x,aBlock,bBlock)(refs:_*)(wefs:_*))
   }
 
   def WHILE(c: => BOOL)(b: => Unit): Unit = {
     val cBlock = g.reify(c.x)
     val bBlock = g.reify({b;Const(())})
     // compute effect (cBlock bBlock)* cBlock
-    val efs = (g.getEffKeys(cBlock) ++ g.getEffKeys(bBlock)).distinct
-    g.reflectEffect("W",cBlock,bBlock)(efs:_*)
+    val (refs, wefs) = g.mergeEffKeys(cBlock, bBlock)
+    g.reflectEffect("W",cBlock,bBlock)(refs:_*)(wefs:_*)
   }
 
 
@@ -81,18 +81,20 @@ class FrontEnd {
       case Some(Node(f, "λ", List(b: Block), _)) =>
         if (g.isPure(b))
           INT(g.reflect("@",f,x.x))
-        else
-          INT(g.reflectEffect("@",f,x.x)(g.getEffKeys(b):_*))
+        else {
+          val (rkeys, wkeys) = g.getEffKeys(b)
+          INT(g.reflectEffect("@",f,x.x)(rkeys:_*)(wkeys:_*))
+        }
       case _ =>
-        INT(g.reflectEffect("@",f,x.x)(CTRL))
+        INT(g.reflectWrite("@",f,x.x)(CTRL))
     }
   }
 
   def PRINT(x: INT): Unit =
-    g.reflectEffect("P",x.x)(CTRL)
+    g.reflectWrite("P",x.x)(CTRL)
 
   def PRINT(x: STRING): Unit =
-    g.reflectEffect("P",x.x)(CTRL)
+    g.reflectWrite("P",x.x)(CTRL)
 
   def FUN(f: INT => INT): INT => INT = FUN((_,x) => f(x))
 
@@ -103,7 +105,7 @@ class FrontEnd {
     // NOTE: lambda expression itself does not have
     // an effect, so body block should not count as
     // latent effect of the lambda
-    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()()
+    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()()()
     f1
   }
 
