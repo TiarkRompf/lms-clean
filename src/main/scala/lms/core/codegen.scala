@@ -135,7 +135,7 @@ class ScalaCodeGen extends Traverser {
     emit(
       s"""
         |class Snippet extends (${m1.toString} => ${m2.toString}) {
-        |  def apply($arg: Int): Int = {
+        |  def apply($arg: ${m1.toString}): ${m2.toString} = {
        """.stripMargin)
     apply(g)
     emit("\n}\n}")
@@ -261,7 +261,7 @@ class CPSScalaCodeGen extends CPSTraverser {
     emitln(
       s"""
         |class Snippet extends (${m1.toString} => ${m2.toString}) {
-        |  def apply($arg: Int): Int = {
+        |  def apply($arg: ${m1.toString}): ${m2.toString} = {
        """.stripMargin)
     apply(g)
     emitln("\n}\n}")
