@@ -55,25 +55,25 @@ class TensorFrontEnd2 extends FrontEnd {
   }
 
   implicit object FUNII_Type extends Type[INT => INT] {
-    def fromExp(x: Exp): INT => INT = (y:INT) => INT(g.reflectEffect("@", x, y.x)(CTRL))
+    def fromExp(x: Exp): INT => INT = (y:INT) => INT(g.reflectWrite("@", x, y.x)(CTRL))
     def toExp(x: INT => INT): Exp = g.reflect("λ",g.reify(xn => x(INT(xn)).x))
   }
   implicit object FUNIU_Type extends Type[INT => Unit] {
-    def fromExp(x: Exp): INT => Unit = (y:INT) => g.reflectEffect("@", x, y.x)(CTRL)
+    def fromExp(x: Exp): INT => Unit = (y:INT) => g.reflectWrite("@", x, y.x)(CTRL)
     def toExp(x: INT => Unit): Exp = g.reflect("λ",g.reify{xn => x(INT(xn)); Const(())})
   }
   implicit object FUNSI_Type extends Type[SEQ => INT] {
-    def fromExp(x: Exp): SEQ => INT = (y:SEQ) => INT(g.reflectEffect("@", x, y.x)(CTRL))
+    def fromExp(x: Exp): SEQ => INT = (y:SEQ) => INT(g.reflectWrite("@", x, y.x)(CTRL))
     def toExp(x: SEQ => INT): Exp = g.reflect("λ",g.reify(xn => x(SEQ(xn)).x))
   }
   implicit object FUNSU_Type extends Type[SEQ => Unit] {
-    def fromExp(x: Exp): SEQ => Unit = (y:SEQ) => g.reflectEffect("@", x, y.x)(CTRL)
+    def fromExp(x: Exp): SEQ => Unit = (y:SEQ) => g.reflectWrite("@", x, y.x)(CTRL)
     def toExp(x: SEQ => Unit): Exp = g.reflect("λ",g.reify{xn => x(SEQ(xn)); Const(())})
   }
 
 
-  def reflect[T:Type](s: String, xs: Exp*)(efs: Effect*): T = {
-    unref[T](g.reflectEffect(s, xs:_*)(efs:_*))
+  def reflect[T:Type](s: String, xs: Exp*)(refs: Exp*)(wefs: Exp*): T = {
+    unref[T](g.reflectEffect(s, xs:_*)(refs:_*)(wefs:_*))
   }
   def ref[T:Type](x: T): Exp = implicitly[Type[T]].toExp(x)
   def unref[T:Type](x: Exp): T = implicitly[Type[T]].fromExp(x)
@@ -143,7 +143,7 @@ class TensorFrontEnd2 extends FrontEnd {
   class write extends scala.annotation.StaticAnnotation
 
   def PRINT(x: Tensor1): Unit =
-    g.reflectEffect("P",x.x)(CTRL)
+    g.reflectWrite("P",x.x)(CTRL)
 
 
   @ir("TensorLowering")
@@ -280,13 +280,7 @@ class TensorFrontEnd2 extends FrontEnd {
       val subst = new mutable.HashMap[Def,Exp]
       subst(in) = x
       //subst(ein) = g.effectToExp(g.curBlock)
-      def substEff(x: Effect) = x match {
-        case Read(x) => Read(subst.getOrElse(x, x).asInstanceOf[Sym])
-        case Write(x) => Write(subst.getOrElse(x, x).asInstanceOf[Sym])
-        case Other(x) => Other(subst.getOrElse(x, x).asInstanceOf[Const])
-        case _ => x
-      }
-
+      //
       val nodes = g.globalDefs.filter(n => bound.hm.getOrElse(n.n,Set())(in) || bound.hm.getOrElse(n.n,Set())(ein))
       // println(s"nodes dependent on $in,$ein:")
       // nodes.foreach(println)
@@ -294,10 +288,11 @@ class TensorFrontEnd2 extends FrontEnd {
       nodes.foreach { case Node(n,op,rhs,efs) =>
         val (effects,pure) = (efs.deps,rhs)
         val args = pure.map(a => subst.getOrElse(a,a)) // XXX TODO: Blocks!
-        val efs1 = efs.keys.map(substEff)
+        val refs1 = efs.rkeys.map(a => subst.getOrElse(a,a))
+        val wefs1 = efs.rkeys.map(a => subst.getOrElse(a,a))
         // XXX losing effect stuff here !!!
         if (effects.nonEmpty)
-          subst(n) = g.reflectEffect(op,args:_*)(efs1:_*)
+          subst(n) = g.reflectEffect(op,args:_*)(refs1:_*)(wefs1:_*)
         else
           subst(n) = g.reflect(op,args:_*)
       }
@@ -411,11 +406,12 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
             for (l <- loops) {
               val (Node(s,op,List(sh:Exp,f:Exp), _)) = l
               assert(transform(sh) == shape, "ERROR: fused loop shapes don't match (TODO!)")
-              this.g.reflectEffect("@", transform(f), e)() //XXX effect
+              this.g.reflectEffect("@", transform(f), e)()() //XXX effect
             }
             Const(())
           }
-          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(this.g.getEffKeys(newBody):_*)
+          val (refs, wefs) = this.g.getEffKeys(newBody)
+          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(refs:_*)(wefs:_*)
       }
 
     } else {

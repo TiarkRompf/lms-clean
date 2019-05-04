@@ -39,9 +39,9 @@ class TensorFrontEnd extends FrontEnd {
   def Sum(shape: SEQ)(f: SEQ => INT): INT = INT(g.reflect("sum", shape.x, g.reify(xn => f(SEQ(xn)).x)))
 
   def PRINT(x: SEQ): Unit =
-    g.reflectEffect("P",x.x)(CTRL)
+    g.reflectWrite("P",x.x)(CTRL)
   def PRINT(x: Tensor): Unit =
-    g.reflectEffect("P",x.x)(CTRL)
+    g.reflectWrite("P",x.x)(CTRL)
 
 
   override def mkGraphBuilder() = new MyGraphBuilder()
@@ -256,9 +256,9 @@ abstract class MultiLoopLowering extends Transformer {
 
       class Builder(op: String) { // TODO: proper subclasses?
         val state = if (op == "tensor")
-          g.reflectEffect("array_new", shape.reduce(_*_).x)(STORE)
+          g.reflectMutable("array_new", shape.reduce(_*_).x)
         else
-          g.reflectEffect("var_new", Const(0))(STORE)
+          g.reflectMutable("var_new", Const(0))
 
         def +=(i: List[INT], x: INT) = if (op == "tensor")
           g.reflectWrite("array_set", state, linearize(shape,i).x, x.x)(state)
@@ -319,7 +319,7 @@ abstract class MultiLoopBuilderLowering extends Transformer {
   override def transform(n: Node): Exp = n match {
     case Node(s, "multiloop", List(sh: Exp, Const(ops: List[String]), f:Block), _) =>
       class Builder(op: String) { // TODO: proper subclasses?
-        val state = g.reflectEffect(op+"_builder_new", sh)(STORE)
+        val state = g.reflectMutable(op+"_builder_new", sh)
         def +=(i: SEQ, x: INT) = g.reflectWrite(op+"_builder_add", state, i.x, x.x)(state)
         def result() = g.reflectRead(op+"_builder_get", state)(state)
       }
@@ -328,7 +328,8 @@ abstract class MultiLoopBuilderLowering extends Transformer {
 
       def foreach(sz: SEQ)(f: SEQ => Unit): Unit = {
         val b = g.reify{ e => f(SEQ(e)); Const() }
-        g.reflectEffect("foreach", sh, b)(g.getEffKeys(b):_*)
+        val (refs, wefs) = g.getEffKeys(b)
+        g.reflectEffect("foreach", sh, b)(refs:_*)(wefs:_*)
       }
 
       foreach(SEQ(sh)) { e =>
@@ -370,7 +371,8 @@ abstract class MultiDimForeachLowering extends Transformer {
 
       def foreach(sz: INT)(f: INT => Unit): Unit = {
         val b = g.reify{ e => f(INT(e)); Const() }
-        g.reflectEffect("foreach", sz.x, b)(g.getEffKeys(b):_*)
+        val (refs, wefs) = g.getEffKeys(b)
+        g.reflectEffect("foreach", sz.x, b)(refs:_*)(wefs:_*)
       }
 
       def forloops(sz: List[INT])(f: List[INT] => Unit): Unit = sz match {
@@ -395,7 +397,7 @@ abstract class MultiDimForeachLowering extends Transformer {
       builders(s) = n
       val INT(Const(dims:Int)) = SEQ(sh).length // TODO: proper error message
       val shape = SEQ(sh).explode(dims)
-      g.reflectEffect("array_new", shape.reduce(_*_).x)(STORE)
+      g.reflectMutable("array_new", shape.reduce(_*_).x)
 
     case Node(s, "tensor_builder_add", List(builder: Sym, i: Exp, x: Exp), _) =>
       val (Node(s, "tensor_builder_new", List(sh0: Exp), _)) = builders(builder)

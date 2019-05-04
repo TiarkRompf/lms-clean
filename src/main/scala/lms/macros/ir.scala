@@ -51,14 +51,14 @@ object ir {
       // - 3. Extract meaningful arg annotation symbol?
 
       case q"def $name[..$t](..$args): $tpe" =>
-        val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"Write(ref($x).asInstanceOf[Sym])" } //XXX FIXME: currently any ann counts as effect!
+        val effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: currently any ann counts as effect!
         val args1 = args map { case ValDef(_,x,_,_) => q"ref($x)" }
         val tpes = args map { case ValDef(_,x,t,_) => q"$t" }
         val name_extract = TermName("M"+name.toString)
         val args3 = args map { case ValDef(_,x,_,_) => pq"$x" }
         val args2 = args map { case ValDef(_,x,t,_) => q"unref[$t]($x)" }
         return c.Expr(q"""
-          def $name[..$t](..$args): $tpe = reflect[$tpe](${name.toString},..$args1)(..$effects)
+          def $name[..$t](..$args): $tpe = reflect[$tpe](${name.toString},..$args1)()(..$effects)
           object $name_extract {
             def unapply(xx_x: Any): Option[(..$tpes)] = xx_x match {
               case Reflect(${Literal(Constant(name.toString))}, List(..$args3)) => Some((..$args2))
@@ -68,9 +68,10 @@ object ir {
         """)
       case q"def $name[..$t](..$args): $tpe = $body" =>
         // TODO: strip by-name type (?)
-        var effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"Write(ref($x).asInstanceOf[Sym])" } //XXX FIXME: any ann counts as effect!
-        var effects2 = args collect { case v@ValDef(m,x,t,y) if m.annotations.nonEmpty => q"Write(ref($x).asInstanceOf[Sym])" }
+        var effects = args collect { case v@ValDef(_,x,t,y) if v.toString contains("@") => q"ref($x)" } //XXX FIXME: any ann counts as effect!
+        var effects2 = args collect { case v@ValDef(m,x,t,y) if m.annotations.nonEmpty => q"ref($x)" }
         assert(effects.toString == effects2.toString, s"$effects != $effects2")
+        var reffects = List[c.universe.Tree]()
         if (tpe.toString.contains("@")) {
           println(tpe.getClass)
           tpe match {
@@ -80,7 +81,7 @@ object ir {
           //XXX TODO cleanup!!
           // println(tpe.asInstanceOf[scala.reflect.internal.Trees$Tree].annotations)
           println("XXXXXXXXXXXXX "+tpe)
-          effects :+= q"Alloc" // q"Const(STORE)"
+          reffects :+= q"Const(STORE)"
         }
 
         val args0 = args map { case ValDef(_,x,_,_) => q"$x" }
@@ -93,7 +94,7 @@ object ir {
         val lower = target match { case Some(t) => q"rewriteAt($t)" case _ => q"rewrite"}
         return c.Expr(q"""
           $lower { case $name_extract(..$args3) => $name_next(..$args0) }
-          def $name[..$t](..$args): $tpe = reflect[$tpe](${name.toString},..$args1)(..$effects)
+          def $name[..$t](..$args): $tpe = reflect[$tpe](${name.toString},..$args1)(..$reffects)(..$effects)
           def $name_next[..$t](..$args): $tpe = $body
           object $name_extract {
             def unapply(xx_x: Any): Option[(..$tpes)] = xx_x match {

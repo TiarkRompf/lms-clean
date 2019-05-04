@@ -25,7 +25,7 @@ trait FFT extends FrontEnd {
     def update(i: INT, y: DOUBLE): Unit = g.reflectWrite("array_set",x,i.x,y.x)(x)
   }
   object DARRAY {
-    def apply(n: INT): DARRAY = DARRAY(g.reflectEffect("array_new",n.x)(STORE))
+    def apply(n: INT): DARRAY = DARRAY(g.reflectMutable("array_new",n.x))
   }
 
   implicit def liftDouble(x: Double): DOUBLE = DOUBLE(Const(x))
