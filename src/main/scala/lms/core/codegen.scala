@@ -126,8 +126,9 @@ class ScalaCodeGen extends Traverser {
   }
 
   override def apply(g: Graph): Unit = {
-    bound(g)
-    withScope(Nil, g.nodes) { traverse(g.block) }
+    val ng = HardenMayHardDeps(g)
+    bound(ng)
+    withScope(Nil, ng.nodes) { traverse(ng.block) }
   }
 
   def emitAll(g: Graph)(m1:Manifest[_],m2:Manifest[_]): Unit = {
@@ -251,9 +252,10 @@ class CPSScalaCodeGen extends CPSTraverser {
   }
 
   override def apply(g: Graph): Unit = {
-    bound(g)
-    path = Nil; inner = g.nodes
-    traverse(g.block){ e => emit(s"${quote(e)} /*exit ${quote(e)}*/") }
+    val ng = HardenMayHardDeps(g)
+    bound(ng)
+    path = Nil; inner = ng.nodes
+    traverse(ng.block){ e => emit(s"${quote(e)} /*exit ${quote(e)}*/") }
   }
 
   def emitAll(g: Graph)(m1:Manifest[_],m2:Manifest[_]): Unit = {
@@ -497,7 +499,8 @@ class CompactScalaCodeGen extends CompactTraverser {
   }
 
   override def apply(g: Graph) = {
-    quoteBlockP(super.apply(g))
+    val ng = HardenMayHardDeps(g)
+    quoteBlockP(super.apply(ng))
     emitln()
   }
 }
@@ -510,10 +513,8 @@ class DeadCodeElimCG {
   var live: collection.Set[Sym] = _
   var reach: collection.Set[Sym] = _
 
-  def valueSyms(n: Node): List[Sym] =  n match {
-    case n @ Node(s, "?", _, _) if !live(s) => directSyms(n)
-    case _ => directSyms(n) ++ blocks(n).collect { case Block(_,res:Sym,_,_) => res }
-  }
+  def valueSyms(n: Node): List[Sym] =
+    directSyms(n) ++ blocks(n).collect { case Block(_,res:Sym,_,_) => res }
 
   def mysyms(n: Node): Set[Sym] = n match {
     case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) =>
@@ -525,27 +526,69 @@ class DeadCodeElimCG {
   // staticData -- not really a DCE task, but hey
   var statics: collection.Set[Node] = _
 
-  def apply(g: Graph): Unit = {
+  def resolveMayHDeps(block: Block, res: Exp, effectPath: Set[Sym]) = {
+    block.copy(res = res, eff = block.eff.copy(hdeps = block.eff.hdeps ++ (block.eff.mayHdeps.collect {
+      case (key, dep) if effectPath(key) => dep
+    })))
+  }
+  def forceMayHDeps(block: Def) = block match {
+    case block: Block => block.copy(eff = block.eff.copy(hdeps = block.eff.hdeps ++ block.eff.mayHdeps.values))
+    case o => o
+  }
+
+  val mustForceMayDeps = Set("λ")
+
+  def apply(g: Graph): Graph = {
 
     live = new mutable.HashSet[Sym]
     reach = new mutable.HashSet[Sym]
     statics = new mutable.HashSet[Node]
+    var readReversePath = Set[Sym]()
+    var newNodes: List[Node] = Nil
+    var newGlobalDefsCache = Map[Sym,Node]()
 
     reach ++= g.block.used
+    assert(g.block.eff.mayHdeps.isEmpty) // all effect should be resolved
 
     if (g.block.res.isInstanceOf[Sym])
       live += g.block.res.asInstanceOf[Sym]
 
     for (d <- g.nodes.reverseIterator) {
       if (reach(d.n)) {
-        live ++= valueSyms(d)
-        reach ++= mysyms(d)
-        if (d.op == "staticData")
-          statics += d
+        val nn = d match {
+          case n @ Node(s, "?", List(c,a:Block,b:Block), eff) =>
+            n.copy(rhs = List(c, resolveMayHDeps(a, if (live(s)) a.res else Const(()), readReversePath), resolveMayHDeps(b, if (live(s)) b.res else Const(()), readReversePath))) // remove result deps if dead
+          case n @ Node(s, "W", List(c@Block(_, resC, _, effC), b@Block(_, resB, _, effB)), eff) =>
+            System.out.println(s"Resolved:\n\t$effC\n\t$effB")
+            readReversePath ++= {
+              val tmp = (effC.mayHdeps.keys.toSet.intersect(effB.keys.toSet) ++ effB.mayHdeps.keys.toSet.intersect(effC.keys.toSet)).asInstanceOf[Set[Sym]]
+              System.out.println(s"\tadded $tmp")
+              tmp
+            }
+            n.copy(rhs = List(resolveMayHDeps(c, resC, readReversePath), resolveMayHDeps(b, resB, readReversePath)))
+          case n if mustForceMayDeps(n.op) =>
+            n.copy(rhs = n.rhs.map(forceMayHDeps))
+          case n =>
+            n.copy(rhs = d.rhs.map {
+              case b: Block => resolveMayHDeps(b, b.res, readReversePath)
+              case o => o
+            })
+        }
+        live ++= valueSyms(nn)
+        reach ++= hardSyms(nn)
+        var alloc = false
+        for (e <- d.eff.rkeys) e match {
+          case Const("STORE") => alloc = true
+          case s: Sym => readReversePath += s
+        }
+        if (!alloc || readReversePath(nn.n)) {
+          newNodes = nn::newNodes
+          newGlobalDefsCache = newGlobalDefsCache + (nn.n -> nn)
+        }
       }
     }
 
-    //Graph(g.nodes.filter(d => live(d.n)), g.block)
+    Graph(newNodes, g.block, newGlobalDefsCache)
   }
 }
 
@@ -596,7 +639,7 @@ trait ExtendedCodeGen {
     case sig => function(sig)
   }
 
-  def init(g: Graph): Unit = { dce(g) }
+  def init(g: Graph): Graph = dce(g)
 
 
   def quoteStatic(n: Node) = n match {
@@ -828,8 +871,16 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     }
   }
 
+  override def apply(g: Graph): Unit = {
+    bound(g)
+    withScope(Nil, g.nodes) {
+      quoteBlockP(traverse(g.block))
+      emitln()
+    }
+  }
+
   def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit = {
-    init(g)
+    val ng = init(g)
     val arg = quote(g.block.in.head)
     val efs = "" //quoteEff(g.block.ein)
     val stt = dce.statics.toList.map(quoteStatic).mkString(", ")
@@ -842,7 +893,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     """)
     emitln(s"class $className($stt) extends ($ms1 => $ms2) {")
     emit(s"  def apply($arg: $ms1): $ms2$efs = ")
-    quoteBlock(apply(g))
+    quoteBlock(apply(ng))
     emitln("}")
     emitln("""
     /*****************************************
@@ -1329,7 +1380,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   }
 
   def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit = {
-    init(g)
+    val ng = init(g)
     val efs = "" //quoteEff(g.block.ein)
     val stt = dce.statics.toList.map(quoteStatic).mkString(", ")
     emitln("""
@@ -1337,7 +1388,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     Emitting C Generated Code
     *******************************************/
     """)
-    val src = run(name, g)
+    val src = run(name, ng)
     emitHeaders(stream)
     emitDatastructures(stream)
     emitFunctions(stream)

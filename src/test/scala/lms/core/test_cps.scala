@@ -33,7 +33,7 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
   }
 
   // CPS CodeGen
-  lazy val g: Graph = time("staging") {Adapter.program(Adapter.g.reify(x => Unwrap(wrapper(Wrap[A](x)))))}
+  lazy val g: Graph = time("staging") { HardenMayHardDeps(Adapter.program(Adapter.g.reify(x => Unwrap(wrapper(Wrap[A](x)))))) }
 
   lazy val code: String = utils.captureOut{ (new CPSScalaCodeGen).emitAll(g)(manifest[A],manifest[B]) }
 

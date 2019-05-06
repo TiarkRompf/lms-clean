@@ -8,23 +8,13 @@ import lms.core.stub.Adapter
 abstract class Traverser {
 
   // freq/block computation
-  def symsFreq(x: Node, effectPath: Set[Exp]): List[(Def,Double)] = x match {
+  def symsFreq(x: Node): List[(Def,Double)] = x match {
     case Node(f, "λ", List(Block(in, y, ein, eff)), _) =>
       (y::eff.deps).map(e => (e,100.0))
     // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
     case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
-      val freqs = new mutable.ListBuffer[(Def,Double)]
-      for ((key, dep: Def) <- af.mayHdeps)
-        if (effectPath(key)) freqs += ((dep, 0.5))
-      for ((key, dep: Def) <- bf.mayHdeps)
-        if (effectPath(key)) freqs += ((dep, 0.5))
-      for (dep <- ae::be::af.hdeps ++ bf.hdeps)
-        freqs += ((dep, 0.5))
-      for (dep <- c::eff.hdeps)
-        freqs += ((dep, 1.0))
-      // (c::eff.hdeps).map(e => (e,1.0)) ++ (ae::be::af.hdeps ++ bf.hdeps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
-      freqs.toList
+      (c::eff.hdeps).map(e => (e,1.0)) ++ (ae::be::af.hdeps ++ bf.hdeps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
     case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
       eff.hdeps.map(e => (e,1.0)) ++ (ae::af.hdeps ++ bf.hdeps).map(e => (e,100.0)) // XXX why eff.deps?
     case _ => hardSyms(x) map (s => (s,1.0))
@@ -80,9 +70,6 @@ abstract class Traverser {
     val reachInner = new mutable.HashSet[Sym]
 
     reach ++= y.used
-    var effectReversePath = blockEffectPath.getOrElse(y, Set())
-    for ((key, dep) <- y.eff.mayHdeps)
-      if (effectReversePath(key)) { System.out.println(s"Add $dep!!"); reach += dep }
 
     // for (d <- g.nodes) {
     //   println("check "+d + " " + bound.hm(d.n) + " " + path1.toSet + " " + reach(d.n) + " " + available(d))
@@ -93,19 +80,15 @@ abstract class Traverser {
         if (available(d)) {
           // node will be sched here, don't follow if branches!
           // other statement will be scheduled in an inner block
-          for ((e:Sym,f) <- symsFreq(d, effectReversePath))
+          for ((e:Sym,f) <- symsFreq(d))
             if (f > 0.5) reach += e else reachInner += e
         } else {
-          for ((e: Sym, _) <- symsFreq(d, effectReversePath))
-            reach += e
+          reach ++= hardSyms(d)
         }
       }
       if (reachInner(d.n)) {
-        for ((e: Sym, _) <- symsFreq(d, effectReversePath))
-          reachInner += e
+        reachInner ++= hardSyms(d)
       }
-      for (block <- blocks(d)) blockEffectPath += block -> effectReversePath
-      effectReversePath = effectReversePath ++ d.eff.rkeys
     }
 
     /*
@@ -169,14 +152,15 @@ abstract class Traverser {
       }
     }
 
-    // System.out.println(s"=== $y ===")
-    // System.out.println("=== Inner ===")
-    // for (n <- inner) System.out.println(s"\t$n")
-    // System.out.println("=== Outer ===")
-    // for (n <- outer1) System.out.println(s"\t$n")
-    // System.out.println("=== New Inner ===")
-    // for (n <- inner1) System.out.println(s"\t$n")
-    // System.out.println("\n\n")
+    // System.out.println(s"================ $y ==============")
+    // for (n <- inner)
+    //   System.out.println(s"\t$n")
+    // System.out.println(s"==== Outer ====")
+    // for (n <- outer1)
+    //   System.out.println(s"\t$n")
+    // System.out.println(s"==== inner ====")
+    // for (n <- inner1)
+    //   System.out.println(s"\t$n")
 
     f(path1, inner1.toSeq, outer1.toSeq, y)
   }
@@ -252,9 +236,10 @@ abstract class CPSTraverser extends Traverser {
   }
 
   def apply(g: Graph)(k: Int): Unit = {
-    bound(g)
-    path = Nil; inner = g.nodes
-    traverse(g.block)(e => {})
+    val ng = HardenMayHardDeps(g)
+    bound(ng)
+    path = Nil; inner = ng.nodes
+    traverse(ng.block)(e => {})
   }
 }
 

@@ -154,6 +154,7 @@ class FFTTest extends TutorialFunSuite {
     test(name) {
       checkOut(name, "scala", {
         var g = program({ x => prog(DARRAY(x.x)); INT(Const(())) }) //XXX hack!
+        g = HardenMayHardDeps(g)
 
         if (verbose) {
           println("// Raw:")

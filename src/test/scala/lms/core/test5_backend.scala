@@ -22,6 +22,8 @@ class BackendTest extends TutorialFunSuite {
       checkOut(name, "scala", {
         var g = program(prog)
 
+        g = HardenMayHardDeps(g)
+
         if (verbose) {
           println("// Raw:")
           g.nodes.foreach(println)

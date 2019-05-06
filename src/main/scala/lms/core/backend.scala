@@ -26,7 +26,7 @@ object Backend {
   case class EffectSummary(sdeps: List[Sym], hdeps: List[Sym], rkeys: List[Exp], wkeys: List[Exp], mayHdeps: Map[Sym,Sym]) {
   // case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
     lazy val keys = rkeys ++ wkeys
-    lazy val deps = hdeps ++ sdeps
+    lazy val deps = sdeps ++ hdeps
     override def toString = if (deps.nonEmpty || keys.nonEmpty)
       keys.mkString("[", " ", ":") + (if (sdeps.nonEmpty) sdeps.mkString(" soft {", " ", "}") else "") + (if (hdeps.nonEmpty) hdeps.mkString(" hard {", " ", "}") else "") + (if (mayHdeps.nonEmpty) mayHdeps.mkString(" mayh {", " ", "}]") else "]")
     else ""
@@ -173,9 +173,12 @@ class GraphBuilder {
           val prevHard = new mutable.ListBuffer[Sym]
           val prevSoft = writes.flatMap(e => curEffects.get(e) match {
             case Some((lw, lr)) => prevHard += lw; lr
-            case _ => if (curLocalDefs(e)) List(e.asInstanceOf[Sym]) else List(curBlock) // not sure the condition is required. locally defined => effect on Store added an effect to the map?
+            case _ => prevHard += (if (curLocalDefs(e)) e.asInstanceOf[Sym] else curBlock); Nil // not sure the condition is required. locally defined => effect on Store added an effect to the map?
           })
-          prevHard ++= reads.map(getLastWrite(_)) // depends if other writes later??
+          prevHard ++= reads.map {
+            case Const("STORE") => curBlock
+            case e => getLastWrite(e) // depends if other writes later??
+          }
 
           // val prevSoft = new mutable.HashSet[Sym]
           // val prevHard = new mutable.HashSet[Sym]
@@ -203,7 +206,7 @@ class GraphBuilder {
           //     curEffects = curEffects + (v -> (res, Nil))
           // }
           for (key <- reads) key match {
-            // case Const("STORE") => curEffects = curEffects + (res -> (res, Nil))
+            case Const("STORE") => curEffects = curEffects + (res -> (res, Nil))
             case _ =>
               val (lw, lrs) = curEffects.getOrElse(key, (curBlock, Nil)) // FIXME really? mayHdeps?
               curEffects = curEffects + (key -> (lw, res::lrs))
@@ -322,7 +325,7 @@ class GraphBuilder {
             } else {
               wkeys += s
               mayHdeps = mayHdeps + (s -> lw) // what about reads?
-              hard += lw
+              // hard += lw
               // hard ++= lrs
             }
         }
@@ -361,6 +364,19 @@ class DeadCodeElim extends Phase {
       if (live(d.n)) live ++= syms(d)
 
     g.copy(nodes = g.nodes.filter(d => live(d.n)))
+  }
+}
+
+object HardenMayHardDeps extends Phase {
+  def forceMayHDeps(block: Def) = block match {
+    case block: Block => block.copy(eff = block.eff.copy(hdeps = block.eff.hdeps ++ block.eff.mayHdeps.values))
+    case o => o
+  }
+
+  def apply(g: Graph): Graph = {
+    g.copy(nodes = g.nodes.map({ d =>
+      d.copy(rhs = d.rhs.map(forceMayHDeps))
+    }), block = forceMayHDeps(g.block).asInstanceOf[Block])
   }
 }
 
