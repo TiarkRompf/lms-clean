@@ -236,7 +236,7 @@ class BackendTest extends TutorialFunSuite {
   testBE("reorder-01") { x =>
     val i = VAR(x)
     val read = i()
-    i() = 10
+    i() = 10 // no strong dependencies will be removed
     read
   }
 
@@ -244,7 +244,7 @@ class BackendTest extends TutorialFunSuite {
     val i = VAR(x)
     val read = i()
     val add = read + 5
-    i() = 10
+    i() = 10 // no strong dependencies will be removed
     add
   }
 

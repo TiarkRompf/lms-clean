@@ -2,9 +2,7 @@
 class backend_reorder_01 extends (Int => Int) {
   def apply(x0: Int): Int = {
     var x1 = x0
-    val x2 = x1
-    x1 = 10
-    x2
+    x1
   }
 }
 compilation: ok
