@@ -23,13 +23,18 @@ object Backend {
   // TOOD: this can be made more fine-grained, i.e.,
   // distinguish may/must and read/write effects,
   // soft dependencies, ...
-  case class EffectSummary(sdeps: List[Sym], hdeps: List[Sym], rkeys: List[Exp], wkeys: List[Exp], mayHdeps: Map[Sym,Sym]) {
+  case class EffectSummary(sdeps: Set[Sym], hdeps: Set[Sym], rkeys: Set[Exp], wkeys: Set[Exp], mayHdeps: Map[Sym,Sym]) {
   // case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
     lazy val keys = rkeys ++ wkeys
     lazy val deps = sdeps ++ hdeps
-    override def toString = if (deps.nonEmpty || keys.nonEmpty)
-      keys.mkString("[", " ", ":") + (if (sdeps.nonEmpty) sdeps.mkString(" soft {", " ", "}") else "") + (if (hdeps.nonEmpty) hdeps.mkString(" hard {", " ", "}") else "") + (if (mayHdeps.nonEmpty) mayHdeps.mkString(" mayh {", " ", "}]") else "]")
-    else ""
+    def isEmpty = sdeps.isEmpty && hdeps.isEmpty && rkeys.isEmpty && wkeys.isEmpty
+    override def toString = if (!isEmpty) {
+      val keyString = (if (rkeys.nonEmpty) rkeys.mkString(" ") else "") + (if (wkeys.nonEmpty) wkeys.map(_ + "*").mkString(" ") else "")
+      val depString = (if (sdeps.nonEmpty) sdeps.mkString(" ") else "_") + ", " +
+      (if (hdeps.nonEmpty) hdeps.mkString(" ") else "_") + ", " +
+      (if (mayHdeps.nonEmpty) mayHdeps.mkString(" ") else "_")
+      "[" + keyString + ": " + depString + "]"
+    } else ""
   }
 
   // A node in a computation graph links a symbol with
@@ -59,8 +64,11 @@ object Backend {
   // inputs, result, effect input, effect output summary
   case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def {
     def bound = ein::in
-    def used = if (res.isInstanceOf[Sym] && !eff.hdeps.contains(res)) (res.asInstanceOf[Sym])::eff.hdeps else eff.hdeps
-    def isPure = eff.deps == List(ein)
+    def used = res match {
+      case res: Sym => eff.hdeps + res
+      case _ => eff.deps
+    }
+    def isPure = eff.deps == Set(ein)
   }
 
 
@@ -90,14 +98,14 @@ object Backend {
       case s: Sym => List(s)
       case b: Block => b.used
       case _ => Nil
-    } ++ x.eff.deps.collect { case s: Sym => s }
+    } ++ x.eff.deps
   }
 
-  def hardSyms(x: Node): List[Sym] = {
-    x.rhs.flatMap {
-      case s: Sym => List(s)
-      case b: Block => b.used
-      case _ => Nil
+  def hardSyms(x: Node): Set[Sym] = {
+    x.rhs.foldLeft(Set[Sym]()) {
+      case (agg, s: Sym) => agg + s
+      case (agg, b: Block) => agg ++ b.used
+      case (agg, _) => agg
     } ++ x.eff.hdeps
   }
 }
@@ -140,6 +148,8 @@ class GraphBuilder {
     case _ => curBlock
   }
 
+  def reflectEffectSummary(s: String, as: Def*)(efKeys: (Set[Exp], Set[Exp])): Exp =
+    reflectEffect(s, as:_*)(efKeys._1.toSeq:_*)(efKeys._2.toSeq:_*)
   def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
     // rewrite?
     rewrite(s,as.toList) match {
@@ -167,9 +177,6 @@ class GraphBuilder {
         if (reads.nonEmpty || writes.nonEmpty) {
           val sm = Sym(fresh)
           // gather effect dependencies
-          // def latest(e1: Exp, e2: Exp) = if (curLocalDefs(e1)) e1 else e2
-          // val prev = efKeys2.map(e => curEffects.getOrElse(e,latest(e,curBlock))).distinct
-
           val prevHard = new mutable.ListBuffer[Sym]
           val prevSoft = writes.flatMap(e => curEffects.get(e) match {
             case Some((lw, lr)) => prevHard += lw; lr
@@ -180,31 +187,8 @@ class GraphBuilder {
             case e => getLastWrite(e) // depends if other writes later??
           }
 
-          // val prevSoft = new mutable.HashSet[Sym]
-          // val prevHard = new mutable.HashSet[Sym]
-          // for (e <- efKeys2) e match {
-          //   case Read(v) => prevHard += getLastWrite(v) // still need curent block for loops!
-          //   case Alloc   => prevSoft += curBlock
-          //   case Write(v)=>
-          //     val (lw, lrs) = curEffects.getOrElse(v, (curBlock, Nil))
-          //     prevHard += lw // hard dep last write, required for arrays but not variables
-          //     prevSoft ++= lrs // soft dep reads since last write
-          //   case Other(s)=> // CTRL STORE CPS
-          //     prevSoft += getLastWrite(s)
-          // }
           // prevSoft --= prevHard
           val res = reflect(sm, s, as:_*)(prevSoft.toSeq:_*)(prevHard.toSeq:_*)(reads:_*)(writes:_*)
-          // for (e <- efKeys2) e match {
-          //   case Alloc    => curEffects = curEffects + (res -> (res, Nil))
-          //   case Read(v)  =>
-          //     val (lw, lrs) = curEffects.getOrElse(v, (curBlock, Nil)) // FIXME really?
-          //     curEffects = curEffects + (v -> (lw, res::lrs))
-          //   case Write(v) =>
-          //     val (lw, _) = curEffects.getOrElse(v, (curBlock, Nil)) // FIXME really?
-          //     curEffects = curEffects + (v -> (res, Nil))
-          //   case Other(v) =>
-          //     curEffects = curEffects + (v -> (res, Nil))
-          // }
           for (key <- reads) key match {
             case Const("STORE") => curEffects = curEffects + (res -> (res, Nil))
             case _ =>
@@ -226,7 +210,7 @@ class GraphBuilder {
 
   // FIXME: take EffectSummary as argument?
   def reflect(x: Sym, s: String, as: Def*)(sEfDeps: Sym*)(hEfDeps: Sym*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Sym = {
-    val n = Node(x,s,as.toList,EffectSummary(sEfDeps.toList, hEfDeps.toList, readEfKeys.toList, writeEfKeys.toList, Map()))
+    val n = Node(x,s,as.toList,EffectSummary(sEfDeps.toSet, hEfDeps.toSet, readEfKeys.toSet, writeEfKeys.toSet, Map()))
     globalDefs += n
     globalDefsCache(x) = n
     globalDefsReverseCache((s,n.rhs)) = n
@@ -277,7 +261,7 @@ class GraphBuilder {
 
   def getEffKeys(b: Block) = (b.eff.rkeys, b.eff.wkeys)
   def mergeEffKeys(b: Block, c: Block) =
-    ((b.eff.rkeys ++ c.eff.rkeys).distinct, (b.eff.wkeys ++ c.eff.wkeys).distinct)
+    (b.eff.rkeys ++ c.eff.rkeys, b.eff.wkeys ++ c.eff.wkeys)
 
   def reify(x: => Exp): Block =  reify(0, xs => x )
   def reify(x: Exp => Exp): Block = reify(1, xs => x(xs(0)))
@@ -331,7 +315,7 @@ class GraphBuilder {
         }
       }
       // soft --= hard
-      Block(args, res, block, EffectSummary(soft.toList, if (hard.size == 0) List(block) else hard.toList, rkeys.toList, wkeys.toList, mayHdeps))
+      Block(args, res, block, EffectSummary(soft.toSet, if (hard.size == 0) Set(block) else hard.toSet, rkeys.toSet, wkeys.toSet, mayHdeps))
     } finally {
       curBlock = save
       curEffects = saveEffects
@@ -367,6 +351,9 @@ class DeadCodeElim extends Phase {
   }
 }
 
+/*
+ * Trasform all may dependencies in hard dependencies without analysis
+ */
 object HardenMayHardDeps extends Phase {
   def forceMayHDeps(block: Def) = block match {
     case block: Block => block.copy(eff = block.eff.copy(hdeps = block.eff.hdeps ++ block.eff.mayHdeps.values))

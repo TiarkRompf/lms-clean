@@ -777,8 +777,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // TimingOps
   def timeGeneratedCode[A: Manifest](f: => Rep[A], msg: Rep[String] = unit("")): Rep[A] = {
     val ff = Adapter.g.reify(Unwrap(f))
-    val (refs, wefs) = Adapter.g.getEffKeys(ff)
-    Wrap[A](Adapter.g.reflectEffect("timeGenerated", Unwrap(msg), ff)(refs:_*)(wefs:_*))
+    val summary = Adapter.g.getEffKeys(ff)
+    Wrap[A](Adapter.g.reflectEffectSummary("timeGenerated", Unwrap(msg), ff)(summary))
   }
   def timestamp: Rep[Long] = Wrap[Long](Adapter.g.reflectWrite("timestamp")(Adapter.CTRL))
 
@@ -794,8 +794,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     if (g.isPure(bb))
       Wrap[A](g.reflect("comment",Backend.Const(l),Backend.Const(verbose),bb))
     else {
-      val (refs, wefs) = Adapter.g.getEffKeys(bb)
-      Wrap[A](g.reflectEffect("comment",Backend.Const(l),Backend.Const(verbose),bb)(refs:_*)(wefs:_*))
+      val summary = Adapter.g.getEffKeys(bb)
+      Wrap[A](g.reflectEffectSummary("comment",Backend.Const(l),Backend.Const(verbose),bb)(summary))
     }
   }
 

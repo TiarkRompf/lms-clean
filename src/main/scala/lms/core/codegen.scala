@@ -303,17 +303,15 @@ class CompactScalaCodeGen extends CompactTraverser {
     if (!doPrintEffects) ""
     else " /* " + quote(x) + " */"
 
-  def quoteEff(x: List[Exp]): String =
+  def quoteEff(x: Set[Sym]): String =
     if (!doPrintEffects) ""
     else " /* " + x.map(quote).mkString("") + " */"
 
   def quoteEff(x: EffectSummary): String = quoteEff(x.deps)
 
   def quoteEff(n: Node): String = if (!doPrintEffects) "" else {
-    val deps = n.eff.deps
-    val eff = n.eff.keys
-    if (deps.isEmpty && eff.isEmpty) "" else {
-      s"/* val ${quote(n.n)} = ${eff.map(quote).mkString(",")}:${deps.map(quote).mkString("")} */"
+    if (n.eff.isEmpty) "" else {
+      s"/* val ${quote(n.n)} = ${n.eff} */"
     }
   }
 

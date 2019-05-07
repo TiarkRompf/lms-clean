@@ -59,19 +59,17 @@ class FrontEnd {
     val bBlock = g.reify(b.x)
     // compute effect (aBlock || bBlock)
     val pure = g.isPure(aBlock) && g.isPure(bBlock)
-    val (refs, wefs) = g.mergeEffKeys(aBlock, bBlock)
     if (pure)
       INT(g.reflect("?",c.x,aBlock,bBlock))
     else
-      INT(g.reflectEffect("?",c.x,aBlock,bBlock)(refs:_*)(wefs:_*))
+      INT(g.reflectEffectSummary("?",c.x,aBlock,bBlock)(g.mergeEffKeys(aBlock, bBlock)))
   }
 
   def WHILE(c: => BOOL)(b: => Unit): Unit = {
     val cBlock = g.reify(c.x)
     val bBlock = g.reify({b;Const(())})
     // compute effect (cBlock bBlock)* cBlock
-    val (refs, wefs) = g.mergeEffKeys(cBlock, bBlock)
-    g.reflectEffect("W",cBlock,bBlock)(refs:_*)(wefs:_*)
+    g.reflectEffectSummary("W",cBlock,bBlock)(g.mergeEffKeys(cBlock, bBlock))
   }
 
 
@@ -82,8 +80,7 @@ class FrontEnd {
         if (g.isPure(b))
           INT(g.reflect("@",f,x.x))
         else {
-          val (rkeys, wkeys) = g.getEffKeys(b)
-          INT(g.reflectEffect("@",f,x.x)(rkeys:_*)(wkeys:_*))
+          INT(g.reflectEffectSummary("@",f,x.x)(g.getEffKeys(b)))
         }
       case _ =>
         INT(g.reflectWrite("@",f,x.x)(CTRL))

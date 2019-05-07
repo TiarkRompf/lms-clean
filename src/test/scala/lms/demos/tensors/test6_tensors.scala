@@ -328,8 +328,8 @@ abstract class MultiLoopBuilderLowering extends Transformer {
 
       def foreach(sz: SEQ)(f: SEQ => Unit): Unit = {
         val b = g.reify{ e => f(SEQ(e)); Const() }
-        val (refs, wefs) = g.getEffKeys(b)
-        g.reflectEffect("foreach", sh, b)(refs:_*)(wefs:_*)
+        val summary = g.getEffKeys(b)
+        g.reflectEffectSummary("foreach", sh, b)(summary)
       }
 
       foreach(SEQ(sh)) { e =>
@@ -371,8 +371,8 @@ abstract class MultiDimForeachLowering extends Transformer {
 
       def foreach(sz: INT)(f: INT => Unit): Unit = {
         val b = g.reify{ e => f(INT(e)); Const() }
-        val (refs, wefs) = g.getEffKeys(b)
-        g.reflectEffect("foreach", sz.x, b)(refs:_*)(wefs:_*)
+        val summary = g.getEffKeys(b)
+        g.reflectEffectSummary("foreach", sz.x, b)(summary)
       }
 
       def forloops(sz: List[INT])(f: List[INT] => Unit): Unit = sz match {

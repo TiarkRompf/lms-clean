@@ -288,8 +288,8 @@ class TensorFrontEnd2 extends FrontEnd {
       nodes.foreach { case Node(n,op,rhs,efs) =>
         val (effects,pure) = (efs.deps,rhs)
         val args = pure.map(a => subst.getOrElse(a,a)) // XXX TODO: Blocks!
-        val refs1 = efs.rkeys.map(a => subst.getOrElse(a,a))
-        val wefs1 = efs.rkeys.map(a => subst.getOrElse(a,a))
+        val refs1 = efs.rkeys.map(a => subst.getOrElse(a,a)).toSeq
+        val wefs1 = efs.rkeys.map(a => subst.getOrElse(a,a)).toSeq
         // XXX losing effect stuff here !!!
         if (effects.nonEmpty)
           subst(n) = g.reflectEffect(op,args:_*)(refs1:_*)(wefs1:_*)
@@ -383,7 +383,7 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
       def dep(n: Node): List[Exp] = syms(n)
 
       val scc = GraphUtil.stronglyConnectedComponents[List[Node]](
-        find(g.block.res)::g.block.eff.deps.map(find),
+        find(g.block.res)::g.block.eff.deps.map(find).toList,
         es => es.map(dep).flatMap(_.map(find))
       )
 
@@ -410,8 +410,8 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
             }
             Const(())
           }
-          val (refs, wefs) = this.g.getEffKeys(newBody)
-          val fusedLoopSym = this.g.reflectEffect("forloops", shape, this.g.reflect("λ",newBody))(refs:_*)(wefs:_*)
+          val summary = this.g.getEffKeys(newBody)
+          val fusedLoopSym = this.g.reflectEffectSummary("forloops", shape, this.g.reflect("λ",newBody))(summary)
       }
 
     } else {

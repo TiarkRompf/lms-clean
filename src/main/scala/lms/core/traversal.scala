@@ -8,16 +8,16 @@ import lms.core.stub.Adapter
 abstract class Traverser {
 
   // freq/block computation
-  def symsFreq(x: Node): List[(Def,Double)] = x match {
+  def symsFreq(x: Node): Set[(Def,Double)] = x match {
     case Node(f, "λ", List(Block(in, y, ein, eff)), _) =>
-      (y::eff.deps).map(e => (e,100.0))
+      eff.deps.map((e: Def) => (e,100.0)) + ((y, 100.0))
     // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
-    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
-      (c::eff.hdeps).map(e => (e,1.0)) ++ (ae::be::af.hdeps ++ bf.hdeps).map(e => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
-    case Node(_, "W", Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::Nil, eff) =>
-      eff.hdeps.map(e => (e,1.0)) ++ (ae::af.hdeps ++ bf.hdeps).map(e => (e,100.0)) // XXX why eff.deps?
-    case _ => hardSyms(x) map (s => (s,1.0))
+    case Node(_, "?", c::(a: Block)::(b: Block)::Nil, eff) =>
+      eff.hdeps.map((e: Def) => (e,1.0)) + ((c, 1.0)) ++ (a.used ++ b.used).map((e: Def) => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
+    case Node(_, "W", (a: Block)::(b: Block)::Nil, eff) =>
+      eff.hdeps.map((e: Def) => (e,1.0)) ++ (a.used ++ b.used).map(e => (e,100.0)) // XXX why eff.deps?
+    case _ => hardSyms(x).map((s: Def) => (s,1.0))
   }
 
 
@@ -442,7 +442,7 @@ abstract class Transformer extends Traverser {
       }
       // NOTE: we're not transforming 'effects' here (just the keys)
       if (effects.nonEmpty)
-        g.reflectEffect(op,args:_*)(es.rkeys.map(transform):_*)(es.wkeys.map(transform):_*)
+        g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
       else
         g.reflect(op,args:_*)
   }
@@ -505,7 +505,7 @@ abstract class CPSTransformer extends Transformer {
 
   def reflectHelper(es: EffectSummary, op: String, args: Def*): Exp =
     if (es.deps.nonEmpty)
-      g.reflectEffect(op, args: _*)(es.rkeys.map(transform):_*)(es.wkeys.map(transform):_*)
+      g.reflectEffect(op, args: _*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
     else
       g.reflect(op, args:_*)
 
