@@ -39,9 +39,9 @@ class TensorFrontEnd extends FrontEnd {
   def Sum(shape: SEQ)(f: SEQ => INT): INT = INT(g.reflect("sum", shape.x, g.reify(xn => f(SEQ(xn)).x)))
 
   def PRINT(x: SEQ): Unit =
-    g.reflectWrite("P",x.x)(CTRL)
+    g.reflectEffect("P",x.x)(x.x)(CTRL) // read on x.x
   def PRINT(x: Tensor): Unit =
-    g.reflectWrite("P",x.x)(CTRL)
+    g.reflectEffect("P",x.x)(x.x)(CTRL) // read on x.x
 
 
   override def mkGraphBuilder() = new MyGraphBuilder()
@@ -438,7 +438,7 @@ class TensorTest extends TutorialFunSuite {
   def testBE(name: String, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(prog: INT => INT) = {
     test(name) {
       checkOut(name, "scala", {
-        var g = program(prog)
+        var g = HardenMayHardDeps(program(prog))
 
         if (verbose) {
           println("// Raw:")
@@ -482,40 +482,51 @@ class TensorTest extends TutorialFunSuite {
 
 
         // lower zeros, ones, etc to uniform tensor constructor
+        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
         println("// After Tensor lowering:")
         println(emitSource())
 
         // fuse tensor constructors
+        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorFusionV { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
+        System.out.println("\n\n\n")
         println("// After Tensor fusion V:")
         println(emitSource())
 
+        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorFusionH { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
+        System.out.println("\n\n\n")
         println("// After Tensor fusion H:")
         println(emitSource())
 
         if (!alt) {
           val g_fused = g
 
+          g = HardenMayHardDeps(g) // TMP need handle
           g = (new MultiLoopLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g_fused)
 
+          System.out.println("\n\n\n")
           println("// After Multiloop lowering:")
           println(emitSource())
 
           g = g_fused
         }
 
+        g = HardenMayHardDeps(g) // TMP need handle
         g = (new MultiLoopBuilderLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
+        System.out.println("\n\n\n")
         println("// After Multiloop/Builder lowering:")
         println(emitSource())
 
+        g = HardenMayHardDeps(g) // TMP need handle
         g = (new MultiDimForeachLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
+        System.out.println("\n\n\n")
         println("// After MultiDim foreach lowering:")
         println(emitSource())
 
