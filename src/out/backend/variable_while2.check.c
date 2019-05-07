@@ -8,9 +8,10 @@ Emitting C Generated Code
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = 1;
-  x1 = 3;
-  x1 = 4;
-  printf("%d\n", x1);
+  while (x1 < 10) {
+    printf("%d\n", x1);
+    x1 = x1 + 1;
+  }
 }
 /*****************************************
 End of C Generated Code
