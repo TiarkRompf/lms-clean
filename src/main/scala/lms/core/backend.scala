@@ -28,12 +28,15 @@ object Backend {
     lazy val keys = rkeys ++ wkeys
     lazy val deps = sdeps ++ hdeps
     def isEmpty = sdeps.isEmpty && hdeps.isEmpty && rkeys.isEmpty && wkeys.isEmpty
-    override def toString = if (!isEmpty) {
-      val keyString = (if (rkeys.nonEmpty) rkeys.mkString(" ") else "") + (if (wkeys.nonEmpty) wkeys.map(_ + "*").mkString(" ") else "")
-      val depString = (if (sdeps.nonEmpty) sdeps.mkString(" ") else "_") + ", " +
-      (if (hdeps.nonEmpty) hdeps.mkString(" ") else "_") + ", " +
-      (if (mayHdeps.nonEmpty) mayHdeps.mkString(" ") else "_")
+    def repr(f: Exp => String) = {
+      val keyString = (if (rkeys.nonEmpty) rkeys.map(f).mkString(" ") + " " else "") + (if (wkeys.nonEmpty) wkeys.map(f(_) + "*").mkString(" ") else "")
+      val depString = (if (sdeps.nonEmpty) sdeps.map(f).mkString(" ") else "_") + ", " +
+      (if (hdeps.nonEmpty) hdeps.map(f).mkString(" ") else "_") + ", " +
+      (if (mayHdeps.nonEmpty) mayHdeps.map(x => f(x._1) + " -> " + f(x._2)).mkString(" ") else "_")
       "[" + keyString + ": " + depString + "]"
+    }
+    override def toString = if (!isEmpty) {
+      repr(_.toString)
     } else ""
   }
 
@@ -143,9 +146,10 @@ class GraphBuilder {
   def reflectMutable(s: String, as: Def*) = reflectEffect(s, as:_*)(Const("STORE"))()
 
 
+  def latest(e1: Exp) = if (curLocalDefs(e1)) e1.asInstanceOf[Sym] else curBlock
   def getLastWrite(x: Exp) = curEffects.get(x) match {
     case Some((lw, _)) => lw
-    case _ => curBlock
+    case _ => latest(x)
   }
 
   def reflectEffectSummary(s: String, as: Def*)(efKeys: (Set[Exp], Set[Exp])): Exp =
@@ -179,8 +183,8 @@ class GraphBuilder {
           // gather effect dependencies
           val prevHard = new mutable.ListBuffer[Sym]
           val prevSoft = writes.flatMap(e => curEffects.get(e) match {
-            case Some((lw, lr)) => prevHard += lw; lr
-            case _ => prevHard += (if (curLocalDefs(e)) e.asInstanceOf[Sym] else curBlock); Nil // not sure the condition is required. locally defined => effect on Store added an effect to the map?
+            case Some((lw, lr)) => prevHard += latest(lw); lr
+            case _ => prevHard += latest(e); Nil // not sure the condition is required. locally defined => effect on Store added an effect to the map?
           })
           prevHard ++= reads.map {
             case Const("STORE") => curBlock

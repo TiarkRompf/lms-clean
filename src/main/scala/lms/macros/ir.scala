@@ -81,7 +81,7 @@ object ir {
           //XXX TODO cleanup!!
           // println(tpe.asInstanceOf[scala.reflect.internal.Trees$Tree].annotations)
           println("XXXXXXXXXXXXX "+tpe)
-          reffects :+= q"Const(STORE)"
+          reffects :+= q"STORE"
         }
 
         val args0 = args map { case ValDef(_,x,_,_) => q"$x" }

@@ -492,14 +492,12 @@ class TensorTest extends TutorialFunSuite {
         g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorFusionV { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
-        System.out.println("\n\n\n")
         println("// After Tensor fusion V:")
         println(emitSource())
 
         g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorFusionH { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
-        System.out.println("\n\n\n")
         println("// After Tensor fusion H:")
         println(emitSource())
 
@@ -509,7 +507,6 @@ class TensorTest extends TutorialFunSuite {
           g = HardenMayHardDeps(g) // TMP need handle
           g = (new MultiLoopLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g_fused)
 
-          System.out.println("\n\n\n")
           println("// After Multiloop lowering:")
           println(emitSource())
 
@@ -519,14 +516,12 @@ class TensorTest extends TutorialFunSuite {
         g = HardenMayHardDeps(g) // TMP need handle
         g = (new MultiLoopBuilderLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
-        System.out.println("\n\n\n")
         println("// After Multiloop/Builder lowering:")
         println(emitSource())
 
         g = HardenMayHardDeps(g) // TMP need handle
         g = (new MultiDimForeachLowering { val frontEnd = new TensorFrontEnd; init() }).transform(g)
 
-        System.out.println("\n\n\n")
         println("// After MultiDim foreach lowering:")
         println(emitSource())
 
