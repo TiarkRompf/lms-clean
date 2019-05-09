@@ -58,7 +58,7 @@ class FrontEnd {
     val aBlock = g.reify(a.x)
     val bBlock = g.reify(b.x)
     // compute effect (aBlock || bBlock)
-    val pure = g.isPure(aBlock) && g.isPure(bBlock)
+    val pure = aBlock.isPure && bBlock.isPure
     if (pure)
       INT(g.reflect("?",c.x,aBlock,bBlock))
     else
@@ -77,7 +77,7 @@ class FrontEnd {
     // XXX lookup lambda ...
     g.findDefinition(f) match {
       case Some(Node(f, "λ", List(b: Block), _)) =>
-        if (g.isPure(b))
+        if (b.isPure)
           INT(g.reflect("@",f,x.x))
         else {
           INT(g.reflectEffectSummary("@",f,x.x)(g.getEffKeys(b)))

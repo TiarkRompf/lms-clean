@@ -126,9 +126,8 @@ class ScalaCodeGen extends Traverser {
   }
 
   override def apply(g: Graph): Unit = {
-    val ng = HardenMayHardDeps(g)
-    bound(ng)
-    withScope(Nil, ng.nodes) { traverse(ng.block) }
+    bound(g)
+    withScope(Nil, g.nodes) { traverse(g.block) }
   }
 
   def emitAll(g: Graph)(m1:Manifest[_],m2:Manifest[_]): Unit = {
@@ -252,10 +251,9 @@ class CPSScalaCodeGen extends CPSTraverser {
   }
 
   override def apply(g: Graph): Unit = {
-    val ng = HardenMayHardDeps(g)
-    bound(ng)
-    path = Nil; inner = ng.nodes
-    traverse(ng.block){ e => emit(s"${quote(e)} /*exit ${quote(e)}*/") }
+    bound(g)
+    path = Nil; inner = g.nodes
+    traverse(g.block){ e => emit(s"${quote(e)} /*exit ${quote(e)}*/") }
   }
 
   def emitAll(g: Graph)(m1:Manifest[_],m2:Manifest[_]): Unit = {
@@ -497,8 +495,7 @@ class CompactScalaCodeGen extends CompactTraverser {
   }
 
   override def apply(g: Graph) = {
-    val ng = HardenMayHardDeps(g)
-    quoteBlockP(super.apply(ng))
+    quoteBlockP(super.apply(g))
     emitln()
   }
 }
@@ -508,11 +505,15 @@ class CompactScalaCodeGen extends CompactTraverser {
  */
 class DeadCodeElimCG {
 
+  final val fixDeps = true // remove deps on removed nodes
   var live: collection.Set[Sym] = _
   var reach: collection.Set[Sym] = _
 
   def valueSyms(n: Node): List[Sym] =
-    directSyms(n) ++ blocks(n).collect { case Block(_,res:Sym,_,_) => res }
+    directSyms(n) ++ blocks(n).flatMap {
+      case Block(ins, res:Sym, ein, _) => res::ein::ins
+      case Block(ins, _, ein, _) => ein::ins
+    }
 
   def mysyms(n: Node): Set[Sym] = n match {
     case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) =>
@@ -524,66 +525,70 @@ class DeadCodeElimCG {
   // staticData -- not really a DCE task, but hey
   var statics: collection.Set[Node] = _
 
-  def resolveMayHDeps(block: Block, res: Exp, effectPath: Set[Sym]) = {
-    block.copy(res = res, eff = block.eff.copy(hdeps = block.eff.hdeps ++ (block.eff.mayHdeps.collect {
-      case (key, dep) if effectPath(key) => dep
-    })))
-  }
-  def forceMayHDeps(block: Def) = block match {
-    case block: Block => block.copy(eff = block.eff.copy(hdeps = block.eff.hdeps ++ block.eff.mayHdeps.values))
-    case o => o
-  }
-
-  val mustForceMayDeps = Set("λ")
-
   def apply(g: Graph): Graph = {
 
     live = new mutable.HashSet[Sym]
     reach = new mutable.HashSet[Sym]
     statics = new mutable.HashSet[Node]
-    var readReversePath = Set[Sym]()
     var newNodes: List[Node] = Nil
-    var newGlobalDefsCache = Map[Sym,Node]()
+    val used = new mutable.HashSet[Exp]
+    var size = 0
 
+    // First pass liveness and reachability
+    // Only a single pass that reduce input size and first step of the next loop
     reach ++= g.block.used
-    assert(g.block.eff.mayHdeps.isEmpty) // all effect should be resolved
-
-    if (g.block.res.isInstanceOf[Sym])
+    if (g.block.res.isInstanceOf[Sym]) {
       live += g.block.res.asInstanceOf[Sym]
-
+      used += g.block.res.asInstanceOf[Sym]
+    }
     for (d <- g.nodes.reverseIterator) {
       if (reach(d.n)) {
         val nn = d match {
-          case n @ Node(s, "?", List(c,a:Block,b:Block), eff) =>
-            n.copy(rhs = List(c, resolveMayHDeps(a, if (live(s)) a.res else Const(()), readReversePath), resolveMayHDeps(b, if (live(s)) b.res else Const(()), readReversePath))) // remove result deps if dead
-          case n @ Node(s, "W", List(c@Block(_, resC, _, effC), b@Block(_, resB, _, effB)), eff) =>
-            System.out.println(s"Resolved:\n\t$effC\n\t$effB")
-            readReversePath ++= {
-              val tmp = (effC.mayHdeps.keys.toSet.intersect(effB.keys.toSet) ++ effB.mayHdeps.keys.toSet.intersect(effC.keys.toSet)).asInstanceOf[Set[Sym]]
-              System.out.println(s"\tadded $tmp")
-              tmp
-            }
-            n.copy(rhs = List(resolveMayHDeps(c, resC, readReversePath), resolveMayHDeps(b, resB, readReversePath)))
-          case n if mustForceMayDeps(n.op) =>
-            n.copy(rhs = n.rhs.map(forceMayHDeps))
-          case n =>
-            n.copy(rhs = d.rhs.map {
-              case b: Block => resolveMayHDeps(b, b.res, readReversePath)
-              case o => o
-            })
+          case n @ Node(s, "?", List(c,a:Block,b:Block), eff) if !live(s) =>
+            n.copy(rhs = List(c, a.copy(res = Const(())), b.copy(res = Const(())))) // remove result deps if dead
+          case _ => d
         }
         live ++= valueSyms(nn)
         reach ++= hardSyms(nn)
-        var alloc = false
-        for (e <- d.eff.rkeys) e match {
-          case Const("STORE") => alloc = true
-          case s: Sym => readReversePath += s
+
+        if (!used(nn.n)) {
+          if (nn.eff.hasSimpleEffect || nn.eff.wkeys.exists(used)) {
+            used += nn.n
+            used ++= valueSyms(d)
+          }
+        } else {
+          used ++= valueSyms(d)
         }
-        if (!alloc || readReversePath(nn.n)) {
-          newNodes = nn::newNodes
-          newGlobalDefsCache = newGlobalDefsCache + (nn.n -> nn)
+        newNodes = nn::newNodes
+      }
+    }
+
+    // Second pass remove unused variables
+    while (size != used.size) {
+      size = used.size
+      for (d <- newNodes.reverseIterator) {
+        if (!used(d.n)) {
+          if (d.eff.hasSimpleEffect || d.eff.wkeys.exists(used)) {
+            used += d.n
+            used ++= valueSyms(d)
+          }
+        } else {
+          used ++= valueSyms(d)
         }
       }
+    }
+
+    var newGlobalDefsCache = Map[Sym,Node]()
+    newNodes = for (d <- newNodes if used(d.n)) yield {
+      newGlobalDefsCache += d.n -> d
+      if (d.op == "staticData") statics += d
+      if (fixDeps)
+        d.copy(rhs = d.rhs.map {
+          case b: Block => b.copy(eff = b.eff.filter(used))
+          case o => o
+        }, eff = d.eff.filter(used))
+      else
+        d
     }
 
     Graph(newNodes, g.block, newGlobalDefsCache)
@@ -858,8 +863,8 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       shallow(x); emit("("); shallow(i); emit(") = "); shallow(y); emitln()
 
-    case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
-    case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
+    case n @ Node(s,"var_get",_,_) if !dce.live(s) => ??? // no-op
+    case n @ Node(s,"array_get",_,_) if !dce.live(s) => ??? // no-op
 
     case n @ Node(s,_,_,_) =>
       if (!recursive) {
@@ -1300,8 +1305,8 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     //      should never inline a live expr into something that's not live ...
     // (b) dce above should anticipate that these will be eliminated
     //      do not register dependencies as live!
-    case n @ Node(s,"var_get",_,_) if !dce.live(s) => // no-op
-    case n @ Node(s,"array_get",_,_) if !dce.live(s) => // no-op
+    case n @ Node(s,"var_get",_,_) if !dce.live(s) => ??? // no-op
+    case n @ Node(s,"array_get",_,_) if !dce.live(s) => ??? // no-op
 
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       shallow1(x); emit("["); shallow(i); emit("] = "); shallow(y); emitln(";")
@@ -1309,8 +1314,8 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
     case n @ Node(s,"?",c::(a:Block)::(b:Block)::_,_) if !dce.live(s) =>
       emit(s"if ("); shallow(c); emit(") ")
-      quoteBlock(traverse(a.copy(res = Const(()))))
-      quoteElseBlock(traverse(b.copy(res = Const(()))))
+      quoteBlock(traverse(a))
+      quoteElseBlock(traverse(b))
       emitln()
 
     case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) => // is it necessary? the while value will always be dead.

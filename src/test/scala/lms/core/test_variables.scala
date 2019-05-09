@@ -128,6 +128,26 @@ class VariablesTest extends TutorialFunSuite {
     check("variable_while3", driver.code, "c")
   }
 
+  test("variable_while4") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 1
+        var y = 0
+        var z = 0
+        var t = 6
+        while (x < 10) {
+          z += y
+          y += 1
+          t += z
+          x += 1
+        }
+        printf("%d\n", z)
+      }
+    }
+    check("variable_while4", driver.code, "c")
+  }
+
   test("variable_if_nested") {
     val driver = new DslDriverC[Int,Unit] {
       @virtualize
@@ -145,6 +165,7 @@ class VariablesTest extends TutorialFunSuite {
     }
     check("variable_if_nested", driver.code, "c")
   }
+
   test("variable_if_nested_dead") {
     val driver = new DslDriverC[Int,Unit] {
       @virtualize
@@ -156,5 +177,19 @@ class VariablesTest extends TutorialFunSuite {
       }
     }
     check("variable_if_nested_dead", driver.code, "c")
+  }
+
+  test("variable_write_after_read") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 1
+        printf("%d\n", x)
+        if (x > 0)
+          x += 1
+        else printf("%d\n", x)
+      }
+    }
+    check("variable_write_after_read", driver.code, "c")
   }
 }

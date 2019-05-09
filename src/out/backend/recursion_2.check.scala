@@ -9,7 +9,7 @@ class Snippet() extends (Int => Unit) {
     x2 = x3
     def x3(x4:Int): Int = if (x4 > 0) x4 * x2(x4 - x0) else 1
     while (x1 < 10) {
-      x3(x1)
+      println(x3(x1))
       x1 = x1 + 1
     }
   }
@@ -18,3 +18,23 @@ class Snippet() extends (Int => Unit) {
 End of Generated Code
 *******************************************/
 // output:
+1
+1
+2
+6
+24
+120
+720
+5040
+40320
+362880
+1
+1
+2
+3
+8
+15
+48
+105
+384
+945

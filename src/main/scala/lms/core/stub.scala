@@ -94,7 +94,8 @@ object Adapter extends FrontEnd {
       // as(i) = as(i) => ()   side condition: no write in-between!
       case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1: Exp, i1))))
         if as == as1 && i == i1 && {
-          curEffects.get(as).map { case (_, lrs) => lrs contains rs.asInstanceOf[Sym] } getOrElse(false) } =>
+          // rs is part of the list of read since the last write
+          curEffects.get(as).map { case (_, lrs, _) => lrs contains rs.asInstanceOf[Sym] } getOrElse(false) } =>
         Some(Const(()))
 
       case ("Array.length", List(Def("NewArray", Const(n)::_))) =>
@@ -674,7 +675,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def doLambda[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] = fun(f)
   implicit class FunOps[A:Manifest,B:Manifest](f: Rep[A => B]) {
     def apply(x: Rep[A]): Rep[B] =
-      Wrap[B](Adapter.g.reflectWrite("@",Unwrap(f),Unwrap(x))(Adapter.CTRL))
+      Wrap[B](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x))()())
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
@@ -683,7 +684,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def doLambda[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = fun(f)
   implicit class FunOps2[A:Manifest,B:Manifest,C:Manifest](f: Rep[(A,B) => C]) {
     def apply(x: Rep[A], y: Rep[B]): Rep[C] =
-      Wrap[C](Adapter.g.reflectWrite("@",Unwrap(f),Unwrap(x),Unwrap(y))(Adapter.CTRL))
+      Wrap[C](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y))()())
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
@@ -692,7 +693,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = fun(f)
   implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
     def apply(x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =
-      Wrap[D](Adapter.g.reflectWrite("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))(Adapter.CTRL))
+      Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))()())
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
@@ -701,7 +702,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
   implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {
     def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D]): Rep[E] =
-      Wrap[E](Adapter.g.reflectWrite("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))(Adapter.CTRL))
+      Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))()())
   }
 
   def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
@@ -791,7 +792,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def comment[A:Manifest](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A] = {
     val g = Adapter.g
     val bb = g.reify(Unwrap(b))
-    if (g.isPure(bb))
+    if (bb.isPure)
       Wrap[A](g.reflect("comment",Backend.Const(l),Backend.Const(verbose),bb))
     else {
       val summary = Adapter.g.getEffKeys(bb)

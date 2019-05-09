@@ -236,10 +236,9 @@ abstract class CPSTraverser extends Traverser {
   }
 
   def apply(g: Graph)(k: Int): Unit = {
-    val ng = HardenMayHardDeps(g)
-    bound(ng)
-    path = Nil; inner = ng.nodes
-    traverse(ng.block)(e => {})
+    bound(g)
+    path = Nil; inner = g.nodes
+    traverse(g.block)(e => {})
   }
 }
 

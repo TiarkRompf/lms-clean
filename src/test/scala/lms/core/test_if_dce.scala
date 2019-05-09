@@ -2,7 +2,6 @@ package lms
 package core
 
 import lms.core.stub._
-import lms.core.virtualize
 import lms.macros.SourceContext
 
 class IfDCETest extends TutorialFunSuite {

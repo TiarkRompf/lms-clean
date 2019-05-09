@@ -442,7 +442,7 @@ class TensorTest2 extends TutorialFunSuite {
   def testBE(name: String, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(prog: INT => INT) = {
     test(name) {
       checkOut(name, "scala", {
-        var g = HardenMayHardDeps(program(prog))
+        var g = program(prog)
 
         if (verbose) {
           println("// Raw:")
@@ -486,38 +486,32 @@ class TensorTest2 extends TutorialFunSuite {
 
 
         // lower zeros, ones, etc to uniform tensor constructor
-        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorTransformer("TensorLowering")).transform(g)
 
         println("// After Tensor lowering:")
         println(emitSource())
 
         // fuse tensor constructors
-        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorTransformer("TensorFusionV")).transform(g)
 
         println("// After Tensor fusion V:")
         println(emitSource())
 
-        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorTransformer("TensorFusionH")).transform(g)
 
         println("// After Tensor fusion H:")
         println(emitSource())
 
-        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorTransformer("MultiLoopBuilderLowering")).transform(g)
 
         println("// After Multiloop/Builder lowering:")
         println(emitSource())
 
-        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorFusionH2).transform(g)
 
         println("// After Tensor fusion H2:")
         println(emitSource())
 
-        g = HardenMayHardDeps(g) // TMP need handle
         g = (new TensorTransformer("MultiDimForeachLowering")).transform(g)
 
         println("// After MultiDim foreach lowering:")
