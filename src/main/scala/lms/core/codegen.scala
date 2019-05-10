@@ -554,10 +554,10 @@ class DeadCodeElimCG {
         if (!used(nn.n)) {
           if (nn.eff.hasSimpleEffect || nn.eff.wkeys.exists(used)) {
             used += nn.n
-            used ++= valueSyms(d)
+            used ++= valueSyms(nn)
           }
         } else {
-          used ++= valueSyms(d)
+          used ++= valueSyms(nn)
         }
         newNodes = nn::newNodes
       }

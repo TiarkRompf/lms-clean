@@ -78,6 +78,7 @@ object Backend {
       case res: Sym => eff.hdeps + res
       case _ => eff.hdeps
     }
+    def deps = used ++ eff.sdeps
     // NOTE/TODO: want to mask out purely local effects
     // STORE pure??
     def isPure = eff.hdeps == Set(ein)
@@ -108,7 +109,7 @@ object Backend {
   def syms(x: Node): List[Sym] = {
     x.rhs.flatMap {
       case s: Sym => List(s)
-      case b: Block => b.used
+      case b: Block => b.deps
       case _ => Nil
     } ++ x.eff.deps
   }
@@ -161,8 +162,17 @@ class GraphBuilder {
     case _ => latest(x)
   }
 
+  var reflectHere = false
   def reflectEffectSummary(s: String, as: Def*)(efKeys: (Set[Exp], Set[Exp])): Exp =
     reflectEffect(s, as:_*)(efKeys._1.toSeq:_*)(efKeys._2.toSeq:_*)
+  def reflectEffectSummaryHere(s: String, as: Def*)(efKeys: (Set[Exp], Set[Exp])): Exp = {
+    val saveReflectHere = reflectHere
+    reflectHere = true
+    try {
+      reflectEffect(s, as:_*)(efKeys._1.toSeq:_*)(efKeys._2.toSeq:_*)
+    } finally { reflectHere = saveReflectHere }
+  }
+
   def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
     // rewrite?
     rewrite(s,as.toList) match {
@@ -174,7 +184,7 @@ class GraphBuilder {
           (readEfKeys, writeEfKeys)
         } else {
           val (ref, wef) = getLatentEffect(s, as:_*)
-          ((readEfKeys ++ ref).toSeq, (writeEfKeys ++ wef).toSeq)
+          ((ref ++ readEfKeys).toSeq, (wef ++ writeEfKeys).toSeq)
         }
         val writes = if (s == "reset1") _writes filter (_ != stub.Adapter.CPS) else _writes
 
@@ -184,20 +194,22 @@ class GraphBuilder {
           // gather effect dependencies
           val prevHard = new mutable.ListBuffer[Sym]
           val prevSoft = writes.flatMap(e => curEffects.get(e) match {
-            case Some((lw, lr, _)) => prevHard += latest(lw); lr
+            case Some((lw, lr, _)) => prevHard += latest(lw); if (!reflectHere) lr else Nil
             case _ => prevHard += latest(e); Nil
           })
+          if (reifyHere) prevHard += curBlock
           prevHard ++= reads.map(getLastWrite(_))
 
           // prevSoft --= prevHard
           val res = reflect(sm, s, as:_*)(prevSoft.toSeq:_*)(prevHard.toSeq:_*)(reads:_*)(writes:_*)
           for (key <- reads) {
             val (lw, lrs, _) = curEffects.getOrElse(key, (curBlock, Nil, false)) // FIXME really?
-            curEffects = curEffects + (key -> (lw, res::lrs, true))
-          }
+            curEffects += key -> (lw, res::lrs, true)
+            if (key == Const("STORE")) curEffects += res -> (res, Nil, false) // Needed to notify res was defined locally
+          }                                                                   // Do we want it?
           for (key <- writes) {
             val (_, _, wr) = curEffects.getOrElse(key, (curBlock, Nil, false))
-            curEffects = curEffects + (key -> (res, Nil, wr))
+            curEffects += key -> (res, Nil, wr)
           }
           res
         } else {
@@ -283,8 +295,9 @@ class GraphBuilder {
 
 
   var curBlock: Sym = _ // could this become an ExplodedStruct?
-  var curEffects: Map[Exp,(Sym, List[Sym], Boolean)] = _ // map key to write/read deps, was read?
+  var curEffects: BlockEffect = _ // map key to write/read deps, was read?
   var curLocalDefs: Set[Exp] = _
+  var reifyHere: Boolean = false
 
   // NOTE/TODO: want to mask out purely local effects
 
@@ -299,21 +312,30 @@ class GraphBuilder {
   def mergeEffKeys(b: Block, c: Block) =
     (b.eff.rkeys ++ c.eff.rkeys, b.eff.wkeys ++ c.eff.wkeys)
 
-  def reify(x: => Exp): Block =  reify(0, xs => x )
+  def reify(x: => Exp): Block =  reify(0, xs => x)
+  def reifyHere(x: => Exp): Block =  reify(0, xs => x, true)
   def reify(x: Exp => Exp): Block = reify(1, xs => x(xs(0)))
   def reify(x: (Exp, Exp) => Exp): Block = reify(2, xs => x(xs(0), xs(1)))
   def reify(x: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => x(xs(0), xs(1), xs(2)))
   def reify(x: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => x(xs(0), xs(1), xs(2), xs(3)))
 
-  def reify(arity: Int, x: List[Exp] => Exp): Block = {
+  case class BlockEffect(var map: Map[Exp,(Sym, List[Sym], Boolean)], prev: BlockEffect) {
+    def get(key: Exp): Option[(Sym, List[Sym], Boolean)] = if (prev != null) map.get(key) orElse prev.get(key) else map.get(key)
+    def getOrElse(key: Exp, default: (Sym, List[Sym], Boolean)) = get(key).getOrElse(default)
+    def +=(kv: (Exp, (Sym, List[Sym], Boolean))) = map += kv
+  }
+
+  def reify(arity: Int, x: List[Exp] => Exp, here: Boolean = false): Block = {
     val save = curBlock
     val saveEffects = curEffects
     val saveLocalDefs = curLocalDefs
+    val saveReifyHere = reifyHere
     try {
       val block = Sym(fresh)
       val args = (0 until arity).toList.map(_ => Sym(fresh))
       curBlock = block
-      curEffects = Map()
+      curEffects = BlockEffect(Map(), if (here) curEffects else null)
+      reifyHere = here
       curLocalDefs = Set()
       val res = x(args)
       // remove local definitions from visible effect keys
@@ -327,7 +349,7 @@ class GraphBuilder {
       val hard = new mutable.HashSet[Sym]
       val rkeys = new mutable.ListBuffer[Exp]
       val wkeys = new mutable.ListBuffer[Exp]
-      for ((key, (lw, lrs, wr)) <- curEffects) {
+      for ((key, (lw, lrs, wr)) <- curEffects.map) {
         if (key == res) // if res is a local mutable (e.g. Array)
           hard += lw
         else if (!curLocalDefs.contains(key)) {
@@ -345,6 +367,7 @@ class GraphBuilder {
       curBlock = save
       curEffects = saveEffects
       curLocalDefs = saveLocalDefs
+      reifyHere = saveReifyHere
     }
   }
 }

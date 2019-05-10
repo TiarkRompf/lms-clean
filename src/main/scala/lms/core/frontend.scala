@@ -55,14 +55,14 @@ class FrontEnd {
   }
 
   def IF(c: BOOL)(a: => INT)(b: => INT): INT = {
-    val aBlock = g.reify(a.x)
-    val bBlock = g.reify(b.x)
+    val aBlock = g.reifyHere(a.x)
+    val bBlock = g.reifyHere(b.x)
     // compute effect (aBlock || bBlock)
     val pure = aBlock.isPure && bBlock.isPure
     if (pure)
       INT(g.reflect("?",c.x,aBlock,bBlock))
     else
-      INT(g.reflectEffectSummary("?",c.x,aBlock,bBlock)(g.mergeEffKeys(aBlock, bBlock)))
+      INT(g.reflectEffectSummaryHere("?",c.x,aBlock,bBlock)(g.mergeEffKeys(aBlock, bBlock)))
   }
 
   def WHILE(c: => BOOL)(b: => Unit): Unit = {

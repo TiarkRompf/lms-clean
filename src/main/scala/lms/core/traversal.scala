@@ -142,13 +142,18 @@ abstract class Traverser {
     def scheduleHere(d: Node) =
       available(d) && reach(d.n)
 
-    val outer1 = new mutable.ListBuffer[Node]()
-    val inner1 = new mutable.ListBuffer[Node]()
-    for (n <- inner) {
+    var outer1 = Seq[Node]()
+    var inner1 = Seq[Node]()
+    for (n <- inner.reverseIterator) {
       if (reach(n.n)) {
-        if (available(n)) outer1 += n else inner1 += n
+        if (available(n)) {
+          outer1 = n +: outer1
+          reach ++= n.eff.sdeps
+        } else {
+          inner1 = n +: inner1
+        }
       } else if (reachInner(n.n)) {
-          inner1 += n
+        inner1 = n +: inner1
       }
     }
 
@@ -162,7 +167,7 @@ abstract class Traverser {
     // for (n <- inner1)
     //   System.out.println(s"\t$n")
 
-    f(path1, inner1.toSeq, outer1.toSeq, y)
+    f(path1, inner1, outer1, y)
   }
 
   def traverse(ns: Seq[Node], res: Block): Unit = {
@@ -294,7 +299,7 @@ class CompactTraverser extends Traverser {
       blocks(n).foreach(hmi ++= _.used) // block results count as inner
     }                                   // syms(n) -- directSyms(n)
 
-    for (n <- inner) hmi ++= syms(n)
+    for (n <- inner) hmi ++= hardSyms(n)
 
     // NOTE: Recursive lambdas cannot be inlined. To ensure this
     // behavior, we count λforward as additional ref to the lambda

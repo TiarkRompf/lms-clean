@@ -192,4 +192,26 @@ class VariablesTest extends TutorialFunSuite {
     }
     check("variable_write_after_read", driver.code, "c")
   }
+
+  test("variable_while_deps_read") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 1
+        val y: Rep[Int] = x
+        if (x < 50) {
+          while (x < 10) {
+            printf("%d\n", x)
+            x += 1
+          }
+          printf("%d\n", y)
+        }
+        val z: Rep[Int] = x
+        x += 1
+        printf("%d\n", z)
+        printf("%d\n", x)
+      }
+    }
+    check("variable_while_deps_read", driver.code, "c")
+  }
 }

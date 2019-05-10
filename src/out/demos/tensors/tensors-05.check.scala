@@ -69,7 +69,7 @@ def tensors_05(x0: Int): Int /* x1 */ = {
     val x9 = builder_add(x3, x5, x8)/* val x9 = [x3*: _ | x6] */
     val x10 = builder_add(x2, x5, x8 + x7)/* val x10 = [x2*: _ | x6] */
     /* x10 x9 */
-  })/* val x4 = [x3* x2*: _ | x3, x2] */
+  })/* val x4 = [x2* x3*: _ | x2, x3] */
   println(builder_res(x3)/* val x11 = [x3*: _ | x4] */)/* val x12 = [x11 "CTRL"*: _ | x1, x11] */
   println(builder_res(x2)/* val x13 = [x2*: _ | x4] */)/* val x14 = [x13 "CTRL"*: _ | x12, x13] */
   0 /* x14 */
