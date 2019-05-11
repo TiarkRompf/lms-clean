@@ -103,6 +103,9 @@ object Adapter extends FrontEnd {
       case ("Array.length", List(Def("Array", List(Const(as: Array[_]))))) =>
         Some(Const(as.length))
 
+      case ("String.length", List(Const(as: String))) =>
+        Some(Const(as.length))
+
       case ("!", List(Const(b: Boolean))) => Some(Const(!b))
       case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
       case ("!=", List(Const(a), Const(b))) => Some(Const(a != b))
