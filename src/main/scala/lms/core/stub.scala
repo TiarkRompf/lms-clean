@@ -95,7 +95,7 @@ object Adapter extends FrontEnd {
       case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1: Exp, i1))))
         if as == as1 && i == i1 && {
           // rs is part of the list of read since the last write
-          curEffects.get(as).map { case (_, lrs, _) => lrs contains rs.asInstanceOf[Sym] } getOrElse(false) } =>
+          curEffects.get(as).map { case (_, lrs) => lrs contains rs.asInstanceOf[Sym] } getOrElse(false) } =>
         Some(Const(()))
 
       case ("Array.length", List(Def("NewArray", Const(n)::_))) =>
@@ -563,6 +563,11 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     val xs = p.productIterator.map(convertToExp).toSeq
     Wrap[T](Adapter.g.reflectWrite(p.productPrefix, xs:_*)(Unwrap(w)))
   }
+  def reflectFree[T:Manifest](w: Rep[Any])(x: Def[T]): Exp[T] = {
+    val p = x.asInstanceOf[Product]
+    val xs = p.productIterator.map(convertToExp).toSeq
+    Wrap[T](Adapter.g.reflectEffect(p.productPrefix, xs:_*)()(Unwrap(w), Adapter.CTRL))
+  }
 
   def emitValDef(sym: Sym[Any], rhs: String): Unit = ???
 
@@ -714,14 +719,14 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         Adapter.funTable = (fn, can)::Adapter.funTable
 
         val fn1 = Backend.Sym(Adapter.g.fresh)
-        Adapter.g.reflect(fn, "λforward", fn1)()()()()
+        Adapter.g.reflect(fn, "λforward", fn1)()
         //val xn = Sym(g.fresh)
         //val f1 = (x: INT) => APP(fn,x)
         // NOTE: lambda expression itself does not have
         // an effect, so body block should not count as
         // latent effect of the lambda
         val block = Adapter.g.reify(arity, gf)
-        val res = Adapter.g.reflect(fn1,"λ",block)()(fn)()()
+        val res = Adapter.g.reflect(fn1,"λ",block)(hardSummary(fn))
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }
@@ -736,7 +741,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     val can = canonicalize(f)
     topLevelFunctions.getOrElseUpdate(can, {
       val fn = Backend.Sym(Adapter.g.fresh)
-      Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()()()()
+      Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()
       fn
     })
   }

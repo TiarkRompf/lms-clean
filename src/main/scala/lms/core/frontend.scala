@@ -102,7 +102,7 @@ class FrontEnd {
     // NOTE: lambda expression itself does not have
     // an effect, so body block should not count as
     // latent effect of the lambda
-    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()()()
+    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()
     f1
   }
 

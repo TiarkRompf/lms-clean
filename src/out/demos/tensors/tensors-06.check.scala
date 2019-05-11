@@ -77,7 +77,7 @@ def tensors_06(x0: Int): Int /* x1 */ = {
     val x9 = sum_builder_add(x3, x6, x8)/* val x9 = [x3*: _ | x7] */
     val x10 = sum_builder_add(x2, x6, x8 * x8)/* val x10 = [x2*: _ | x7] */
     val x11 = sum_builder_add(x4, x6, x8)/* val x11 = [x4*: _ | x7] */
-    /* x11 x9 x10 */
+    /* x9 x10 x11 */
   })/* val x5 = [x2* x3* x4*: _ | x2, x3, x4] */
   val x12 = sum_builder_res(x4)/* [x4*: _ | x5] */ / 100
   println(sum_builder_res(x3)/* [x3*: _ | x5] */ / 100)/* val x15 = ["CTRL"*: _ | x1] */

@@ -431,7 +431,7 @@ abstract class Transformer extends Traverser {
       // need to deal with recursive binding!
       val s1 = Sym(g.fresh)
       subst(s) = s1
-      g.reflect(s1, "λ", transform(b))()()()()
+      g.reflect(s1, "λ", transform(b))()
     case Node(s,op,rs,es) =>
       // effect dependencies in target graph are managed by
       // graph builder, so we drop all effects here
@@ -528,7 +528,7 @@ abstract class CPSTransformer extends Transformer {
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
         if (b.eff.keys contains Adapter.CPS) forwardCPSSet += forwardMap(subst(s).asInstanceOf[Sym])
         val s1: Sym = subst(s).asInstanceOf[Sym]
-        g.reflect(s1, "λ", transformLambda(b))()(forwardMap(s1))()()
+        g.reflect(s1, "λ", transformLambda(b))(hardSummary(forwardMap(s1)))
       } else {
         subst(s) = g.reflect("λ", transformLambda(b))
       }
@@ -546,7 +546,7 @@ abstract class CPSTransformer extends Transformer {
       val sLoop = Sym(g.fresh)
       g.reflect(sLoop, "λ", transform(c)(v =>
         reflectHelper(es, "?", v, transform(b)(v =>
-          g.reflectWrite("@", sLoop)(Adapter.CTRL)), g.reify(k))))()()()(Adapter.CTRL)
+          g.reflectWrite("@", sLoop)(Adapter.CTRL)), g.reify(k))))(writeSummary(Adapter.CTRL))
       withSubst(f)(reflectHelper(es, "@", sLoop))
 
     case n @ Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) =>
@@ -558,7 +558,7 @@ abstract class CPSTransformer extends Transformer {
       val sFrom = Sym(g.fresh); val sTo = Sym(g.fresh)
       subst(s) = sFrom; subst(y) = sTo
       forwardMap(sTo) = sFrom
-      g.reflect(sFrom, "λforward", sTo)()()()()
+      g.reflect(sFrom, "λforward", sTo)()
       k
 
     case Node(s,op,rs,es) =>
@@ -606,7 +606,7 @@ abstract class SelectiveCPSTransformer extends CPSTransformer {
     case Node(s,"λ", List(b: Block),es) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
         val s1: Sym = subst(s).asInstanceOf[Sym]
-        g.reflect(s1, "λ", transform(b)(v => v))()(forwardMap(s1))()()
+        g.reflect(s1, "λ", transform(b)(v => v))(hardSummary(forwardMap(s1)))
       } else {
         subst(s) = g.reflect("λ", transform(b)(v => v))
       }

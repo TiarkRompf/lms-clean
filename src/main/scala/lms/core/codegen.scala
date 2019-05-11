@@ -303,7 +303,7 @@ class CompactScalaCodeGen extends CompactTraverser {
 
   def quoteEff(x: Set[Sym]): String =
     if (!doPrintEffects) ""
-    else " /* " + x.map(quote).mkString(" ") + " */"
+    else " /* " + x.toSeq.sorted.map(quote).mkString(" ") + " */"
 
   def quoteEff(x: EffectSummary): String = quoteEff(x.deps)
 
@@ -337,7 +337,7 @@ class CompactScalaCodeGen extends CompactTraverser {
   def quoteBlockP(f: => Unit): Unit = quoteBlockP(0)(f)
   def quoteBlockP(prec: Int)(f: => Unit) = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      val paren = numStms == 0 && lastNode.map(n => precedence(n) < prec).getOrElse(false)
+      val paren = numStms == 0 && l.map(n => precedence(n) < prec).getOrElse(false)
       if (paren) emit("(") else if (numStms > 0) emitln("{")
       f
       if (y.res != Const(())) { shallow(y.res); emit(quoteEff(y.eff)) } else emit(quoteEff(y.eff))
@@ -590,8 +590,12 @@ class DeadCodeElimCG {
       else
         d
     }
+    val newBlock = if (fixDeps)
+      g.block.copy(eff = g.block.eff.filter(used))
+    else
+      g.block
 
-    Graph(newNodes, g.block, newGlobalDefsCache)
+    Graph(newNodes, newBlock, newGlobalDefsCache)
   }
 }
 
@@ -817,6 +821,17 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case _ => super.shallow(n)
   }
 
+  override def emitValDef(n: Node): Unit = {
+      if (!recursive) {
+        if (dce.live(n.n))
+          emit(s"val ${quote(n.n)} = ");
+        shallow(n); emitln()
+      } else {
+        if (dce.live(n.n))
+          emit(s"${quote(n.n)} = ");
+        shallow(n); emitln()
+    }
+  }
 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "exit", List(x) ,_) =>
@@ -866,12 +881,8 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => ??? // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => ??? // no-op
 
-    case n @ Node(s,_,_,_) =>
-      if (!recursive) {
-        if (dce.live(s)) emit(s"val ${quote(s)} = "); shallow(n); emitln()
-      } else {
-        if (dce.live(s)) emit(s"${quote(s)} = "); shallow(n); emitln()
-    }
+    case n =>
+      emitValDef(n)
   }
 
   override def apply(g: Graph): Unit = {
@@ -1065,7 +1076,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   override def quoteBlockP(prec: Int)(f: => Unit) = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
       assert(y.res != Const(()), "You should use quoteBlock maybe?")
-      val paren = numStms > 0 || lastNode.map(n => precedence(n) < prec).getOrElse(false)
+      val paren = numStms > 0 || l.map(n => precedence(n) < prec).getOrElse(false)
       val brace = numStms > 0 // || (numStms == 0 ^ y.res != Const(()))
       if (paren) emit("(")
       if (brace) emitln("{")
@@ -1167,11 +1178,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   }
 
   override def emitValDef(n: Node): Unit = {
-    if (dce.live(n.n)) {
-      emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = "); shallow(n); emitln(";")
-    } else {
-      shallow(n); emitln(";")
-    }
+    if (dce.live(n.n))
+      emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = ")
+    shallow(n); emitln(";")
   }
   def emitVarDef(n: Node): Unit = {
     // emit(s"var ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
