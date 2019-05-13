@@ -144,11 +144,17 @@ abstract class Traverser {
 
     var outer1 = Seq[Node]()
     var inner1 = Seq[Node]()
+
+    // Extra reachable statement from soft dependencies
+    val extraThroughSoft = new mutable.HashSet[Sym]
     for (n <- inner.reverseIterator) {
-      if (reach(n.n)) {
+      if (reach(n.n) || extraThroughSoft(n.n)) {
         if (available(n)) {
           outer1 = n +: outer1
-          reach ++= n.eff.sdeps
+          if (!reach(n.n)) // if added through soft deps, hards needs to be added as well
+            extraThroughSoft ++= syms(n)
+          else
+            extraThroughSoft ++= n.eff.sdeps
         } else {
           inner1 = n +: inner1
         }
