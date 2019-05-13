@@ -906,24 +906,64 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // UncheckedOps
   private def uncheckedHelp(xs: Seq[Any]) = {
-    (xs map {
+    val str = xs map {
       case s: String => s
       case e: Exp[Any] => "[ ]"
       case e: Var[Any] => "[ ]"
       case e => e.toString
-    } mkString(""),
-    xs collect {
-      case e: Exp[Any] => Unwrap(e)
-      case v: Var[Any] => UnwrapV(v)
-    })
+    } mkString("")
+    var effs = Set[Backend.Exp]()
+    val args = xs collect {
+      case e: Exp[Any] =>
+        val res = Unwrap(e)
+        effs += res
+        res
+      case v: Var[Any] =>
+        val res = UnwrapV(v)
+        effs += res
+        res
+    }
+    (str, args, effs)
   }
+
+  // TODO:
+  // - More than one
+  // - filter non mutable
   def unchecked[T:Manifest](xs: Any*): Rep[T] = {
-    val (strings, args) = uncheckedHelp(xs)
-    Wrap[T](Adapter.g.reflectWrite("unchecked" + strings, args:_*)(Adapter.CTRL))
+    val (strings, args, effs) = uncheckedHelp(xs)
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()((effs + Adapter.CTRL).toSeq:_*))
+  }
+  def uncheckedWrite[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    x match {
+      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedWrite, please use unchecked")
+      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedWrite, please use unchecked")
+    }
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()((effs + Adapter.CTRL).toSeq:_*))
+  }
+  def uncheckedRead[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    x match {
+      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedRead, please use unchecked")
+      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedRead, please use unchecked")
+    }
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)(Adapter.CTRL))
   }
   def uncheckedPure[T:Manifest](xs: Any*): Rep[T] = {
-    val (strings, args) = uncheckedHelp(xs)
-    Wrap[T](Adapter.g.reflect("unchecked" + strings, args:_*))
+    val (strings, args, effs) = uncheckedHelp(xs)
+    // assert(effs.isEmpty, "variable detected in uncheckedPure, please use unchecked*Write, unchecked*Read, or unchecked")
+    if (effs.isEmpty)
+      Wrap[T](Adapter.g.reflect("unchecked" + strings, args:_*))
+    else
+      Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)())
+  }
+  def uncheckedPureWrite[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    x match {
+      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedPureWrite, please use unchecked")
+      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedPureWrite, please use unchecked")
+    }
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()(effs.toSeq:_*))
   }
 
   // Variables
