@@ -98,9 +98,11 @@ object Adapter extends FrontEnd {
           curEffects.get(as).map { case (_, lrs) => lrs contains rs.asInstanceOf[Sym] } getOrElse(false) } =>
         Some(Const(()))
 
-      case ("Array.length", List(Def("NewArray", Const(n)::_))) =>
+      case ("array_slice", List(as: Exp, Const(0), Const(-1))) => Some(as)
+
+      case ("array_length", List(Def("NewArray", Const(n)::_))) =>
         Some(Const(n))
-      case ("Array.length", List(Def("Array", List(Const(as: Array[_]))))) =>
+      case ("array_length", List(Def("Array", List(Const(as: Array[_]))))) =>
         Some(Const(as.length))
 
       case ("String.length", List(Const(as: String))) =>
@@ -629,8 +631,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Int], y: Rep[A]): Unit = Wrap[Unit](Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
-    def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("Array.length", Unwrap(x)))
-    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("Array.slice", Unwrap(s), Unwrap(e)))
+    def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("array_length", Unwrap(x)))
+    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflectEffect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))(Unwrap(x), Adapter.STORE)())
   }
 
   trait LongArray[+T]
@@ -638,8 +640,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
     def apply(i: Rep[Long]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Long], y: Rep[A]): Unit = Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
-    def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("Array.length", Unwrap(x)))
-    def slice(s: Rep[Long], e: Rep[Long] = unit(0L)): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("+", Unwrap(x), Unwrap(s)))
+    def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("array_length", Unwrap(x)))
+    def slice(s: Rep[Long], e: Rep[Long] = unit(-1L)): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))) // FIXME: borrowing effect?
   }
 
   // BooleanOps
@@ -744,7 +746,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     val can = canonicalize(f)
     topLevelFunctions.getOrElseUpdate(can, {
       val fn = Backend.Sym(Adapter.g.fresh)
-      Adapter.g.reflect(fn,"λtop", Adapter.g.reify(arity, gf))()
+      Adapter.g.reflect(fn,"λ", Adapter.g.reify(arity, gf), Backend.Const(0))()
       fn
     })
   }

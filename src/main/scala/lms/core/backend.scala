@@ -269,7 +269,7 @@ class GraphBuilder {
       getEffKeys(b)
     case s: Sym =>
       findDefinition(s) match {
-        case Some(Node(_, "λ", List(b @ Block(ins, out, ein, eout)), _)) =>
+        case Some(Node(_, "λ", (b@Block(ins, out, ein, eout))::_, _)) =>
           getEffKeys(b)
         case _ =>
           (Set[Exp](), Set[Exp]())
@@ -281,7 +281,7 @@ class GraphBuilder {
     case ("@", (f: Sym)+:args) => // should be a lambda. Block?
       val (reads, writes) = getLatentEffect("useless", args:_*)
       val ((freads, fwrites), argsSym) = findDefinition(f) match {
-        case Some(Node(_, "λ", List(b @ Block(ins, out, ein, eout)), _)) =>
+        case Some(Node(_, "λ", (b@Block(ins, out, ein, eout))::_, _)) =>
           (getEffKeys(b), ins)
         case Some(Node(_, "λforward", _, _)) => // what about doubly recursive?
           ((Set[Exp](), Set[Exp]()), Nil)

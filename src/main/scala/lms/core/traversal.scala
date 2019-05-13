@@ -9,13 +9,13 @@ abstract class Traverser {
 
   // freq/block computation
   def symsFreq(x: Node): Set[(Def,Double)] = x match {
-    case Node(f, "λ", List(Block(in, y, ein, eff)), _) =>
+    case Node(f, "λ", Block(in, y, ein, eff)::_, _) =>
       eff.deps.map((e: Def) => (e,100.0)) + ((y, 100.0))
     // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
     case Node(_, "?", c::(a: Block)::(b: Block)::Nil, eff) =>
       eff.hdeps.map((e: Def) => (e,1.0)) + ((c, 1.0)) ++ (a.used ++ b.used).map((e: Def) => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
-    case Node(_, "W", (a: Block)::(b: Block)::Nil, eff) =>
+    case Node(_, "W", (a: Block)::(b: Block)::_, eff) =>
       eff.hdeps.map((e: Def) => (e,1.0)) ++ (a.used ++ b.used).map(e => (e,100.0)) // XXX why eff.deps?
     case _ => hardSyms(x).map((s: Def) => (s,1.0))
   }

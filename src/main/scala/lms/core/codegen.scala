@@ -186,7 +186,7 @@ class CPSScalaCodeGen extends CPSTraverser {
       traverse(b){ v => emit(s"cIf$index("); emit(quote(v)); emit(")") }
       emitln("\n}")
 
-    case n @ Node(f,"W",(c:Block)::(b:Block)::e,_) =>
+    case n @ Node(f,"W", List(c:Block, b:Block),_) =>
       val index = fresh
       emitln(s"def loop$index(): Int = {")
       traverse(c){ v => emit("if ("); emit(quote(v)); emit(") ") }
@@ -515,13 +515,6 @@ class DeadCodeElimCG {
       case Block(ins, _, ein, _) => ein::ins
     }
 
-  def mysyms(n: Node): Set[Sym] = n match {
-    case n @ Node(s, "?", List(c,(a:Block),(b:Block)), _) if !live(s) =>
-      val (s, e) = symsAndEffectSyms(n)
-      (s -- List(a.res, b.res).collect { case s: Sym => s}) ++ e
-    case _ => hardSyms(n).toSet
-  }
-
   // staticData -- not really a DCE task, but hey
   var statics: collection.Set[Node] = _
 
@@ -544,8 +537,10 @@ class DeadCodeElimCG {
     for (d <- g.nodes.reverseIterator) {
       if (reach(d.n)) {
         val nn = d match {
-          case n @ Node(s, "?", List(c,a:Block,b:Block), eff) if !live(s) =>
-            n.copy(rhs = List(c, a.copy(res = Const(())), b.copy(res = Const(())))) // remove result deps if dead
+          case n @ Node(s, "?", c::(a:Block)::(b:Block)::_, eff) if !live(s) =>
+            n.copy(rhs = n.rhs match {
+              case c::(a: Block)::(b: Block)::t => c::a.copy(res = Const(()))::b.copy(res = Const(()))::t // remove result deps if dead
+            })
           case _ => d
         }
         live ++= valueSyms(nn)
@@ -681,8 +676,9 @@ trait ExtendedCodeGen {
 class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
   // val rename = new mutable.HashMap[Sym,String]
-  override def emit(s: String): Unit = stream.print(s)
-  override def emitln(s: String = "") = stream.println(s)
+  var lastNL = false
+  override def emit(s: String): Unit = { stream.print(s); lastNL = false }
+  override def emitln(s: String = "") = if (s != "" || !lastNL) { stream.println(s); lastNL = true }
 
   def array(innerType: String): String = ""
   def primitive(rawType: String): String = ""
@@ -758,6 +754,8 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       shallow(x)
     case n @ Node(s,"array_get",List(x,i),_) =>
       shallow1(x); emit("("); shallow(i); emit(")")
+    case n @ Node(s,"array_length",List(x), _) =>
+      shallow(x); emit(".length")
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("new Array["); emit(tpe); emit("]("); shallow(x); emit(")")
@@ -922,10 +920,12 @@ class Unknown // HACK: Sentinel for typeMap
 
 class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
-  override def emit(s: String): Unit = stream.print(s)
-  override def emitln(s: String = "") = stream.println(s)
+  var lastNL = false
+  override def emit(s: String): Unit = { stream.print(s); lastNL = false }
+  override def emitln(s: String = "") = if (s != "" || !lastNL) { stream.println(s); lastNL = true }
 
   override def quote(x: Def) = x match {
+    case Const(x: Double) if x.isNaN => "NAN"
     case Const(x: List[_]) => "{" + x.mkString(", ") + "}" // translate a Scala List literal to C List literal
     case _ => super.quote(x)
   }
@@ -935,10 +935,10 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case "Unit" => "void"
     case "Boolean" => "bool"
     case "Char" => "char"
-    case "Int" => "int"
+    case "Int" => "int32_t"
     case "Double" => "double"
     case "Float" => "float"
-    case "Long" => "long"
+    case "Long" => "int64_t"
     case "java.lang.String" => "char*"
     // case "Nothing" | "Any" => ???
     case _ => rawType
@@ -1024,7 +1024,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case "==" | "!=" | "String.equalsTo" => 7
     case "<" | ">" | "<=" | ">=" => 8
     case "<<" | ">>" => 9
-    case "+" | "-" => 10
+    case "+" | "-" | "array_slice" => 10
     case "*" | "/" | "%" => 11
     case "cast" => 12
     case "ref_new" => 13 // & address of
@@ -1091,7 +1091,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   // block of statements without produced value -- effect only
   override def quoteBlock(f: => Unit): Unit = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      assert(y.res == Const(()), "You should use quoteBlockP maybe?")
+      assert(y.res == Const(()), s"You should use quoteBlockP maybe? Result: $y")
       if (numStms > 1) emitln("{ ") else if (numStms == 0) emit("{")
       f
       if (numStms > 1) emit("}") else if (numStms == 0) emit("}")
@@ -1231,17 +1231,12 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       quoteBlockP(precedence("?"))(traverse(a))
       emit(" : ")
       quoteBlockP(precedence("?"))(traverse(b))
-    case n @ Node(f,"W",List(c:Block,b:Block),_) =>
-      emit("while (");
-      quoteBlockP(traverse(c))
-      emit(") ")
-      quoteBlock(traverse(b))
-      emitln()
+    case n @ Node(f,"W",List(c:Block,b:Block),_) => ???
     case n @ Node(s,"generate-comment",List(Const(x: String)),_) => ???
 
     case n @ Node(s,"P",List(x),_) =>
       emit("""printf("%s\n", """); shallow(x); emit(")");
-    case n @ Node(s, "λtop", List(block: Block), _) =>
+    case n @ Node(s, "λ", (block: Block)::Const(0)::Nil, _) =>
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
       }
@@ -1255,6 +1250,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       emit(s"($tpe*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof($tpe))")
     case n @ Node(s,"array_new",List(x),_) =>
       emit(s"(int*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof(int))")
+    case n @ Node(s,"array_slice",List(x, idx, _), _) =>
+      shallow1(x, precedence("+")); emit(" + "); shallow1(idx, precedence("+") + 1)
+    case n @ Node(s,"array_length",List(x), _) => ???
     case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
       emit("qsort("); shallow1(arr); emit(" ,"); shallow1(len); emit(", sizeof(*"); shallow(arr2); emit("), (__compar_fn_t)"); shallow(comp); emit(")")
     case n @ Node(s,op,args,_) if nameMap contains op =>
@@ -1327,7 +1325,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       quoteElseBlock(traverse(b))
       emitln()
 
-    case n @ Node(s,"W",List(c:Block,b:Block),_) if !dce.live(s) => // is it necessary? the while value will always be dead.
+    case n @ Node(s,"W",List(c:Block,b:Block),_) =>
       emit("while (")
       quoteBlockP(traverse(c))
       emit(") ")
