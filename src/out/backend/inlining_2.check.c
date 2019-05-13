@@ -6,9 +6,9 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int x0) {
-  int x1 = x0 - 4;
-  int x2 = 0;
+void Snippet(int32_t x0) {
+  int32_t x1 = x0 - 4;
+  int32_t x2 = 0;
   while (x2 < x0) {
     printf("%d\n", x1);
     x2 = x2 + 1;

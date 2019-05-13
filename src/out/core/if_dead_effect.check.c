@@ -6,7 +6,7 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int x0) {
+void Snippet(int32_t x0) {
   if (x0 == 0) printf("hkjfd\n");
   else printf("fsgl");
 }
