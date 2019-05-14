@@ -5,10 +5,10 @@ class Snippet extends (Int => Int) {
       val x6 = x2(x5)
       x6
     }
+    def x13(x11: Int): Int = {
+      x11 /*exit: x11 */
+    }
     def x15(x9: Int): Int = {
-      def x13(x11: Int): Int = {
-        x11 /*exit: x11 */
-      }
       val x14 = x7(x13, x9)
       x14
     }

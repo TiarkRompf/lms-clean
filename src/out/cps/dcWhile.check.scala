@@ -7,13 +7,13 @@ class Snippet extends (Int => Int) {
       }
       var x5 = 0
       var x6 = 0
+      val x13 = x4(x1)
       def loop0(): Int = {
         val x8 = x5
         val x9 = x8 < 5
         if (x9) {
           val x11 = x6
           val x12 = x4(x11)
-          val x13 = x4(x1)
           val x14 = x12 + x13
           val x15 = x5
           val x16 = x4(x15)

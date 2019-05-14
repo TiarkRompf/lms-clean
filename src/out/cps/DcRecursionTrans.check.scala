@@ -12,7 +12,7 @@ class Snippet extends (Int => Int) {
         val x16 = x10(x15)
         x16
       }
-      val x30 = if (x13) {
+      val x29 = if (x13) {
         val x19 = x7(x12)
         val x20 = x12 - 1
         def x25(x22: Int): Int = {
@@ -23,21 +23,21 @@ class Snippet extends (Int => Int) {
         val x26 = x8(x25, x20)
         x26
       } else {
-        val x28 = x7(x12)
-        val x29 = x17(x28)
-        x29
+        val x19 = x7(x12)
+        val x28 = x17(x19)
+        x28
       }
-      x30
+      x29
     }
-    val x35 = {
-      def x33(x32: Int): Int = {
-        x32
-      }
-      val x34 = x9(x33, x1)
-      x34
+    def x32(x31: Int): Int = {
+      x31
     }
-    val x36 = x35 + 10
-    x36 /*exit: x36 */
+    val x34 = {
+      val x33 = x9(x32, x1)
+      x33
+    }
+    val x35 = x34 + 10
+    x35 /*exit: x35 */
   }
 }
 // output:
