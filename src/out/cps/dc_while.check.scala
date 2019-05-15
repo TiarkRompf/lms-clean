@@ -1,8 +1,8 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
+    var x2 = 0
+    var x3 = 0
     val x25 = {
-      var x2 = 0
-      var x3 = 0
       def loop0(): Int = {
         val x6 = x2
         val x7 = x6 < 5

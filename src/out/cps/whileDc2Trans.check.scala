@@ -6,7 +6,6 @@ class Snippet extends (Int => Int) {
       val x15 = x14 * 2
       x15
     }
-    val x19 = x16(x1)
     def x4(): Int = {
       val x6 = x2
       val x7 = x6 < 5
@@ -17,6 +16,7 @@ class Snippet extends (Int => Int) {
         val x26 = {
           val x17 = x3
           val x18 = x16(x17)
+          val x19 = x16(x1)
           val x20 = x18 + x19
           val x21 = x2
           val x22 = x16(x21)

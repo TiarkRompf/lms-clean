@@ -9,7 +9,6 @@ class Snippet extends (Int => Int) {
       val x11 = x7(x10)
       x11
     }
-    val x13 = x6(x1)
     def x19(x18: Int): Int = {
       x18
     }
@@ -19,6 +18,7 @@ class Snippet extends (Int => Int) {
       x20
     }
     val x23 = {
+      val x13 = x6(x1)
       val x22 = x12(x21, x13)
       x22
     }

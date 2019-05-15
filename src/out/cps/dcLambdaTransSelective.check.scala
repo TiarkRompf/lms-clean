@@ -8,11 +8,11 @@ class Snippet extends (Int => Int) {
       val x9 = x8 * 2
       x9
     }
-    val x11 = x6(x1)
-    val x12 = x10(x11)
-    val x13 = x6(x12)
-    val x14 = x10(x13)
     val x15 = {
+      val x11 = x6(x1)
+      val x12 = x10(x11)
+      val x13 = x6(x12)
+      val x14 = x10(x13)
       x14
     }
     val x16 = x15 + 5

@@ -6,7 +6,6 @@ class Snippet extends (Int => Int) {
       val x14 = x13 * 2
       x14
     }
-    val x18 = x15(x1)
     while ({
       val x5 = x2
       val x6 = x5 < 5
@@ -18,6 +17,7 @@ class Snippet extends (Int => Int) {
       val x25 = {
         val x16 = x3
         val x17 = x15(x16)
+        val x18 = x15(x1)
         val x19 = x17 + x18
         val x20 = x2
         val x21 = x15(x20)

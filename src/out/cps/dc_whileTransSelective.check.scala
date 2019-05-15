@@ -1,23 +1,23 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
+    var x2 = 0
+    var x3 = 0
     val x25 = {
-      var x3 = 0
-      var x4 = 0
       while ({
-        val x6 = x3
+        val x6 = x2
         val x7 = x6 < 5
         x7
       }) {
-        val x9 = x4
-        val x10 = x3
+        val x9 = x3
+        val x10 = x2
         val x11 = x9 + x10
-        x4 = x11
-        val x13 = x3
+        x3 = x11
+        val x13 = x2
         val x14 = x13 + 1
-        x3 = x14
+        x2 = x14
         ()
       }
-      val x17 = x4
+      val x17 = x3
       def x22(x19: Int): Int = {
         val x20 = x17 * x19
         val x21 = x20 * 2

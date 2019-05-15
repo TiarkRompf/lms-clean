@@ -8,24 +8,24 @@ class Snippet extends (Int => Int) {
     lazy val x8 = x9 _
     def x9(x11: Int): Int = {
       val x12 = x11 > 0
-      val x19 = if (x12) {
+      val x20 = if (x12) {
         val x14 = x7(x11)
         val x15 = x11 - 1
         val x16 = x8(x15)
         val x17 = x14 * x16
         x17
       } else {
-        val x14 = x7(x11)
-        x14
+        val x19 = x7(x11)
+        x19
       }
-      x19
-    }
-    val x20 = x9(x1)
-    val x21 = {
       x20
     }
-    val x22 = x21 + 10
-    x22 /*exit: x22 */
+    val x22 = {
+      val x21 = x9(x1)
+      x21
+    }
+    val x23 = x22 + 10
+    x23 /*exit: x23 */
   }
 }
 // output:

@@ -19,8 +19,10 @@ abstract class Traverser {
       eff.hdeps.map((e: Def) => (e,1.0)) ++ (a.used ++ b.used).map(e => (e,100.0)) // XXX why eff.deps?
     case Node(_, "comment", _::_::(a: Block)::_ , eff) =>
       a.used.map((s: Def) => (s, 0.5)) ++ eff.hdeps.map((e: Def) => (e, 1.0))
-    case Node(_, "shift1", (a: Block)::_, eff) => hardSyms(x).map((s: Def) => (s,0.5))
-    case Node(_, "reset1", (a: Block)::_, eff) => hardSyms(x).map((s: Def) => (s,0.5))
+    case Node(_, "shift1", (a: Block)::_, eff) =>
+      a.used.map((s: Def) => (s, 0.5)) ++ eff.hdeps.map((e: Def) => (e, 1.0))
+    case Node(_, "reset1", (a: Block)::_, eff) =>
+      a.used.map((s: Def) => (s, 0.5)) ++ eff.hdeps.map((e: Def) => (e, 1.0))
     case _ => hardSyms(x).map((s: Def) => (s,1.0))
   }
 
