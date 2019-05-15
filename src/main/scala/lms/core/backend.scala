@@ -47,7 +47,7 @@ object Backend {
     } else ""
 
 
-    lazy val hasSimpleEffect = wkeys.exists(_.isInstanceOf[Const])
+    lazy val hasSimpleEffect = wkeys.exists(key => key.isInstanceOf[Const] && key != Const("STORE"))
     lazy val isPure = sdeps.isEmpty && hdeps.isEmpty && rkeys.isEmpty && wkeys.isEmpty
 
     def filter(f: Sym => Boolean) = {
@@ -168,8 +168,9 @@ class GraphBuilder {
     reflectEffect(s, as:_*)()()
   }
 
-  def reflectRead(s: String, as: Def*)(efKeys: Exp*) = reflectEffect(s, as:_*)(efKeys:_*)()
-  def reflectWrite(s: String, as: Def*)(efKeys: Exp*) = reflectEffect(s, as:_*)()(efKeys:_*)
+  def reflectRead(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(efKeys)()
+  def reflectWrite(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys)
+  def reflectFree(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys, Const("STORE"))
   def reflectMutable(s: String, as: Def*) = reflectEffect(s, as:_*)(Const("STORE"))()
 
 

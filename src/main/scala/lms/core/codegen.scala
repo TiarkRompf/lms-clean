@@ -534,6 +534,7 @@ class DeadCodeElimCG {
       live += g.block.res.asInstanceOf[Sym]
       used += g.block.res.asInstanceOf[Sym]
     }
+    used ++= g.block.bound
     for (d <- g.nodes.reverseIterator) {
       if (reach(d.n)) {
         val nn = d match {
@@ -756,6 +757,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       shallow1(x); emit("("); shallow(i); emit(")")
     case n @ Node(s,"array_length",List(x), _) =>
       shallow(x); emit(".length")
+    case n @ Node(s,"array_free", List(arr), _) => ()
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("new Array["); emit(tpe); emit("]("); shallow(x); emit(")")
@@ -925,6 +927,8 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   override def emitln(s: String = "") = if (s != "" || !lastNL) { stream.println(s); lastNL = true }
 
   override def quote(x: Def) = x match {
+    case Const(scala.Int.MinValue) => "0x" + scala.Int.MinValue.toHexString
+    case Const(scala.Long.MinValue) => "0x" + scala.Long.MinValue.toHexString + "L"
     case Const(x: Double) if x.isNaN => "NAN"
     case Const(x: List[_]) => "{" + x.mkString(", ") + "}" // translate a Scala List literal to C List literal
     case _ => super.quote(x)
@@ -1228,9 +1232,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       shallow1(c, precedence("?") + 1); emit(" ? ")
-      quoteBlockP(precedence("?"))(traverse(a))
+      quoteBlockP(precedence("?") + 1)(traverse(a))
       emit(" : ")
-      quoteBlockP(precedence("?"))(traverse(b))
+      quoteBlockP(precedence("?") + 1)(traverse(b))
     case n @ Node(f,"W",List(c:Block,b:Block),_) => ???
     case n @ Node(s,"generate-comment",List(Const(x: String)),_) => ???
 
@@ -1248,13 +1252,18 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"($tpe*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof($tpe))")
+    case n @ Node(s, "NewArray" ,List(x, Const(0)), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit(s"($tpe*)calloc("); shallow1(x); emit(s", sizeof($tpe))")
     case n @ Node(s,"array_new",List(x),_) =>
       emit(s"(int*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof(int))")
     case n @ Node(s,"array_slice",List(x, idx, _), _) =>
       shallow1(x, precedence("+")); emit(" + "); shallow1(idx, precedence("+") + 1)
     case n @ Node(s,"array_length",List(x), _) => ???
     case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
-      emit("qsort("); shallow1(arr); emit(" ,"); shallow1(len); emit(", sizeof(*"); shallow(arr2); emit("), (__compar_fn_t)"); shallow(comp); emit(")")
+      emit("qsort("); shallow(arr); emit(" ,"); shallow(len); emit(", sizeof(*"); shallow(arr2); emit("), (__compar_fn_t)"); shallow(comp); emit(")")
+    case n @ Node(s,"array_free", List(arr), _) =>
+      emit("free("); shallow(arr); emit(")")
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
     case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
@@ -1303,6 +1312,11 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"$tpe ${quote(s)}[${xs.length}] = { "); shallow(xs.head); xs.tail.foreach(x => {emit(", "); shallow(x)}); emitln(" };")
 
+    case n @ Node(s, "NewArray", List(x, Const(v)), _) if v != 0 =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit(s"long ${quote(s)}_len = "); shallow1(x, precedence("*")); emitln(s" * sizeof($tpe);")
+      emitln(s"$tpe ${quote(s)} = ($tpe*)malloc(${quote(s)}_len)")
+      emitln(s"memset(${quote(s)}, $v, ${quote(s)}_len);")
     // DCE: FIXME:
     // (a) check that args have no side-effects
     //      maybe this can be ensured by overriding InlineSym?
@@ -1354,7 +1368,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       // for this case, adding (f, y) in forwardMap is all we need
       // XXX: this is most likely not enough in the general case
       rename(s) = quote(y)
-    case n @ Node(s, "λtop", List(block@Block(args, res, _, _)), _) => ??? // shouldn't be possible in C
+    case n @ Node(s, "λ", List(block@Block(args, res, _, _)), _) => ??? // shouldn't be possible in C
     case n @ Node(s, "timestamp", _, _) =>
       registerHeader("<sys/time.h>")
       emitln(s"struct timeval ${quote(s)}_t;")

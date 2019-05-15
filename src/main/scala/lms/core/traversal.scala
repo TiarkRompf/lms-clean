@@ -264,6 +264,7 @@ class CompactTraverser extends Traverser {
     case Node(s, "var_new", _, _) => false
     case Node(s, "local_struct", _, _) => false
     case Node(s, "timestamp", _, _) => false
+    case Node(s, "NewArray", List(_, _), _) => false
     case _ => true
   }
 

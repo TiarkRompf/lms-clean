@@ -571,7 +571,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def reflectFree[T:Manifest](w: Rep[Any])(x: Def[T]): Exp[T] = {
     val p = x.asInstanceOf[Product]
     val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflectEffect(p.productPrefix, xs:_*)()(Unwrap(w), Adapter.CTRL))
+    Wrap[T](Adapter.g.reflectFree(p.productPrefix, xs:_*)(Unwrap(w)))
   }
 
   def emitValDef(sym: Sym[Any], rhs: String): Unit = ???
@@ -623,7 +623,6 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def notequals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean]
 
   // ArrayOps
-  // XXX HACK for generic type!
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
   def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("Array", xs.map(Unwrap(_)):_*))
@@ -633,15 +632,20 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def update(i: Rep[Int], y: Rep[A]): Unit = Wrap[Unit](Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("array_length", Unwrap(x)))
     def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflectEffect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))(Unwrap(x), Adapter.STORE)())
+    def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
   }
 
   trait LongArray[+T]
-  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int] = None): Rep[LongArray[T]] = Wrap[LongArray[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
+  def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int] = None): Rep[LongArray[T]] = init match {
+    case Some(v) => Wrap[LongArray[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x), Backend.Const(v)))
+    case _ => Wrap[LongArray[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
+  }
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
     def apply(i: Rep[Long]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Long], y: Rep[A]): Unit = Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
     def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("array_length", Unwrap(x)))
     def slice(s: Rep[Long], e: Rep[Long] = unit(-1L)): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))) // FIXME: borrowing effect?
+    def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
   }
 
   // BooleanOps
