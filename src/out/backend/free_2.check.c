@@ -6,15 +6,15 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int32_t x1) {
-  int32_t* x2 = (int32_t*)malloc(10 * sizeof(int32_t));
-  int32_t x3 = 0;
-  while (x3 < 10) {
-    x2[x3] = x3;
-    x3 = x3 + 1;
+void Snippet(int32_t x0) {
+  int32_t* x1 = (int32_t*)malloc(10 * sizeof(int32_t));
+  int32_t x2 = 0;
+  while (x2 < 10) {
+    x1[x2] = x2;
+    x2 = x2 + 1;
   }
-  printf(">> %d\n", x2[5]);
-  free(x2);
+  printf(">> %d\n", x1[5]);
+  free(x1);
 }
 /*****************************************
 End of C Generated Code
