@@ -109,7 +109,11 @@ object Adapter extends FrontEnd {
         Some(Const(as.length))
 
       case ("!", List(Const(b: Boolean))) => Some(Const(!b))
+      case ("==", List(Const(a: Double), _)) if a.isNaN => Some(Const(false))
+      case ("==", List(_, Const(b: Double))) if b.isNaN => Some(Const(false))
       case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
+      case ("==", List(Const(a: Double), _)) if a.isNaN => Some(Const(true))
+      case ("==", List(_, Const(b: Double))) if b.isNaN => Some(Const(true))
       case ("!=", List(Const(a), Const(b))) => Some(Const(a != b))
       case ("<=", List(Const(a: Int), Const(b: Int))) => Some(Const(a <= b))
       case ("<=", List(Const(a: Float), Const(b: Float))) => Some(Const(a <= b))
@@ -135,7 +139,14 @@ object Adapter extends FrontEnd {
       case (">", List(Const(a: Float), Const(b: Float))) => Some(Const(a > b))
       case (">", List(Const(a: Double), Const(b: Double))) => Some(Const(a > b))
 
-      case ("?", List(c, Const(t), Const(e))) if t == e => Some(Const(t))
+      case ("?", c::(t: Block)::(e: Block)::_) if t.isPure && e.isPure && t.res == e.res => Some(t.res)
+      case ("?", (c: Sym)::(t: Block)::(e: Block)::_) if t.isPure && e.isPure => (t.res, e.res) match {
+        case (Const(t: Double), Const(e: Double)) if t.isNaN && e.isNaN => Some(Const(Double.NaN))
+        // c && true or c || false => if (c) true else false
+        // if (c) false else true
+        case (Const(t: Boolean), Const(e: Boolean)) /* if t != e */ => Some(if (t) c else reflect("!", c))
+        case _ => None
+      }
 
       case _  =>
         super.rewrite(s,as)
@@ -157,7 +168,6 @@ object Adapter extends FrontEnd {
       case ("/", List(Const(a:Int),Const(b:Int))) => Const(a/b)
       case ("%", List(Const(a:Int),Const(b:Int))) => Const(a%b)
 
-      case ("?", List(c: Sym, Const(t: Boolean), Const(e: Boolean))) if t != e => if (t) c else reflect("!", c)
       // TBD: can't just rewrite, need to reflect block!
       // case ("?", List(Const(true),a:Block,b:Block)) => a
 
