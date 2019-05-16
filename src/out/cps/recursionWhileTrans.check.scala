@@ -24,19 +24,19 @@ class Snippet extends (Int => Int) {
       }
       x24
     }
-    def x38(x32: Int): Int = {
-      x3 = x32
-      val x34 = x2
-      val x35 = x34 + 1
-      x2 = x35
-      val x37 = x25()
-      x37
-    }
     def x25(): Int = {
       val x27 = x2
       val x28 = x27 < 10
       val x43 = if (x28) {
         val x30 = x2
+        def x38(x32: Int): Int = {
+          x3 = x32
+          val x34 = x2
+          val x35 = x34 + 1
+          x2 = x35
+          val x37 = x25()
+          x37
+        }
         val x39 = x5(x38, x30)
         x39
       } else {

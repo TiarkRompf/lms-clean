@@ -1,42 +1,43 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
     lazy val x2 = x3 _
-    def x12(x9: Int): Int = {
-      val x10 = x9 * 2
-      val x11 = x10 + 3
-      x11
+    def x14(x11: Int): Int = {
+      val x12 = x11 * 2
+      val x13 = x12 + 3
+      x13
     }
     def x3(x4: Int => Int, x6: Int): Int = {
-      val x13 = x6 > 0
-      val x18 = x12(x6)
-      val x19 = x6 - 1
-      val x29 = {
-        def x16(x15: Int): Int = {
-          x15
+      val x7 = x6 > 0
+      val x8 = x6 - 1
+      val x30 = {
+        def x17(x16: Int): Int = {
+          x16
         }
-        val x28 = if (x13) {
+        val x29 = if (x7) {
+          val x19 = x14(x6)
           def x24(x21: Int): Int = {
-            val x22 = x18 * x21
-            val x23 = x16(x22)
+            val x22 = x19 * x21
+            val x23 = x17(x22)
             x23
           }
-          val x25 = x2(x24, x19)
+          val x25 = x2(x24, x8)
           x25
         } else {
-          val x27 = x16(x18)
-          x27
+          val x27 = x14(x6)
+          val x28 = x17(x27)
+          x28
         }
-        x28
+        x29
       }
-      val x30 = x29 + 10
-      val x31 = x4(x30)
-      x31
+      val x31 = x30 + 10
+      val x32 = x4(x31)
+      x32
     }
-    def x35(x33: Int): Int = {
-      x33 /*exit: x33 */
+    def x36(x34: Int): Int = {
+      x34 /*exit: x34 */
     }
-    val x36 = x3(x35, x1)
-    x36
+    val x37 = x3(x36, x1)
+    x37
   }
 }
 // output:

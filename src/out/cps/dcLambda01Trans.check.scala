@@ -1,9 +1,9 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    def x8(x3: Int => Int, x5: Int): Int = {
-      val x6 = x5 * 2
-      val x7 = x3(x6)
-      x7
+    def x7(x2: Int => Int, x4: Int): Int = {
+      val x5 = x4 * 2
+      val x6 = x2(x5)
+      x6
     }
     def x15(x13: Int): Int = {
       val x14 = x13 + 3
@@ -11,7 +11,7 @@ class Snippet extends (Int => Int) {
     }
     def x17(x10: Int): Int = {
       val x11 = x10 + 2
-      val x16 = x8(x15, x11)
+      val x16 = x7(x15, x11)
       x16
     }
     val x20 = {

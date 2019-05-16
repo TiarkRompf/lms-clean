@@ -1,7 +1,9 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
+    val x3 = x1 * 2
+    val x14 = x1 - 5
+    val x16 = x1 + 5
     val x19 = {
-      val x3 = x1 * 2
       var x4 = x3
       def x6(x10: Int) = {
         val x11 = x4
@@ -11,10 +13,8 @@ class Snippet extends (Int => Int) {
           x18
         }
         if (x12) {
-          val x14 = x1 - 5
           cIf0(x14)
         } else {
-          val x16 = x1 + 5
           cIf0(x16)
         }
       }

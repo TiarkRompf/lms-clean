@@ -285,9 +285,9 @@ class GraphBuilder {
         case Some(Node(_, "λ", (b@Block(ins, out, ein, eout))::_, _)) =>
           (getEffKeys(b), ins)
         case Some(Node(_, "λforward", _, _)) => // what about doubly recursive?
-          ((Set[Exp](), Set[Exp]()), Nil)
+          ((Set[Exp](), Set[Exp](Const("CTRL"))), Nil)
         case None => // FIXME: function argument? fac-01 test used for recursive function...
-          ((Set[Exp](), Set(Const("CTRL"))), Nil)
+          ((Set[Exp](), Set[Exp](Const("CTRL"))), Nil)
         case Some(_) =>
           ??? // FIXME what about @, ?, array_apply => conservative write on all args?
       }
