@@ -942,7 +942,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // TODO:
   // - More than one
-  // - filter non mutable
+  // - filter non mutable or detect arrays?
   def unchecked[T:Manifest](xs: Any*): Rep[T] = {
     val (strings, args, effs) = uncheckedHelp(xs)
     Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()((effs + Adapter.CTRL).toSeq:_*))
@@ -964,13 +964,15 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)(Adapter.CTRL))
   }
   def uncheckedPure[T:Manifest](xs: Any*): Rep[T] = {
-    val (strings, args, effs) = uncheckedHelp(xs)
+    val (strings, args, _) = uncheckedHelp(xs)
     // assert(effs.isEmpty, "variable detected in uncheckedPure, please use unchecked*Write, unchecked*Read, or unchecked")
-    if (effs.isEmpty)
-      Wrap[T](Adapter.g.reflect("unchecked" + strings, args:_*))
-    else
-      Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)())
+    Wrap[T](Adapter.g.reflect("unchecked" + strings, args:_*))
   }
+
+  // def uncheckedPureRead[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+  //   val (strings, args, _) = uncheckedHelp(xs)
+  //   Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)())
+  // }
   def uncheckedPureWrite[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
     val (strings, args, effs) = uncheckedHelp(xs)
     x match {
