@@ -518,7 +518,7 @@ class DeadCodeElimCG {
   // staticData -- not really a DCE task, but hey
   var statics: collection.Set[Node] = _
 
-  def apply(g: Graph): Graph = {
+  def apply(g: Graph): Graph = utils.time("DeadCodeElimCG") {
 
     live = new mutable.HashSet[Sym]
     reach = new mutable.HashSet[Sym]
@@ -529,69 +529,77 @@ class DeadCodeElimCG {
 
     // First pass liveness and reachability
     // Only a single pass that reduce input size and first step of the next loop
-    reach ++= g.block.used
-    if (g.block.res.isInstanceOf[Sym]) {
-      live += g.block.res.asInstanceOf[Sym]
-      used += g.block.res.asInstanceOf[Sym]
-    }
-    used ++= g.block.bound
-    for (d <- g.nodes.reverseIterator) {
-      if (reach(d.n)) {
-        val nn = d match {
-          case n @ Node(s, "?", c::(a:Block)::(b:Block)::_, eff) if !live(s) =>
-            n.copy(rhs = n.rhs match {
-              case c::(a: Block)::(b: Block)::t => c::a.copy(res = Const(()))::b.copy(res = Const(()))::t // remove result deps if dead
-            })
-          case _ => d
-        }
-        live ++= valueSyms(nn)
-        reach ++= hardSyms(nn)
-
-        if (!used(nn.n)) {
-          if (nn.eff.hasSimpleEffect || nn.eff.wkeys.exists(used)) {
-            used += nn.n
-            used ++= valueSyms(nn)
+    utils.time("A_First_Path") {
+      reach ++= g.block.used
+      if (g.block.res.isInstanceOf[Sym]) {
+        live += g.block.res.asInstanceOf[Sym]
+        used += g.block.res.asInstanceOf[Sym]
+      }
+      used ++= g.block.bound
+      for (d <- g.nodes.reverseIterator) {
+        if (reach(d.n)) {
+          val nn = d match {
+            case n @ Node(s, "?", c::(a:Block)::(b:Block)::_, eff) if !live(s) =>
+              n.copy(rhs = n.rhs match {
+                case c::(a: Block)::(b: Block)::t => c::a.copy(res = Const(()))::b.copy(res = Const(()))::t // remove result deps if dead
+              })
+            case _ => d
           }
-        } else {
-          used ++= valueSyms(nn)
+          live ++= valueSyms(nn)
+          reach ++= hardSyms(nn)
+
+          // if (!used(nn.n)) {
+          //   if (nn.eff.hasSimpleEffect || nn.eff.wkeys.exists(used)) {
+          //     used += nn.n
+          //     used ++= valueSyms(nn)
+          //   }
+          // } else {
+          //   used ++= valueSyms(nn)
+          // }
+          newNodes = nn::newNodes
         }
-        newNodes = nn::newNodes
       }
     }
 
     // Second pass remove unused variables
+    var idx: Int = 1
     while (size != used.size) {
-      size = used.size
-      for (d <- newNodes.reverseIterator) {
-        if (!used(d.n)) {
-          if (d.eff.hasSimpleEffect || d.eff.wkeys.exists(used)) {
-            used += d.n
+      utils.time(s"Extra_Path_$idx") {
+        size = used.size
+        for (d <- newNodes.reverseIterator) {
+          if (!used(d.n)) {
+            if (d.eff.hasSimpleEffect || d.eff.wkeys.exists(used)) {
+              used += d.n
+              used ++= valueSyms(d)
+            }
+          } else {
             used ++= valueSyms(d)
           }
-        } else {
-          used ++= valueSyms(d)
         }
       }
+      idx += 1
     }
 
-    var newGlobalDefsCache = Map[Sym,Node]()
-    newNodes = for (d <- newNodes if used(d.n)) yield {
-      newGlobalDefsCache += d.n -> d
-      if (d.op == "staticData") statics += d
-      if (fixDeps)
-        d.copy(rhs = d.rhs.map {
-          case b: Block => b.copy(eff = b.eff.filter(used))
-          case o => o
-        }, eff = d.eff.filter(used))
+    utils.time(s"Recreate_the_graph") {
+      var newGlobalDefsCache = Map[Sym,Node]()
+      newNodes = for (d <- newNodes if used(d.n)) yield {
+        newGlobalDefsCache += d.n -> d
+        if (d.op == "staticData") statics += d
+        if (fixDeps)
+          d.copy(rhs = d.rhs.map {
+            case b: Block => b.copy(eff = b.eff.filter(used))
+            case o => o
+          }, eff = d.eff.filter(used))
+        else
+          d
+      }
+      val newBlock = if (fixDeps)
+        g.block.copy(eff = g.block.eff.filter(used))
       else
-        d
-    }
-    val newBlock = if (fixDeps)
-      g.block.copy(eff = g.block.eff.filter(used))
-    else
-      g.block
+        g.block
 
-    Graph(newNodes, newBlock, newGlobalDefsCache)
+      Graph(newNodes, newBlock, newGlobalDefsCache)
+    }
   }
 }
 
