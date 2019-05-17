@@ -1340,6 +1340,8 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"array_set",List(x,i,y),_) =>
       shallow1(x); emit("["); shallow(i); emit("] = "); shallow(y); emitln(";")
 
+    case n @ Node(s, "array_copyTo", List(src, dst, start, len), _) =>
+      emit("memcpy("); shallow1(dst, precedence("+")); emit(" + "); shallow1(start, precedence("+") + 1); emit(", "); shallow(src); emit(", "); shallow(len); emitln(");")
 
     case n @ Node(s,"?",c::(a:Block)::(b:Block)::_,_) if !dce.live(s) =>
       emit(s"if ("); shallow(c); emit(") ")

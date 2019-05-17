@@ -641,8 +641,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def apply(i: Rep[Int]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
     def update(i: Rep[Int], y: Rep[A]): Unit = Wrap[Unit](Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("array_length", Unwrap(x)))
-    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflectEffect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))(Unwrap(x), Adapter.STORE)())
+    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))) // (Unwrap(x), Adapter.STORE)())
     def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
+    def copyToArray(arr: Rep[Array[A]], start: Rep[Int], len: Rep[Int]) = Adapter.g.reflectEffect("array_copyTo", Unwrap(x), Unwrap(arr), Unwrap(start), Unwrap(len))(Unwrap(x))(Unwrap(arr))
   }
 
   trait LongArray[+T]
@@ -969,10 +970,14 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap[T](Adapter.g.reflect("unchecked" + strings, args:_*))
   }
 
-  // def uncheckedPureRead[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
-  //   val (strings, args, _) = uncheckedHelp(xs)
-  //   Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)())
-  // }
+  def uncheckedPureRead[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    x match {
+      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedRead, please use unchecked")
+      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedRead, please use unchecked")
+    }
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)())
+  }
   def uncheckedPureWrite[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
     val (strings, args, effs) = uncheckedHelp(xs)
     x match {

@@ -4,7 +4,7 @@ package core
 import stub._
 import macros.SourceContext
 
-class FreeTest extends TutorialFunSuite {
+class ArrayTest extends TutorialFunSuite {
   val under = "backend/"
 
   test("free-1") {
@@ -87,5 +87,40 @@ class FreeTest extends TutorialFunSuite {
       }
     }
     check("free_dead4", driver.code, "c")
+  }
+
+  test("array-copy-1") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewArray[Int](10)
+        val y = NewArray[Int](10)
+        var idx = 0
+        while (idx < 10) {
+          x(idx) = idx
+          idx += 1
+        }
+        x.copyToArray(y, 0, 10)
+        idx = 0
+        while (idx < 10) {
+          printf("%d\n", y(idx))
+          idx += 1
+        }
+      }
+    }
+    check("array_copy_1", driver.code, "c")
+  }
+
+  test("array-copy-2") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewArray[Char](10)
+        val y = unit("Hello")
+        uncheckedPure[Array[Char]](y).copyToArray(x, 0, 5)
+        printf("%5s\n", uncheckedPureRead[String](x)(x))
+      }
+    }
+    check("array_copy_2", driver.code, "c")
   }
 }
