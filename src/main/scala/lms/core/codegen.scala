@@ -880,6 +880,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
         case block: Block =>
           emitln("case _ =>")
           noquoteBlock(traverse(block))
+        case _ =>
       }
       emitln("}")
     case n @ Node(s,"var_new",List(x),_) =>
@@ -1381,6 +1382,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
           emitln("default:")
           noquoteBlock(traverse(block))
           emitln("break;")
+        case _ =>
       }
       emitln("}")
 

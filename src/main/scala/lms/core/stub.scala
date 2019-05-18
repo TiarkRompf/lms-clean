@@ -810,7 +810,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         Seq(Backend.Const(s.map(Backend.Const(_))), block)
     }
 
-    val bDefault = default.map {f =>
+    val bDefault = default.map { f =>
       val block = Adapter.g.reifyHere({ f(); Backend.Const(()) })
       isPure &&= block.isPure
       block
