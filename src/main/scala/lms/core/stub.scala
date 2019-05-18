@@ -800,6 +800,28 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Adapter.g.reflectWrite("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
   }
 
+  def switch(x: Rep[Long], default: Option[() => Unit])(cases: (Seq[Long], Rep[Long] => Unit)*) = {
+    var isPure = true
+    val bCases: Seq[Backend.Def]  = cases.flatMap {
+      case (Seq(), _)  => ???
+      case (s, f) =>
+        val block = Adapter.g.reifyHere({f(if (s.length == 1) s.head else x); Backend.Const(())})
+        isPure &&= block.isPure
+        Seq(Backend.Const(s), block)
+    }
+
+    val bDefault = default.map {f =>
+      val block = Adapter.g.reifyHere({ f(); Backend.Const(()) })
+      isPure &&= block.isPure
+      block
+    }
+
+    if (isPure)
+      Adapter.g.reflect("switch", Unwrap(x) +: bDefault.getOrElse(Backend.Const(())) +: bCases: _*)
+    else
+      Adapter.g.reflectEffectSummaryHere("switch", Unwrap(x) +: bDefault.getOrElse(Backend.Const(())) +: bCases:_*)((Set[Backend.Exp](), Set[Backend.Exp]()))
+  }
+
   // TimingOps
   def timeGeneratedCode[A: Manifest](f: => Rep[A], msg: Rep[String] = unit("")): Rep[A] = {
     val ff = Adapter.g.reify(Unwrap(f))

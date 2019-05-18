@@ -539,10 +539,8 @@ class DeadCodeElimCG {
       for (d <- g.nodes.reverseIterator) {
         if (reach(d.n)) {
           val nn = d match {
-            case n @ Node(s, "?", c::(a:Block)::(b:Block)::_, eff) if !live(s) =>
-              n.copy(rhs = n.rhs match {
-                case c::(a: Block)::(b: Block)::t => c::a.copy(res = Const(()))::b.copy(res = Const(()))::t // remove result deps if dead
-              })
+            case n @ Node(s, "?", c::(a:Block)::(b:Block)::t, eff) if !live(s) =>
+              n.copy(rhs = c::a.copy(res = Const(()))::b.copy(res = Const(()))::t) // remove result deps if dead
             case _ => d
           }
           live ++= valueSyms(nn)
@@ -871,7 +869,19 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
         noquoteBlock(traverse(b))
       }
       emitln("\n//# " + str)
-
+    case n @ Node(_, "switch", guard::default::others, _) =>
+      shallow1(guard); emitln(" match {");
+      others.grouped(2).foreach {
+        case List(Const(cases: Seq[Long]), block: Block) =>
+          emit("case "); emit(cases.head.toString); cases.tail.foreach(x => emit(s" | $x")); emitln(" =>")
+          noquoteBlock(traverse(block))
+      }
+      default match {
+        case block: Block =>
+          emitln("case _ =>")
+          noquoteBlock(traverse(block))
+      }
+      emitln("}")
     case n @ Node(s,"var_new",List(x),_) =>
       /*if (dce.live(s))*/
       if (!recursive) {
@@ -1036,7 +1046,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case "==" | "!=" | "String.equalsTo" => 7
     case "<" | ">" | "<=" | ">=" => 8
     case "<<" | ">>" => 9
-    case "+" | "-" | "array_slice" => 10
+    case "+" | "-" | "array_slice" | "String.slice" => 10
     case "*" | "/" | "%" => 11
     case "cast" => 12
     case "ref_new" => 13 // & address of
@@ -1355,6 +1365,22 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       emit(") ")
       quoteBlock(traverse(b))
       emitln()
+
+    case n @ Node(_, "switch", guard::default::others, _) =>
+      emit("switch ("); shallow(guard); emitln(") {");
+      others.grouped(2).foreach {
+        case Seq(Const(cases: Seq[Long]), block: Block) =>
+          cases.foreach(x => emitln(s"case $x:"))
+          noquoteBlock(traverse(block))
+          emitln("break;")
+      }
+      default match {
+        case block: Block =>
+          emitln("default:")
+          noquoteBlock(traverse(block))
+          emitln("break;")
+      }
+      emitln("}")
 
     case n @ Node(s,"generate-comment",List(Const(x: String)),_) =>
       emit("// "); emitln(x)
