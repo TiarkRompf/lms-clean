@@ -800,7 +800,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Adapter.g.reflectWrite("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
   }
 
-  def switch[T:Manifest](x: Rep[T], default: Option[() => Unit] = None)(cases: (Seq[T], Rep[T] => Unit)*) = {
+  def switch[T:Manifest](x: Rep[T], default: Option[() => Unit] = None)(cases: (Seq[T], Rep[T] => Unit)*): Unit = {
     var isPure = true
     val bCases: Seq[Backend.Def]  = cases.flatMap {
       case (Seq(), _)  => ???

@@ -873,7 +873,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       shallow1(guard); emitln(" match {");
       others.grouped(2).foreach {
         case List(Const(cases: Seq[Const]), block: Block) =>
-          emit("case "); emit(cases.head.toString); cases.tail.foreach(x => emit(s" | ${quote(x)}")); emitln(" =>")
+          emit("case "); emit(quote(cases.head)); cases.tail.foreach(x => emit(s" | ${quote(x)}")); emitln(" =>")
           noquoteBlock(traverse(block))
       }
       default match {
