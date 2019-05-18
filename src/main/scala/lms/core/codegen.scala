@@ -872,8 +872,8 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(_, "switch", guard::default::others, _) =>
       shallow1(guard); emitln(" match {");
       others.grouped(2).foreach {
-        case List(Const(cases: Seq[Long]), block: Block) =>
-          emit("case "); emit(cases.head.toString); cases.tail.foreach(x => emit(s" | $x")); emitln(" =>")
+        case List(Const(cases: Seq[Const]), block: Block) =>
+          emit("case "); emit(cases.head.toString); cases.tail.foreach(x => emit(s" | ${quote(x)}")); emitln(" =>")
           noquoteBlock(traverse(block))
       }
       default match {
@@ -1366,11 +1366,13 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       quoteBlock(traverse(b))
       emitln()
 
-    case n @ Node(_, "switch", guard::default::others, _) =>
+    case n @ Node(_, "switch", (guard: Exp)::default::others, _) =>
+      val tp = typeBlockRes(guard)
+      assert(tp == manifest[Long] || tp == manifest[Int] || tp == manifest[Short] || tp == manifest[Char])
       emit("switch ("); shallow(guard); emitln(") {");
       others.grouped(2).foreach {
-        case Seq(Const(cases: Seq[Long]), block: Block) =>
-          cases.foreach(x => emitln(s"case $x:"))
+        case Seq(Const(cases: Seq[Const]), block: Block) =>
+          cases.foreach(x => emitln(s"case ${quote(x)}:"))
           noquoteBlock(traverse(block))
           emitln("break;")
       }
