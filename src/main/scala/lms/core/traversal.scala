@@ -17,6 +17,13 @@ abstract class Traverser {
       eff.hdeps.map((e: Def) => (e,1.0)) + ((c, 1.0)) ++ (a.used ++ b.used).map((e: Def) => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
     case Node(_, "W", (a: Block)::(b: Block)::_, eff) =>
       eff.hdeps.map((e: Def) => (e,1.0)) ++ (a.used ++ b.used).map(e => (e,100.0)) // XXX why eff.deps?
+    case Node(_, "switch", guard::rhs, eff) => // 1 / # blocks instead of 0.5?
+      var freqs = Set[(Def,Double)]()
+      rhs.foreach {
+        case b: Block => freqs ++= b.used.map(e => (e, 0.5))
+        case _ =>
+      }
+      freqs + ((guard, 1.0)) ++ eff.hdeps.map((e: Def) => (e,1.0))
     case _ => hardSyms(x).map((s: Def) => (s,1.0))
   }
 
