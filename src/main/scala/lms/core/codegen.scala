@@ -1146,6 +1146,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
   def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
 
+  val libraryFlags = mutable.HashSet[String]()
+  def registerLibrary(nLibraries: String*) = libraryFlags ++= nLibraries.toSet
+
   private val registeredFunctions = mutable.HashSet[String]()
   private val functionsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
   private val ongoingFun = new mutable.HashSet[String]()
@@ -1221,6 +1224,8 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
   override def shallow(n: Node): Unit = n match {
     case Node(s, op, List(a), _) if math.contains(op) =>
+      registerHeader("<math.h>")
+      registerLibrary("-lm")
       emit(s"$op("); shallow(a); emit(")")
     case Node(s, "cast", List(a), _) =>
       val tpe = typeMap.getOrElse(s, manifest[Unknown])
