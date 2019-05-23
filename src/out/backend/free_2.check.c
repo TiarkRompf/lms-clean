@@ -6,9 +6,9 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int32_t x0) {
-  int32_t* x1 = (int32_t*)malloc(10 * sizeof(int32_t));
-  int32_t x2 = 0;
+void Snippet(int x0) {
+  int* x1 = (int*)malloc(10 * sizeof(int));
+  int x2 = 0;
   while (x2 < 10) {
     x1[x2] = x2;
     x2 = x2 + 1;

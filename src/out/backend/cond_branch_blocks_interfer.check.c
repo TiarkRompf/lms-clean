@@ -6,7 +6,7 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int32_t x0) {
+void Snippet(int x0) {
   printf("%d\n", (x0 > 0 ? x0 - 4 > 0 : x0 - 4 < 3) ? x0 - 4 : x0 - 4 + 1);
 }
 /*****************************************

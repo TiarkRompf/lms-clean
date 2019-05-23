@@ -6,8 +6,8 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int32_t x0) {
-  int32_t* x1 = (int32_t*)malloc(10 * sizeof(int32_t));
+void Snippet(int x0) {
+  int* x1 = (int*)malloc(10 * sizeof(int));
   printf("%d\n", x1[0]);
   free(x1);
 }

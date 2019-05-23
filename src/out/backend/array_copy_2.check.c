@@ -6,7 +6,7 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int32_t x0) {
+void Snippet(int x0) {
   char* x1 = (char*)malloc(10 * sizeof(char));
   memcpy(x1 + 0, "Hello", 5);
   printf("%5s\n", x1);

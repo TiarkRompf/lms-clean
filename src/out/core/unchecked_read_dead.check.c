@@ -6,8 +6,8 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int32_t x0) {
-  int32_t x1 = x0;
+void Snippet(int x0) {
+  int x1 = x0;
   x1 = 5;
   foo(x1);
   printf("Hello\n");

@@ -6,7 +6,7 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int32_t x0) {
+void Snippet(int x0) {
 }
 /*****************************************
 End of C Generated Code

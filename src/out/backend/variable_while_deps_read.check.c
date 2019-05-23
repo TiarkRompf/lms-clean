@@ -6,17 +6,17 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
-void Snippet(int32_t x0) {
-  int32_t x1 = 1;
+void Snippet(int x0) {
+  int x1 = 1;
   if (x1 < 50) {
-    int32_t x2 = x1;
+    int x2 = x1;
     while (x1 < 10) {
       printf("%d\n", x1);
       x1 = x1 + 1;
     }
     printf("%d\n", x2);
   }
-  int32_t x3 = x1;
+  int x3 = x1;
   x1 = x1 + 1;
   printf("%d\n", x3);
   printf("%d\n", x1);

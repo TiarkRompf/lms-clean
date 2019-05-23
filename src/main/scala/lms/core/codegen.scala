@@ -958,10 +958,10 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case "Unit" => "void"
     case "Boolean" => "bool"
     case "Char" => "char"
-    case "Int" => "int32_t"
+    case "Int" => "int"
     case "Double" => "double"
     case "Float" => "float"
-    case "Long" => "int64_t"
+    case "Long" => "int"
     case "java.lang.String" => "char*"
     // case "Nothing" | "Any" => ???
     case _ => rawType
