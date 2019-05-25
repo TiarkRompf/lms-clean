@@ -505,7 +505,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     (source.toString, statics)
   }
   var compilerCommand = "cc -std=c99 -O3"
-  val libraries = codegen.libraryFlags mkString(" ")
+  def libraries = codegen.libraryFlags mkString(" ")
   lazy val f: A => Unit = {
     // TBD: should read result of type B?
     val out = new java.io.PrintStream("/tmp/snippet.c")
@@ -1464,6 +1464,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   implicit def varToPrimitiveMathOpsLongOpsCls(x: Var[Long])(implicit __pos: SourceContext) = new PrimitiveMathOpsLongOpsCls(readVar(x))(__pos)
 
   class PrimitiveMathOpsLongOpsCls(val self: Rep[Long])(implicit __pos: SourceContext) {
+    def unary_- = Wrap[Long](Adapter.g.reflect("-", Unwrap(self)))
+
     def +(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded105) = { double_plus(self.toDouble, unit(rhs)) }
     def -(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded105) = { double_minus(self.toDouble, unit(rhs)) }
     def *(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded105) = { double_times(self.toDouble, unit(rhs)) }
@@ -1629,7 +1631,7 @@ trait PrimitiveOps extends Base with OverloadHack {
 
   def cast_helper[X,Y](x: Rep[X])(implicit c: X => Y, mX: Manifest[X], mY: Manifest[Y], pos: SourceContext) : Rep[Y] = x match {
     case Wrap(Backend.Const(x: X)) => Wrap[Y](Backend.Const(c(x)))
-    case _ => Wrap[Y](Adapter.g.reflect("cast", Unwrap(x)))
+    case _ => Wrap[Y](Adapter.g.reflect("cast", Unwrap(x), Backend.Const(manifest[Y])))
   }
 
   implicit def doubleToInt(x: Double) = x.toInt
@@ -1828,7 +1830,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   def int_to_char(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Char] = cast_helper[Int,Char](lhs)
   def int_to_double(lhs: Rep[Int])(implicit pos: SourceContext) : Rep[Double] = cast_helper[Int,Double](lhs)
   def int_leftshift(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
-  def int_rightshiftarith(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
+  def int_rightshiftarith(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] =
+    Wrap[Int](Adapter.g.reflect(">>", Unwrap(lhs), Unwrap(rhs)))
   def int_rightshiftlogical(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] = ???
 
   /**
@@ -1840,10 +1843,16 @@ trait PrimitiveOps extends Base with OverloadHack {
   class CharOpsCls(self: Rep[Char]) {
     def toInt(implicit pos: SourceContext) = char_toInt(self)
     def toLong(implicit pos: SourceContext) = char_toLong(self)
+    def &(__arg1: Rep[Char])(implicit pos: SourceContext,__imp1: Overloaded1) = char_binaryand(self, __arg1)
+    def |(__arg1: Rep[Char])(implicit pos: SourceContext,__imp1: Overloaded1) = char_binaryor(self, __arg1)
   }
 
   def char_toInt(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Int] = cast_helper[Char,Int](lhs)
   def char_toLong(lhs: Rep[Char])(implicit pos: SourceContext): Rep[Long] = cast_helper[Char,Long](lhs)
+  def char_binaryor(lhs: Rep[Char], rhs: Rep[Char])(implicit pos: SourceContext): Rep[Char] =
+    Wrap[Char](Adapter.g.reflect("|", Unwrap(lhs), Unwrap(rhs))) // FIXME: scala would be Int
+  def char_binaryand(lhs: Rep[Char], rhs: Rep[Char])(implicit pos: SourceContext): Rep[Char] =
+    Wrap[Char](Adapter.g.reflect("&", Unwrap(lhs), Unwrap(rhs))) // FIXME: scala would be Int
 
   /**
    * Long

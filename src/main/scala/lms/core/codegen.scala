@@ -797,7 +797,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
     // case n @ Node(s,op,List(x),_) if numTypeConv(op) =>
     //   shallow1(x); emit(s".$op")
-    case n @ Node(s, "cast", List(a), _) =>
+    case n @ Node(s, "cast", a::_, _) =>
       val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
       shallow1(a); emit(s".to$tpe")
 
@@ -949,6 +949,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case Const(scala.Int.MinValue) => "0x" + scala.Int.MinValue.toHexString
     case Const(scala.Long.MinValue) => "0x" + scala.Long.MinValue.toHexString + "L"
     case Const(x: Double) if x.isNaN => "NAN"
+    case Const(c: Char) if c.toInt < 0x20 || c.toInt > 0x7F =>
+      val res = super.quote(x) // if escaped
+      if (res.charAt(1) == '\\') res else "0x" + c.toHexString
     case Const(x: List[_]) => "{" + x.mkString(", ") + "}" // translate a Scala List literal to C List literal
     case _ => super.quote(x)
   }
@@ -1227,7 +1230,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       registerHeader("<math.h>")
       registerLibrary("-lm")
       emit(s"$op("); shallow(a); emit(")")
-    case Node(s, "cast", List(a), _) =>
+    case Node(s, "cast", a::_, _) =>
       val tpe = typeMap.getOrElse(s, manifest[Unknown])
       a match {// FIXME should it be there?
         case Const(n) => ??? // Constant cast should be resolved before
@@ -1413,7 +1416,10 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       // for this case, adding (f, y) in forwardMap is all we need
       // XXX: this is most likely not enough in the general case
       rename(s) = quote(y)
-    case n @ Node(s, "λ", List(block@Block(args, res, _, _)), _) => ??? // shouldn't be possible in C
+    case n @ Node(s, "λ", (block: Block)::Const(0)::Nil, _) => // FIXME: check free var?
+      registerTopLevelFunction(quote(s)) {
+        emitFunction(quote(s), block)
+      }
     case n @ Node(s, "timestamp", _, _) =>
       registerHeader("<sys/time.h>")
       emitln(s"struct timeval ${quote(s)}_t;")
