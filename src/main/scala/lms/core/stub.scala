@@ -112,9 +112,10 @@ object Adapter extends FrontEnd {
       case ("==", List(Const(a: Double), _)) if a.isNaN => Some(Const(false))
       case ("==", List(_, Const(b: Double))) if b.isNaN => Some(Const(false))
       case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
-      case ("==", List(Const(a: Double), _)) if a.isNaN => Some(Const(true))
-      case ("==", List(_, Const(b: Double))) if b.isNaN => Some(Const(true))
+      case ("!=", List(Const(a: Double), _)) if a.isNaN => Some(Const(true))
+      case ("!=", List(_, Const(b: Double))) if b.isNaN => Some(Const(true))
       case ("!=", List(Const(a), Const(b))) => Some(Const(a != b))
+      case ("^", List(Const(a: Boolean), Const(b: Boolean))) => Some(Const(a ^ b))
       case ("<=", List(Const(a: Int), Const(b: Int))) => Some(Const(a <= b))
       case ("<=", List(Const(a: Float), Const(b: Float))) => Some(Const(a <= b))
       case ("<=", List(Const(a: Long), Const(b: Long))) => Some(Const(a <= b))
@@ -538,6 +539,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def Unwrap(x: Exp[Any]) = x match {
     case Wrap(x) => x
     case Const(x) => Backend.Const(x)
+    case EffectView(Wrap(x), _) => x // TODO: fix!
   }
 
   case class WrapV[A:Manifest](x: lms.core.Backend.Exp) extends Var[A] {
@@ -638,11 +640,20 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("Array", xs.map(Unwrap(_)):_*))
   }
+  def LongArray[T:Manifest](xs: Rep[T]*): Rep[LongArray[T]] = {
+    Wrap[LongArray[T]](Adapter.g.reflectMutable("Array", xs.map(Unwrap(_)):_*))
+  }
   implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
-    def apply(i: Rep[Int]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Int], y: Rep[A]): Unit = Wrap[Unit](Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x)))
+    def apply(i: Rep[Int]): Rep[A] = x match {
+      case Wrap(_) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+      case EffectView(x, base) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(base)))
+    }
+    def update(i: Rep[Int], y: Rep[A]): Unit = x match {
+      case Wrap(_) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
+      case EffectView(x, base) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(base))
+    }
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("array_length", Unwrap(x)))
-    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = Wrap[Array[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))) // (Unwrap(x), Adapter.STORE)())
+    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = EffectView[Array[A]](Wrap[Array[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))), x) // (Unwrap(x), Adapter.STORE)())
     def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
     def copyToArray(arr: Rep[Array[A]], start: Rep[Int], len: Rep[Int]) = Adapter.g.reflectEffect("array_copyTo", Unwrap(x), Unwrap(arr), Unwrap(start), Unwrap(len))(Unwrap(x))(Unwrap(arr))
   }
@@ -653,12 +664,20 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     case _ => Wrap[LongArray[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
   }
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
-    def apply(i: Rep[Long]): Rep[A] = Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-    def update(i: Rep[Long], y: Rep[A]): Unit = Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
+    def apply(i: Rep[Long]): Rep[A] = x match {
+      case Wrap(_) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+      case EffectView(x, base) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(base)))
+    }
+    def update(i: Rep[Long], y: Rep[A]): Unit = x match {
+      case Wrap(_) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
+      case EffectView(x, base) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(base))
+    }
     def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("array_length", Unwrap(x)))
-    def slice(s: Rep[Long], e: Rep[Long] = unit(-1L)): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))) // FIXME: borrowing effect?
+    def slice(s: Rep[Long], e: Rep[Long] = unit(-1L)): Rep[LongArray[A]] = EffectView[LongArray[A]](Wrap[LongArray[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))), x) // FIXME: borrowing effect?
+    def resize(s: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflectRealloc("array_resize", Unwrap(x), Unwrap(s))(Unwrap(x)))
     def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
   }
+  case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Rep[A]
 
   // BooleanOps
   implicit def bool2boolOps(lhs: Boolean) = new BoolOps(lhs)
@@ -679,6 +698,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     // }
     def ||(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
       __ifThenElse(lhs, unit(true), rhs)
+    def ^(rhs: Rep[Boolean]) = Wrap[Boolean](Adapter.g.reflect("^", Unwrap(lhs), Unwrap(rhs)))
   }
 
   // shift/reset

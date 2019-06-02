@@ -415,7 +415,7 @@ class CompactScalaCodeGen extends CompactTraverser {
   // (either inline or as part of val def)
   // XXX TODO: precedence of nested expressions!!
   val unaryop = Set("-","!","&")
-  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", "&&", "||")
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", "&&", "||", "^")
   val math = Set("sin", "cos", "tanh", "exp", "sqrt")
   def shallow(n: Node): Unit = { n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
@@ -1066,6 +1066,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     val args = body.in
     emit(s"${remap(typeBlockRes(res))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}") mkString(", ")}) ")
     quoteBlockPReturn(traverse(body))
+    emitln()
   }
 
   // block of statements
@@ -1199,7 +1200,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     withStream(initWriter)(f)
     ongoingInit = false
   }
-  def emitInit(out: PrintStream) = if (initStream.size > 0){
+  def emitInit(out: PrintStream) = if (initStream.size > 0) {
     out.println("\n/*********** Init ***********/")
     out.println("inline int init() {")
     initStream.writeTo(out)
@@ -1281,7 +1282,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       emit(s"($tpe*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof($tpe))")
     case n @ Node(s, "NewArray" ,List(x, Const(0)), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"($tpe*)calloc("); shallow1(x); emit(s", sizeof($tpe))")
+      emit(s"($tpe*)calloc("); shallow(x); emit(s", sizeof($tpe))")
     case n @ Node(s,"array_new",List(x),_) =>
       emit(s"(int*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof(int))")
     case n @ Node(s,"array_slice",List(x, idx, _), _) =>
@@ -1291,6 +1292,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       emit("qsort("); shallow(arr); emit(" ,"); shallow(len); emit(", sizeof(*"); shallow(arr2); emit("), (__compar_fn_t)"); shallow(comp); emit(")")
     case n @ Node(s,"array_free", List(arr), _) =>
       emit("free("); shallow(arr); emit(")")
+    case n @ Node(s,"array_resize", List(arr, nsize), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit(s"($tpe*)realloc("); shallow(arr); emit(", "); shallow1(nsize, precedence("*")); emit(s" * sizeof($tpe))")
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
     case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
@@ -1381,13 +1385,13 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       emit("switch ("); shallow(guard); emitln(") {");
       others.grouped(2).foreach {
         case Seq(Const(cases: Seq[Const]), block: Block) =>
-          cases.foreach(x => emitln(s"case ${quote(x)}:"))
+          cases.foreach(x => emitln(s"case ${quote(x)}:;")) // extra ; used to avoid error on case 2: int x = 1; ....
           noquoteBlock(traverse(block))
           emitln("break;")
       }
       default match {
         case block: Block =>
-          emitln("default:")
+          emitln("default:;")
           noquoteBlock(traverse(block))
           emitln("break;")
         case _ =>
@@ -1425,6 +1429,8 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       emitln(s"struct timeval ${quote(s)}_t;")
       emitln(s"gettimeofday(&${quote(s)}_t, NULL);")
       emitln(s"long ${quote(s)} = ${quote(s)}_t.tv_sec * 1000000L + ${quote(s)}_t.tv_usec;");
+    case n @ Node(s, "exit", List(x) ,_) =>
+      emit("fflush(stdout); fflush(stderr); exit("); shallow(x); emitln(");")
     case _ =>
       // emit(s"val ${quote(s)} = " + shallow(n))
       emitValDef(n)

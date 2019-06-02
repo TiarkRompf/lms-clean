@@ -9,15 +9,15 @@ Emitting C Generated Code
 void Snippet(int x0) {
   int x1 = 0;
   switch (x0) {
-    case 0:
+    case 0:;
     printf("zero %d\n", 0);
     break;
-    case 1:
-    case 2:
-    case 3:
+    case 1:;
+    case 2:;
+    case 3:;
     x1 = x0;
     break;
-    default:
+    default:;
     printf("%d\n", x0);
     break;
   }

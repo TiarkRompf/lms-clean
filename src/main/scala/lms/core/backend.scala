@@ -170,8 +170,11 @@ class GraphBuilder {
 
   def reflectRead(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(efKeys)()
   def reflectWrite(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys)
-  def reflectFree(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys, Const("STORE"))
   def reflectMutable(s: String, as: Def*) = reflectEffect(s, as:_*)(Const("STORE"))()
+
+  // FIXME:
+  def reflectFree(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys, Const("STORE"))
+  def reflectRealloc(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(Const("STORE"))(efKeys, Const("STORE"))
 
 
   def latest(e1: Exp) = if (curLocalDefs(e1)) e1.asInstanceOf[Sym] else curBlock
@@ -337,6 +340,7 @@ class GraphBuilder {
   def reify(x: => Exp): Block =  reify(0, xs => x)
   def reifyHere(x: => Exp): Block =  reify(0, xs => x, true)
   def reify(x: Exp => Exp): Block = reify(1, xs => x(xs(0)))
+  def reifyHere(x: Exp => Exp): Block =  reify(1, xs => x(xs(0)), true)
   def reify(x: (Exp, Exp) => Exp): Block = reify(2, xs => x(xs(0), xs(1)))
   def reify(x: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => x(xs(0), xs(1), xs(2)))
   def reify(x: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => x(xs(0), xs(1), xs(2), xs(3)))

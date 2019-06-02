@@ -123,4 +123,81 @@ class ArrayTest extends TutorialFunSuite {
     }
     check("array_copy_2", driver.code, "c")
   }
+
+  test("realloc-1") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewLongArray[Int](10L)
+        printf("%d\n", x(0L))
+        val y = x.resize(20L)
+        printf("%d\n", y(5L))
+        y.free
+      }
+    }
+    check("realloc_1", driver.code, "c")
+  }
+  test("realloc-2") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewLongArray[Int](10L)
+        printf("%d\n", x(0L))
+        val y = x.resize(20L)
+        y.free
+      }
+    }
+    check("realloc_2", driver.code, "c")
+  }
+  test("realloc-3") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewLongArray[Int](10L)
+        x(0L) = 3
+        val y = x.resize(20L)
+        y(4L) = 3
+        printf("%d\n", y(3L))
+        y.free
+      }
+    }
+    check("realloc_3", driver.code, "c")
+  }
+  test("realloc-4") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewLongArray[Int](10L)
+        x(0L) = 3
+        val y = x.resize(20L)
+        printf("%d\n", y(3L))
+        y.free
+      }
+    }
+    check("realloc_4", driver.code, "c")
+  }
+  test("realloc-dead1") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewLongArray[Int](10L)
+        val y = x.resize(20L)
+        y.free
+      }
+    }
+    check("realloc_dead1", driver.code, "c")
+  }
+  test("realloc-dead2") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewLongArray[Int](10L)
+        x(0L) = 3
+        val y = x.resize(20L)
+        y(4L) = 3
+        y.free
+      }
+    }
+    check("realloc_dead2", driver.code, "c")
+  }
 }
