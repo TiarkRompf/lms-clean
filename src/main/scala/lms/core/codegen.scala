@@ -390,7 +390,7 @@ class CompactScalaCodeGen extends CompactTraverser {
     case "&" => 6
     case "==" | "!=" => 7
     case "<" | ">" | "<=" | ">=" => 8
-    case "<<" | ">>" => 9
+    case "<<" | ">>" | ">>>" => 9
     case "+" | "-" => 10
     case "*" | "/" | "%" => 11
     case "cast" => 12
@@ -415,7 +415,7 @@ class CompactScalaCodeGen extends CompactTraverser {
   // (either inline or as part of val def)
   // XXX TODO: precedence of nested expressions!!
   val unaryop = Set("-","!","&")
-  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", "&&", "||", "^")
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", ">>>", "&&", "||", "^")
   val math = Set("sin", "cos", "tanh", "exp", "sqrt")
   def shallow(n: Node): Unit = { n match {
     case n @ Node(f,"λ",List(y:Block),_) =>
@@ -639,6 +639,7 @@ trait ExtendedCodeGen {
   def primitive(rawType: String): String
   def record(man: RefinedManifest[_]): String
   def function(sig: List[Manifest[_]]): String
+  def remapUnsigned(m: Manifest[_]): String
   def remap(m: Manifest[_]): String = m.typeArguments match {
     case Nil => m match {
       case ref: RefinedManifest[_] => record(ref)
@@ -691,6 +692,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   def primitive(rawType: String): String = ""
   def record(man: RefinedManifest[_]): String = ""
   def function(sig: List[Manifest[_]]): String = ""
+  def remapUnsigned(m: Manifest[_]) = ???
   override def remap(m: Manifest[_]): String = m.toString
 
   val nameMap: Map[String, String] = Map( // FIXME: tutorial-specific
@@ -949,6 +951,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case Const(scala.Int.MinValue) => "0x" + scala.Int.MinValue.toHexString
     case Const(scala.Long.MinValue) => "0x" + scala.Long.MinValue.toHexString + "L"
     case Const(x: Double) if x.isNaN => "NAN"
+    case Const(null) => "NULL"
     case Const(c: Char) if c.toInt < 0x20 || c.toInt > 0x7F =>
       val res = super.quote(x) // if escaped
       if (res.charAt(1) == '\\') res else "0x" + c.toHexString
@@ -969,6 +972,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     // case "Nothing" | "Any" => ???
     case _ => rawType
   }
+  def remapUnsigned(m: Manifest[_]): String = "unsigned " + remap(m)
   def array(innerType: String) = innerType + "*"
   def function(sig: List[Manifest[_]]): String = ???
   def record(man: RefinedManifest[_]): String = {
@@ -1049,7 +1053,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case "&" => 6
     case "==" | "!=" | "String.equalsTo" => 7
     case "<" | ">" | "<=" | ">=" => 8
-    case "<<" | ">>" => 9
+    case "<<" | ">>" | ">>>" => 9
     case "+" | "-" | "array_slice" | "String.slice" => 10
     case "*" | "/" | "%" => 11
     case "cast" => 12
@@ -1227,6 +1231,8 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   }
 
   override def shallow(n: Node): Unit = n match {
+    case Node(s, ">>>", List(a, b), _) =>
+      emit("(("); emit(remapUnsigned(typeMap.getOrElse(s, manifest[Unknown]))); emit(") "); shallow1(a, precedence("cast") + 1); emit(") >> "); shallow1(b, precedence(">>") + 1)
     case Node(s, op, List(a), _) if math.contains(op) =>
       registerHeader("<math.h>")
       registerLibrary("-lm")

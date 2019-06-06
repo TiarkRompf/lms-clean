@@ -1072,14 +1072,14 @@ class CPSTest extends TutorialFunSuite {
       def snippet(a: Rep[Int]): Rep[Int] = {
         val x = a + a
         val y = x * a
-        val z = y / y
+        val z = (y + y)/ y
         z
       }
     }
     // test by running
     for (i <- 1 until 10) {
-      assert(driver.eval(i) == 1)
-      assert(driver.eval2(i) == 1)
+      assert(driver.eval(i) == 2)
+      assert(driver.eval2(i) == 2)
     }
     // test source
     val src = driver.code

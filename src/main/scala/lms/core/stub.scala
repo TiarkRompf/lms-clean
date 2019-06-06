@@ -99,7 +99,6 @@ object Adapter extends FrontEnd {
         Some(Const(()))
 
       case ("array_slice", List(as: Exp, Const(0), Const(-1))) => Some(as)
-
       case ("array_length", List(Def("NewArray", Const(n)::_))) =>
         Some(Const(n))
       case ("array_length", List(Def("Array", List(Const(as: Array[_]))))) =>
@@ -107,6 +106,8 @@ object Adapter extends FrontEnd {
 
       case ("String.length", List(Const(as: String))) =>
         Some(Const(as.length))
+      case ("String.charAt", List(Const(as: String), Const(idx: Int))) =>
+        Some(Const(as.charAt(idx)))
 
       case ("!", List(Const(b: Boolean))) => Some(Const(!b))
       case ("==", List(Const(a: Double), _)) if a.isNaN => Some(Const(false))
@@ -153,21 +154,45 @@ object Adapter extends FrontEnd {
         super.rewrite(s,as)
     }
 
+    def width(m: Manifest[_]) = {
+      if (m == manifest[Int]) 32
+      else if (m == manifest[Long]) 64
+      else ???
+    }
+
+    // From miniscala CPSOptimizer.scala
+    val leftNeutral: Set[(Any, String)] =
+      Set((0, "+"), (1, "*"), (~0, "&"), (0, "|"), (0, "^"))
+    val rightNeutral: Set[(String, Any)] =
+       Set(("+", 0), ("-", 0), ("*", 1), ("/", 1),
+           ("<<", 0), (">>", 0), (">>>", 0),
+           ("&", ~0), ("|", 0), ("^", 0))
+    val leftAbsorbing: Set[(Any, String)] =
+      Set((0, "*"), (0, "&"), (~0, "|"))
+    val rightAbsorbing: Set[(String, Any)] =
+      Set(("*", 0), ("&", 0), ("|", ~0))
+
+    val sameArgReduce: Map[String, Any] =
+      Map("-" -> 0, "/" -> 1, "%" -> 0, "^" -> 0,
+        "<=" -> true, ">=" -> true, "==" -> true,
+        "<" -> false, ">" -> false, "!=" -> false)
 
     override def reflect(s: String, as: Def*): Exp = (s,as.toList) match {
       case ("+", List(Const(a:Int),Const(b:Int))) => Const(a+b)
-      case ("+", List(Const(0),b:Exp)) => b
-      case ("+", List(a:Exp,Const(0))) => a
       case ("-", List(Const(a:Int),Const(b:Int))) => Const(a-b)
-      // case ("-", List(Const(0),b)) => b
-      case ("-", List(a:Exp,Const(0))) => a
       case ("*", List(Const(a:Int),Const(b:Int))) => Const(a*b)
-      case ("*", List(Const(1),b:Exp)) => b
-      case ("*", List(a:Exp,Const(1))) => a
-      case ("*", List(Const(0),b:Exp)) => Const(0)
-      case ("*", List(a:Exp,Const(0))) => Const(0)
       case ("/", List(Const(a:Int),Const(b:Int))) => Const(a/b)
       case ("%", List(Const(a:Int),Const(b:Int))) => Const(a%b)
+      case (">>>", List(Const(a: Int),Const(b:Int))) => Const(a >>> b)
+      case (">>>", List(Const(a: Long),Const(b:Int))) => Const(a >>> b)
+      case ("<<",  List(Const(a: Int),Const(b:Int))) => Const(a << b)
+      case ("<<", List(Const(a: Long),Const(b:Int))) => Const(a << b)
+      case (op, List(Const(x),b:Exp)) if leftNeutral((x, op)) => b
+      case (op, List(a:Exp,Const(x))) if rightNeutral((op, x)) => a
+      case (op, List(Const(x),b:Exp)) if leftAbsorbing((x, op)) => Const(x)
+      case (op, List(a:Exp,Const(x))) if rightAbsorbing((op, x)) => Const(x)
+      case (op, List(a,b)) if a == b && sameArgReduce.contains(op) => Const(sameArgReduce(op))
+      case (op, List(a,b)) if a == b && sameArgReduce.contains(op) => Const(sameArgReduce(op))
 
       // TBD: can't just rewrite, need to reflect block!
       // case ("?", List(Const(true),a:Block,b:Block)) => a
@@ -1968,11 +1993,16 @@ trait PrimitiveOps extends Base with OverloadHack {
     Wrap[Long](Adapter.g.reflect("&", Unwrap(lhs), Unwrap(rhs)))
   def long_binaryor(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long](Adapter.g.reflect("|", Unwrap(lhs), Unwrap(rhs)))
-  def long_binaryxor(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] = ???
+  def long_binaryxor(lhs: Rep[Long], rhs: Rep[Long])(implicit pos: SourceContext): Rep[Long] =
+    Wrap[Long](Adapter.g.reflect("^", Unwrap(lhs), Unwrap(rhs)))
   def long_shiftleft(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] =
     Wrap[Long](Adapter.g.reflect("<<", Unwrap(lhs), Unwrap(rhs)))
-  def long_shiftright_signed(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
-  def long_shiftright_unsigned(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = ???
+  def long_shiftright_signed(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] =
+    Wrap[Long](Adapter.g.reflect(">>", Unwrap(lhs), Unwrap(rhs)))
+  def long_shiftright_unsigned(lhs: Rep[Long], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Long] = Unwrap(rhs) match {
+    case Backend.Const(64) => unit(0L)
+    case _ => Wrap[Long](Adapter.g.reflect(">>>", Unwrap(lhs), Unwrap(rhs)))
+  }
 
   implicit def longToInt(x: Long) = x.toInt
   def long_to_int(lhs: Rep[Long])(implicit pos: SourceContext): Rep[Int] = cast_helper[Long,Int](lhs)

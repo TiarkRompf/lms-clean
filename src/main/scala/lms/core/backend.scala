@@ -172,7 +172,16 @@ class GraphBuilder {
   def reflectWrite(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys)
   def reflectMutable(s: String, as: Def*) = reflectEffect(s, as:_*)(Const("STORE"))()
 
-  // FIXME:
+  // FIXME: issues:
+  //  - write to STORE doens't really capture the meaning of free
+  //  - if one of the free is DCE, the "path" through write on store is broken thus free aren't generated:
+  //      x11: free(x1) // deps ...
+  //      x12: free(x2) // hdeps x11
+  //      x13: free(x3) // hdeps x12
+  //
+  //    x12 DCEed...
+  //      x11: free(x1) // deps ...  <- non reachable
+  //      x13: free(x3) // hdeps x12
   def reflectFree(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys, Const("STORE"))
   def reflectRealloc(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(Const("STORE"))(efKeys, Const("STORE"))
 
