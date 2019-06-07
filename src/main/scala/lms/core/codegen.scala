@@ -956,21 +956,17 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       val res = super.quote(x) // if escaped
       if (res.charAt(1) == '\\') res else "0x" + c.toHexString
     case Const(x: List[_]) => "{" + x.mkString(", ") + "}" // translate a Scala List literal to C List literal
-    case _ => super.quote(x)
+    case _ =>
+      super.quote(x)
   }
 
   // Remap auxiliary function C specific
   def primitive(rawType: String): String = rawType match {
     case "Unit" => "void"
     case "Boolean" => "bool"
-    case "Char" => "char"
-    case "Int" => "int"
-    case "Double" => "double"
-    case "Float" => "float"
-    case "Long" => "int"
     case "java.lang.String" => "char*"
     // case "Nothing" | "Any" => ???
-    case _ => rawType
+    case _ => rawType.toLowerCase
   }
   def remapUnsigned(m: Manifest[_]): String = "unsigned " + remap(m)
   def array(innerType: String) = innerType + "*"
