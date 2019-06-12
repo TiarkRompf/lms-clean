@@ -24,6 +24,7 @@ object Backend {
   })
   implicit val orderingSym: Ordering[Sym] = Ordering.by(_.n)
 
+  val STORE = Const("STORE")
   // A list of effect keys (mutable vars, ...) and
   // dependencies (previous writes, ...)
   //
@@ -47,7 +48,7 @@ object Backend {
     } else ""
 
 
-    lazy val hasSimpleEffect = wkeys.exists(key => key.isInstanceOf[Const] && key != Const("STORE"))
+    lazy val hasSimpleEffect = wkeys.exists(key => key.isInstanceOf[Const] && key != STORE)
     lazy val isPure = sdeps.isEmpty && hdeps.isEmpty && rkeys.isEmpty && wkeys.isEmpty
 
     def filter(f: Sym => Boolean) = {
@@ -170,7 +171,7 @@ class GraphBuilder {
 
   def reflectRead(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(efKeys)()
   def reflectWrite(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys)
-  def reflectMutable(s: String, as: Def*) = reflectEffect(s, as:_*)(Const("STORE"))()
+  def reflectMutable(s: String, as: Def*) = reflectEffect(s, as:_*)(STORE)()
 
   // FIXME: issues:
   //  - write to STORE doens't really capture the meaning of free
@@ -182,8 +183,8 @@ class GraphBuilder {
   //    x12 DCEed...
   //      x11: free(x1) // deps ...  <- non reachable
   //      x13: free(x3) // hdeps x12
-  def reflectFree(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys, Const("STORE"))
-  def reflectRealloc(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(Const("STORE"))(efKeys, Const("STORE"))
+  def reflectFree(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys, STORE)
+  def reflectRealloc(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(STORE)(efKeys, STORE)
 
 
   def latest(e1: Exp) = if (curLocalDefs(e1)) e1.asInstanceOf[Sym] else curBlock
@@ -203,6 +204,7 @@ class GraphBuilder {
     } finally { reflectHere = saveReflectHere }
   }
 
+  def isCurrentValue(src: Exp, value: Sym) = !curEffects.get(src).filter({ case (_, lrs) => lrs contains value }).isEmpty
   def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
     // rewrite?
     rewrite(s,as.toList) match {
@@ -220,30 +222,41 @@ class GraphBuilder {
 
         // effects or pure? // FIXME: only reads?
         if (reads.nonEmpty || writes.nonEmpty) {
-          val sm = Sym(fresh)
-          // gather effect dependencies
-          val prevHard = new mutable.ListBuffer[Sym]
-          val prevSoft = writes.flatMap(e => curEffects.get(e) match {
-            case Some((lw, lr)) => prevHard += latest(lw); if (!reflectHere) lr else Nil
-            case _ => prevHard += latest(e); Nil
-          })
-          if (reifyHere) prevHard += curBlock
-          prevHard ++= reads.map(getLastWrite(_))
+          lazy val res = {
+            val sm = Sym(fresh)
+            // gather effect dependencies
+            val prevHard = new mutable.ListBuffer[Sym]
+            val prevSoft = writes.flatMap(e => curEffects.get(e) match {
+              case Some((lw, lr)) => prevHard += latest(lw); if (!reflectHere) lr else Nil
+              case _ => prevHard += latest(e); Nil
+            })
+            if (reifyHere) prevHard += curBlock
+            prevHard ++= reads.map(getLastWrite(_))
 
-          // prevSoft --= prevHard
-          val summary = EffectSummary(prevSoft.toSet, prevHard.toSet, reads, writes)
-          val res = reflect(sm, s, as:_*)(summary)
-          for (key <- reads) {
-            val (lw, lrs) = curEffects.getOrElse(key, (curBlock, Nil)) // FIXME really?
-            curEffects += key -> (lw, res::lrs)
-            curLocalReads += key
-            if (key == Const("STORE")) curEffects += res -> (res, Nil) // Needed to notify res was defined locally
-          }                                                            // Do we want it?
-          for (key <- writes) {
-            curEffects += key -> (res, Nil)
-            curLocalWrites += key
+            // prevSoft --= prevHard
+            val summary = EffectSummary(prevSoft.toSet, prevHard.toSet, reads, writes)
+            val res = reflect(sm, s, as:_*)(summary)
+            for (key <- reads) {
+              val (lw, lrs) = curEffects.getOrElse(key, (curBlock, Nil)) // FIXME really?
+              curEffects += key -> (lw, res::lrs)
+              curLocalReads += key
+              if (key == STORE) curEffects += res -> (res, Nil) // Needed to notify res was defined locally
+            }                                                            // Do we want it?
+            for (key <- writes) {
+              curEffects += key -> (res, Nil)
+              curLocalWrites += key
+            }
+            res
           }
-          res
+
+          // if (writes.isEmpty) // cse for reads effects
+          //   findDefinition(s,as).filter({ n =>
+          //     val curValue = reads.forall(src => src != STORE && isCurrentValue(src, n.n))
+          //     // if (curValue) System.out.println(s"$s $as -- DCE with ${n.n} (${reads.mkString(", ")})")
+          //     curValue
+          //   }).map(_.n).getOrElse(res)
+          // else
+            res
         } else {
           // cse? never for effectful stm
           findDefinition(s,as) match {

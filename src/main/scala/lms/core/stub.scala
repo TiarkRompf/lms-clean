@@ -91,12 +91,52 @@ object Adapter extends FrontEnd {
           case a => Some(reflect("staticData", Const(a)))
         }
 
+      // FIXME: Can we generalize that for mutable objects?
       // as(i) = as(i) => ()   side condition: no write in-between!
       case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1: Exp, i1))))
         if as == as1 && i == i1 && {
           // rs is part of the list of read since the last write
-          curEffects.get(as).map { case (_, lrs) => lrs contains rs.asInstanceOf[Sym] } getOrElse(false) } =>
+          !curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isEmpty } =>
         Some(Const(()))
+
+      // TODO: should be handle by the case below. However it doesn't because of aliasing issues!
+      // (x + idx)->i = (x + idx)->i => ()    side condition: no write in-between! (on x)
+      case ("reffield_set", List(Def("array_slice", (as: Exp)::idx::_), i, rs @ Def("reffield_get", List(Def("array_slice", (as1: Exp)::idx1::_), i1)))) =>
+        // System.out.println(s">>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
+        if (as == as1 && idx == idx1 && i == i1 && {
+          // rs is part of the list of read since the last write
+          // System.out.println(s">>> ${curEffects.get(as)}")
+          // System.out.println(s"  |->>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
+          !curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isEmpty })
+        Some(Const(()))
+      else None
+
+      // x-> i = x->i => ()    side condition: no write in-between!
+      case ("reffield_set", List(as:Exp, i, rs @ Def("reffield_get", List(as1: Exp, i1)))) =>
+        // System.out.println(s">>> $as -> $i == $as1 -> $i1")
+        if (as == as1 && i == i1 && {
+          // rs is part of the list of read since the last write
+          !curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isEmpty })
+        Some(Const(()))
+      else
+        None
+
+      // x = x => ()    side condition: no write in-between!
+      case ("var_set", List(as:Exp, rs @ Def("var_get", List(as1: Exp)))) =>
+        // System.out.println(s">>> $as -> $i == $as1 -> $i1")
+        if (as == as1 && {
+          // rs is part of the list of read since the last write
+          !curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isEmpty })
+        Some(Const(()))
+      else
+        None
+
+      // [var] x = y; ....; x => [var] x = y; ....; y    side condition: no write in-between!
+      case ("var_get", List(as:Exp)) =>
+        curEffects.get(as).map({ case (lw, _) => findDefinition(lw) collect {
+          case Node(_, "var_new", List(init: Exp), _) => init
+          case Node(_, "var_set", List(_, value: Exp), _) => value
+        }}).getOrElse(None)
 
       case ("array_slice", List(as: Exp, Const(0), Const(-1))) => Some(as)
       case ("array_length", List(Def("NewArray", Const(n)::_))) =>
