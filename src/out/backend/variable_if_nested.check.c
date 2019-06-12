@@ -8,7 +8,7 @@ Emitting C Generated Code
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = 1;
-  if (x0 > 10) if (x0 < 20) x1 = x1 + 1;
+  if (x0 > 10) if (x0 < 20) x1 = 2;
   printf("%d\n", x1);
 }
 /*****************************************

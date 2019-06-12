@@ -5,21 +5,19 @@ class Snippet extends (Int => Int) {
       val x5 = x4 * 2
       x5
     }
-    val x18 = {
-      var x8 = x2
-      def x15(x10: Int): Int = {
-        val x11 = x8
-        val x12 = x6(x11)
-        val x13 = x6(x12)
-        val x14 = x10 + x13
-        x14
-      }
-      val x16 = x15(x1)
-      val x17 = x15(x16)
-      x17
+    val x7 = x6(x2)
+    val x8 = x6(x7)
+    def x13(x11: Int): Int = {
+      val x12 = x11 + x8
+      x12
     }
-    val x19 = x18 + 5
-    x19 /*exit: x19 */
+    val x16 = {
+      val x14 = x13(x1)
+      val x15 = x13(x14)
+      x15
+    }
+    val x17 = x16 + 5
+    x17 /*exit: x17 */
   }
 }
 // output:

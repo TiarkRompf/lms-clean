@@ -6,27 +6,25 @@ class Snippet extends (Int => Int) {
       val x7 = x3(x6)
       x7
     }
-    val x26 = {
-      var x10 = x2
-      def x23(x12: Int): Int = {
-        val x13 = x10
-        def x19(x17: Int): Int = {
-          val x18 = x12 + x17
-          x18
-        }
-        def x21(x15: Int): Int = {
-          val x20 = x8(x19, x15)
-          x20
-        }
-        val x22 = x8(x21, x13)
-        x22
+    def x23(x12: Int): Int = {
+      def x17(x15: Int): Int = {
+        val x16 = x15 + x12
+        x16
       }
-      val x24 = x23(x1)
-      val x25 = x23(x24)
-      x25
+      val x20 = {
+        val x18 = x17(x1)
+        val x19 = x17(x18)
+        x19
+      }
+      val x21 = x20 + 5
+      x21 /*exit: x21 */
     }
-    val x27 = x26 + 5
-    x27 /*exit: x27 */
+    def x25(x10: Int): Int = {
+      val x24 = x8(x23, x10)
+      x24
+    }
+    val x26 = x8(x25, x2)
+    x26
   }
 }
 // output:

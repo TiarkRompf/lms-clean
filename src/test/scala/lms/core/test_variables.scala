@@ -185,9 +185,11 @@ class VariablesTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]) = {
         var x = 1
         printf("%d\n", x)
-        if (x > 0)
+        if (arg > 0)
           x += 1
-        else printf("%d\n", x)
+        else
+          x += 2
+        printf("%d\n", x)
       }
     }
     check("variable_write_after_read", driver.code, "c")
@@ -199,7 +201,7 @@ class VariablesTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]) = {
         var x = 1
         val y: Rep[Int] = x
-        if (x < 50) {
+        if (arg < 50) {
           while (x < 10) {
             printf("%d\n", x)
             x += 1

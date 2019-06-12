@@ -1,6 +1,6 @@
 class Snippet extends (Int => Int) {
   def apply(x1: Int): Int = {
-    val x30 = {
+    val x29 = {
       var x3 = 0
       var x4 = 0
       def x16(x11: Int): Int = {
@@ -13,7 +13,7 @@ class Snippet extends (Int => Int) {
       def x5(): Int = {
         val x7 = x3
         val x8 = x7 < 5
-        val x28 = if (x8) {
+        val x27 = if (x8) {
           val x17 = x4
           val x18 = x16(x17)
           val x19 = x16(x1)
@@ -22,19 +22,18 @@ class Snippet extends (Int => Int) {
           val x22 = x16(x21)
           val x23 = x20 + x22
           x4 = x23
-          val x25 = x4
-          x25
+          x23
         } else {
-          val x27 = x4
-          x27
+          val x26 = x4
+          x26
         }
-        x28
+        x27
       }
-      val x29 = x5()
-      x29
+      val x28 = x5()
+      x28
     }
-    val x31 = x30 + 4
-    x31 /*exit: x31 */
+    val x30 = x29 + 4
+    x30 /*exit: x30 */
   }
 }
 // output:

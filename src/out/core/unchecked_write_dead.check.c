@@ -8,10 +8,9 @@ Emitting C Generated Code
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = x0;
-  int x2 = x1;
   x1 = 5;
   foo(&x1);
-  printf("%d\n", x2);
+  printf("%d\n", x0);
 }
 /*****************************************
 End of C Generated Code

@@ -105,7 +105,8 @@ class UncheckedTest extends TutorialFunSuite {
         val xv: Rep[Int] = x
         val yv: Rep[Int] = y
         val z = uncheckedPure[Int]("foo(",x,", ",y,")")
-        printf("%d %d\n", xv, yv)
+        printf("%d\n", xv)
+        printf("%d\n", yv)
       }
     }
     check("uncheckedPure_vars_dead", driver.code, "c")

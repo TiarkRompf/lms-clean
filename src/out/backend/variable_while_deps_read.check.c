@@ -8,18 +8,15 @@ Emitting C Generated Code
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = 1;
-  if (x1 < 50) {
-    int x2 = x1;
+  if (x0 < 50) {
     while (x1 < 10) {
       printf("%d\n", x1);
       x1 = x1 + 1;
     }
-    printf("%d\n", x2);
+    printf("%d\n", 1);
   }
-  int x3 = x1;
-  x1 = x1 + 1;
-  printf("%d\n", x3);
   printf("%d\n", x1);
+  printf("%d\n", x1 + 1);
 }
 /*****************************************
 End of C Generated Code

@@ -7,9 +7,8 @@ Emitting C Generated Code
 #include <stdbool.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  int x1 = x0;
-  int x2 = x0 + 5;
-  printf("%d %d\n", x1, x2);
+  printf("%d\n", x0);
+  printf("%d\n", x0 + 5);
 }
 /*****************************************
 End of C Generated Code
