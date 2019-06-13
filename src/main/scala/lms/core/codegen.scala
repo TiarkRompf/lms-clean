@@ -1221,11 +1221,6 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       // emit(s"$rhs;")
   }
 
-  def compatibleType(m: Manifest[_], n: Manifest[_]) = {
-    m == manifest[Char] && (n == manifest[Long] || n == manifest[Int] || n == manifest[Short]) || m == manifest[Short] && (n == manifest[Long] || n == manifest[Int]) || m == manifest[Int] && n == manifest[Long]
-    // || m == manifest[Float] && n == manifest[Double]
-  }
-
   override def shallow(n: Node): Unit = n match {
     case Node(s, ">>>", List(a, b), _) =>
       emit("(("); emit(remapUnsigned(typeMap.getOrElse(s, manifest[Unknown]))); emit(") "); shallow1(a, precedence("cast") + 1); emit(") >> "); shallow1(b, precedence(">>") + 1)
@@ -1234,18 +1229,14 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       registerLibrary("-lm")
       emit(s"$op("); shallow(a); emit(")")
     case Node(s, "cast", a::_, _) =>
+      // NOTE: removing upcast can lead to errors because if inlining:
+      // int32_t x = ...
+      // int64_t hash = (x << 6) + ...
+      // is different from
+      // int32_t x = ...
+      // int64_t hash = ((int64_t)x << 6) + ...
       val tpe = typeMap.getOrElse(s, manifest[Unknown])
-      a match {// FIXME should it be there?
-        case Const(n) => ??? // Constant cast should be resolved before
-        case v@Sym(_) if compatibleType(typeMap.getOrElse(v, manifest[Unknown]), tpe) =>
-          shallow1(a, precedence("cast")) // FIXME: can we be smarter about parenthesis? Issue require to remember the precedence of the outer node
-                                          // x = x * 10 + (y - '0')   // useless parenthesis
-                                          // x = x + (y == z ? 1 : 0) // required
-        case b@Block(_, res, _, _) if compatibleType(typeMap.getOrElse(res, manifest[Unknown]), tpe) =>
-          ??? //  shallow(a) FIXME: quoteBlockP??
-        case _ =>
-          emit(s"(${remap(tpe)})"); shallow1(a, precedence("cast"))
-      }
+      emit(s"(${remap(tpe)})"); shallow1(a, precedence("cast"))
     case Node(s,"String.charAt",List(a,i),_) =>
       shallow1(a); emit("["); shallow(i); emit("]")
     case Node(s,"array_get",List(a,i),_) =>
