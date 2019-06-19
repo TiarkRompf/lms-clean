@@ -96,7 +96,7 @@ object Adapter extends FrontEnd {
       case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1: Exp, i1))))
         if as == as1 && i == i1 && {
           // rs is part of the list of read since the last write
-          !curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isEmpty } =>
+          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined } =>
         Some(Const(()))
 
       // TODO: should be handle by the case below. However it doesn't because of aliasing issues!
@@ -107,7 +107,7 @@ object Adapter extends FrontEnd {
           // rs is part of the list of read since the last write
           // System.out.println(s">>> ${curEffects.get(as)}")
           // System.out.println(s"  |->>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
-          !curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isEmpty })
+          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
         Some(Const(()))
       else None
 
@@ -116,7 +116,7 @@ object Adapter extends FrontEnd {
         // System.out.println(s">>> $as -> $i == $as1 -> $i1")
         if (as == as1 && i == i1 && {
           // rs is part of the list of read since the last write
-          !curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isEmpty })
+          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
         Some(Const(()))
       else
         None
@@ -126,17 +126,17 @@ object Adapter extends FrontEnd {
         // System.out.println(s">>> $as -> $i == $as1 -> $i1")
         if (as == as1 && {
           // rs is part of the list of read since the last write
-          !curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isEmpty })
+          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
         Some(Const(()))
       else
         None
 
       // [var] x = y; ....; x => [var] x = y; ....; y    side condition: no write in-between!
       case ("var_get", List(as:Exp)) =>
-        curEffects.get(as).map({ case (lw, _) => findDefinition(lw) collect {
+        curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw) collect {
           case Node(_, "var_new", List(init: Exp), _) => init
           case Node(_, "var_set", List(_, value: Exp), _) => value
-        }}).getOrElse(None)
+        }})
 
       case ("array_slice", List(as: Exp, Const(0), Const(-1))) => Some(as)
       case ("array_length", List(Def("NewArray", Const(n)::_))) =>
@@ -194,12 +194,6 @@ object Adapter extends FrontEnd {
         super.rewrite(s,as)
     }
 
-    def width(m: Manifest[_]) = {
-      if (m == manifest[Int]) 32
-      else if (m == manifest[Long]) 64
-      else ???
-    }
-
     // From miniscala CPSOptimizer.scala
     val leftNeutral: Set[(Any, String)] =
       Set((0, "+"), (1, "*"), (~0, "&"), (0, "|"), (0, "^"))
@@ -231,7 +225,6 @@ object Adapter extends FrontEnd {
       case (op, List(a:Exp,Const(x))) if rightNeutral((op, x)) => a
       case (op, List(Const(x),b:Exp)) if leftAbsorbing((x, op)) => Const(x)
       case (op, List(a:Exp,Const(x))) if rightAbsorbing((op, x)) => Const(x)
-      case (op, List(a,b)) if a == b && sameArgReduce.contains(op) => Const(sameArgReduce(op))
       case (op, List(a,b)) if a == b && sameArgReduce.contains(op) => Const(sameArgReduce(op))
 
       // TBD: can't just rewrite, need to reflect block!
