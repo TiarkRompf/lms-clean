@@ -24,6 +24,14 @@ object Backend {
   })
   implicit val orderingSym: Ordering[Sym] = Ordering.by(_.n)
 
+  val nextName = new mutable.HashMap[String,Int]()
+  final def unstableEffect(pref: String) = { // Const(pref + nextName.updateWith(pref) { v => v.map(_ + 1) orElse Some(0) } get) // 2.13!!
+    val i = nextName.getOrElseUpdate(pref, 0)
+    try { Const(pref + i) } finally { nextName(pref) = i + 1 }
+  }
+
+
+  final def UNSAFE = unstableEffect("UNSAFE")
   val STORE = Const("STORE")
   // A list of effect keys (mutable vars, ...) and
   // dependencies (previous writes, ...)
@@ -185,6 +193,8 @@ class GraphBuilder {
   //      x13: free(x3) // hdeps x12
   def reflectFree(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys, STORE)
   def reflectRealloc(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(STORE)(efKeys, STORE)
+
+  def reflectUnsafe(s: String, as: Def*) = reflectEffect(s, as:_*)(UNSAFE)()
 
 
   def latest(e1: Exp) = if (curLocalDefs(e1)) e1.asInstanceOf[Sym] else curBlock

@@ -837,12 +837,17 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // could we use funTable instead?
   val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
   def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
-    val can = canonicalize(f)
-    topLevelFunctions.getOrElseUpdate(can, {
+    lazy val ff = {
       val fn = Backend.Sym(Adapter.g.fresh)
       Adapter.g.reflect(fn,"λ", Adapter.g.reify(arity, gf), Backend.Const(0))()
       fn
-    })
+    }
+    try {
+      val can = canonicalize(f)
+      topLevelFunctions.getOrElseUpdate(can, ff)
+    } catch {
+      case _: Throwable => ff
+    }
   }
   def topFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
     Wrap[A=>B](__topFun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
