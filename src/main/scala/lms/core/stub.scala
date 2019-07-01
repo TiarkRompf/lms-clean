@@ -1022,7 +1022,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def charAt(i: Rep[Int]): Rep[Char] = Wrap[Char](Adapter.g.reflect("String.charAt", Unwrap(lhs), Unwrap(i))) // XXX: may fail! effect?
     def apply(i: Rep[Int]): Rep[Char] = charAt(i)
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.length", Unwrap(lhs)))
-    def substring(idx: Rep[Int], end: Rep[Int]): Rep[Int] = Wrap[Int](Adapter.g.reflect("String.slice", Unwrap(lhs), Unwrap(idx), Unwrap(end))) // FIXME: View
+    def substring(idx: Rep[Int], end: Rep[Int]): Rep[String] = Wrap[String](Adapter.g.reflect("String.slice", Unwrap(lhs), Unwrap(idx), Unwrap(end))) // FIXME: View
     def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.toInt", Unwrap(lhs))) // XXX: may fail!
     def toDouble: Rep[Double] = Wrap[Double](Adapter.g.reflect("String.toDouble", Unwrap(lhs))) // XXX: may fail!
   }
