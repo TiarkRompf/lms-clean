@@ -221,6 +221,7 @@ object Adapter extends FrontEnd {
       case (">>>", List(Const(a: Long),Const(b:Int))) => Const(a >>> b)
       case ("<<",  List(Const(a: Int),Const(b:Int))) => Const(a << b)
       case ("<<", List(Const(a: Long),Const(b:Int))) => Const(a << b)
+      case ("&", List(Const(a: Long),Const(b:Long))) => Const(a & b)
       case (op, List(Const(x),b:Exp)) if leftNeutral((x, op)) => b
       case (op, List(a:Exp,Const(x))) if rightNeutral((op, x)) => a
       case (op, List(Const(x),b:Exp)) if leftAbsorbing((x, op)) => Const(x)
@@ -756,7 +757,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     // }
     def ||(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
       __ifThenElse(lhs, unit(true), rhs)
-    def ^(rhs: Rep[Boolean]) = Wrap[Boolean](Adapter.g.reflect("^", Unwrap(lhs), Unwrap(rhs)))
+    def ^(rhs: Rep[Boolean]) = Wrap[Boolean](Adapter.g.reflect("!=", Unwrap(lhs), Unwrap(rhs)))
   }
 
   // shift/reset
@@ -1021,6 +1022,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def charAt(i: Rep[Int]): Rep[Char] = Wrap[Char](Adapter.g.reflect("String.charAt", Unwrap(lhs), Unwrap(i))) // XXX: may fail! effect?
     def apply(i: Rep[Int]): Rep[Char] = charAt(i)
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.length", Unwrap(lhs)))
+    def substring(idx: Rep[Int], end: Rep[Int]): Rep[Int] = Wrap[Int](Adapter.g.reflect("String.slice", Unwrap(lhs), Unwrap(idx), Unwrap(end))) // FIXME: View
     def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.toInt", Unwrap(lhs))) // XXX: may fail!
     def toDouble: Rep[Double] = Wrap[Double](Adapter.g.reflect("String.toDouble", Unwrap(lhs))) // XXX: may fail!
   }

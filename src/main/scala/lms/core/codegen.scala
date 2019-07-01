@@ -1056,7 +1056,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case "ref_new" => 13 // & address of
     case "reffield_get" => 14 // -> pointer member access
     // type casting is lower in precedence?
-    case "NewArray" => 19 // there might be type conversion before array access, which should be put in parenthesis
+    case "NewArray" | "mmap" => 19 // there might be type conversion before array access, which should be put in parenthesis
     case _ if op.startsWith("unchecked") => 0 // force parenthesis if nested: 3 * unchecked(5 + 4)
     case _ => 20
   }
@@ -1273,6 +1273,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"($tpe*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof($tpe))")
+    case n @ Node(s, "mmap" ,List(len, fd), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit(s"($tpe*)mmap(0, "); shallow(len); emit(", PROT_READ, MAP_FILE | MAP_SHARED, "); shallow(fd); emit(", 0)")
     case n @ Node(s, "NewArray" ,List(x, Const(0)), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"($tpe*)calloc("); shallow(x); emit(s", sizeof($tpe))")
@@ -1304,6 +1307,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
       registerHeader("<string.h>")
       (op.substring(7), args) match {
+        case ("slice", List(lhs, idx, _)) => shallow1(lhs, precedence("+")); emit(" + "); shallow1(idx, precedence("+") + 1)
         case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
         case ("toDouble", List(rhs)) => emit("atof("); shallow(rhs); emit(")")
         case ("toInt", List(rhs)) => emit("atoi("); shallow(rhs); emit(")")
