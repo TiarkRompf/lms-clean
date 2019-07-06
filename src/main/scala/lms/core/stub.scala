@@ -1422,6 +1422,8 @@ trait PrimitiveOps extends Base with OverloadHack {
   implicit def varToPrimitiveMathOpsFloatOpsCls(x: Var[Float])(implicit __pos: SourceContext) = new PrimitiveMathOpsFloatOpsCls(readVar(x))(__pos)
 
   class PrimitiveMathOpsFloatOpsCls(val self: Rep[Float])(implicit __pos: SourceContext) {
+    def unary_- = Wrap[Float](Adapter.g.reflect("-", Unwrap(self)))
+
     def +(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded41) = { double_plus(self.toDouble, unit(rhs)) }
     def -(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded41) = { double_minus(self.toDouble, unit(rhs)) }
     def *(rhs: Double)(implicit __pos: SourceContext,__imp1: Overloaded41) = { double_times(self.toDouble, unit(rhs)) }
