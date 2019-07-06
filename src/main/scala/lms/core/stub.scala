@@ -138,6 +138,12 @@ object Adapter extends FrontEnd {
           case Node(_, "var_set", List(_, value: Exp), _) => value
         }})
 
+      // x[i] = y; ....; x => x[i] = y; ....; y    side condition: no write in-between!
+      case ("array_get", List(as:Exp,i:Exp)) =>
+        curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw) collect {
+          case Node(_, "array_set", List(_, i2: Exp, value: Exp), _) if i == i2 => value
+        }})
+
       case ("array_slice", List(as: Exp, Const(0), Const(-1))) => Some(as)
       case ("array_length", List(Def("NewArray", Const(n)::_))) =>
         Some(Const(n))
