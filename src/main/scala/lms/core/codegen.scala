@@ -1343,7 +1343,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s, "NewArray", List(x, Const(v)), _) if v != 0 =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"long ${quote(s)}_len = "); shallow1(x, precedence("*")); emitln(s" * sizeof($tpe);")
-      emitln(s"$tpe ${quote(s)} = ($tpe*)malloc(${quote(s)}_len)")
+      emitln(s"$tpe* ${quote(s)} = ($tpe*)malloc(${quote(s)}_len)")
       emitln(s"memset(${quote(s)}, $v, ${quote(s)}_len);")
     // DCE: FIXME:
     // (a) check that args have no side-effects
