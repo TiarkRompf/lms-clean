@@ -16,7 +16,7 @@ object Backend {
     override def toString = s"x$n"
   }
   case class Const(x: Any) extends Exp {
-    override def toString = x.toString
+    override def toString = if (x != null) x.toString else "null"
   }
   implicit val orderingExp: Ordering[Exp] = Ordering.by(e => e match {
     case Const(s) => -s.##.abs
