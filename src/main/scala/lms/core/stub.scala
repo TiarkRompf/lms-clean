@@ -1043,11 +1043,11 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     } mkString("")
     var effs = Set[Backend.Exp]()
     val args = xs collect {
-      case e: Sym[Any] =>
+      case e: Exp[Any] =>
         val res = Unwrap(e)
-        effs += res
+        if (res.isInstanceOf[Backend.Sym])
+          effs += res
         res
-      case e: Exp[Any] => Unwrap(e)
       case v: Var[Any] =>
         val res = UnwrapV(v)
         effs += res
