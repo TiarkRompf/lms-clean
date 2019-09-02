@@ -721,6 +721,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = EffectView[Array[A]](Wrap[Array[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))), x) // (Unwrap(x), Adapter.STORE)())
     def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
     def copyToArray(arr: Rep[Array[A]], start: Rep[Int], len: Rep[Int]) = Adapter.g.reflectEffect("array_copyTo", Unwrap(x), Unwrap(arr), Unwrap(start), Unwrap(len))(Unwrap(x))(Unwrap(arr))
+    def copyToLongArray(arr: Rep[LongArray[A]], start: Rep[Long], len: Rep[Int]) = Adapter.g.reflectEffect("array_copyTo", Unwrap(x), Unwrap(arr), Unwrap(start), Unwrap(len))(Unwrap(x))(Unwrap(arr))
   }
 
   trait LongArray[+T]
@@ -1898,7 +1899,7 @@ trait PrimitiveOps extends Base with OverloadHack {
   }
 
   def obj_integer_parseInt(s: Rep[String])(implicit pos: SourceContext): Rep[Int] = ???
-  def obj_int_max_value(implicit pos: SourceContext): Rep[Int] = ???
+  def obj_int_max_value(implicit pos: SourceContext): Rep[Int] = 2147483647
   def obj_int_min_value(implicit pos: SourceContext): Rep[Int] = ???
   def int_plus(lhs: Rep[Int], rhs: Rep[Int])(implicit pos: SourceContext): Rep[Int] =
     Wrap[Int]((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x)
