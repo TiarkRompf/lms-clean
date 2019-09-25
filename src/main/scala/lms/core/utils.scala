@@ -3,8 +3,12 @@ package lms.core
 import java.io._
 
 object utils {
-  lazy val profileStream = new PrintStream(new FileOutputStream(new File(s"timing.log")))
-  lazy val profileInvStream = new PrintStream(new FileOutputStream(new File(s"timingInv.log")))
+  lazy val defaultProfileStream = new PrintStream(new FileOutputStream(new File(s"timing.log")))
+  lazy val defaultProfileInvStream = new PrintStream(new FileOutputStream(new File(s"timingInv.log")))
+  var customProfileStream: Option[PrintStream] = None
+  var customProfileInvStream: Option[PrintStream] = None
+  def profileStream = customProfileStream.getOrElse(defaultProfileStream)
+  def profileInvStream = customProfileInvStream.getOrElse(defaultProfileInvStream)
   var scope = List[String]()
   var timeInSub = 0L
 
@@ -13,17 +17,31 @@ object utils {
     val saveTime = timeInSub
     scope = key::scope
     timeInSub = 0
-    try a finally { 
+    try a finally {
       val timeElapsed = (System.nanoTime - start) / 1000
       val timeHere = timeElapsed - timeInSub
 
       profileStream.println(s"${scope.reverse.mkString(";")} $timeHere")
       profileInvStream.println(s"${scope.mkString(";")} $timeHere")
 
-      scope = scope.tail; 
+      scope = scope.tail;
       timeInSub = saveTime
       timeInSub += timeElapsed // account for time spent here in parent
     }
+  }
+  def withTiming[T](profileStream: PrintStream, profileInvStream: PrintStream)(f: => T): T = {
+    val prevProfileStream = customProfileStream
+    val prevProfileInvStream = customProfileInvStream
+
+    customProfileStream = Some(profileStream)
+    customProfileInvStream = Some(profileInvStream)
+
+    val res = f
+
+    customProfileStream = prevProfileStream
+    customProfileInvStream = prevProfileInvStream
+
+    res
   }
   def captureOut(func: => Any): String = {
     val source = new java.io.ByteArrayOutputStream()
