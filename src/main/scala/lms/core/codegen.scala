@@ -354,6 +354,9 @@ class CompactScalaCodeGen extends CompactTraverser {
       def typed(s:String) = if (argType) s+": Int" else s //FIXME hardcoded
       def paren(s:String) = if (argType) "("+s+")" else s
       quoteBlock(s"${paren(typed(quote(x)))}$eff => ")(traverse(y))
+    } else if (y.in.length == 2) {
+      val List(x1, x2) = y.in // FIXME hardcoded for tutorial
+      quoteBlock(s"(${quote(x1)}: Int, ${quote(x2)}: scala.lms.tutorial.StringScanner)$eff => ")(traverse(y))
     } else (???) //FIXME
   }
   def noquoteBlock(f: => Unit) = {
