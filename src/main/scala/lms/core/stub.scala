@@ -222,6 +222,8 @@ object Adapter extends FrontEnd {
       case ("-", List(Const(a:Int),Const(b:Int))) => Const(a-b)
       case ("*", List(Const(a:Int),Const(b:Int))) => Const(a*b)
       case ("/", List(Const(a:Int),Const(b:Int))) => Const(a/b)
+      case ("/", List(Const(a:Long),Const(b:Long))) => Const(a/b)
+      case ("/", List(Const(a:Double),Const(b:Double))) => Const(a/b)
       case ("%", List(Const(a:Int),Const(b:Int))) => Const(a%b)
       case (">>>", List(Const(a: Int),Const(b:Int))) => Const(a >>> b)
       case (">>>", List(Const(a: Long),Const(b:Int))) => Const(a >>> b)
