@@ -724,6 +724,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
     def copyToArray(arr: Rep[Array[A]], start: Rep[Int], len: Rep[Int]) = Adapter.g.reflectEffect("array_copyTo", Unwrap(x), Unwrap(arr), Unwrap(start), Unwrap(len))(Unwrap(x))(Unwrap(arr))
     def copyToLongArray(arr: Rep[LongArray[A]], start: Rep[Long], len: Rep[Int]) = Adapter.g.reflectEffect("array_copyTo", Unwrap(x), Unwrap(arr), Unwrap(start), Unwrap(len))(Unwrap(x))(Unwrap(arr))
+    // FIXME: currently copy!!
+    def sort(size: Rep[Int] /* , sort: (Rep[A], Rep[A]) => Rep[Int] */) = Wrap[Array[A]](Adapter.g.reflectMutable("array_sort_scala", Unwrap(x), Unwrap(size))) //, Adapter.g.reify((x, y) => Unwrap(sort(Wrap[A](x), Wrap[A](y)))))(Unwrap(x))(Unwrap(x))
   }
 
   trait LongArray[+T]

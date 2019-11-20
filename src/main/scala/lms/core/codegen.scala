@@ -829,6 +829,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
         emit(")")
       }
     case n @ Node(s, "timestamp", _, _) => emitln(s"System.nanoTime / 1000L")
+    case n @ Node(s, "array_sort_scala", List(arr, l), _) => shallow1(arr); emit(".slice(0, "); shallow1(l); emitln(").sorted")
 
     case _ => super.shallow(n)
   }

@@ -271,6 +271,7 @@ class CompactTraverser extends Traverser {
     case Node(s, "Array", _, _) => false
     case Node(s, "String.##", List(_, _), _) => false
     case Node(s, "comment", _, _) => false
+    case Node(s, "array_sort_scala", _, _) => true
     case _ => true
   }
 
