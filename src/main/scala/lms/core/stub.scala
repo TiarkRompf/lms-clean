@@ -30,18 +30,25 @@ object Adapter extends FrontEnd {
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
 
-  def emitCommon1(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) =
-    emitCommon(name, cg, stream, verbose, alt, eff)(m1, m2)(g.reify(prog))
-  def emitCommon2(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: (Exp, Exp) => Exp) =
+  def emitCommon1(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
+                  verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
+                 (m1: Manifest[_], m2: Manifest[_])(prog: Exp => Exp) =
     emitCommon(name, cg, stream, verbose, alt, eff)(m1, m2)(g.reify(prog))
 
-  def emitCommon(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream, verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)(m1:Manifest[_],m2:Manifest[_])(prog: => Block) = {
+  def emitCommon2(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
+                  verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
+                 (m1: Manifest[_], m2: Manifest[_])(prog: (Exp, Exp) => Exp) =
+    emitCommon(name, cg, stream, verbose, alt, eff)(m1, m2)(g.reify(prog))
+
+  def emitCommon(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
+                 verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
+                (m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
     typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
     funTable = Nil
 
     var g = time("staging") { program(prog) }
 
-    def extra() =  if (verbose) utils.captureOut {
+    def extra() = if (verbose) utils.captureOut {
       println("// Raw:")
       g.nodes.foreach(println)
 
@@ -104,32 +111,32 @@ object Adapter extends FrontEnd {
       case ("reffield_set", List(Def("array_slice", (as: Exp)::idx::_), i, rs @ Def("reffield_get", List(Def("array_slice", (as1: Exp)::idx1::_), i1)))) =>
         // System.out.println(s">>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
         if (as == as1 && idx == idx1 && i == i1 && {
-          // rs is part of the list of read since the last write
-          // System.out.println(s">>> ${curEffects.get(as)}")
-          // System.out.println(s"  |->>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
-          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
-        Some(Const(()))
-      else None
+            // rs is part of the list of read since the last write
+            // System.out.println(s">>> ${curEffects.get(as)}")
+            // System.out.println(s"  |->>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
+            curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
+          Some(Const(()))
+        else None
 
       // x-> i = x->i => ()    side condition: no write in-between!
       case ("reffield_set", List(as:Exp, i, rs @ Def("reffield_get", List(as1: Exp, i1)))) =>
         // System.out.println(s">>> $as -> $i == $as1 -> $i1")
         if (as == as1 && i == i1 && {
-          // rs is part of the list of read since the last write
-          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
-        Some(Const(()))
-      else
-        None
+            // rs is part of the list of read since the last write
+            curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
+          Some(Const(()))
+        else
+          None
 
       // x = x => ()    side condition: no write in-between!
       case ("var_set", List(as:Exp, rs @ Def("var_get", List(as1: Exp)))) =>
         // System.out.println(s">>> $as -> $i == $as1 -> $i1")
         if (as == as1 && {
-          // rs is part of the list of read since the last write
-          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
-        Some(Const(()))
-      else
-        None
+            // rs is part of the list of read since the last write
+            curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
+          Some(Const(()))
+        else
+          None
 
       // [var] x = y; ....; x => [var] x = y; ....; y    side condition: no write in-between!
       case ("var_get", List(as:Exp)) =>
@@ -1162,8 +1169,8 @@ trait ScalaGenBase extends ExtendedScalaCodeGen {
   // def remap[A](m: Manifest[A]): String = ???
   // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
-    val statics = Adapter.emitCommon1(className,this,stream)(manifest[A],manifest[B])(x => Unwrap(f(Wrap[A](x))))
+  def emitSource[A: Manifest, B: Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
+    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
     // stream.println(src)
     statics.toList
   }
@@ -1177,7 +1184,7 @@ trait CGenBase extends ExtendedCCodeGen {
   // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
   def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
-    val statics = Adapter.emitCommon1(className,this,stream)(manifest[A],manifest[B])(x => Unwrap(f(Wrap[A](x))))
+    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
     // stream.println(src)
     statics.toList
   }

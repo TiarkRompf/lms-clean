@@ -919,7 +919,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     }
   }
 
-  def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit = {
+  def emitAll(g: Graph, name: String)(m1: Manifest[_], m2: Manifest[_]): Unit = {
     val ng = init(g)
     val arg = quote(g.block.in.head)
     val efs = "" //quoteEff(g.block.ein)
