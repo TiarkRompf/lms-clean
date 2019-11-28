@@ -286,10 +286,11 @@ trait UtilOpsExp extends UtilOps with BaseExp { this: DslExp =>
   // }).asInstanceOf[Exp[A]]
 }
 
-
-
 // @virtualize
-trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString with LiftPrimitives with LiftNumeric with LiftBoolean with IfThenElse with Equal with RangeOps with OrderingOps with MiscOps with ArrayOps with StringOps with SeqOps with Functions with While with StaticData with Variables with LiftVariables with ObjectOps with UtilOps {
+trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString with LiftPrimitives
+    with LiftNumeric with LiftBoolean with IfThenElse with Equal with RangeOps with OrderingOps
+    with MiscOps with ArrayOps with StringOps with SeqOps with Functions with While with StaticData
+    with Variables with LiftVariables with ObjectOps with UtilOps {
   implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
   // implicit class BooleanOps2(lhs: Rep[Boolean]) {
   //   def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
@@ -300,7 +301,11 @@ trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString w
 }
 
 // @virtualize
-trait DslExp extends Dsl with PrimitiveOpsExpOpt with NumericOpsExpOpt with BooleanOpsExp with IfThenElseExpOpt with EqualExpBridgeOpt with RangeOpsExp with OrderingOpsExp with MiscOpsExp with EffectExp with ArrayOpsExpOpt with StringOpsExp with SeqOpsExp with FunctionsRecursiveExp with WhileExp with StaticDataExp with VariablesExpOpt with ObjectOpsExpOpt with UtilOpsExp {
+trait DslExp extends Dsl with PrimitiveOpsExpOpt with NumericOpsExpOpt with BooleanOpsExp
+    with IfThenElseExpOpt with EqualExpBridgeOpt with RangeOpsExp with OrderingOpsExp
+    with MiscOpsExp with EffectExp with ArrayOpsExpOpt with StringOpsExp with SeqOpsExp
+    with FunctionsRecursiveExp with WhileExp with StaticDataExp with VariablesExpOpt
+    with ObjectOpsExpOpt with UtilOpsExp {
   //STUB
   // override def boolean_or(lhs: Exp[Boolean], rhs: Exp[Boolean])(implicit pos: SourceContext) : Exp[Boolean] = lhs match {
   //   case Const(false) => rhs
@@ -352,7 +357,7 @@ trait DslGen extends ScalaGenNumericOps
   val IR: DslExp
 
   import IR._
-/*STUB
+  /*STUB
   override def quote(x: Exp[Any]) = x match {
     case Const('\n') if x.tp == typ[Char] => "'\\n'"
     case Const('\t') if x.tp == typ[Char] => "'\\t'"
@@ -383,7 +388,7 @@ trait DslGen extends ScalaGenNumericOps
       stream.println("}")
     case _ => super.emitNode(sym, rhs)
   }
-*/
+  */
 }
 
 // @virtualize
@@ -454,7 +459,7 @@ trait DslGenC extends CGenBase with CGenNumericOps
   //     stream.println(rhs + ";")
   // }
 
-/*STUB
+  /*STUB
   override def quote(x: Exp[Any]) = x match {
     case Const(s: String) => "\""+s.replace("\"", "\\\"")+"\"" // TODO: more escapes?
     case Const('\n') if x.tp == typ[Char] => "'\\n'"
@@ -1164,6 +1169,7 @@ trait ScalaGenBase extends ExtendedScalaCodeGen {
   }
   def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
 }
+
 trait CGenBase extends ExtendedCCodeGen {
   val IR: Base
   import IR._

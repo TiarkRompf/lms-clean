@@ -11,7 +11,7 @@ abstract class Traverser {
   def symsFreq(x: Node): Set[(Def,Double)] = x match {
     case Node(f, "λ", Block(in, y, ein, eff)::_, _) =>
       eff.deps.map((e: Def) => (e,100.0)) + ((y, 100.0))
-    // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
+      // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
     case Node(_, "?", c::(a: Block)::(b: Block)::_, eff) =>
       eff.hdeps.map((e: Def) => (e,1.0)) + ((c, 1.0)) ++ (a.used ++ b.used).map((e: Def) => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
