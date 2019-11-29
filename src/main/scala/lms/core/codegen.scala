@@ -347,8 +347,8 @@ class CompactScalaCodeGen extends CompactTraverser {
   }
   def quoteBlock(b: Block, argType: Boolean = false): Unit = {
     def eff = quoteEff(b.ein)
-    if (y.in.length == 0) {
-      quoteBlock(traverse(y)) //XXX(GW): discard eff if arg length == 0?
+    if (b.in.length == 0) {
+      quoteBlock(traverse(b)) //XXX(GW): discard eff if arg length == 0?
     } else {
       val argsStr = b.in.map({ arg =>
         val tp = if (argType) (": " + ???) else "" //FIXME(GW): get the type annotation, add a typeMap?
