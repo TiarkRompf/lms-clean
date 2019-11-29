@@ -526,7 +526,7 @@ trait DslGenC extends CGenBase with CGenNumericOps
         int c;
 
         while ((c = *str++) && len--)
-          hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+          hash = ((hash << 5) + hash) + c; // hash * 33 + c 
 
         return hash;
       }
