@@ -345,19 +345,13 @@ class CompactScalaCodeGen extends CompactTraverser {
     }
     withWraper(wraper _)(f)
   }
-  def quoteBlock(y: Block, argType: Boolean = false): Unit = {
-    def eff = quoteEff(y.ein)
-    if (y.in.length == 0) {
-      quoteBlock(traverse(y))
-    } else if (y.in.length == 1) {
-      val x = y.in.head
-      def typed(s:String) = if (argType) s+": Int" else s //FIXME hardcoded
-      def paren(s:String) = if (argType) "("+s+")" else s
-      quoteBlock(s"${paren(typed(quote(x)))}$eff => ")(traverse(y))
-    } else if (y.in.length == 2) {
-      val List(x1, x2) = y.in // FIXME hardcoded for tutorial
-      quoteBlock(s"(${quote(x1)}: Int, ${quote(x2)}: scala.lms.tutorial.StringScanner)$eff => ")(traverse(y))
-    } else (???) //FIXME
+  def quoteBlock(b: Block, argType: Boolean = false): Unit = {
+    def eff = quoteEff(b.ein)
+    val argsStr = b.in.map({ arg =>
+      val tp = if (argType) (": " + ???) else "" //FIXME(GW): get the type annotation, add a typeMap?
+      quote(arg) + tp
+    }).mkString("(", ", ", s")$eff => ")
+    quoteBlock(argsStr)(traverse(b))
   }
   def noquoteBlock(f: => Unit) = {
     withWraper(nowraper _)(f)
@@ -654,7 +648,6 @@ trait ExtendedCodeGen {
 
   def init(g: Graph): Graph = dce(g)
 
-
   def quoteStatic(n: Node) = n match {
     case Node(s, "staticData", List(Const(a)), _) =>
       val arg = "p"+quote(s)
@@ -747,8 +740,9 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       // as a separate phase b/c it may trigger
       // further optimizations
       // quoteBlock1(y, true)
-      val argsTyped = (y.in map { arg => s"${quote(arg)}: ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" } mkString("(", ",", ") => "))
-      quoteBlock(argsTyped)(traverse(y))
+      val argsTyped = y.in map { arg => s"${quote(arg)}: ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" }
+      val argsTypedStr = argsTyped.mkString("(", ",", ") => ")
+      quoteBlock(argsTypedStr)(traverse(y))
     case n @ Node(s,"?",List(c, a: Block, b: Block),_) if b.isPure && b.res == Const(false) =>
       shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
     case n @ Node(s,"?",List(c, a: Block, b: Block),_) if a.isPure && a.res == Const(true) =>
@@ -835,14 +829,12 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   }
 
   override def emitValDef(n: Node): Unit = {
-      if (!recursive) {
-        if (dce.live(n.n))
-          emit(s"val ${quote(n.n)} = ");
-        shallow(n); emitln()
-      } else {
-        if (dce.live(n.n))
-          emit(s"${quote(n.n)} = ");
-        shallow(n); emitln()
+    if (!recursive) {
+      if (dce.live(n.n)) emit(s"val ${quote(n.n)} = ");
+      shallow(n); emitln()
+    } else {
+      if (dce.live(n.n)) emit(s"${quote(n.n)} = ");
+      shallow(n); emitln()
     }
   }
 
@@ -1228,7 +1220,8 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
   override def shallow(n: Node): Unit = n match {
     case Node(s, ">>>", List(a, b), _) =>
-      emit("(("); emit(remapUnsigned(typeMap.getOrElse(s, manifest[Unknown]))); emit(") "); shallow1(a, precedence("cast") + 1); emit(") >> "); shallow1(b, precedence(">>") + 1)
+      emit("(("); emit(remapUnsigned(typeMap.getOrElse(s, manifest[Unknown]))); emit(") ")
+      shallow1(a, precedence("cast") + 1); emit(") >> "); shallow1(b, precedence(">>") + 1)
     case Node(s, op, List(a), _) if math.contains(op) =>
       registerHeader("<math.h>")
       registerLibrary("-lm")

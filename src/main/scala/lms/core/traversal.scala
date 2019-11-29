@@ -289,9 +289,8 @@ class CompactTraverser extends Traverser {
     val save2 = lastNode
     try super.withScope(p, ns)(b) finally { shouldInline = save; numStms = save1; lastNode = save2 }
   }
-
+  
   override def traverse(ns: Seq[Node], y: Block): Unit = {
-
     // ----- forward pass -----
 
     // lookup sym -> node for locally defined nodes
@@ -375,7 +374,6 @@ class CompactTraverser extends Traverser {
     }
 
     // ----- forward pass -----
-
     traverseCompact(ns, y)
   }
 
