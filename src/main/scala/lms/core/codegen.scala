@@ -347,11 +347,15 @@ class CompactScalaCodeGen extends CompactTraverser {
   }
   def quoteBlock(b: Block, argType: Boolean = false): Unit = {
     def eff = quoteEff(b.ein)
-    val argsStr = b.in.map({ arg =>
-      val tp = if (argType) (": " + ???) else "" //FIXME(GW): get the type annotation, add a typeMap?
-      quote(arg) + tp
-    }).mkString("(", ", ", s")$eff => ")
-    quoteBlock(argsStr)(traverse(b))
+    if (y.in.length == 0) {
+      quoteBlock(traverse(y)) //XXX(GW): discard eff if arg length == 0?
+    } else {
+      val argsStr = b.in.map({ arg =>
+        val tp = if (argType) (": " + ???) else "" //FIXME(GW): get the type annotation, add a typeMap?
+        quote(arg) + tp
+      }).mkString("(", ", ", s")$eff => ")
+      quoteBlock(argsStr)(traverse(b))
+    }
   }
   def noquoteBlock(f: => Unit) = {
     withWraper(nowraper _)(f)
