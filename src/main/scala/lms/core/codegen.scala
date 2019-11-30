@@ -293,7 +293,7 @@ class CompactScalaCodeGen extends CompactTraverser {
 
   def shallow(n: Def): Unit = n match {
     case InlineSym(n) => shallow(n)
-    case b:Block => quoteBlock(b, false)
+    case b:Block => quoteBlock(b)
     case _ => emit(quote(n))
   }
 
@@ -327,12 +327,23 @@ class CompactScalaCodeGen extends CompactTraverser {
   def quoteBlock(f: => Unit): Unit = quoteBlock("")(f)
   def quoteBlock(header: String)(f: => Unit): Unit = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      if (numStms > 0) emitln("{ " + header) else emit(header)
+      if (numStms > 0) emitln("{ " + header)
+      else emit(header)
       f
-      if (y.res != Const(())) { shallow(y.res); emit(quoteEff(y.eff)) } else emit(quoteEff(y.eff))
+      if (y.res != Const(())) shallow(y.res)
+      emit(quoteEff(y.eff))
       if (numStms > 0) emit("\n}")
     }
     withWraper(wraper _)(f)
+  }
+  def quoteBlock(b: Block): Unit = {
+    def eff = quoteEff(b.ein)
+    if (b.in.length == 0) {
+      quoteBlock(traverse(b)) //FIXME(GW): discard eff if arg length == 0?
+    } else {
+      val argsStr = b.in.map(arg => quote(arg)).mkString("(", ", ", s")$eff => ")
+      quoteBlock(argsStr)(traverse(b))
+    }
   }
   def quoteBlockP(f: => Unit): Unit = quoteBlockP(0)(f)
   def quoteBlockP(prec: Int)(f: => Unit) = {
@@ -345,21 +356,7 @@ class CompactScalaCodeGen extends CompactTraverser {
     }
     withWraper(wraper _)(f)
   }
-  def quoteBlock(b: Block, argType: Boolean = false): Unit = {
-    def eff = quoteEff(b.ein)
-    if (b.in.length == 0) {
-      quoteBlock(traverse(b)) //XXX(GW): discard eff if arg length == 0?
-    } else {
-      val argsStr = b.in.map({ arg =>
-        val tp = if (argType) (": " + ???) else "" //FIXME(GW): get the type annotation, add a typeMap?
-        quote(arg) + tp
-      }).mkString("(", ", ", s")$eff => ")
-      quoteBlock(argsStr)(traverse(b))
-    }
-  }
-  def noquoteBlock(f: => Unit) = {
-    withWraper(nowraper _)(f)
-  }
+  def noquoteBlock(f: => Unit) = withWraper(nowraper _)(f)
   def quoteElseBlock(f: => Unit) = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
       if (numStms > 0) {
@@ -424,7 +421,8 @@ class CompactScalaCodeGen extends CompactTraverser {
       // proper inlining will likely work better
       // as a separate phase b/c it may trigger
       // further optimizations
-      quoteBlock(y, true)
+      // Note: if argument types have to be emitted, ExtendedScalaCodeGen has overrided this case
+      quoteBlock(y)
 
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       emit("if ("); shallow(c); emit(") ")
@@ -682,7 +680,6 @@ trait ExtendedCodeGen {
 
 
 class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
-
   // val rename = new mutable.HashMap[Sym,String]
   var lastNL = false
   override def emit(s: String): Unit = { stream.print(s); lastNL = false }
@@ -733,6 +730,25 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     wraper = save1 // necessary?
   }
 
+  def quoteBlock(b: Block, argType: Boolean = false): Unit = {
+    def eff = quoteEff(b.ein)
+    if (b.in.length == 0) {
+      quoteBlock(traverse(b)) //FIXME(GW): discard eff if arg length == 0?
+    } else {
+      val argsStr = b.in.map({ arg =>
+        val tp = if (argType) s": ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" else ""
+        quote(arg) + tp
+      }).mkString("(", ", ", s")$eff => ")
+      quoteBlock(argsStr)(traverse(b))
+    }
+  }
+
+  def shallow(n: Def, emitType: Boolean = false): Unit = n match {
+    case b:Block => quoteBlock(b, emitType)
+    case _ => super.shallow(n)
+  }
+
+
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
   // XXX TODO: precedence of nested expressions!!
@@ -743,10 +759,12 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       // proper inlining will likely work better
       // as a separate phase b/c it may trigger
       // further optimizations
-      // quoteBlock1(y, true)
+      /*
       val argsTyped = y.in map { arg => s"${quote(arg)}: ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" }
       val argsTypedStr = argsTyped.mkString("(", ",", ") => ")
       quoteBlock(argsTypedStr)(traverse(y))
+      */
+      quoteBlock(y, true)
     case n @ Node(s,"?",List(c, a: Block, b: Block),_) if b.isPure && b.res == Const(false) =>
       shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
     case n @ Node(s,"?",List(c, a: Block, b: Block),_) if a.isPure && a.res == Const(true) =>

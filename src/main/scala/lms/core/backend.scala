@@ -375,17 +375,13 @@ class GraphBuilder {
   def reify(f: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => f(xs(0), xs(1), xs(2)))
   def reify(f: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => f(xs(0), xs(1), xs(2), xs(3)))
 
-  //TODO(GW): support reify functions for fold
-  //def reify(f: (Exp, Tuple2[Exp, Exp]) => Exp): Block = reify(3, xs => f(xs(0), (xs(1), xs(2))))
-  //def reify(f: (Tuple2[Exp, Exp], Exp) => Exp): Block = reify(3, xs => f((xs(0), xs(1)), xs(2)))
-
   case class BlockEffect(var map: Map[Exp,(Sym, List[Sym])], prev: BlockEffect) {
     def get(key: Exp): Option[(Sym, List[Sym])] = if (prev != null) map.get(key) orElse prev.get(key) else map.get(key)
     def getOrElse(key: Exp, default: (Sym, List[Sym])) = get(key).getOrElse(default)
     def +=(kv: (Exp, (Sym, List[Sym]))) = map += kv
   }
 
-  def reify(arity: Int, x: List[Exp] => Exp, here: Boolean = false): Block = {
+  def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block = {
     val save = curBlock
     val saveEffects = curEffects
     val saveLocalDefs = curLocalDefs
@@ -401,7 +397,7 @@ class GraphBuilder {
       curLocalDefs = Set()
       curLocalReads = Set()
       curLocalWrites = Set()
-      val res = x(args)
+      val res = f(args)
       // remove local definitions from visible effect keys
       // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
       // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
