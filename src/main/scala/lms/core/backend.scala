@@ -78,7 +78,7 @@ object Backend {
   // arguments, as well as an effect summary.
 
   case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary) {
-    override def toString = s"$n = ($op ${rhs.mkString(" ")})  $eff"
+    override def toString = s"$n = ($op ${rhs.mkString(" ")}) $eff"
   }
 
   /* YYY TODO
@@ -91,7 +91,6 @@ object Backend {
       us from allowing any value as part of rhs
       (guess: typeclass to/fro conversion for FrontEnd)
   */
-
 
   // A definition is part of the right-hand side of a
   // node definition.
@@ -217,10 +216,9 @@ class GraphBuilder {
   def isCurrentValue(src: Exp, value: Sym) = !curEffects.get(src).filter({ case (_, lrs) => lrs contains value }).isEmpty
   def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
     // rewrite?
-    rewrite(s,as.toList) match {
+    rewrite(s, as.toList) match {
       case Some(e) => e
       case None =>
-
         // latent effects? closures, mutable vars, ... (these are the keys!)
         val (reads, _writes) = if (s == "λ") { // NOTE: block in lambda is a latent effect for app, not declaration
           (readEfKeys.toSet, writeEfKeys.toSet)
@@ -369,13 +367,17 @@ class GraphBuilder {
   def mergeEffKeys(b: Block, c: Block) =
     (b.eff.rkeys ++ c.eff.rkeys, b.eff.wkeys ++ c.eff.wkeys)
 
-  def reify(x: => Exp): Block =  reify(0, xs => x)
-  def reifyHere(x: => Exp): Block =  reify(0, xs => x, true)
-  def reify(x: Exp => Exp): Block = reify(1, xs => x(xs(0)))
-  def reifyHere(x: Exp => Exp): Block =  reify(1, xs => x(xs(0)), true)
-  def reify(x: (Exp, Exp) => Exp): Block = reify(2, xs => x(xs(0), xs(1)))
-  def reify(x: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => x(xs(0), xs(1), xs(2)))
-  def reify(x: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => x(xs(0), xs(1), xs(2), xs(3)))
+  def reify(f: => Exp): Block =  reify(0, _ => f)
+  def reifyHere(f: => Exp): Block =  reify(0, xs => f, true)
+  def reify(f: Exp => Exp): Block = reify(1, xs => f(xs(0)))
+  def reifyHere(f: Exp => Exp): Block =  reify(1, xs => f(xs(0)), true)
+  def reify(f: (Exp, Exp) => Exp): Block = reify(2, xs => f(xs(0), xs(1)))
+  def reify(f: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => f(xs(0), xs(1), xs(2)))
+  def reify(f: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => f(xs(0), xs(1), xs(2), xs(3)))
+
+  //TODO(GW): support reify functions for fold
+  //def reify(f: (Exp, Tuple2[Exp, Exp]) => Exp): Block = reify(3, xs => f(xs(0), (xs(1), xs(2))))
+  //def reify(f: (Tuple2[Exp, Exp], Exp) => Exp): Block = reify(3, xs => f((xs(0), xs(1)), xs(2)))
 
   case class BlockEffect(var map: Map[Exp,(Sym, List[Sym])], prev: BlockEffect) {
     def get(key: Exp): Option[(Sym, List[Sym])] = if (prev != null) map.get(key) orElse prev.get(key) else map.get(key)
