@@ -327,12 +327,13 @@ class CompactScalaCodeGen extends CompactTraverser {
   def quoteBlock(f: => Unit): Unit = quoteBlock("")(f)
   def quoteBlock(header: String)(f: => Unit): Unit = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      if (numStms > 0) emitln("{ " + header)
+      // XXX(GW): for performance, can we omit those checks and just emit { }?
+      if (numStms > 0 || header.startsWith("case")) emitln("{ " + header)
       else emit(header)
       f
       if (y.res != Const(())) shallow(y.res)
       emit(quoteEff(y.eff))
-      if (numStms > 0) emit("\n}")
+      if (numStms > 0 || header.startsWith("case")) emit("\n}")
     }
     withWraper(wraper _)(f)
   }
@@ -362,10 +363,12 @@ class CompactScalaCodeGen extends CompactTraverser {
       if (numStms > 0) {
         emitln(" else {")
         f
-        if (y.res != Const(())) { shallow(y.res); emitln(quoteEff(y.eff)) } else emitln(quoteEff(y.eff))
+        if (y.res != Const(())) shallow(y.res)
+        emitln(quoteEff(y.eff))
         emit("}")
       } else {
-        if (y.res != Const(())) { emit(" else "); shallow(y.res); emit(quoteEff(y.eff)) } else emit(quoteEff(y.eff))
+        if (y.res != Const(())) { emit(" else "); shallow(y.res) }
+        emit(quoteEff(y.eff))
       }
     }
     withWraper(wraper _)(f)
@@ -730,7 +733,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     wraper = save1 // necessary?
   }
 
-  def quoteBlock(b: Block, argType: Boolean = false): Unit = {
+  def quoteBlock(b: Block, argType: Boolean = false, pattern: Option[List[Int]] = None): Unit = {
     def eff = quoteEff(b.ein)
     if (b.in.length == 0) {
       quoteBlock(traverse(b)) //FIXME(GW): discard eff if arg length == 0?
@@ -747,7 +750,6 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case b:Block => quoteBlock(b, emitType)
     case _ => super.shallow(n)
   }
-
 
   // generate string for node's right-hand-size
   // (either inline or as part of val def)
