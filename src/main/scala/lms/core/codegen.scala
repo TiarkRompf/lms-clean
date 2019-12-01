@@ -327,7 +327,7 @@ class CompactScalaCodeGen extends CompactTraverser {
   def quoteBlock(f: => Unit): Unit = quoteBlock("")(f)
   def quoteBlock(header: String)(f: => Unit): Unit = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      // XXX(GW): for performance, can we omit those checks and just emit { }?
+      // XXX(GW): for performance, can we omit those checks and just emit { } anyway?
       if (numStms > 0 || header.startsWith("case")) emitln("{ " + header)
       else emit(header)
       f
@@ -681,6 +681,9 @@ trait ExtendedCodeGen {
   def nameMap: Map[String, String]
 }
 
+trait Pattern
+case class PVar(x: Sym) extends Pattern
+case class PTuple(xs: List[Pattern]) extends Pattern
 
 class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   // val rename = new mutable.HashMap[Sym,String]
@@ -733,17 +736,32 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     wraper = save1 // necessary?
   }
 
-  def quoteBlock(b: Block, argType: Boolean = false, pattern: Option[List[Int]] = None): Unit = {
+  def quoteBlock(b: Block, emitType: Boolean = false): Unit = {
     def eff = quoteEff(b.ein)
     if (b.in.length == 0) {
       quoteBlock(traverse(b)) //FIXME(GW): discard eff if arg length == 0?
     } else {
       val argsStr = b.in.map({ arg =>
-        val tp = if (argType) s": ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" else ""
+        val tp = if (emitType) s": ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" else ""
         quote(arg) + tp
       }).mkString("(", ", ", s")$eff => ")
       quoteBlock(argsStr)(traverse(b))
     }
+  }
+
+  def patternToString(p: Pattern, emitType: Boolean = false): String = p match {
+    case PVar(x) =>
+      val tp = if (emitType) s": ${remap(typeMap.getOrElse(x, manifest[Unknown]))}" else ""
+      quote(x) + tp
+    case PTuple(xs) => "(" + xs.map(patternToString(_)).mkString(", ") + ")"
+  }
+  
+  //TODO(GW): merge this code into exisitng quoteBlock or reify?
+  // The current block.in is a special case of a tuple of arguments, can be generalized.
+  // More generally, a block can have multiple cases.
+  def quoteCaseBlock(b: Block, argPattern: Pattern, emitType: Boolean = false): Unit = {
+    val patStr = patternToString(argPattern, emitType)
+    quoteBlock("case " + patStr + " =>")(traverse(b))
   }
 
   def shallow(n: Def, emitType: Boolean = false): Unit = n match {
