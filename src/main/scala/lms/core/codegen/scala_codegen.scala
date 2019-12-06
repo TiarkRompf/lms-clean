@@ -551,16 +551,16 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   }
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(s, "exit", List(x) ,_) =>
+    case n @ Node(s, "exit", List(x), _) =>
       emit("System.exit("); shallow(x); emitln(")")
-    case n @ Node(f,"λ",List(y:Block),_) =>
-      val x = y.in
-      val a = x.map(typeMap(_))
-      val b = typeMap.getOrElse(y.res, manifest[Unit])
-      val e = quoteEff(y.ein)
+    case n @ Node(f, "λ", List(y: Block), _) =>
+      val args = y.in
+      val types = args.map { a => remap(typeMap.getOrElse(a, manifest[Unknown])) }
+      val retType = remap(typeMap.getOrElse(y.res, manifest[Unit]))
+      val eff = quoteEff(y.ein)
 
-      val args = (x zip a).map{case (x, a) => s"${quote(x)}:$a"}.mkString(", ")
-      emit(s"def ${quote(f)}($args): $b$e = ")
+      val argsStr = (args zip types).map{ case (x, a) => s"${quote(x)}: $a" }.mkString(", ")
+      emit(s"def ${quote(f)}($argsStr): $retType$eff = ")
       quoteBlockP(traverse(y,f))
       emitln()
 
