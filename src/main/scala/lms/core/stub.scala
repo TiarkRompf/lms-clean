@@ -91,6 +91,12 @@ object Adapter extends FrontEnd {
     // def isNum(x: Any) = x.isInstanceOf[Int] || x.isInstanceOf[Float]
 
     override def rewrite(s: String, as: List[Def]): Option[Exp] = (s,as) match {
+      // TODO: make those optimization modular, instead of hardcoded here
+      case ("tuple2-1", List(Def("tuple2-new", List(t1: Exp, t2: Exp)))) =>
+        Some(t1)
+      case ("tuple2-2", List(Def("tuple2-new", List(t1: Exp, t2: Exp)))) =>
+        Some(t2)
+
       // staticData(as)(i) => staticData(as(i))
       case ("array_get", List(Def("staticData", List(Const(as: Array[_]))), Const(i:Int))) =>
         as(i) match {
