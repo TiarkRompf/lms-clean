@@ -96,6 +96,16 @@ object Adapter extends FrontEnd {
         Some(t1)
       case ("tuple2-2", List(Def("tuple2-new", List(t1: Exp, t2: Exp)))) =>
         Some(t2)
+      /*
+      case ("list-foldLeft", List(Def("list-new", Const(mA: Manifest[_])::(xs: List[Exp])), z: Exp, block, Const(f: ((Exp, Exp) => Exp)))) =>
+        System.out.println("here list fold")
+        System.out.println(xs, z)
+        System.out.println(xs.foldLeft(z)(f))
+        None
+      case ("map-foldLeft", List(Def("map-new", Const(mK: Manifest[_])::Const(mV: Manifest[_])::kvs), z, block)) =>
+        System.out.println("here map fold")
+        None
+      */
 
       // staticData(as)(i) => staticData(as(i))
       case ("array_get", List(Def("staticData", List(Const(as: Array[_]))), Const(i:Int))) =>
