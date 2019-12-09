@@ -91,22 +91,6 @@ object Adapter extends FrontEnd {
     // def isNum(x: Any) = x.isInstanceOf[Int] || x.isInstanceOf[Float]
 
     override def rewrite(s: String, as: List[Def]): Option[Exp] = (s,as) match {
-      // TODO: make those optimization modular, instead of hardcoded here
-      case ("tuple2-1", List(Def("tuple2-new", List(t1: Exp, t2: Exp)))) =>
-        Some(t1)
-      case ("tuple2-2", List(Def("tuple2-new", List(t1: Exp, t2: Exp)))) =>
-        Some(t2)
-      /*
-      case ("list-foldLeft", List(Def("list-new", Const(mA: Manifest[_])::(xs: List[Exp])), z: Exp, block, Const(f: ((Exp, Exp) => Exp)))) =>
-        System.out.println("here list fold")
-        System.out.println(xs, z)
-        System.out.println(xs.foldLeft(z)(f))
-        None
-      case ("map-foldLeft", List(Def("map-new", Const(mK: Manifest[_])::Const(mV: Manifest[_])::kvs), z, block)) =>
-        System.out.println("here map fold")
-        None
-      */
-
       // staticData(as)(i) => staticData(as(i))
       case ("array_get", List(Def("staticData", List(Const(as: Array[_]))), Const(i:Int))) =>
         as(i) match {
@@ -619,17 +603,18 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
 
 trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompare {
   type Rep[+T] = Exp[T];
+
   abstract class Exp[+T]
   abstract class Def[+T]
   abstract class Var[T]
   abstract class Block[T]
 
+  case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
+    Adapter.typeMap(x) = manifest[A]
+  }
   def Wrap[A:Manifest](x: lms.core.Backend.Exp): Exp[A] = {
     if (manifest[A] == manifest[Unit]) Const(()).asInstanceOf[Exp[A]]
     else new Wrap[A](x)
-  }
-  case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
-    Adapter.typeMap(x) = manifest[A]
   }
   def Unwrap(x: Exp[Any]) = x match {
     case Wrap(x) => x
