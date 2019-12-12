@@ -466,7 +466,7 @@ class Flow extends Phase {
   // XXX perhaps we need to count freqs differently (?)
 
   def symsFreq(x: Node): List[(Def,Double)] = x match {
-    case Node(f, "λ", List(Block(in, y, ein, eff)), _) =>
+    case Node(f, "λ", Block(in, y, ein, eff)::_, _) =>
       List((y,100.0)) ++ eff.deps.map(e => (e,0.001))
     case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::_, _) =>
       List((c,1.0),(ae,0.5),(be,0.5)) ++ af.deps.map(e => (e,0.001)) ++ bf.deps.map(e => (e,0.001))

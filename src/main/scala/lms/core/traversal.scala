@@ -211,7 +211,7 @@ abstract class Traverser {
 
 
   def traverse(n: Node): Unit = n match {
-    case n @ Node(f, "λ", List(y:Block), _) =>
+    case n @ Node(f, "λ", (y:Block)::_, _) =>
       // special case λ: add free var f
       traverse(y, f)
     case n @ Node(f, op, es, _) =>
@@ -246,7 +246,7 @@ abstract class CPSTraverser extends Traverser {
     if (!bs.isEmpty) traverse(bs.head)(v => traverse(bs.tail)(k)) else k
 
   def traverse(n: Node)(k: => Unit): Unit = n match {
-    case n @ Node(f, "λ", List(y:Block), _) =>
+    case n @ Node(f, "λ", (y:Block)::_, _) =>
       traverse(y, f)(v => k)
     case n @ Node(f, op, es, _) =>
       val blocks = es.filter{ case Block(_,_,_,_) => true; case _ => false}.map(_.asInstanceOf[Block])
@@ -400,7 +400,7 @@ class CompactTraverser extends Traverser {
   }
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(f,"λ",List(y:Block),_) =>
+    case n @ Node(f, "λ", (y:Block)::_, _) =>
       // special case λ: add free var f
       traverse(y,f)
     case n @ Node(f, op, es, _) =>
@@ -443,7 +443,7 @@ abstract class Transformer extends Traverser {
   }
 
   def transform(n: Node): Exp = n match {
-    case Node(s,"λ", List(b @ Block(in, y, ein, eff)),_) =>
+    case Node(s, "λ", (b @ Block(in, y, ein, eff))::_, _) =>
       // need to deal with recursive binding!
       val s1 = Sym(g.fresh)
       subst(s) = s1
@@ -540,7 +540,7 @@ abstract class CPSTransformer extends Transformer {
       subst(s) = g.reflectWrite("reset0", transform(y)(v => v))(Adapter.CTRL)
       k
 
-    case Node(s,"λ", List(b: Block),es) =>
+    case Node(s,"λ", (b: Block)::_, es) =>
       if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
         if (b.eff.keys contains Adapter.CPS) forwardCPSSet += forwardMap(subst(s).asInstanceOf[Sym])
         val s1: Sym = subst(s).asInstanceOf[Sym]

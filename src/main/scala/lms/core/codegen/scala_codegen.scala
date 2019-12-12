@@ -27,7 +27,7 @@ class ScalaCodeGen extends Traverser {
   }
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(f,"λ",List(y:Block),_) =>
+    case n @ Node(f, "λ", (y:Block)::_, _) =>
       val para = y.in.length match {
         case 0 => ""
         case 1 => s"${quote(y.in.head)}: Int"
@@ -268,7 +268,7 @@ class CompactScalaCodeGen extends CompactTraverser {
   val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", ">>>", "&&", "||", "^")
   val math = Set("sin", "cos", "tanh", "exp", "sqrt")
   def shallow(n: Node): Unit = { n match {
-    case n @ Node(f,"λ",List(y:Block),_) =>
+    case n @ Node(f, "λ", (y:Block)::_, _) =>
       // XXX what should we do for functions?
       // proper inlining will likely work better
       // as a separate phase b/c it may trigger
@@ -320,7 +320,7 @@ class CompactScalaCodeGen extends CompactTraverser {
   }; emit(quoteEff(n)) }
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(f,"λ",List(y:Block),_) =>
+    case n @ Node(f, "λ", (y:Block)::_, _) =>
       val x = y.in.head
       emit(s"def ${quote(f)}(${quote(x)}: Int): Int${quoteEff(y.ein)} = "); quoteBlockP(traverse(y,f)); emitln("")
     // XXX: should not need these below!
@@ -444,7 +444,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   // XXX TODO: precedence of nested expressions!!
   override def shallow(n: Node): Unit = n match {
     case n @ Node(f,"λforward",List(y),_) => emit(quote(y))
-    case n @ Node(f,"λ",List(y:Block),_) =>
+    case n @ Node(f, "λ", (y:Block)::_, _) =>
       // XXX what should we do for functions?
       // proper inlining will likely work better
       // as a separate phase b/c it may trigger
@@ -553,7 +553,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "exit", List(x), _) =>
       emit("System.exit("); shallow(x); emitln(")")
-    case n @ Node(f, "λ", List(y: Block), _) =>
+    case n @ Node(f, "λ", (y: Block)::_, _) =>
       val args = y.in
       val types = args.map { a => remap(typeMap.getOrElse(a, manifest[Unknown])) }
       val retType = remap(typeMap.getOrElse(y.res, manifest[Unit]))
