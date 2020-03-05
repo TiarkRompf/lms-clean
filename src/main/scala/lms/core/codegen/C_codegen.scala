@@ -255,10 +255,10 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     datastructuresStream.writeTo(out)
   }
 
-  private val registeredInit = mutable.HashSet[String]()
-  private val initStream = new ByteArrayOutputStream()
-  private val initWriter = new PrintStream(initStream)
-  private var ongoingInit = false
+  protected val registeredInit = mutable.HashSet[String]()
+  protected val initStream = new ByteArrayOutputStream()
+  protected val initWriter = new PrintStream(initStream)
+  protected var ongoingInit = false
   def registerInit(id: String)(f: => Unit) = if (!registeredInit(id)) {
     if (ongoingInit) ???
     ongoingInit = true
