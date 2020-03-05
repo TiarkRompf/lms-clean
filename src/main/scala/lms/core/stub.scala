@@ -593,7 +593,13 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     out.close
     (new java.io.File("/tmp/snippet")).delete
     import scala.sys.process._
-    time("gcc") { (s"$compilerCommand /tmp/snippet.c -o /tmp/snippet $libraries": ProcessBuilder).lines.foreach(Console.println _) }
+    time("gcc") {
+      val includes =
+        if (codegen.includePaths.isEmpty) ""
+        else s"-I ${codegen.includePaths.mkString(" ")}"
+      val pb: ProcessBuilder = s"$compilerCommand /tmp/snippet.c -o /tmp/snippet $libraries $includes"
+      pb.lines.foreach(Console.println _)
+    }
     (a: A) => (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
   }
   def eval(a: A): Unit = { val f1 = f; time("eval")(f1(a)) }
