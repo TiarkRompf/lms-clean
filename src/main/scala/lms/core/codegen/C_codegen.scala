@@ -529,10 +529,10 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     val efs = "" //quoteEff(g.block.ein)
     val stt = dce.statics.toList.map(quoteStatic).mkString(", ")
     emitln("""
-    /*****************************************
-    Emitting C Generated Code
-    *******************************************/
-    """)
+    |/*****************************************
+    |Emitting C Generated Code
+    |*******************************************/
+    """.stripMargin)
     val src = run(name, ng)
     emitHeaders(stream)
     emitDatastructures(stream)
