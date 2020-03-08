@@ -214,6 +214,10 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
   private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
+  def registerHeader(includePath: String, header: String): Unit = {
+    registerIncludePath(includePath)
+    registerHeader(header)
+  }
   def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
 
   val includePaths = mutable.HashSet[String]()

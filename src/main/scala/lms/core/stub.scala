@@ -595,7 +595,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     import scala.sys.process._
     val includes =
       if (codegen.includePaths.isEmpty) ""
-      else s"-I ${codegen.includePaths.mkString(" ")}"
+      else s"-I ${codegen.includePaths.mkString(" -I ")}"
     val pb: ProcessBuilder = s"$compilerCommand /tmp/snippet.c -o /tmp/snippet $libraries $includes"
     time("gcc") { pb.lines.foreach(Console.println _) }
     (a: A) => (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
