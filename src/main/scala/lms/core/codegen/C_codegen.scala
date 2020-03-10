@@ -135,8 +135,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     emitln()
   }
 
-  // block of statements
-  //  block of statements with result expression
+  // block of statements with result expression
   def quoteBlockPReturn(f: => Unit) = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
       emitln("{")
@@ -205,6 +204,20 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     }
     withWraper(wraper _)(f)
   }
+
+  // emit closures with explicit argument types and return type
+  def quoteTypedBlock(b: Block, autoArgType: Boolean, retType: Boolean, capture: String = "&"): Unit = {
+    val eff = quoteEff(b.ein)
+    def typed(s: Sym) =
+      if (autoArgType) s"auto ${quote(s)}"
+      else s"${remap(typeMap(s))} ${quote(s)}"
+    val args = b.in.map(typed(_)).mkString(", ")
+    val ret: String = if (retType) "->"+remap(typeBlockRes(b.res)) else ""
+    emit(s"[$capture](${args})$ret $eff")
+    quoteBlockPReturn(traverse(b))
+  }
+
+  override def quoteBlock(b: Block): Unit = quoteTypedBlock(b, true, false)
 
   override def shallow(n: Def): Unit = n match {
     case InlineSym(t: Node) => shallow(t)
