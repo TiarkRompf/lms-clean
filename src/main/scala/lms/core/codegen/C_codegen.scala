@@ -130,7 +130,10 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   def emitFunction(name: String, body: Block) = {
     val res = body.res
     val args = body.in
-    emit(s"${remap(typeBlockRes(res))} $name(${args map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}") mkString(", ")}) ")
+    val ret = s"${remap(typeBlockRes(res))} "
+    val params = "(" + args.map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}").mkString(", ") + ")"
+    val sig = ret + name + params
+    emit(sig)
     quoteBlockPReturn(traverse(body))
     emitln()
   }
@@ -286,6 +289,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     withStream(initWriter)(f)
     ongoingInit = false
   }
+
   def emitInit(out: PrintStream) = if (initStream.size > 0) {
     out.println("\n/*********** Init ***********/")
     out.println("inline int init() {")
@@ -298,6 +302,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = ")
     shallow(n); emitln(";")
   }
+
   def emitVarDef(n: Node): Unit = {
     // emit(s"var ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     // TODO: enable dce for vars ... but currently getting unused expression warnings ...
