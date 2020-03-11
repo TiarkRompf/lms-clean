@@ -209,13 +209,21 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   }
 
   // emit closures with explicit argument types and return type
-  def quoteTypedBlock(b: Block, autoArgType: Boolean, retType: Boolean, capture: String = "&"): Unit = {
+  // `argMod`/`retMod` specifies pass by copy or reference
+  def quoteTypedBlock(b: Block, autoArgType: Boolean, retType: Boolean,
+                      capture: String = "&", argMod: Option[List[String]] = None, retMod: Option[String] = None): Unit = {
     val eff = quoteEff(b.ein)
-    def typed(s: Sym) =
-      if (autoArgType) s"auto ${quote(s)}"
-      else s"${remap(typeMap(s))} ${quote(s)}"
-    val args = b.in.map(typed(_)).mkString(", ")
-    val ret: String = if (retType) "->"+remap(typeBlockRes(b.res)) else ""
+    val args = b.in.zipWithIndex.map({
+        case (s, i) =>
+          val mod = argMod match {
+            case None => ""
+            case Some(xs) => xs(i)
+          }
+          if (autoArgType) s"auto$mod ${quote(s)}"
+          else s"${remap(typeMap(s))}$mod ${quote(s)}"
+      }).mkString(", ")
+    val mod = retMod.getOrElse("")
+    val ret: String = if (retType) "->"+remap(typeBlockRes(b.res))+mod else ""
     emit(s"[$capture](${args})$ret $eff")
     quoteBlockPReturn(traverse(b))
   }
