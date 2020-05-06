@@ -213,15 +213,20 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   def quoteTypedBlock(b: Block, autoArgType: Boolean, retType: Boolean,
                       capture: String = "&", argMod: Option[List[String]] = None, retMod: Option[String] = None): Unit = {
     val eff = quoteEff(b.ein)
-    val args = b.in.zipWithIndex.map({
-        case (s, i) =>
-          val mod = argMod match {
-            case None => ""
-            case Some(xs) => xs(i)
-          }
-          if (autoArgType) s"auto$mod ${quote(s)}"
-          else s"${remap(typeMap(s))}$mod ${quote(s)}"
-      }).mkString(", ")
+    val args = argMod match {
+      case Some(mods) =>
+        assert(mods.length == b.in.length, s"argMod should have same length as block inputs ${mods.length} ${b.in.length}")
+        b.in.zipWithIndex.map{
+          case (s, i) =>
+            val mod = mods(i)
+            if (autoArgType) s"auto$mod ${quote(s)}"
+            else s"${remap(typeMap(s))}$mod ${quote(s)}"
+        }.mkString(", ")
+      case None => b.in.map{s =>
+          if (autoArgType) s"auto ${quote(s)}"
+          else s"${remap(typeMap(s))} ${quote(s)}"
+      }.mkString(", ")
+    }
     val mod = retMod.getOrElse("")
     val ret: String = if (retType) "->"+remap(typeBlockRes(b.res))+mod else ""
     emit(s"[$capture](${args})$ret $eff")
