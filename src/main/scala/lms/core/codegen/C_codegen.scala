@@ -131,7 +131,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     val res = body.res
     val args = body.in
     val ret = s"${remap(typeBlockRes(res))} "
-    val params = "(" + args.map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}").mkString(", ") + ")"
+    val params = "(" + args.map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}").mkString(", ") + ") "
     val sig = ret + name + params
     emit(sig)
     quoteBlockPReturn(traverse(body))
@@ -233,7 +233,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     quoteBlockPReturn(traverse(b))
   }
 
-  override def quoteBlock(b: Block): Unit = quoteTypedBlock(b, true, false)
+  def quoteBlock(b: Block): Unit = quoteTypedBlock(b, true, false)
 
   override def shallow(n: Def): Unit = n match {
     case InlineSym(t: Node) => shallow(t)
