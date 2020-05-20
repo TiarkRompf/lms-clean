@@ -236,7 +236,7 @@ class GraphBuilder {
             val prevHard = new mutable.ListBuffer[Sym]
             val prevSoft = new mutable.ListBuffer[Sym]
             writes.foreach(e => curEffects.get(e) match {
-              case Some((lw, lr)) => 
+              case Some((lw, lr)) =>
                 // If latest(lw) is on the same array at the same index, we do not add hard dependence (Fei added)
                 // TODO: can we factor this out as a separate function, which just handle the dependencies?
                 val lastWrite = latest(lw)
@@ -247,12 +247,12 @@ class GraphBuilder {
                       prevHard ++= deps.hdeps
                       true
                   case _ => false
-                })) { 
-                  () 
+                })) {
+                  ()
                 } else {
-                  prevHard += latest(lw); 
+                  prevHard += latest(lw);
                 }
-                if (!reflectHere) prevSoft ++= lr 
+                if (!reflectHere) prevSoft ++= lr
               case _ => prevHard += latest(e)
             })
             if (reifyHere) prevHard += curBlock
