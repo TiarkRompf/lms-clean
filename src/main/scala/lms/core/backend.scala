@@ -78,7 +78,7 @@ object Backend {
   // arguments, as well as an effect summary.
 
   case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary) {
-    override def toString = s"$n = ($op ${rhs.mkString(" ")}) $eff"
+    override def toString = s"$n = ($op ${rhs.mkString(" ")})  $eff"
   }
 
   /* YYY TODO

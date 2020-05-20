@@ -186,14 +186,15 @@ class CompactScalaCodeGen extends CompactTraverser {
     }
     withWraper(wraper _)(f)
   }
-  def quoteBlock(b: Block): Unit = {
+  def quoteBlock(b: Block, argType: Boolean = false): Unit = {
     def eff = quoteEff(b.ein)
-    if (b.in.length == 0) {
-      quoteBlock(traverse(b)) //FIXME(GW): discard eff if arg length == 0?
-    } else {
-      val argsStr = b.in.map(arg => quote(arg)).mkString("(", ", ", s")$eff => ")
-      quoteBlock(argsStr)(traverse(b))
-    }
+    val args = b.in.map({ arg =>
+      val tp = if (argType) (": Int") else "" //FIXME(GW): get the type annotation, add a typeMap?
+      quote(arg) + tp
+    })
+    val argsStr = if (args.length == 1 && !argType) s"${args.head}$eff => "
+                  else args.mkString("(", ", ", s")$eff => ")
+    quoteBlock(argsStr)(traverse(b))
   }
   def quoteBlockP(f: => Unit): Unit = quoteBlockP(0)(f)
   def quoteBlockP(prec: Int)(f: => Unit) = {
@@ -274,7 +275,7 @@ class CompactScalaCodeGen extends CompactTraverser {
       // as a separate phase b/c it may trigger
       // further optimizations
       // Note: if argument types have to be emitted, ExtendedScalaCodeGen has overrided this case
-      quoteBlock(y)
+      quoteBlock(y, true)
 
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       emit("if ("); shallow(c); emit(") ")
@@ -406,7 +407,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     wraper = save1 // necessary?
   }
 
-  def quoteBlock(b: Block, emitType: Boolean = false): Unit = {
+  override def quoteBlock(b: Block, emitType: Boolean = false): Unit = {
     def eff = quoteEff(b.ein)
     if (b.in.length == 0) {
       quoteBlock(traverse(b)) //FIXME(GW): discard eff if arg length == 0?
@@ -559,7 +560,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       val retType = remap(typeMap.getOrElse(y.res, manifest[Unit]))
       val eff = quoteEff(y.ein)
 
-      val argsStr = (args zip types).map{ case (x, a) => s"${quote(x)}: $a" }.mkString(", ")
+      val argsStr = (args zip types).map{ case (x, a) => s"${quote(x)}:$a" }.mkString(", ")
       emit(s"def ${quote(f)}($argsStr): $retType$eff = ")
       quoteBlockP(traverse(y,f))
       emitln()
