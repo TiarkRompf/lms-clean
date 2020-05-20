@@ -106,6 +106,13 @@ object Adapter extends FrontEnd {
           curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined } =>
         Some(Const(()))
 
+      case ("array_set", List(as: Exp, i, rs)) if ({
+          curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw)}) match {
+            case Some(Node(_, "array_set", List(as2, idx2, value2), _)) if (as == as2 && i == idx2 && value2 == rs) => true
+            case _ => false
+          }
+        }) => Some(Const(()))
+
       // TODO: should be handle by the case below. However it doesn't because of aliasing issues!
       // (x + idx)->i = (x + idx)->i => ()    side condition: no write in-between! (on x)
       case ("reffield_set", List(Def("array_slice", (as: Exp)::idx::_), i, rs @ Def("reffield_get", List(Def("array_slice", (as1: Exp)::idx1::_), i1)))) =>

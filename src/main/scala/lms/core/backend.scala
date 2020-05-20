@@ -234,9 +234,26 @@ class GraphBuilder {
             val sm = Sym(fresh)
             // gather effect dependencies
             val prevHard = new mutable.ListBuffer[Sym]
-            val prevSoft = writes.flatMap(e => curEffects.get(e) match {
-              case Some((lw, lr)) => prevHard += latest(lw); if (!reflectHere) lr else Nil
-              case _ => prevHard += latest(e); Nil
+            val prevSoft = new mutable.ListBuffer[Sym]
+            writes.foreach(e => curEffects.get(e) match {
+              case Some((lw, lr)) => 
+                // If latest(lw) is on the same array at the same index, we do not add hard dependence (Fei added)
+                // TODO: can we factor this out as a separate function, which just handle the dependencies?
+                val lastWrite = latest(lw)
+                if ((s == "array_set") && (findDefinition(lastWrite) match {
+                  case Some(Node(_, "array_set", List(as2, idx2, value2), deps)) if (as(0) == as2 && as(1) == idx2) =>
+                      prevSoft ++= deps.sdeps
+                      prevSoft += lastWrite
+                      prevHard ++= deps.hdeps
+                      true
+                  case _ => false
+                })) { 
+                  () 
+                } else {
+                  prevHard += latest(lw); 
+                }
+                if (!reflectHere) prevSoft ++= lr 
+              case _ => prevHard += latest(e)
             })
             if (reifyHere) prevHard += curBlock
             prevHard ++= reads.map(getLastWrite(_))
