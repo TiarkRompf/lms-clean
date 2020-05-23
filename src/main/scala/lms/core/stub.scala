@@ -80,6 +80,38 @@ object Adapter extends FrontEnd {
 
   class MyGraphBuilder extends GraphBuilder {
 
+    override def gatherEffectDeps(reads: Set[Exp], writes: Set[Exp], s: String, as: Def*): (Set[Sym], Set[Sym]) = {
+      val (prevHard, prevSoft) = (new mutable.ListBuffer[Sym], new mutable.ListBuffer[Sym])
+      // gather effect dependencies 1): handle the write keys
+      writes.foreach(key => curEffects.get(key) match {
+        case Some((lw, lr)) =>
+          // Fine Grained HardDeps:
+          val lastWrite = latest(lw)
+          if (s == "array_set") {
+            findDefinition(lastWrite) match {
+              // If latest(lw) is on the same array at the same index, we do not add hard dependence but soft dependence
+              case Some(Node(_, "array_set", List(as2, idx2, value2), deps)) if (as(0) == as2 && as(1) == idx2) =>
+                prevSoft += lastWrite
+                prevSoft ++= deps.sdeps
+                prevHard ++= deps.hdeps
+              case _ => prevHard += lastWrite
+            }
+          } else {
+            prevHard += lastWrite;
+          }
+          // write has soft deps to previous reads
+          if (!reflectHere) prevSoft ++= lr
+        case _ =>
+          // write has hard dependencies on declaration (if declared locally) or block (if declared globally, i.e., out of current block)
+          prevHard += latest(key);
+      })
+      // gather effect dependencies 2): if we enforce reifyHere (reify in current block), add curBlock as hard dependencies
+      if (reifyHere) prevHard += curBlock
+      // gather effect dependencies 3): handle read keys (i.e., reads have hard dependencies on previous write)
+      reads.foreach(key => prevHard += getLastWrite(key))
+      (prevHard.toSet, prevSoft.toSet)
+    }
+
     // def num[T](m: Manifest[T]): Numeric[T] = m match {
     //   case t: Manifest[Int] => implicitly[Numeric[Int]]
     //   case t: Manifest[Float] => implicitly[Numeric[Float]]
@@ -105,6 +137,13 @@ object Adapter extends FrontEnd {
           // rs is part of the list of read since the last write
           curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined } =>
         Some(Const(()))
+
+      // as(i) = rs; ...; as(i) = rs => as(i) = rs; ...; () side condition no write in-between
+      case ("array_set", List(as: Exp, i, rs)) if ({curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw)}) match {
+          case Some(Node(_, "array_set", List(as2, idx2, value2), _)) if (as == as2 && i == idx2 && value2 == rs) => true
+          case _ => false
+        }
+      }) => Some(Const(()))
 
       // TODO: should be handle by the case below. However it doesn't because of aliasing issues!
       // (x + idx)->i = (x + idx)->i => ()    side condition: no write in-between! (on x)
@@ -526,7 +565,7 @@ trait DslGenC extends CGenBase with CGenNumericOps
         int c;
 
         while ((c = *str++) && len--)
-          hash = ((hash << 5) + hash) + c; // hash * 33 + c 
+          hash = ((hash << 5) + hash) + c; // hash * 33 + c
 
         return hash;
       }
