@@ -241,12 +241,12 @@ class GraphBuilder {
             // update effect environments (curEffects, curLocalReads, and curLocalWrites)
             curLocalReads ++= reads
             curLocalWrites ++= writes
-            reads.foreach { key =>
+            for (key <- reads) {
               val (lw, lrs) = curEffects.getOrElse(key, (curBlock, Nil)) // FIXME really?
               curEffects += key -> (lw, res::lrs)
               if (key == STORE) curEffects += res -> (res, Nil) // Needed to notify res was defined locally
             }                                                            // Do we want it?
-            writes.foreach { key => curEffects += key -> (res, Nil) }
+            for (key <- writes) { curEffects += key -> (res, Nil) }
             res
           }
 
@@ -272,22 +272,30 @@ class GraphBuilder {
   def gatherEffectDeps(reads: Set[Exp], writes: Set[Exp], s: String, as: Def*): (Set[Sym], Set[Sym]) = {
     val (prevHard, prevSoft) = (new mutable.ListBuffer[Sym], new mutable.ListBuffer[Sym])
     // gather effect dependencies 1): handle the write keys
-    writes.foreach{key => curEffects.get(key) match {
-      case Some((lw, lr)) =>
-        // write has hard dependencies on previous write (this is conservative for array case, Store, Ctrl,...)
-        prevHard += latest(lw);
-        // write has soft dependencies on previous read (just enforcing order, do not enforcing the reads to be scheduled)
-        if (!reflectHere) prevSoft ++= lr else Nil // FIXME(feiw) why not adding soft dependencies when not reflectHere?
-      case _ =>
-        // write has hard dependencies on declaration (if declared locally) or block (if declared globally, i.e., out of current block)
-        prevHard += latest(key);
-    }}
+    for (key <- writes) {
+      curEffects.get(key) match {
+        case Some((lw, lr)) =>
+          val (sdeps, hdeps) = gatherEffectDepsWrite(s, as, lw, lr)
+          prevSoft ++= sdeps; prevHard ++= hdeps
+        case _ =>
+          // write has hard dependencies on declaration (if declared locally) or block (if declared globally, i.e., out of current block)
+          prevHard += latest(key);
+      }
+    }
     // gather effect dependencies 2): if we enforce reifyHere (reify in current block), add curBlock as hard dependencies
     if (reifyHere) prevHard += curBlock
     // gather effect dependencies 3): handle read keys (i.e., reads have hard dependencies on previous write)
-    reads.foreach(key => prevHard += getLastWrite(key))
+    for (key <- reads) {
+      prevHard += getLastWrite(key)
+    }
     (prevHard.toSet, prevSoft.toSet)
   }
+
+  // Conservative handling of dependencies for write keys: (return soft deps and hard deps respectively)
+  // 1) write has hard dependencies on previous write (this is conservative for array case, Store, Ctrl,...)
+  // 2) write has soft dependencies on previous read (just enforcing order, do not enforcing the reads to be scheduled)
+  def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Seq[Sym], Seq[Sym]) =
+    (if (!reflectHere) lr else Seq(), Seq(latest(lw))) // FIXME(feiw) why not adding soft dependencies when not reflectHere?
 
   // FIXME: take EffectSummary as argument?
   def reflect(x: Sym, s: String, as: Def*)(summary: EffectSummary = emptySummary): Sym = {
