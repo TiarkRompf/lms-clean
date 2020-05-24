@@ -98,6 +98,24 @@ class LambdaTest extends TutorialFunSuite {
     check("lambda_05", driver.code, "scala")
   }
 
+  test("lambda_closure") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 100
+        val f = fun( { (n: Rep[Int]) =>
+          x = 50
+          NewArray[Int](n)
+        })
+        val arr = f(2)
+        arr(0) = 1
+        println(arr(1))
+        println(x)
+      }
+    }
+    check("lambda_closure", driver.code, "scala")
+  }
+
   test("recursion_1") {
     val driver = new DslDriver[Int,Int] {
 

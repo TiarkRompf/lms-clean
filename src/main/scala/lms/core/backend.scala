@@ -349,15 +349,13 @@ class GraphBuilder {
           ??? // FIXME what about @, ?, array_apply => conservative write on all args?
       }
 
-      // For @ we need to transfer effect on parameters
-      // on the actual values
-      for ((x: Exp, xin) <- args zip argsSym) {
-          if (fwrites(xin)) writes += x
-          else if (freads(xin))  reads += x
-      }
+      // For @ we need to replace the effect on parameters to the actual arguments.
+      // the asInstanceOf seems unsafe at first glance. However, it is not a problem since a standalone block
+      // should never be an argument in function application.
+      val updated_fwrites: Set[Exp] = fwrites.map(k => if (argsSym.contains(k)) args(argsSym.indexOf(k)).asInstanceOf[Exp] else k)
+      val updated_freads: Set[Exp] = freads.map(k => if (argsSym.contains(k)) args(argsSym.indexOf(k)).asInstanceOf[Exp] else k)
+      (reads ++ updated_freads, writes ++ updated_fwrites)
 
-      // We also need to add Const effect:
-      (reads ++ freads.filter(_.isInstanceOf[Const]), writes ++ fwrites.filter(_.isInstanceOf[Const]))
     case _ =>
       val reads = new mutable.HashSet[Exp]
       val writes = new mutable.HashSet[Exp]
