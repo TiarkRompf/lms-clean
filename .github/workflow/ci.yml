@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps: 
-      - name: Import Submoudles
+      - name: Checkout
         uses: actions/checkout@v1
 
       - name: Compile
