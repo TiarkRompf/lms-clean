@@ -282,7 +282,10 @@ class GraphBuilder {
           prevHard += latest(key);
       }
     }
-    // gather effect dependencies 2): if we enforce reifyHere (reify in current block), add curBlock as hard dependencies
+    // gather effect dependencies 2): handling of reifyHere
+    // reifyHere is an Effect Optimization for conditionals (if and switch)
+    // it allows the block of conditionals to be aware of the `curEffects` out of the block
+    // The exact demonstration of the optimization is yet unknown, should investigate.
     if (reifyHere) prevHard += curBlock
     // gather effect dependencies 3): handle read keys (i.e., reads have hard dependencies on previous write)
     for (key <- reads) {
