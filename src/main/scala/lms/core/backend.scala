@@ -285,7 +285,7 @@ class GraphBuilder {
     // gather effect dependencies 2): handling of reifyHere
     // reifyHere is an Effect Optimization for conditionals (if and switch)
     // it allows the block of conditionals to be aware of the `curEffects` out of the block
-    // The exact demonstration of the optimization is yet unknown, should investigate.
+    // The exact demonstration of the optimization is in test IfDCETest "if_effect_reifyHere".
     if (reifyHere) prevHard += curBlock
     // gather effect dependencies 3): handle read keys (i.e., reads have hard dependencies on previous write)
     for (key <- reads) {

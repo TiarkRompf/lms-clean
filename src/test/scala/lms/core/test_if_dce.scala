@@ -77,4 +77,23 @@ class IfDCETest extends TutorialFunSuite {
     }
     check("if_effect", driver.code, "c")
   }
+
+  test("if_effect_reifyHere") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 0
+        var y = 0
+        if (arg == 0) {
+          x += 1
+          y += 5
+        } else {
+          x += 3
+        }
+        printf("%d\n", y)
+      }
+    }
+    check("if_effect_reifyHere", driver.code, "c")
+  }
+
 }
