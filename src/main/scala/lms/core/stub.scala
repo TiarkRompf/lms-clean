@@ -80,12 +80,12 @@ object Adapter extends FrontEnd {
 
   class MyGraphBuilder extends GraphBuilder {
 
-    override def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Seq[Sym], Seq[Sym]) =
+    override def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Set[Sym], Set[Sym]) =
     findDefinition(latest(lw)) match {
       case Some(Node(_, "array_set", as2, deps)) if (s == "array_set" && as.init == as2.init) =>
         // If latest(lw) is setting the same array at the same index, we do not add hard dependence but soft dependence
         // In addition, we need to inherite the soft and hard deps of latest(lw)
-        (deps.sdeps.toSeq ++ Seq(latest(lw)), deps.hdeps.toSeq)
+        (deps.sdeps + latest(lw), deps.hdeps)
       case _ => super.gatherEffectDepsWrite(s, as, lw, lr)
     }
 
