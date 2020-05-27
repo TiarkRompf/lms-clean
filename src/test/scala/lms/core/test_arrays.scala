@@ -200,4 +200,16 @@ class ArrayTest extends TutorialFunSuite {
     }
     check("realloc_dead2", driver.code, "c")
   }
+  test("array_opt_set_equal") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewArray[Int](10)
+        x(0) = arg
+        x(0) = arg
+        printf("%d", x(1))
+      }
+    }
+    check("array_opt_set_equal", driver.code, "c")
+  }
 }

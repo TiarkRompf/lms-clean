@@ -40,10 +40,9 @@ object Backend {
   // distinguish may/must and read/write effects,
   // soft dependencies, ...
   case class EffectSummary(sdeps: Set[Sym], hdeps: Set[Sym], rkeys: Set[Exp], wkeys: Set[Exp]) {
-  // case class EffectSummary(deps: List[Exp], keys: List[Exp]) {
     lazy val keys = rkeys ++ wkeys
     lazy val deps = sdeps ++ hdeps
-    def isEmpty = sdeps.isEmpty && hdeps.isEmpty && rkeys.isEmpty && wkeys.isEmpty
+    // the string representation of EffectSummary is "[key : sdeps | hdeps]" where write-keys have *.
     def repr(f: Exp => String) = {
       val keyString = (if (rkeys.nonEmpty) rkeys.toSeq.sorted.map(f).mkString(" ") + " " else "") +
         (if (wkeys.nonEmpty) wkeys.toSeq.sorted.map(f(_) + "*").mkString(" ") else "")
@@ -55,9 +54,9 @@ object Backend {
       repr(_.toString)
     } else ""
 
-
-    lazy val hasSimpleEffect = wkeys.exists(key => key.isInstanceOf[Const] && key != STORE)
+    def isEmpty = isPure
     lazy val isPure = sdeps.isEmpty && hdeps.isEmpty && rkeys.isEmpty && wkeys.isEmpty
+    lazy val hasSimpleEffect = wkeys.exists(key => key.isInstanceOf[Const] && key != STORE)
 
     def filter(f: Sym => Boolean) = {
       val nf = (e: Exp) => e match {
@@ -89,7 +88,7 @@ object Backend {
     + Block should separate out input effects, too
     - Should (can?) we get rid of type Def? what prevents
       us from allowing any value as part of rhs
-      (guess: typeclass to/fro conversion for FrontEnd)
+      (guess: typeclass to/from conversion for FrontEnd)
   */
 
   // A definition is part of the right-hand side of a
@@ -205,20 +204,23 @@ class GraphBuilder {
   var reflectHere = false
   def reflectEffectSummary(s: String, as: Def*)(efKeys: (Set[Exp], Set[Exp])): Exp =
     reflectEffect(s, as:_*)(efKeys._1.toSeq:_*)(efKeys._2.toSeq:_*)
-  def reflectEffectSummaryHere(s: String, as: Def*)(efKeys: (Set[Exp], Set[Exp])): Exp = {
+  def reflectEffectSummaryHere(s: String, as: Def*)(efKeys: (Set[Exp], Set[Exp])): Exp =
+    scopedReflectHere(true)(reflectEffectSummary(s, as:_*)(efKeys))
+  def scopedReflectHere(flag: Boolean)(closure: => Exp): Exp = {
     val saveReflectHere = reflectHere
-    reflectHere = true
+    reflectHere = flag
     try {
-      reflectEffect(s, as:_*)(efKeys._1.toSeq:_*)(efKeys._2.toSeq:_*)
+      closure
     } finally { reflectHere = saveReflectHere }
   }
 
   def isCurrentValue(src: Exp, value: Sym) = !curEffects.get(src).filter({ case (_, lrs) => lrs contains value }).isEmpty
+  // This is the main function for reflect with explicit read/write effects
   def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
-    // rewrite?
+    // simple pre-construction optimization
     rewrite(s, as.toList) match {
-      case Some(e) => e
-      case None =>
+      case Some(e) => e // found optimization (resulting in pure expressions only)
+      case None => // no available optimization
         // latent effects? closures, mutable vars, ... (these are the keys!)
         val (reads, _writes) = if (s == "λ") { // NOTE: block in lambda is a latent effect for app, not declaration
           (readEfKeys.toSet, writeEfKeys.toSet)
@@ -226,34 +228,25 @@ class GraphBuilder {
           val (ref, wef) = getLatentEffect(s, as:_*)
           ((ref ++ readEfKeys).toSet, (wef ++ writeEfKeys).toSet)
         }
+        // FIXME(feiw) get this special case refactored.
         val writes = if (s == "reset1") _writes filter (_ != stub.Adapter.CPS) else _writes
 
-        // effects or pure? // FIXME: only reads?
         if (reads.nonEmpty || writes.nonEmpty) {
           lazy val res = {
             val sm = Sym(fresh)
-            // gather effect dependencies
-            val prevHard = new mutable.ListBuffer[Sym]
-            val prevSoft = writes.flatMap(e => curEffects.get(e) match {
-              case Some((lw, lr)) => prevHard += latest(lw); if (!reflectHere) lr else Nil
-              case _ => prevHard += latest(e); Nil
-            })
-            if (reifyHere) prevHard += curBlock
-            prevHard ++= reads.map(getLastWrite(_))
-
+            val (prevHard, prevSoft) = gatherEffectDeps(reads, writes, s, as:_*)
             // prevSoft --= prevHard
-            val summary = EffectSummary(prevSoft.toSet, prevHard.toSet, reads, writes)
+            val summary = EffectSummary(prevSoft, prevHard, reads, writes)
             val res = reflect(sm, s, as:_*)(summary)
+            // update effect environments (curEffects, curLocalReads, and curLocalWrites)
+            curLocalReads ++= reads
+            curLocalWrites ++= writes
             for (key <- reads) {
               val (lw, lrs) = curEffects.getOrElse(key, (curBlock, Nil)) // FIXME really?
               curEffects += key -> (lw, res::lrs)
-              curLocalReads += key
               if (key == STORE) curEffects += res -> (res, Nil) // Needed to notify res was defined locally
             }                                                            // Do we want it?
-            for (key <- writes) {
-              curEffects += key -> (res, Nil)
-              curLocalWrites += key
-            }
+            for (key <- writes) { curEffects += key -> (res, Nil) }
             res
           }
 
@@ -266,7 +259,7 @@ class GraphBuilder {
           // else
             res
         } else {
-          // cse? never for effectful stm
+          // We can run Common Subexpression Elimination (CSE) for pure nodes
           findDefinition(s,as) match {
             case Some(n) => n.n
             case None =>
@@ -275,6 +268,37 @@ class GraphBuilder {
         }
     }
   }
+
+  def gatherEffectDeps(reads: Set[Exp], writes: Set[Exp], s: String, as: Def*): (Set[Sym], Set[Sym]) = {
+    val (prevHard, prevSoft) = (new mutable.ListBuffer[Sym], new mutable.ListBuffer[Sym])
+    // gather effect dependencies 1): handle the write keys
+    for (key <- writes) {
+      curEffects.get(key) match {
+        case Some((lw, lr)) =>
+          val (sdeps, hdeps) = gatherEffectDepsWrite(s, as, lw, lr)
+          prevSoft ++= sdeps; prevHard ++= hdeps
+        case _ =>
+          // write has hard dependencies on declaration (if declared locally) or block (if declared globally, i.e., out of current block)
+          prevHard += latest(key);
+      }
+    }
+    // gather effect dependencies 2): handling of reifyHere
+    // reifyHere is an Effect Optimization for conditionals (if and switch)
+    // it allows the block of conditionals to be aware of the `curEffects` out of the block
+    // The exact demonstration of the optimization is in test IfDCETest "if_effect_reifyHere".
+    if (reifyHere) prevHard += curBlock
+    // gather effect dependencies 3): handle read keys (i.e., reads have hard dependencies on previous write)
+    for (key <- reads) {
+      prevHard += getLastWrite(key)
+    }
+    (prevHard.toSet, prevSoft.toSet)
+  }
+
+  // Conservative handling of dependencies for write keys: (return soft deps and hard deps respectively)
+  // 1) write has hard dependencies on previous write (this is conservative for array case, Store, Ctrl,...)
+  // 2) write has soft dependencies on previous read (just enforcing order, do not enforcing the reads to be scheduled)
+  def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Set[Sym], Set[Sym]) =
+    (if (!reflectHere) lr.toSet else Set(), Set(latest(lw))) // FIXME(feiw) why not adding soft dependencies when not reflectHere?
 
   // FIXME: take EffectSummary as argument?
   def reflect(x: Sym, s: String, as: Def*)(summary: EffectSummary = emptySummary): Sym = {
@@ -343,7 +367,6 @@ class GraphBuilder {
         writes ++= wef
       }
       (reads, writes)
-
   }
 
 
@@ -381,7 +404,7 @@ class GraphBuilder {
     def +=(kv: (Exp, (Sym, List[Sym]))) = map += kv
   }
 
-  def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block = {
+  def withBlockScopedEnv(here: Boolean)(closure: => Block): Block = {
     val save = curBlock
     val saveEffects = curEffects
     val saveLocalDefs = curLocalDefs
@@ -389,31 +412,13 @@ class GraphBuilder {
     val saveLocalWrites = curLocalWrites
     val saveReifyHere = reifyHere
     try {
-      val block = Sym(fresh)
-      val args = (0 until arity).toList.map(_ => Sym(fresh))
-      curBlock = block
+      curBlock = Sym(fresh)
       curEffects = BlockEffect(Map(), if (here) curEffects else null)
       reifyHere = here
       curLocalDefs = Set()
       curLocalReads = Set()
       curLocalWrites = Set()
-      val res = f(args)
-      // remove local definitions from visible effect keys
-      // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
-      // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
-      // TODO:
-      //  - if tests
-      //  - while tests
-      //  - closure test
-      val reads = curLocalReads.filterNot(curLocalDefs)
-      val writes = curLocalWrites.filterNot(curLocalDefs)
-      var hard = writes.map(curEffects.map(_)._1)
-      if (curEffects.map contains res) // if res is a local mutable (e.g. Array)
-        hard += curEffects.map(res)._1
-      if (hard.isEmpty)
-        hard = Set(curBlock)
-
-      Block(args, res, block, EffectSummary(Set(), hard, reads, writes))
+      closure
     } finally {
       curBlock = save
       curEffects = saveEffects
@@ -422,6 +427,27 @@ class GraphBuilder {
       curLocalWrites = saveLocalWrites
       reifyHere = saveReifyHere
     }
+  }
+
+  def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block = withBlockScopedEnv(here){
+    val args = (0 until arity).toList.map(_ => Sym(fresh))
+    val res = f(args)
+    // remove local definitions from visible effect keys
+    val reads = curLocalReads.filterNot(curLocalDefs)
+    val writes = curLocalWrites.filterNot(curLocalDefs)
+    // TODO: it is possible to remove the dependencies, too (--> DCE for var_set / need to investigate more)
+    // for (e <- curEffects.keys if curLocalDefs(e)) curEffects -= e
+    // TODO:
+    //  - if tests
+    //  - while tests
+    //  - closure test
+    var hard = writes.map(curEffects.map(_)._1)
+    if (curEffects.map contains res) // if res is a local mutable (e.g. Array)
+      hard += curEffects.map(res)._1
+    if (hard.isEmpty)
+      hard = Set(curBlock)
+
+    Block(args, res, curBlock, EffectSummary(Set(), hard, reads, writes))
   }
 }
 

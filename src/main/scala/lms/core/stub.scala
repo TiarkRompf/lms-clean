@@ -80,6 +80,15 @@ object Adapter extends FrontEnd {
 
   class MyGraphBuilder extends GraphBuilder {
 
+    override def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Set[Sym], Set[Sym]) =
+    findDefinition(latest(lw)) match {
+      case Some(Node(_, "array_set", as2, deps)) if (s == "array_set" && as.init == as2.init) =>
+        // If latest(lw) is setting the same array at the same index, we do not add hard dependence but soft dependence
+        // In addition, we need to inherite the soft and hard deps of latest(lw)
+        (deps.sdeps + latest(lw), deps.hdeps)
+      case _ => super.gatherEffectDepsWrite(s, as, lw, lr)
+    }
+
     // def num[T](m: Manifest[T]): Numeric[T] = m match {
     //   case t: Manifest[Int] => implicitly[Numeric[Int]]
     //   case t: Manifest[Float] => implicitly[Numeric[Float]]
@@ -105,6 +114,13 @@ object Adapter extends FrontEnd {
           // rs is part of the list of read since the last write
           curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined } =>
         Some(Const(()))
+
+      // as(i) = rs; ...; as(i) = rs => as(i) = rs; ...; () side condition no write in-between
+      case ("array_set", List(as: Exp, i, rs)) if ({curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw)}) match {
+          case Some(Node(_, "array_set", List(as2, idx2, value2), _)) if (as == as2 && i == idx2 && value2 == rs) => true
+          case _ => false
+        }
+      }) => Some(Const(()))
 
       // TODO: should be handle by the case below. However it doesn't because of aliasing issues!
       // (x + idx)->i = (x + idx)->i => ()    side condition: no write in-between! (on x)
@@ -526,7 +542,7 @@ trait DslGenC extends CGenBase with CGenNumericOps
         int c;
 
         while ((c = *str++) && len--)
-          hash = ((hash << 5) + hash) + c; // hash * 33 + c 
+          hash = ((hash << 5) + hash) + c; // hash * 33 + c
 
         return hash;
       }
