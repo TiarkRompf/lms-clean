@@ -322,49 +322,88 @@ class GraphBuilder {
   of closure conversion).
   */
 
+  // The sub function collect readkeys and writekeys of a Def
   def getLatentEffect(x: Def): (Set[Exp], Set[Exp]) = x match {
     case b: Block =>
       getEffKeys(b)
     case s: Sym =>
       findDefinition(s) match {
+        // 1. At first glance, this lambda case seems redundant, because we know function definition should
+        //    not impose effects (only function application can)
+        //    However, in some cases, function application is done with syntax other than `@`
+        //    for instance: forloop(3, x => x + 1), where `forloop` is a target langange construct that `applies`
+        //    the lambda 3 times. These flexible target language constructs allows functions to be applied in a
+        //    non-@ syntax, thus complicating the effect computation here.
+        // 2. FIXME(feiw):
+        //    You can see that we are not getting the effect for lambda arguments here, because we have an (unchecked)
+        //    assumption that the functions in these target langauge constructs do not have effects on parameters.
+        //    If they do, we are not sure how to get the arguments, so to propagate the effects from parameters to arguments.
         case Some(Node(_, "λ", (b@Block(ins, out, ein, eout))::_, _)) =>
           getEffKeys(b)
+        // FIXME(feiw):
+        // In fact, it appears to have errors here, since lambdas can be wrapped in other structs (such as conditionals)
         case _ =>
           (Set[Exp](), Set[Exp]())
       }
     case _ =>
       (Set[Exp](), Set[Exp]())
   }
-  def getLatentEffect(op: String, xs: Def*): (mutable.Set[Exp], mutable.Set[Exp]) = (op, xs) match {
-    case ("@", (f: Sym)+:args) => // should be a lambda. Block?
-      val (reads, writes) = getLatentEffect("useless", args:_*)
-      val ((freads, fwrites), argsSym) = findDefinition(f) match {
-        case Some(Node(_, "λ", (b@Block(ins, out, ein, eout))::_, _)) =>
-          (getEffKeys(b), ins)
-        case Some(Node(_, "λforward", _, _)) => // what about doubly recursive?
-          ((Set[Exp](), Set[Exp](Const("CTRL"))), Nil)
-        case None => // FIXME: function argument? fac-01 test used for recursive function...
-          ((Set[Exp](), Set[Exp](Const("CTRL"))), Nil)
-        case Some(_) =>
-          ??? // FIXME what about @, ?, array_apply => conservative write on all args?
-      }
+  // This sub function is a thin wrapper of getLatentEffect(Def) to accumulate effects of multiple Defs
+  def getLatentEffect(xs: Def*): (Set[Exp], Set[Exp]) =
+    xs.foldLeft((Set[Exp](), Set[Exp]())) { case ((r, w), x) =>
+      val (ref, wef) = getLatentEffect(x)
+      (r ++ ref, w ++ wef)
+    }
 
-      // For @ we need to replace the effect on parameters to the actual arguments.
-      // the asInstanceOf seems unsafe at first glance. However, it is not a problem since a standalone block
-      // should never be an argument in function application.
-      val updated_fwrites: Set[Exp] = fwrites.map(k => if (argsSym.contains(k)) args(argsSym.indexOf(k)).asInstanceOf[Exp] else k)
-      val updated_freads: Set[Exp] = freads.map(k => if (argsSym.contains(k)) args(argsSym.indexOf(k)).asInstanceOf[Exp] else k)
-      (reads ++ updated_freads, writes ++ updated_fwrites)
+  // The sub function for getting latent effects for functions
+  // It takes an expression that should be a lambda (or lambda forward)
+  // It returns this ((read_keys, write_keys), (read_parameters, write_parameters), result)
+  //                   Set[Exp]   Set[Exp]      Set[Int]: index  Set[Int]: index    Option[Exp]
+  // Using Set[Int] (index) for read_parameters and write_parameters is necessary because in the
+  //     conditional case, the parameters may have different names (symbols) and cannot be Unioned.
+  //     the indices can be unioned easily
+  // Using Option[Exp] for result is necessary because the result might be
+  //    another function that is applied (we need to get its latent effects).
+  // FIXME(feiw) Dig further to see if/why lambda_forward or None cases are correct
+  // FIXME(feiw) in the conditional case, the handling of result is still wrong.
+  def getLambdaLatentEffect(f: Exp): ((Set[Exp], Set[Exp]),(Set[Int], Set[Int]), Option[Exp]) = findDefinition(f) match {
+      case Some(Node(_, "λ", List(b:Block), _)) =>
+        getEffKeysWithParam(b)
+      case Some(Node(_, "λforward", _, _)) => // what about doubly recursive?
+        ((Set[Exp](), Set[Exp](Const("CTRL"))), (Set[Int](), Set[Int]()), None)
+      case None => // FIXME: function argument? fac-01 test used for recursive function...
+        ((Set[Exp](), Set[Exp](Const("CTRL"))), (Set[Int](), Set[Int]()), None)
+      case Some(Node(_, "@", (f: Sym)+:args, _)) =>
+        val ((rk, wk), Some(f_res)) = getApplyLatentEffect(f, args: _*)
+        val ((rk2, wk2), (prk2, pwk2), f_res_res) = getLambdaLatentEffect(f_res)
+        ((rk ++ rk2, wk ++ wk2), (prk2, pwk2), f_res_res)
+      case Some(Node(_, "?", c::Block(ins, out, ein, eout)::Block(ins2, out2, ein2, eout2)::Nil, _)) =>
+        val ((rk, wk), (prk, pwk), _) = getLambdaLatentEffect(out)
+        val ((rk2, wk2), (prk2, pwk2), _) = getLambdaLatentEffect(out2)
+        ((rk ++ rk2, wk ++ wk2), (prk ++ prk2, pwk ++ pwk2), None) // FIXME(feiw)
+      case Some(e) =>
+        ??? // FIXME what about @, ?, array_apply => conservative write on all args?
+  }
 
-    case _ =>
-      val reads = new mutable.HashSet[Exp]
-      val writes = new mutable.HashSet[Exp]
-      for (x <- xs) {
-        val (ref, wef) = getLatentEffect(x)
-        reads ++= ref
-        writes ++= wef
-      }
-      (reads, writes)
+  // The sub function for getting latent effects for function application
+  // 1. get the lambda latent effects from the function
+  // 2. update the lambda latent effects (replace parameters with arguments)
+  // The sub functon also returns the result of the function because the result might
+  //    be another function that is applied (we need to get its latent effects).
+  def getApplyLatentEffect(f: Sym, args: Def*): ((Set[Exp], Set[Exp]), Option[Exp]) = {
+    val (reads, writes) = getLatentEffect(args: _*)
+    val ((freads, fwrites), (preads, pwrites), res) = getLambdaLatentEffect(f)
+    // For @ we need to replace the effect on parameters to the actual arguments.
+    // the asInstanceOf seems unsafe at first glance. However, it is not a problem since a standalone block
+    // should never be an argument in function application.
+    ((reads ++ freads ++ preads.map(args(_).asInstanceOf[Exp]), writes ++ fwrites ++ pwrites.map(args(_).asInstanceOf[Exp])), res)
+  }
+
+  // The main function for getting latent effects
+  // Latent effects are effects in Blocks (conditional, loop, lambda)
+  def getLatentEffect(op: String, xs: Def*): (Set[Exp], Set[Exp]) = (op, xs) match {
+    case ("@", (f: Sym)+:args) => getApplyLatentEffect(f, args:_*)._1
+    case _ => getLatentEffect(xs:_*)
   }
 
 
@@ -387,6 +426,15 @@ class GraphBuilder {
   def getEffKeys(b: Block) = (b.eff.rkeys, b.eff.wkeys)
   def mergeEffKeys(b: Block, c: Block) =
     (b.eff.rkeys ++ c.eff.rkeys, b.eff.wkeys ++ c.eff.wkeys)
+  def splitParamKeys(keys: Set[Exp], ins: List[Sym]): (Set[Exp], Set[Int]) = {
+    val (params, keysWithOutParams) = keys.partition(ins.contains(_))
+    (keysWithOutParams, params.map(ins.indexOf(_)))
+  }
+  def getEffKeysWithParam(b: Block) = {
+    val (brkeys, prkeys) = splitParamKeys(b.eff.rkeys, b.in)
+    val (bwkeys, pwkeys) = splitParamKeys(b.eff.wkeys, b.in)
+    ((brkeys, bwkeys), (prkeys, pwkeys), Some(b.res))
+  }
 
   def reify(f: => Exp): Block =  reify(0, _ => f)
   def reifyHere(f: => Exp): Block =  reify(0, xs => f, true)
