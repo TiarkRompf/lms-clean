@@ -45,7 +45,7 @@ abstract class Traverser {
   var inner: Seq[Node] = _
 
   // This `blockEffectPath` is currently unused.
-  val blockEffectPath = new mutable.HashMap[Block,Set[Exp]]
+  val blockEffectPath = new mutable.HashMap[Block, Set[Exp]]
 
   // This `withScope` function maintains the old `path` and `inner` when entering a new block
   // with new `path` (as parameter `p`) and new `inner` (as parameter `ns`).
