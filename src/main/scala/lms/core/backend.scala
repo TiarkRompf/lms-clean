@@ -121,15 +121,6 @@ object Backend {
       case _ => Nil
     }
 
-  // TODO: remove filter syms
-  def filterSym(x: List[Exp]): Set[Sym] = x collect { case s: Sym => s } toSet
-  def symsAndEffectSyms(x: Node): (Set[Sym], Set[Sym]) = ((Set[Sym](), x.eff.hdeps.toSet) /: x.rhs) {
-    case ((syms, symsEffect), s: Sym) => (syms + s, symsEffect)
-    case ((syms, symsEffect), Block(_, res: Sym, _, eff)) => (syms + res, symsEffect ++ eff.hdeps)
-    case ((syms, symsEffect), Block(_, _, _, eff)) => (syms, symsEffect ++ eff.hdeps)
-    case (agg, _) => agg
-  }
-
   def syms(x: Node): List[Sym] = {
     x.rhs.flatMap {
       case s: Sym => List(s)
@@ -354,6 +345,7 @@ class GraphBuilder {
     case _ =>
       (Set[Exp](), Set[Exp]())
   }
+
   // getLaternEffect(xs: Def*) wrappers getLatentEffect(x: Def) and accumulate effects of multiple Defs
   def getLatentEffect(xs: Def*): (Set[Exp], Set[Exp]) =
     xs.foldLeft((Set[Exp](), Set[Exp]())) { case ((r, w), x) =>
