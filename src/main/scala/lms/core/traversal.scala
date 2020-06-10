@@ -74,7 +74,7 @@ abstract class Traverser {
   // This `withResetScope` function maintains the old `inner` when entering a new block
   // with new `inner` (as paramtere `ns`).
   // It is so far only used in test6_tensors.scala for ???
-  def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
+  def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     assert(path.takeRight(p.length) == p, s"$path -- $p")
     val inner0 = inner
     inner = ns
