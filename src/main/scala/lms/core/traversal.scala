@@ -29,7 +29,7 @@ abstract class Traverser {
 
 
   // This `bound` is used to track the dependent bound variable of each node
-  // See the implementation in lms-clean/src/main/scala/lms/core/backend.scala `class Bound`
+  // See the implementation in src/main/scala/lms/core/backend.scala `class Bound`
   // It is initialized in the `apply()` function of this class
   val bound = new Bound
 
