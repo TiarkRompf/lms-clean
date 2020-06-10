@@ -138,7 +138,7 @@ abstract class Traverser {
           reach ++= hardSyms(d)
         }
       }
-      if (reachInner contains d.n) {
+      if (reachInner.contains(d.n)) {
         reachInner ++= hardSyms(d)
       }
     }
