@@ -367,7 +367,23 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   def record(man: RefinedManifest[_]): String = ""
   def function(sig: List[Manifest[_]]): String = ""
   def remapUnsigned(m: Manifest[_]) = ???
-  override def remap(m: Manifest[_]): String = m.toString
+  override def remap(m: Manifest[_]): String = {
+    m.runtimeClass.getName match {
+      case "scala.Function0" =>
+        val ret = m.typeArguments(0)
+        s"Function0[${remap(ret)}]"
+      case "scala.Function1" =>
+        val fst = m.typeArguments(0)
+        val ret = m.typeArguments(1)
+        s"Function2[${remap(fst)}, ${remap(ret)}]"
+      case "scale.Function2" =>
+        val fst = m.typeArguments(0)
+        val snd = m.typeArguments(1)
+        val ret = m.typeArguments(2)
+        s"Function2[${remap(fst)}, ${remap(snd)}, ${remap(ret)}]"
+      case _ => m.toString
+    }
+  }
 
   val nameMap: Map[String, String] = Map( // FIXME: tutorial-specific
     "ScannerNew"     -> "new scala.lms.tutorial.Scanner",
