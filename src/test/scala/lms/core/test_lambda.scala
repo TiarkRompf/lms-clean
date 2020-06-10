@@ -98,6 +98,241 @@ class LambdaTest extends TutorialFunSuite {
     check("lambda_05", driver.code, "scala")
   }
 
+  // test("nameless_lambda") {
+  //   val driver = new DslDriver[Int,Unit] {
+  //     @virtualize
+  //     def snippet(arg: Rep[Int]) = {
+  //       printf("%d\n", (fun[Int, Int] { (n: Rep[Int]) => n + 1 })(arg))
+  //     }
+  //   }
+  //   System.out.println(indent(driver.code))
+  // }
+
+  // Test for lambdas returned in conditionals
+  test("returned_lambda_0") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val f = if (arg == 0) {
+          fun { (n: Rep[Int]) => 1 }
+        } else {
+          fun { (n: Rep[Int]) => 2 }
+        }
+        println(f(arg))
+      }
+    }
+    check("returned_lambda_0", driver.code, "scala")
+  }
+
+  // Test for lambdas returned in conditionals with effects on parameters
+  test("returned_lambda_1") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val f = if (arg == 0) {
+          fun { (a: Rep[Array[Int]]) => a(0) = 8; 1 }
+        } else {
+          fun { (a: Rep[Array[Int]]) => a(0) = 9; 2 }
+        }
+        val arr = NewArray[Int](10)
+        f(arr)
+        printf("%d %d", arr(0), arr(1))
+      }
+    }
+    check("returned_lambda_1", driver.code, "scala")
+  }
+
+  // Test for lambdas returned by lambdas
+  test("curried_lambda_0") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val f = fun { (n: Rep[Int]) =>
+          fun { (m: Rep[Int]) => n + m }
+        }
+        printf("%d", f(arg)(arg+1))
+      }
+    }
+    check("curried_lambda_0", driver.code, "scala")
+  }
+
+  // Test for lambdas returned by lambdas with effect on global variables
+  test("curried_lambda_1") {
+    val driver = new DslDriver[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 0
+        var y = 1
+        val f = fun { (n: Rep[Int]) =>
+          x = 1
+          fun { (m: Rep[Int]) =>
+            y = 2
+            m + n
+          }
+        }
+        printf("%d, %d, %d", f(arg)(arg), x, y)
+      }
+    }
+    check("curried_lambda_1", driver.code, "scala")
+  }
+
+  // Test for lambdas returned by lambdas returned by lambdas with effect
+  // on global variables
+  test("curried_lambda_2") {
+    val driver = new DslDriver[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 0
+        var y = 1
+        var z = 2
+        val f = fun { (n: Rep[Int]) =>
+          x = 1
+          fun { (m: Rep[Int]) =>
+            y = 2
+            fun { (x: Rep[Int]) =>
+              z = 3
+              n + m + x
+            }
+          }
+        }
+        printf("%d %d %d %d", f(arg)(arg)(arg), x, y, z)
+      }
+    }
+    check("curried_lambda_2", driver.code, "scala")
+  }
+
+  // Test for lambdas returned by lambdas returned by lambdas with effect
+  // on input variables
+  test("curried_lambda_array_0") {
+    val driver = new DslDriver[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val arr = NewArray[Int](10)
+        val arr2 = NewArray[Int](5)
+        val f = fun { (n: Rep[Array[Int]]) =>
+          n(0) = 1
+          fun { (n: Rep[Array[Int]]) =>
+            n(1) = 2
+            fun { (n: Rep[Array[Int]]) =>
+              n(2) = 3
+            }
+          }
+        }
+        f(arr)(arr)(arr2)
+        printf("%d, %d, %d, %d", arr(0), arr(1), arr2(0), arr2(2))
+      }
+    }
+    check("curried_lambda_array_0", driver.code, "scala")
+  }
+
+  // Test for nested function application
+  test("nested_application") {
+    val driver = new DslDriver[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 0
+        var y = 1
+        val f = fun { (n: Rep[Int]) => x = 1; n + 1}
+        val g = fun { (n: Rep[Int]) => y = 3; n + 2}
+        val res = f(g(arg))
+        printf("%d, %d, %d", x, y, res)
+      }
+    }
+    check("nested_application", driver.code, "scala")
+  }
+
+  test("lambda_closure") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        var x = 100
+        val f = fun( { (n: Rep[Int]) =>
+          x = 50
+          NewArray[Int](n)
+        })
+        val arr = f(2)
+        arr(0) = 1
+        println(arr(1))
+        println(x)
+      }
+    }
+    check("lambda_closure", driver.code, "scala")
+  }
+
+  // Test for closed variables (outer scope is stage-level function)
+  test("lambda_closure_1") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        def get_fun() = {
+          var x = 100
+          val f = fun({ (n: Rep[Int]) =>
+            val a = NewArray[Int](n)
+            a(0) = x
+            x = 20
+            a
+          })
+          (f, x)
+        }
+        val (f, x) = get_fun()
+        val arr = f(3)
+        arr(1) = x
+        println(arr(0))
+        println(arr(1))
+        println(arr(2))
+      }
+    }
+    check("lambda_closure_1", driver.code, "scala")
+  }
+
+  // Test for closed variables (outer scope is conditional)
+  test("lambda_closure_2") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val f = if (arg == 0) {
+          var x = 100
+          fun({ (n: Rep[Int]) =>
+            val a = NewArray[Int](n)
+            a(0) = x
+            a
+          })
+        } else {
+          var y = 40
+          fun({ (n: Rep[Int]) =>
+            val b = NewArray[Int](n)
+            b(0) = y
+            b
+          })
+        }
+        val arr = f(3)
+        arr(1) = 70
+        println(arr(0))
+        println(arr(1))
+        println(arr(2))
+      }
+    }
+    check("lambda_closure_2", driver.code, "scala")
+  }
+
+  // FIXME(feiw): need tuple support from Guannan's PR
+  // test("lambda_closure_3") {
+  //   val driver = new DslDriver[Int, Unit] {
+  //     @virtualize
+  //     def snippet(arg: Rep[Int]) = {
+  //       val f = fun { (n: Rep[Int]) =>
+  //         var x = 0
+  //         val g = fun { (m: Rep[Int]) => x = 1; n + m}
+  //         (g, x)
+  //       }
+  //       val ff = f(arg)
+  //       val res = ff._1(arg + 1)
+  //       printf("%d, %d", ff._2, res)
+  //     }
+  //   }
+  //   System.out.println(indent(driver.code))
+  // }
+
   test("recursion_1") {
     val driver = new DslDriver[Int,Int] {
 
