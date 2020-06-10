@@ -50,7 +50,7 @@ abstract class Traverser {
   // This `withScope` function maintains the old `path` and `inner` when entering a new block
   // with new `path` (as parameter `p`) and new `inner` (as parameter `ns`).
   // The block function `b` takes no parameters
-  def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
+  def withScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     val (path0, inner0) = (path, inner)
     path = p; inner = ns;
     try b finally { path = path0; inner = inner0 }
