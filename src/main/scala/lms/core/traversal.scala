@@ -278,8 +278,18 @@ abstract class Traverser {
 
 }
 
+/**
+ * CPSTraverser is an adaptation of regular Traverser, where the traverse calls
+ * are carried out in Continuation-Passing Style (CPS). The CPS style is featured
+ * by the `k` parameter of each `traverse` function, which is the `continuation`
+ * after each `traverse` function. The main idea is that for each `traverse` call,
+ * what needs to happen after are captured in the `continuation`, such that when
+ * a `traverse` function returns, the traverse of all the nodes are done already.
+ */
 abstract class CPSTraverser extends Traverser {
 
+  // Note that the continuation of `traverse(block)` need to use the original
+  // `path0` and `inner0`, as shown in the `(v => withScope(path0, inner0)(k(v)))`
   def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit =
     scheduleBlock_(y, extra: _*) { (path1, inner1, outer1, y) =>
       withScopeCPS(path1, inner1) { (path0, inner0) =>
@@ -287,6 +297,8 @@ abstract class CPSTraverser extends Traverser {
       }
     }
 
+  // Similarly, when traversing a list of nodes or blocks (the next function),
+  // the rest of the blocks are traversed in the continuation of the first node/block
   def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit = {
     if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(y.res)
   }
