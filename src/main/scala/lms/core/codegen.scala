@@ -11,7 +11,7 @@ import Backend._
 class Unknown // HACK: Sentinel for typeMap
 
 /**
- * This class demonstrates a minimal code generator from Traverser.
+ * This `GenericCodeGen` class demonstrates a minimal code generator from Traverser.
  * It is not used in production.
  */
 class GenericCodeGen extends Traverser {
@@ -39,7 +39,19 @@ class GenericCodeGen extends Traverser {
   }
 }
 
-
+/**
+ * This `ExtendedCodeGen` trait defines several interfaces for all Extend*CodeGen,
+ * where * refers to a target language such as Scala, C, CPP, Rust.
+ * 1. Interface for code gen stream, emit, emitln.
+ * 2. Interface for typeMap (from backend.Exp to Manifest).
+ * 3. Interface for remap (from Manifest to String representation of the type).
+ * 4. Interface for dead code elimination (DCE).
+ * 5. Interface for quote* (code gen of Exp, Block, and static data).
+ * 5* Interface for shallow* (code gen of a target langauge right-hand-side)
+ * 5* Interface for traverse* (code gen of a target language statement)
+ * 6. Interface for nameMap (from IR Op string to target language function).
+ * 7. Interface for code gen (emitAll).
+ */
 trait ExtendedCodeGen {
 
   // Method Group 1: stream and emit (for codegen string handling)
@@ -115,4 +127,162 @@ trait ExtendedCodeGen {
 
   // Head Function: emitAll take a graph and generate the code.
   def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit
+}
+
+
+abstract class CompactCodeGen extends CompactTraverser {
+
+  // process and print block results
+  override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
+    wraper(numStms, lastNode, y) {
+      super.traverseCompact(ns, y)
+    }
+  }
+  // the `emit` and `emitln` are basic codegen units.
+  // the actual desitination of them are determined by children classes.
+  def emit(s: String): Unit
+  def emitln(s: String = ""): Unit
+
+  /**
+   * `quote` family of methods are used to emit a codegen unit (a variable, constant, or block)
+   * We have `quote` for variable/const
+   *         `quoteEff` for effects
+   *         `quoteBlock` `quoteBlockP` `quoteElseBlock` for
+   *          block,    block with precedence, and else block
+   */
+  // with `rename` `doRename` and the usage of them in `quote`, we may
+  // rename variables (say from x6 to x4).
+  val rename = new mutable.HashMap[Sym,String]
+  var doRename = true
+  def quote(s: Def): String = s match {
+    case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
+    case Sym(n) => s.toString
+    case Const(s: String) => "\""+s.replace("\"", "\\\"").replace("\n","\\n").replace("\t","\\t")+"\"" // TODO: more escapes?
+    case Const(x: Char) if x == '\n' => "'\\n'"
+    case Const(x: Char) if x == '\t' => "'\\t'"
+    case Const(x: Char) if x == 0    => "'\\0'"
+    case Const(x: Char) => "'"+x+"'"
+    case Const(x: Long) => x.toString + "L"
+    case Const(x) => x.toString
+  }
+
+  // with `doPrintEffects` and `quoteEff`, we can optionally print the effect information
+  var doPrintEffects = false
+  def quoteEff(x: Def): String =
+    if (!doPrintEffects) ""
+    else " /* " + quote(x) + " */"
+
+  def quoteEff(x: Set[Sym]): String =
+    if (!doPrintEffects) ""
+    else " /* " + x.toSeq.sorted.map(quote).mkString(" ") + " */"
+
+  def quoteEff(x: EffectSummary): String = quoteEff(x.deps)
+
+  def quoteEff(n: Node): String = if (!doPrintEffects) "" else {
+    if (n.eff.isEmpty) "" else {
+      s"/* val ${quote(n.n)} = ${n.eff.repr(quote)} */"
+    }
+  }
+
+  type WrapFun = (Int, Option[Node], Block) => (=> Unit) =>Unit
+  var wraper: WrapFun = nowraper _
+  def withWraper(w: WrapFun)(f: => Unit) = {
+    val save = wraper
+    wraper = w
+    f
+    wraper = save // needed?
+  }
+
+  def nowraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = f
+  def noquoteBlock(f: => Unit) = withWraper(nowraper _)(f)
+
+  def quoteBlock(f: => Unit): Unit = quoteBlock("")(f)
+  def quoteBlock(header: String)(f: => Unit): Unit
+  def quoteBlock(b: Block, argType: Boolean = false): Unit
+
+  val unaryop = Set("-","!","&")
+  val binop = Set("+","-","*","/","%","==","!=","<",">",">=","<=","&","|","<<",">>", ">>>", "&&", "||", "^")
+  val math = Set("sin", "cos", "tanh", "exp", "sqrt")
+  final def unaryPrecedence(op: String): Int = 12
+  def precedence(op: String): Int
+  def precedence(n: Node): Int = n match {
+    case Node(s,"?",List(c,a,b:Block),_) if b.isPure && b.res == Const(false) => precedence("&&")
+    case Node(s,"?",List(c,a:Block,b),_) if a.isPure && a.res == Const(true) => precedence("||")
+    case Node(s,op,List(x),_) if unaryop(op) => unaryPrecedence(op)
+    case _ => precedence(n.op)
+  }
+
+  def quoteBlockP(f: => Unit): Unit = quoteBlockP(0)(f)
+  def quoteBlockP(prec: Int)(f: => Unit) = {
+    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
+      val paren = numStms == 0 && l.map(n => precedence(n) < prec).getOrElse(false)
+      if (paren) emit("(") else if (numStms > 0) emitln("{")
+      f
+      if (y.res != Const(())) { shallow(y.res) }
+      emit(quoteEff(y.eff))
+      if (paren) emit(")") else if (numStms > 0) emit("\n}")
+    }
+    withWraper(wraper _)(f)
+  }
+
+  def quoteElseBlock(f: => Unit) = {
+    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
+      if (numStms > 0) {
+        emitln(" else {")
+        f
+        if (y.res != Const(())) shallow(y.res)
+        emitln(quoteEff(y.eff))
+        emit("}")
+      } else {
+        if (y.res != Const(())) { emit(" else "); shallow(y.res) }
+        emit(quoteEff(y.eff))
+      }
+    }
+    withWraper(wraper _)(f)
+  }
+
+  /**
+   * The `shallow` family of codegen methods handle `Def`s that are in the RHS of target langauge.
+   * They are different from `traverse` because they don't generate a variable bindings for the nodes.
+   */
+  def shallow(n: Def): Unit = n match {
+    case InlineSym(n) => shallow(n)
+    case b:Block => quoteBlock(b)
+    case _ => emit(quote(n))
+  }
+
+  def shallowP(n: Def, prec: Int = 20): Unit = n match {
+    case InlineSym(n) if precedence(n) < prec => emit("("); shallow(n); emit(")")
+    case _ => shallow(n)
+  }
+
+  // generate string for node's right-hand-size
+  // (either inline or as part of val def)
+  // XXX TODO: precedence of nested expressions!!
+  def shallow(n: Node): Unit = n match {
+    case n @ Node(s, op,List(x,y),_) if binop(op) => // associativity??
+      shallowP(x, precedence(op)); emit(" "); emit(op); emit(" "); shallowP(y, precedence(op)+1)
+
+    case n @ Node(s, op,List(x),_) if unaryop(op) => // associativity??
+      emit(op); shallowP(x, unaryPrecedence(op))
+
+    case n @ Node(s,"var_get",List(x),_) =>
+      shallow(x)
+
+    case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
+      emit("if ("); shallow(c); emit(") ")
+      quoteBlockP(traverse(a))
+      emit(" else ")
+      quoteBlockP(traverse(b))
+
+    case n @ Node(f,"W",List(c:Block,b:Block),_) =>
+      emit("while ("); quoteBlockP(traverse(c)); emit(") ")
+      quoteBlock(traverse(b))
+
+    case n @ Node(s,"@",x::y,_) =>
+      shallowP(x); emit("("); y.headOption.foreach(h => { shallowP(h, 0); y.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
+
+    case n @ Node(_,op,args,_) =>
+      emit(op); emit("("); args.headOption.foreach(h => { shallowP(h, 0); args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
+  }
 }

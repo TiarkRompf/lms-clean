@@ -8,7 +8,7 @@ import java.io.{ByteArrayOutputStream, PrintStream}
 
 import Backend._
 
-class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
+class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   var lastNL = false
   override def emit(s: String): Unit = { stream.print(s); lastNL = false }
   override def emitln(s: String = "") = if (s != "" || !lastNL) { stream.println(s); lastNL = true }
@@ -106,7 +106,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   //   | &= ^= |=    | Assignment by bitwise AND, XOR, and OR
   //
   // 15|,            | Comma|  Left-to-right
-  final override def precedence(op: String): Int = op match {
+  final def precedence(op: String): Int = op match {
     case "?" => 1
     case "||" => 2
     case "&&" => 3
@@ -138,16 +138,29 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     emitln()
   }
 
+  // block of statements without produced value -- effect only
+  override def quoteBlock(f: => Unit): Unit = {
+    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
+      assert(y.res == Const(()), s"You should use quoteBlockP maybe? Result: $y")
+      if (numStms > 1) emitln("{") else if (numStms == 0) emit("{")
+      f
+      if (numStms > 1) emit("}") else if (numStms == 0) emit("}")
+    }
+    withWraper(wraper _)(f)
+  }
+  def quoteBlock(b: Block): Unit = quoteTypedBlock(b, true, false)
+  def quoteBlock(header: String)(f: => Unit): Unit = ()
+  def quoteBlock(b: Block, argType: Boolean = false): Unit = ()
+
   // block of statements with result expression
   def quoteBlockPReturn(f: => Unit) = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
       emitln("{")
       f
       if (y.res != Const(())) {
-        emit("return "); shallow(y.res); emit(";"); emitln(quoteEff(y.eff));
-      } else {
-        emitln(quoteEff(y.eff))
+        emit("return "); shallow(y.res); emit(";")
       }
+      emitln(quoteEff(y.eff))
       emit("}")
     }
     withWraper(wraper _)(f)
@@ -183,17 +196,6 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     }
     withWraper(wraper _)(f)
   }
-  // block of statements without produced value -- effect only
-  override def quoteBlock(f: => Unit): Unit = {
-    def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
-      assert(y.res == Const(()), s"You should use quoteBlockP maybe? Result: $y")
-      if (numStms > 1) emitln("{ ") else if (numStms == 0) emit("{")
-      f
-      if (numStms > 1) emit("}") else if (numStms == 0) emit("}")
-    }
-    withWraper(wraper _)(f)
-  }
-
   // block of statement of an else branch
   override def quoteElseBlock(f: => Unit) = {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
@@ -232,8 +234,6 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     emit(s"[$capture](${args})$ret $eff")
     quoteBlockPReturn(traverse(b))
   }
-
-  def quoteBlock(b: Block): Unit = quoteTypedBlock(b, true, false)
 
   override def shallow(n: Def): Unit = n match {
     case InlineSym(t: Node) => shallow(t)
@@ -310,7 +310,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     out.println("  return 0;\n}")
   }
 
-  override def emitValDef(n: Node): Unit = {
+  def emitValDef(n: Node): Unit = {
     if (dce.live(n.n))
       emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = ")
     shallow(n); emitln(";")
@@ -328,7 +328,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   override def shallow(n: Node): Unit = n match {
     case Node(s, ">>>", List(a, b), _) =>
       emit("(("); emit(remapUnsigned(typeMap.getOrElse(s, manifest[Unknown]))); emit(") ")
-      shallow1(a, precedence("cast") + 1); emit(") >> "); shallow1(b, precedence(">>") + 1)
+      shallowP(a, precedence("cast") + 1); emit(") >> "); shallowP(b, precedence(">>") + 1)
     case Node(s, op, List(a), _) if math.contains(op) =>
       registerHeader("<math.h>")
       registerLibrary("-lm")
@@ -341,11 +341,11 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       // int32_t x = ...
       // int64_t hash = ((int64_t)x << 6) + ...
       val tpe = typeMap.getOrElse(s, manifest[Unknown])
-      emit(s"(${remap(tpe)})"); shallow1(a, precedence("cast"))
+      emit(s"(${remap(tpe)})"); shallowP(a, precedence("cast"))
     case Node(s,"String.charAt",List(a,i),_) =>
-      shallow1(a); emit("["); shallow(i); emit("]")
+      shallowP(a); emit("["); shallow(i); emit("]")
     case Node(s,"array_get",List(a,i),_) =>
-      shallow1(a); emit("["); shallow(i); emit("]")
+      shallowP(a); emit("["); shallow(i); emit("]")
     // case Node(s,"var_get",List(a),_) =>
       // quote(a)+s"/*${quote(s)}*/"
 
@@ -353,11 +353,11 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       // s"(${super.shallow(n)})" // GNU C block expr
      // Have to be duplicated to be bfore generic C version
     case n @ Node(s,"?",List(c, a: Block, b: Block),_) if b.isPure && b.res == Const(false) =>
-      shallow1(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
+      shallowP(c, precedence("&&")); emit(" && "); quoteBlockP(precedence("&&") + 1)(traverse(a))
     case n @ Node(s,"?",List(c, a: Block, b: Block),_) if a.isPure && a.res == Const(true) =>
-      shallow1(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
+      shallowP(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
-      shallow1(c, precedence("?") + 1); emit(" ? ")
+      shallowP(c, precedence("?") + 1); emit(" ? ")
       quoteBlockP(precedence("?") + 1)(traverse(a))
       emit(" : ")
       quoteBlockP(precedence("?") + 1)(traverse(b))
@@ -372,12 +372,12 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       }
       emit(quote(s))
     case n @ Node(s, "reffield_get", List(ptr, Const(field: String)), _) =>
-      shallow1(ptr, precedence("reffield_get")); emit("->"); emit(field)
+      shallowP(ptr, precedence("reffield_get")); emit("->"); emit(field)
     case n @ Node(s, "ref_new", List(v), _) =>
-      emit("&"); shallow1(v, precedence("ref_new"))
+      emit("&"); shallowP(v, precedence("ref_new"))
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"($tpe*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof($tpe))")
+      emit(s"($tpe*)malloc("); shallowP(x, precedence("*")); emit(s" * sizeof($tpe))")
     case n @ Node(s, "mmap" ,List(len, fd), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"($tpe*)mmap(0, "); shallow(len); emit(", PROT_READ, MAP_FILE | MAP_SHARED, "); shallow(fd); emit(", 0)")
@@ -385,9 +385,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"($tpe*)calloc("); shallow(x); emit(s", sizeof($tpe))")
     case n @ Node(s,"array_new",List(x),_) =>
-      emit(s"(int*)malloc("); shallow1(x, precedence("*")); emit(s" * sizeof(int))")
+      emit(s"(int*)malloc("); shallowP(x, precedence("*")); emit(s" * sizeof(int))")
     case n @ Node(s,"array_slice",List(x, idx, _), _) =>
-      shallow1(x, precedence("+")); emit(" + "); shallow1(idx, precedence("+") + 1)
+      shallowP(x, precedence("+")); emit(" + "); shallowP(idx, precedence("+") + 1)
     case n @ Node(s,"array_length",List(x), _) => ???
     case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
       emit("qsort("); shallow(arr); emit(" ,"); shallow(len); emit(", sizeof(*"); shallow(arr2); emit("), (__compar_fn_t)"); shallow(comp); emit(")")
@@ -395,7 +395,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       emit("free("); shallow(arr); emit(")")
     case n @ Node(s,"array_resize", List(arr, nsize), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"($tpe*)realloc("); shallow(arr); emit(", "); shallow1(nsize, precedence("*")); emit(s" * sizeof($tpe))")
+      emit(s"($tpe*)realloc("); shallow(arr); emit(", "); shallowP(nsize, precedence("*")); emit(s" * sizeof($tpe))")
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
     case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
@@ -412,7 +412,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,op,args,_) if op.startsWith("String") => // String methods
       registerHeader("<string.h>")
       (op.substring(7), args) match {
-        case ("slice", List(lhs, idx, _)) => shallow1(lhs, precedence("+")); emit(" + "); shallow1(idx, precedence("+") + 1)
+        case ("slice", List(lhs, idx, _)) => shallowP(lhs, precedence("+")); emit(" + "); shallowP(idx, precedence("+") + 1)
         case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
         case ("toDouble", List(rhs)) => emit("atof("); shallow(rhs); emit(")")
         case ("toInt", List(rhs)) => emit("atoi("); shallow(rhs); emit(")")
@@ -422,9 +422,9 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
       val (recv::args1) = args
       if (args1.length > 0) {
-        shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1)); emit("("); shallow(args1.head); args1.tail.foreach { emit(", "); shallow(_) }; emit(")")
+        shallowP(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1)); emit("("); shallow(args1.head); args1.tail.foreach { emit(", "); shallow(_) }; emit(")")
       } else {
-        shallow1(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1))
+        shallowP(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1))
       }
     case n =>
       super.shallow(n)
@@ -439,7 +439,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"var_set",List(x,y),_) =>
       emit(s"${quote(x)} = "); shallow(y); emitln(";")
     case n @ Node(s, "reffield_set", List(ptr, Const(field: String), v), _) =>
-      shallow1(ptr, precedence("reffield_get")); emit("->"); emit(field); emit(" = "); shallow(v); emitln(";")
+      shallowP(ptr, precedence("reffield_get")); emit("->"); emit(field); emit(" = "); shallow(v); emitln(";")
     // static array
     case n @ Node(s, "Array" , xs,_) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
@@ -447,7 +447,7 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
     case n @ Node(s, "NewArray", List(x, Const(v)), _) if v != 0 =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"long ${quote(s)}_len = "); shallow1(x, precedence("*")); emitln(s" * sizeof($tpe);")
+      emit(s"long ${quote(s)}_len = "); shallowP(x, precedence("*")); emitln(s" * sizeof($tpe);")
       emitln(s"$tpe* ${quote(s)} = ($tpe*)malloc(${quote(s)}_len)")
       emitln(s"memset(${quote(s)}, $v, ${quote(s)}_len);")
     // DCE: FIXME:
@@ -463,10 +463,10 @@ class ExtendedCCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => ??? // no-op
 
     case n @ Node(s,"array_set",List(x,i,y),_) =>
-      shallow1(x); emit("["); shallow(i); emit("] = "); shallow(y); emitln(";")
+      shallowP(x); emit("["); shallow(i); emit("] = "); shallow(y); emitln(";")
 
     case n @ Node(s, "array_copyTo", List(src, dst, start, len), _) =>
-      emit("memcpy("); shallow1(dst, precedence("+")); emit(" + "); shallow1(start, precedence("+") + 1); emit(", "); shallow(src); emit(", "); shallow(len); emitln(");")
+      emit("memcpy("); shallowP(dst, precedence("+")); emit(" + "); shallowP(start, precedence("+") + 1); emit(", "); shallow(src); emit(", "); shallow(len); emitln(");")
 
     case n @ Node(s,"?",c::(a:Block)::(b:Block)::_,_) if !dce.live(s) =>
       emit(s"if ("); shallow(c); emit(") ")
