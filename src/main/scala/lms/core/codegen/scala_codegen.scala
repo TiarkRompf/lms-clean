@@ -8,6 +8,10 @@ import java.io.{ByteArrayOutputStream, PrintStream}
 
 import Backend._
 
+/**
+ * The `ScalaCodeGen` is a simple code generation class built on Traverser.
+ * It is not used in production.
+ */
 class ScalaCodeGen extends Traverser {
 
   def emit(s: String) = println(s)
@@ -119,14 +123,20 @@ class ScalaCodeGen extends Traverser {
 
 class CompactScalaCodeGen extends CompactTraverser {
 
-  val rename = new mutable.HashMap[Sym,String]
-
-  var doRename = true
-  var doPrintEffects = false
-
   def emit(s: String): Unit = print(s)
   def emitln(s: String = ""): Unit = println(s)
 
+  /**
+   * `quote` family of methods are used to emit a codegen unit (a variable, constant, or block)
+   * We have `quote` for variable/const
+   *         `quoteEff` for effects
+   *         `quoteBlock` `quoteBlockP` `quoteElseBlock` for
+   *          block,    block with parenthesis, and else block
+   */
+  // with `rename` `doRename` and the usage of them in `quote`, we may
+  // rename variables (say from x6 to x4).
+  val rename = new mutable.HashMap[Sym,String]
+  var doRename = true
   def quote(s: Def): String = s match {
     case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
     case Sym(n) => s.toString
@@ -140,12 +150,8 @@ class CompactScalaCodeGen extends CompactTraverser {
     case Const(x) => x.toString
   }
 
-  def shallow(n: Def): Unit = n match {
-    case InlineSym(n) => shallow(n)
-    case b:Block => quoteBlock(b)
-    case _ => emit(quote(n))
-  }
-
+  // with `doPrintEffects` and `quoteEff`, we can optionally print the effect information
+  var doPrintEffects = false
   def quoteEff(x: Def): String =
     if (!doPrintEffects) ""
     else " /* " + quote(x) + " */"
@@ -255,6 +261,12 @@ class CompactScalaCodeGen extends CompactTraverser {
     wraper(numStms, lastNode, y) {
       super.traverseCompact(ns, y)
     }
+  }
+
+  def shallow(n: Def): Unit = n match {
+    case InlineSym(n) => shallow(n)
+    case b:Block => quoteBlock(b)
+    case _ => emit(quote(n))
   }
 
   def shallow1(n: Def, prec: Int = 20): Unit = n match {
@@ -426,7 +438,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       quote(x) + tp
     case PTuple(xs) => "(" + xs.map(patternToString(_)).mkString(", ") + ")"
   }
-  
+
   //TODO(GW): merge this code into exisitng quoteBlock or reify?
   // The current block.in is a special case of a tuple of arguments, can be generalized.
   // More generally, a block can have multiple cases.
