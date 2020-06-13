@@ -272,8 +272,378 @@ object Adapter extends FrontEnd {
 
 }
 
+trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompare {
+  type Rep[+T] = Exp[T];
+
+  abstract class Exp[+T]
+  abstract class Var[T]
+  abstract class Def[+T]
+  // abstract class Block[T]
+
+  case class Const[T](x: T) extends Exp[T]
+  case class Sym[T](x: Int) extends Exp[T]
+  case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Exp[A]
+
+  case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
+    Adapter.typeMap(x) = manifest[A]
+  }
+  def Wrap[A:Manifest](x: lms.core.Backend.Exp): Exp[A] = {
+    if (manifest[A] == manifest[Unit]) Const(()).asInstanceOf[Exp[A]]
+    else new Wrap[A](x)
+  }
+  def Unwrap(x: Exp[Any]) = x match {
+    case Wrap(x) => x
+    case Const(x) => Backend.Const(x)
+    case EffectView(Wrap(x), _) => x // TODO: fix!
+  }
+
+  case class WrapV[A:Manifest](x: lms.core.Backend.Exp) extends Var[A] {
+    Adapter.typeMap(x) = manifest[A] // could include Var type in manifest
+  }
+  def UnwrapV[T](x: Var[T]) = x match { case WrapV(x) => x }
+
+  def convertToExp(x: Any) = x match {
+    case e: Exp[Any] => Unwrap(e)
+    case c => Backend.Const(c)
+  }
+
+  implicit def unit[T:Manifest](x: T): Rep[T] = Wrap[T](Backend.Const(x))
+
+  // Functions
+  def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]) =
+    (x1: Backend.Exp) => Unwrap(f(Wrap[A](x1)))
+  def unwrapFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A],Rep[B]) => Rep[C]) =
+    (x1: Backend.Exp, x2: Backend.Exp) => Unwrap(f(Wrap[A](x1), Wrap[B](x2)))
+
+  def fun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
+    Wrap[A=>B](__fun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
+
+  def doLambda[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] = fun(f)
+  implicit class FunOps[A:Manifest,B:Manifest](f: Rep[A => B]) {
+    def apply(x: Rep[A]): Rep[B] = {
+      Wrap[B](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x))()())
+    }
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
+    Wrap[(A,B)=>C](__fun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = fun(f)
+  implicit class FunOps2[A:Manifest,B:Manifest,C:Manifest](f: Rep[(A,B) => C]) {
+    def apply(x: Rep[A], y: Rep[B]): Rep[C] =
+      Wrap[C](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
+    Wrap[(A,B,C)=>D](__fun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = fun(f)
+  implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =
+      Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
+    Wrap[(A,B,C,D)=>E](__fun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
+  implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D]): Rep[E] =
+      Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))()())
+  }
+
+  def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
+    val can = canonicalize(f)
+    Adapter.funTable.find(_._2 == can) match {
+      case Some((funSym, _)) =>
+        funSym
+      case _ =>
+        // Step 1. set up "λforward" node with 2 new fresh Syms
+        val fn = Backend.Sym(Adapter.g.fresh)
+        val fn1 = Backend.Sym(Adapter.g.fresh)
+        Adapter.g.reflect(fn, "λforward", fn1)()
+
+        // Step 2. register (fn, can) in funTable, so that recursive calls
+        //    will find fn as the function Sym. Reify the block.
+        // Note: it might seem strange why/how recursive calls re-enter this __fun() function.
+        //    The reason is that in user code, recursive functions have to be written as
+        //    lazy val f = fun{...} or def f = fun{...}, in which case the recursive calls
+        //    will re-enter the `fun` call.
+        Adapter.funTable = (fn, can)::Adapter.funTable
+        val block = Adapter.g.reify(arity, gf)
+
+        // Step 3. build the "λ" node with fn1 as the function name
+        //    fix the funTable such that it pairs (fn1, can) for non-recursive uses.
+        val res = Adapter.g.reflect(fn1,"λ",block)(hardSummary(fn))
+        Adapter.funTable = Adapter.funTable.map {
+          case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
+        }
+        res
+    }
+  }
+
+  // Top-Level Functions
+  // XXX: is this data structure needed? should it move elsewhere?
+  // could we use funTable instead?
+  val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
+  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
+    lazy val ff = {
+      val fn = Backend.Sym(Adapter.g.fresh)
+      Adapter.g.reflect(fn,"λ", Adapter.g.reify(arity, gf), Backend.Const(0))()
+      fn
+    }
+    try {
+      val can = canonicalize(f)
+      topLevelFunctions.getOrElseUpdate(can, ff)
+    } catch {
+      case _: Throwable => ff
+    }
+  }
+  def topFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
+    Wrap[A=>B](__topFun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
+
+  def topFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
+    Wrap[(A,B)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1))))))
+
+  def topFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
+    Wrap[(A,B,C)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2))))))
+
+  def topFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
+    Wrap[(A,B,C,D)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3))))))
+
+  // IfThenElse
+  def __ifThenElse[T:Manifest](c: Rep[Boolean], a: => Rep[T], b: => Rep[T])(implicit pos: SourceContext): Rep[T] = c match {
+    case Wrap(Backend.Const(true))  => a
+    case Wrap(Backend.Const(false)) => b
+    case _ =>
+      Wrap[T](Adapter.IF(Adapter.BOOL(Unwrap(c)))
+                     (Adapter.INT(Unwrap(a)))
+                     (Adapter.INT(Unwrap(b))).x)
+  }
+
+  def switch[T:Manifest](x: Rep[T], default: Option[() => Unit] = None)(cases: (Seq[T], Rep[T] => Unit)*): Unit = {
+    var isPure = true
+    val bCases: Seq[Backend.Def]  = cases.flatMap {
+      case (Seq(), _)  => ???
+      case (s, f) =>
+        val block = Adapter.g.reifyHere({f(if (s.length == 1) unit(s.head) else x); Backend.Const(())})
+        isPure &&= block.isPure
+        Seq(Backend.Const(s.map(Backend.Const(_))), block)
+    }
+
+    val bDefault = default.map { f =>
+      val block = Adapter.g.reifyHere({ f(); Backend.Const(()) })
+      isPure &&= block.isPure
+      block
+    }
+
+    if (isPure)
+      Adapter.g.reflect("switch", Unwrap(x) +: bDefault.getOrElse(Backend.Const(())) +: bCases: _*)
+    else
+      Adapter.g.reflectEffectSummaryHere("switch", Unwrap(x) +: bDefault.getOrElse(Backend.Const(())) +: bCases:_*)((Set[Backend.Exp](), Set[Backend.Exp]()))
+  }
+
+  // While
+  def __whileDo(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
+      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
+  }
+  def __whileDoInternal(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
+      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
+  }
+
+  // Variables
+  implicit def readVar[T:Manifest](x: Var[T]): Rep[T] = Wrap[T](Adapter.g.reflectRead("var_get", UnwrapV(x))(UnwrapV(x)))
+  def var_new[T:Manifest](x: Rep[T]): Var[T] = WrapV[T](Adapter.g.reflectMutable("var_new", Unwrap(x)))
+  def __assign[T:Manifest](lhs: Var[T], rhs: Rep[T]): Unit = Wrap[Unit](Adapter.g.reflectWrite("var_set", UnwrapV(lhs), Unwrap(rhs))(UnwrapV(lhs)))
+  def __assign[T:Manifest](lhs: Var[T], rhs: Var[T]): Unit = __assign(lhs,readVar(rhs))
+  def __assign[T:Manifest](lhs: Var[T], rhs: T): Unit = __assign(lhs,unit(rhs)) // shouldn't unit lift T to Rep[T] implicitly?
+
+  def numeric_plus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
+    Wrap[T]((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
+  def numeric_minus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
+    Wrap[T]((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
+  def numeric_mult[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
+    Wrap[T]((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
+
+  implicit class OpsInfixVarT[T:Manifest:Numeric](lhs: Var[T]) {
+    def +=(rhs: T): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
+    def +=(rhs: Rep[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
+    def +=(rhs: Var[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),readVar(rhs)))
+    def -=(rhs: T): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
+    def -=(rhs: Rep[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
+    def -=(rhs: Var[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),readVar(rhs)))
+    def *=(rhs: T): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
+    def *=(rhs: Rep[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
+    def *=(rhs: Var[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),readVar(rhs)))
+  }
+
+  // MiscOps
+  def exit(res: Rep[Int]): Unit = Adapter.g.reflectWrite("exit", Unwrap(res))(Adapter.CTRL)
+  def println(x: Rep[Any]): Unit =
+    Adapter.g.reflectWrite("P",Unwrap(x))(Adapter.CTRL)
+  def printf(f: String, x: Rep[Any]*): Unit = {
+    Adapter.g.reflectWrite("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
+  }
+  def staticData[T:Manifest](x: T): Rep[T] =
+    Wrap[T](Adapter.g.reflect("staticData", Backend.Const(x)))
+
+  // BooleanOps
+  implicit def bool2boolOps(lhs: Boolean) = new BoolOps(lhs)
+  implicit def var2boolOps(lhs: Var[Boolean]) = new BoolOps(lhs)
+  implicit class BoolOps(lhs: Rep[Boolean]) {
+    def unary_!(implicit pos: SourceContext): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("!", Unwrap(lhs)))
+    def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
+    __ifThenElse(lhs, rhs, unit(false))
+    def ||(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
+      __ifThenElse(lhs, unit(true), rhs)
+    def ^(rhs: Rep[Boolean]) = Wrap[Boolean](Adapter.g.reflect("!=", Unwrap(lhs), Unwrap(rhs)))
+  }
+
+  // TimingOps
+  def timeGeneratedCode[A: Manifest](f: => Rep[A], msg: Rep[String] = unit("")): Rep[A] = {
+    val ff = Adapter.g.reify(Unwrap(f))
+    val summary = Adapter.g.getEffKeys(ff)
+    Wrap[A](Adapter.g.reflectEffectSummary("timeGenerated", Unwrap(msg), ff)(summary))
+  }
+  def timestamp: Rep[Long] = Wrap[Long](Adapter.g.reflectWrite("timestamp")(Adapter.CTRL))
+
+  // case class GenerateComment(l: String) extends Def[Unit]
+  // case class Comment[A:Manifest](l: String, verbose: Boolean, b: Block[A]) extends Def[A]
+  def generate_comment(l: String): Rep[Unit] = {
+    Wrap[Unit](Adapter.g.reflectWrite("generate-comment", Backend.Const(l))(Adapter.CTRL))
+  }
+  def comment[A:Manifest](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A] = {
+    val g = Adapter.g
+    val bb = g.reify(Unwrap(b))
+    if (bb.isPure)
+      Wrap[A](g.reflect("comment",Backend.Const(l),Backend.Const(verbose),bb))
+    else {
+      val summary = Adapter.g.getEffKeys(bb)
+      Wrap[A](g.reflectEffectSummary("comment",Backend.Const(l),Backend.Const(verbose),bb)(summary))
+    }
+  }
+
+  // StringOps
+  implicit class StringOps(lhs: Rep[String]) {
+    def charAt(i: Rep[Int]): Rep[Char] = Wrap[Char](Adapter.g.reflect("String.charAt", Unwrap(lhs), Unwrap(i))) // XXX: may fail! effect?
+    def apply(i: Rep[Int]): Rep[Char] = charAt(i)
+    def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.length", Unwrap(lhs)))
+    def substring(idx: Rep[Int], end: Rep[Int]): Rep[String] = Wrap[String](Adapter.g.reflect("String.slice", Unwrap(lhs), Unwrap(idx), Unwrap(end))) // FIXME: View
+    def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.toInt", Unwrap(lhs))) // XXX: may fail!
+    def toDouble: Rep[Double] = Wrap[Double](Adapter.g.reflect("String.toDouble", Unwrap(lhs))) // XXX: may fail!
+  }
+
+  // UncheckedOps
+  private def uncheckedHelp(xs: Seq[Any]) = {
+    val str = xs map {
+      case s: String => s
+      case e: Exp[Any] => "[ ]"
+      case e: Var[Any] => "[ ]"
+      case e => e.toString
+    } mkString("")
+    var effs = Set[Backend.Exp]()
+    val args = xs collect {
+      case e: Exp[Any] =>
+        val res = Unwrap(e)
+        if (res.isInstanceOf[Backend.Sym])
+          effs += res
+        res
+      case v: Var[Any] =>
+        val res = UnwrapV(v)
+        effs += res
+        res
+    }
+    (str, args, effs)
+  }
+
+  // TODO:
+  // - More than one
+  // - filter non mutable or detect arrays?
+  def unchecked[T:Manifest](xs: Any*): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()((effs + Adapter.CTRL).toSeq:_*))
+  }
+  def uncheckedWrite[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    x match {
+      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedWrite, please use unchecked")
+      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedWrite, please use unchecked")
+    }
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()((effs + Adapter.CTRL).toSeq:_*))
+  }
+  def uncheckedRead[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    x match {
+      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedRead, please use unchecked")
+      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedRead, please use unchecked")
+    }
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)(Adapter.CTRL))
+  }
+  def uncheckedPure[T:Manifest](xs: Any*): Rep[T] = {
+    val (strings, args, _) = uncheckedHelp(xs)
+    // assert(effs.isEmpty, "variable detected in uncheckedPure, please use unchecked*Write, unchecked*Read, or unchecked")
+    Wrap[T](Adapter.g.reflect("unchecked" + strings, args:_*))
+  }
+
+  def uncheckedPureRead[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    x match {
+      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedRead, please use unchecked")
+      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedRead, please use unchecked")
+    }
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)())
+  }
+  def uncheckedPureWrite[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    x match {
+      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedPureWrite, please use unchecked")
+      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedPureWrite, please use unchecked")
+    }
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()(effs.toSeq:_*))
+  }
 
 
+  // Def[T]: FIXME(feiw) Do we still need them?
+  implicit def toAtom[T:Manifest](x: Def[T]): Exp[T] = {
+    val p = x.asInstanceOf[Product]
+    val xs = p.productIterator.map(convertToExp).toSeq
+    Wrap[T](Adapter.g.reflect(p.productPrefix, xs:_*))
+  }
+  def reflectEffect[T:Manifest](x: Def[T]): Exp[T] = {
+    val p = x.asInstanceOf[Product]
+    val xs = p.productIterator.map(convertToExp).toSeq
+    Wrap[T](Adapter.g.reflectWrite(p.productPrefix, xs:_*)(Adapter.CTRL))
+  }
+  def reflectMutable[T:Manifest](x: Def[T]): Exp[T] = {
+    val p = x.asInstanceOf[Product]
+    val xs = p.productIterator.map(convertToExp).toSeq
+    Wrap[T](Adapter.g.reflectMutable(p.productPrefix, xs:_*))
+  }
+  def reflectWrite[T:Manifest](w: Rep[Any])(x: Def[T]): Exp[T] = {
+    val p = x.asInstanceOf[Product]
+    val xs = p.productIterator.map(convertToExp).toSeq
+    Wrap[T](Adapter.g.reflectWrite(p.productPrefix, xs:_*)(Unwrap(w)))
+  }
+  def reflectFree[T:Manifest](w: Rep[Any])(x: Def[T]): Exp[T] = {
+    val p = x.asInstanceOf[Product]
+    val xs = p.productIterator.map(convertToExp).toSeq
+    Wrap[T](Adapter.g.reflectFree(p.productPrefix, xs:_*)(Unwrap(w)))
+  }
+
+  // shift/reset
+  def shift1[A:Manifest, B:Manifest](f: Rep[A => B] => Rep[B]): Rep[A] = { // XXX is the type signature correct?
+    val bBlock = Adapter.g.reify(x => Unwrap(f(Wrap[A => B](x))))
+    Wrap[A](Adapter.g.reflectWrite("shift1", bBlock)(Adapter.CPS))
+  }
+  def reset1[A:Manifest](f: => Rep[A]): Rep[A] = { // XXX is the type signature correct?
+    val rBlock = Adapter.g.reify(Unwrap(f))
+    Wrap[A](Adapter.g.reflectEffect("reset1", rBlock)()())
+  }
+
+  // ImplicitOps
+  // TR: I'm concerned about this because it is overly general -- it doesn't appear to be used anyways?
+  // def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
+}
 
 // DSLAPI CODE
 
@@ -314,6 +684,8 @@ trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString w
     with LiftNumeric with LiftBoolean with IfThenElse with Equal with RangeOps with OrderingOps
     with MiscOps with ArrayOps with StringOps with SeqOps with Functions with While with StaticData
     with Variables with LiftVariables with ObjectOps with UtilOps {
+
+  class SeqOpsCls[T](x: Rep[Seq[Char]])
   implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
   // implicit class BooleanOps2(lhs: Rep[Boolean]) {
   //   def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
@@ -433,135 +805,6 @@ trait DslGenC extends CGenBase with CGenNumericOps
     with CGenUtilOps {
   val IR: DslExp
   import IR._
-
-  //STUB
-  // def getMemoryAllocString(count: String, memType: String): String = {
-  //     "(" + memType + "*)malloc(" + count + " * sizeof(" + memType + "));"
-  // }
-  // override def remap[A](m: Typ[A]): String = m.toString match {
-  //   case "java.lang.String" => "char*"
-  //   case "Array[Char]" => "char*"
-  //   case "Char" => "char"
-  //   case _ => super.remap(m)
-  // }
-  // override def format(s: Exp[Any]): String = {
-  //   remap(s.tp) match {
-  //     case "uint16_t" => "%c"
-  //     case "bool" | "int8_t" | "int16_t" | "int32_t" => "%d"
-  //     case "int64_t" => "%ld"
-  //     case "float" | "double" => "%f"
-  //     case "string" => "%s"
-  //     case "char*" => "%s"
-  //     case "char" => "%c"
-  //     case "void" => "%c"
-  //     case _ =>
-  //       import scala.virtualization.lms.internal.GenerationFailedException
-  //       throw new GenerationFailedException("CGenMiscOps: cannot print type " + remap(s.tp))
-  //   }
-  // }
-  // override def quoteRawString(s: Exp[Any]): String = {
-  //   remap(s.tp) match {
-  //     case "string" => quote(s) + ".c_str()"
-  //     case _ => quote(s)
-  //   }
-  // }
-  // // we treat string as a primitive type to prevent memory management on strings
-  // // strings are always stack allocated and freed automatically at the scope exit
-  // override def isPrimitiveType(tpe: String) : Boolean = {
-  //   tpe match {
-  //     case "char*" => true
-  //     case "char" => true
-  //     case _ => super.isPrimitiveType(tpe)
-  //   }
-  // }
-  // // XX: from LMS 1.0
-  // override def emitValDef(sym: Sym[Any], rhs: String): Unit = {
-  //   if (!isVoidType(sym.tp))
-  //     stream.println(remapWithRef(sym.tp) + quote(sym) + " = " + rhs + ";")
-  //   else // we might still want the RHS for its effects
-  //     stream.println(rhs + ";")
-  // }
-
-  /*STUB
-  override def quote(x: Exp[Any]) = x match {
-    case Const(s: String) => "\""+s.replace("\"", "\\\"")+"\"" // TODO: more escapes?
-    case Const('\n') if x.tp == typ[Char] => "'\\n'"
-    case Const('\t') if x.tp == typ[Char] => "'\\t'"
-    case Const(0)    if x.tp == typ[Char] => "'\\0'"
-    case _ => super.quote(x)
-  }
-  override def emitNode(sym: Sym[Any], rhs: Def[Any]) = rhs match {
-    case a@ArrayNew(n) =>
-      val arrType = remap(a.m)
-      stream.println(arrType + "* " + quote(sym) + " = " + getMemoryAllocString(quote(n), arrType))
-    case ArrayApply(x,n) => emitValDef(sym, quote(x) + "[" + quote(n) + "]")
-    case ArrayUpdate(x,n,y) => stream.println(quote(x) + "[" + quote(n) + "] = " + quote(y) + ";")
-    case PrintLn(s) => stream.println("printf(\"" + format(s) + "\\n\"," + quoteRawString(s) + ");")
-    case StringCharAt(s,i) => emitValDef(sym, "%s[%s]".format(quote(s), quote(i)))
-    case Comment(s, verbose, b) =>
-      stream.println("//#" + s)
-      if (verbose) {
-        stream.println("// generated code for " + s.replace('_', ' '))
-      } else {
-        stream.println("// generated code")
-      }
-      emitBlock(b)
-      emitValDef(sym, quote(getBlockResult(b)))
-      stream.println("//#" + s)
-    case _ => super.emitNode(sym,rhs)
-  }
-  override def emitSource[A:Typ](args: List[Sym[_]], body: Block[A], functionName: String, out: java.io.PrintWriter) = {
-    withStream(out) {
-      stream.println("""
-      #include <fcntl.h>
-      #include <errno.h>
-      #include <err.h>
-      #include <sys/mman.h>
-      #include <sys/stat.h>
-      #include <stdio.h>
-      #include <stdint.h>
-      #include <unistd.h>
-      #ifndef MAP_FILE
-      #define MAP_FILE MAP_SHARED
-      #endif
-      int fsize(int fd) {
-        struct stat stat;
-        int res = fstat(fd,&stat);
-        return stat.st_size;
-      }
-      int printll(char* s) {
-        while (*s != '\n' && *s != ',' && *s != '\t') {
-          putchar(*s++);
-        }
-        return 0;
-      }
-      long hash(char *str0, int len)
-      {
-        unsigned char* str = (unsigned char*)str0;
-        unsigned long hash = 5381;
-        int c;
-
-        while ((c = *str++) && len--)
-          hash = ((hash << 5) + hash) + c; // hash * 33 + c
-
-        return hash;
-      }
-      void Snippet(char*);
-      int main(int argc, char *argv[])
-      {
-        if (argc != 2) {
-          printf("usage: query <filename>\n");
-          return 0;
-        }
-        Snippet(argv[1]);
-        return 0;
-      }
-
-      """)
-    }
-    super.emitSource[A](args, body, functionName, out)
-  }
-*/
 }
 
 
@@ -621,122 +864,144 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
 
 // STUB CODE
 
-trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompare {
-  type Rep[+T] = Exp[T];
-
-  abstract class Exp[+T]
-  abstract class Def[+T]
-  abstract class Var[T]
-  abstract class Block[T]
-
-  case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
-    Adapter.typeMap(x) = manifest[A]
-  }
-  def Wrap[A:Manifest](x: lms.core.Backend.Exp): Exp[A] = {
-    if (manifest[A] == manifest[Unit]) Const(()).asInstanceOf[Exp[A]]
-    else new Wrap[A](x)
-  }
-  def Unwrap(x: Exp[Any]) = x match {
-    case Wrap(x) => x
-    case Const(x) => Backend.Const(x)
-    case EffectView(Wrap(x), _) => x // TODO: fix!
-  }
-
-  case class WrapV[A:Manifest](x: lms.core.Backend.Exp) extends Var[A] {
-    Adapter.typeMap(x) = manifest[A] // could include Var type in manifest
-  }
-  def UnwrapV[T](x: Var[T]) = x match { case WrapV(x) => x }
-
-  case class Const[T](x: T) extends Exp[T]
-  case class Sym[T](x: Int) extends Exp[T]
-
-  def convertToExp(x: Any) = x match {
-    case e: Exp[Any] => Unwrap(e)
-    case c => Backend.Const(c)
-  }
-
-  implicit def unit[T:Manifest](x: T): Rep[T] = Wrap[T](Backend.Const(x))
-  implicit def toAtom[T:Manifest](x: Def[T]): Exp[T] = {
-    val p = x.asInstanceOf[Product]
-    val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflect(p.productPrefix, xs:_*))
-  }
-
-  def staticData[T:Manifest](x: T): Rep[T] =
-    Wrap[T](Adapter.g.reflect("staticData", Backend.Const(x)))
 
 
-  def reflectEffect[T:Manifest](x: Def[T]): Exp[T] = {
-    val p = x.asInstanceOf[Product]
-    val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflectWrite(p.productPrefix, xs:_*)(Adapter.CTRL))
+trait Compile
+trait CompileScala
+
+trait BaseExp
+trait ScalaGenBase extends ExtendedScalaCodeGen {
+  val IR: Base
+  import IR._
+  implicit class CodegenHelper(sc: StringContext) {
+    def src(args: Any*): String = ???
   }
-  def reflectMutable[T:Manifest](x: Def[T]): Exp[T] = {
-    val p = x.asInstanceOf[Product]
-    val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflectMutable(p.productPrefix, xs:_*))
+  // def remap[A](m: Manifest[A]): String = ???
+  // def quote(x: Exp[Any]) : String = ???
+  def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
+  def emitSource[A: Manifest, B: Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
+    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
+    // stream.println(src)
+    statics.toList
   }
-  def reflectWrite[T:Manifest](w: Rep[Any])(x: Def[T]): Exp[T] = {
-    val p = x.asInstanceOf[Product]
-    val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflectWrite(p.productPrefix, xs:_*)(Unwrap(w)))
+  // def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
+}
+
+trait CGenBase extends ExtendedCCodeGen {
+  val IR: Base
+  import IR._
+  // def remap[A](m: Manifest[A]): String = ???
+  // def quote(x: Exp[Any]) : String = ???
+  def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
+  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
+    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
+    // stream.println(src)
+    statics.toList
   }
-  def reflectFree[T:Manifest](w: Rep[Any])(x: Def[T]): Exp[T] = {
-    val p = x.asInstanceOf[Product]
-    val xs = p.productIterator.map(convertToExp).toSeq
-    Wrap[T](Adapter.g.reflectFree(p.productPrefix, xs:_*)(Unwrap(w)))
+  // def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
+}
+
+// trait PrimitiveOps
+trait NumericOps
+trait BooleanOps { b: Base =>
+
+}
+trait LiftString
+// trait LiftPrimitives
+trait LiftNumeric
+trait LiftBoolean
+trait IfThenElse
+// trait Equal
+trait RangeOps extends Equal {
+
+  // NOTE(trans): it has to be called 'intWrapper' to shadow the standard Range constructor
+  implicit class intWrapper(start: Int) {
+    // Note that these are ambiguous - need to use type ascription here (e.g. 1 until 10 : Rep[Range])
+    def until(end: Rep[Int])(implicit pos: SourceContext) = range_until(unit(start),end)
+    def until(end: Int)(implicit pos: SourceContext): Rep[Range] = range_until(unit(start),unit(end))
+    def until(end: Int)(implicit pos: SourceContext, o: Overloaded1): Range = new Range(start,end,1)
+  }
+  def range_until(start: Rep[Int], end: Rep[Int]): Rep[Range] = {
+    Wrap[Range](Adapter.g.reflect("range_until", Unwrap(start), Unwrap(end)))
   }
 
-  def emitValDef(sym: Sym[Any], rhs: String): Unit = ???
-
-  // Former Ops:
-
-/*
-  def FUN(f: INT => INT): INT => INT = FUN((_,x) => f(x))
-
-  def FUN(f: ((INT=>INT),INT) => INT): INT => INT = {
-    val fn = Sym(g.fresh)
-    //val xn = Sym(g.fresh)
-    val f1 = (x: INT) => APP(fn,x)
-    // NOTE: lambda expression itself does not have
-    // an effect, so body block should not count as
-    // latent effect of the lambda
-    g.reflect(fn,"λ",g.reify(xn => f(f1,INT(xn)).x))()()()
-    f1
+  implicit class RangeConstrOps(lhs: Rep[Int]) {
+    def until(y: Rep[Int]): Rep[Range] = range_until(lhs,y)
+    // unrelated
+    def ToString: Rep[String] =
+      Wrap[String](Adapter.g.reflect("Object.toString", Unwrap(lhs)))
   }
 
-  var funTable: List[(Sym[_], Any)] = List()
-  override def doLambda[A:Manifest,B:Manifest](f: Exp[A] => Exp[B])(implicit pos: SourceContext): Exp[A => B] = {
-    val can = canonicalize(f)
-    funTable.find(_._2 == can) match {
-      case Some((funSym, _)) =>
-        funSym.asInstanceOf[Exp[A=>B]]
-      case _ =>
-        val funSym = fresh[A=>B]
-        funTable = (funSym,can)::funTable
-        createDefinition(funSym, doLambdaDef(f))
-        funSym
+  implicit class RangeOps(lhs: Rep[Range]) {
+    def foreach(f: Rep[Int] => Rep[Unit])(implicit __pos: SourceContext): Rep[Unit] = {
+
+      // XXX TODO: it would be good to do this as lowering/codegen
+      // (as done previously in LMS), but for now just construct
+      // a while loop directly
+
+      val Adapter.g.Def("range_until", List(x0:Backend.Exp,x1:Backend.Exp)) = Unwrap(lhs)
+
+      // val b = Adapter.g.reify(i => Unwrap(f(Wrap(i))))
+      // val f1 = Adapter.g.reflect("λ",b)
+      // Wrap(Adapter.g.reflect("range_foreach", x0, x1, b))
+
+      val i = var_new(Wrap[Int](x0))
+      __whileDo(notequals(readVar(i), Wrap[Int](x1)), {
+        f(readVar(i))
+        i += 1
+      })
     }
   }
-*/
 
+  trait LongRange
+  implicit class longWrapper(start: Long) {
+    // Note that these are ambiguous - need to use type ascription here (e.g. 1 until 10 : Rep[LongRange])
+    def until(end: Rep[Long])(implicit pos: SourceContext) = longrange_until(unit(start),end)
+    def until(end: Long)(implicit pos: SourceContext): Rep[LongRange] = longrange_until(unit(start),unit(end))
+    def until(end: Long)(implicit pos: SourceContext, o: Overloaded1): immutable.NumericRange.Exclusive[Long] = new immutable.NumericRange.Exclusive(start,end,1L)
+  }
+  def longrange_until(start: Rep[Long], end: Rep[Long]): Rep[LongRange] = {
+    Wrap[LongRange](Adapter.g.reflect("longrange_until", Unwrap(start), Unwrap(end)))
+  }
 
+  implicit class LongRangeConstrOps(lhs: Rep[Long]) {
+    def until(y: Rep[Long]): Rep[LongRange] = longrange_until(lhs,y)
 
-  // def compile[A,B](f: Rep[A] => Rep[B]): A=>B = ???
-  // def compile[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): A=>B = {
-  //   val (src, statics) = Adapter.emitScala("Snippet")(manifest[A],manifest[B])(x => Unwrap(f(Wrap(x))))
-  //   val fc = time("scalac") { Global.sc.compile[A,B]("Snippet", src, statics.toList) }
-  //   fc
-  // }
+    // unrelated
+    def ToString: Rep[String] =
+      Wrap[String](Adapter.g.reflect("Object.toString", Unwrap(lhs)))
+  }
 
-  class SeqOpsCls[T](x: Rep[Seq[Char]])
+  implicit class LongRangeOps(lhs: Rep[LongRange]) {
+    def foreach(f: Rep[Long] => Rep[Unit])(implicit __pos: SourceContext): Rep[Unit] = {
 
-  // implemented in trait Equal
-  def equals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean]
-  def notequals[A:Manifest,B:Manifest](a: Rep[A], b: Rep[B])(implicit pos: SourceContext) : Rep[Boolean]
+      // XXX TODO: it would be good to do this as lowering/codegen
+      // (as done previously in LMS), but for now just construct
+      // a while loop directly
 
-  // ArrayOps
-  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
+      val Adapter.g.Def("longrange_until", List(x0:Backend.Exp,x1:Backend.Exp)) = Unwrap(lhs)
+
+      // val b = Adapter.g.reify(i => Unwrap(f(Wrap(i))))
+      // val f1 = Adapter.g.reflect("λ",b)
+      // Wrap(Adapter.g.reflect("range_foreach", x0, x1, b))
+
+      val i = var_new(Wrap[Long](x0))
+      __whileDo(notequals(readVar(i), Wrap[Long](x1)), {
+        f(readVar(i))
+        i += 1L
+      })
+    }
+  }
+}
+
+// trait OrderingOps
+trait MiscOps
+
+trait ArrayOps { b: Base =>
+
+  def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
+    Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
+  }
   def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("Array", xs.map(Unwrap(_)):_*))
   }
@@ -780,451 +1045,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def resize(s: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflectRealloc("array_resize", Unwrap(x), Unwrap(s))(Unwrap(x)))
     def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
   }
-  case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Rep[A]
-
-  // BooleanOps
-  implicit def bool2boolOps(lhs: Boolean) = new BoolOps(lhs)
-  implicit def var2boolOps(lhs: Var[Boolean]) = new BoolOps(lhs)
-  implicit class BoolOps(lhs: Rep[Boolean]) {
-    def unary_!(implicit pos: SourceContext): Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("!", Unwrap(lhs)))
-    def &&(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
-    __ifThenElse(lhs, rhs, unit(false))
-    // def &&(rhs: => Rep[Boolean])(implicit pos: SourceContext): Rep[Boolean] = lhs match {
-    //   case Wrap(Backend.Const(true))  => rhs
-    //   case Wrap(Backend.Const(false)) => unit(false)
-    //   case _ => Wrap[Boolean](Adapter.g.reflect("&&", Unwrap(lhs), Unwrap(rhs)))
-    // }
-    // def ||(rhs: => Rep[Boolean])(implicit pos: SourceContext): Rep[Boolean] = lhs match {
-    //   case Wrap(Backend.Const(true))  => unit(true)
-    //   case Wrap(Backend.Const(false)) => rhs
-    //   case _ => Wrap[Boolean](Adapter.g.reflect("||", Unwrap(lhs), Unwrap(rhs)))
-    // }
-    def ||(rhs: =>Rep[Boolean])(implicit pos: SourceContext) =
-      __ifThenElse(lhs, unit(true), rhs)
-    def ^(rhs: Rep[Boolean]) = Wrap[Boolean](Adapter.g.reflect("!=", Unwrap(lhs), Unwrap(rhs)))
-  }
-
-  // shift/reset
-  def shift1[A:Manifest, B:Manifest](f: Rep[A => B] => Rep[B]): Rep[A] = { // XXX is the type signature correct?
-    val bBlock = Adapter.g.reify(x => Unwrap(f(Wrap[A => B](x))))
-    Wrap[A](Adapter.g.reflectWrite("shift1", bBlock)(Adapter.CPS))
-  }
-  def reset1[A:Manifest](f: => Rep[A]): Rep[A] = { // XXX is the type signature correct?
-    val rBlock = Adapter.g.reify(Unwrap(f))
-    Wrap[A](Adapter.g.reflectEffect("reset1", rBlock)()())
-  }
-
-  // Functions
-  def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]) = (x1: Backend.Exp) => Unwrap(f(Wrap[A](x1)))
-  def unwrapFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A],Rep[B]) => Rep[C]) = (x1: Backend.Exp, x2: Backend.Exp) => Unwrap(f(Wrap[A](x1), Wrap[B](x2)))
-
-  def fun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
-    Wrap[A=>B](__fun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
-
-  def doLambda[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] = fun(f)
-  implicit class FunOps[A:Manifest,B:Manifest](f: Rep[A => B]) {
-    def apply(x: Rep[A]): Rep[B] =
-      Wrap[B](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x))()())
-  }
-
-  def fun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
-    Wrap[(A,B)=>C](__fun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1))))))
-
-  def doLambda[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] = fun(f)
-  implicit class FunOps2[A:Manifest,B:Manifest,C:Manifest](f: Rep[(A,B) => C]) {
-    def apply(x: Rep[A], y: Rep[B]): Rep[C] =
-      Wrap[C](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y))()())
-  }
-
-  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
-    Wrap[(A,B,C)=>D](__fun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2))))))
-
-  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] = fun(f)
-  implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
-    def apply(x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =
-      Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))()())
-  }
-
-  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
-    Wrap[(A,B,C,D)=>E](__fun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3))))))
-
-  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] = fun(f)
-  implicit class FunOps4[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: Rep[(A,B,C,D) => E]) {
-    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D]): Rep[E] =
-      Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))()())
-  }
-
-  def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
-    val can = canonicalize(f)
-    Adapter.funTable.find(_._2 == can) match {
-      case Some((funSym, _)) => funSym
-      case _ =>
-        val fn = Backend.Sym(Adapter.g.fresh)
-        Adapter.funTable = (fn, can)::Adapter.funTable
-
-        val fn1 = Backend.Sym(Adapter.g.fresh)
-        Adapter.g.reflect(fn, "λforward", fn1)()
-        //val xn = Sym(g.fresh)
-        //val f1 = (x: INT) => APP(fn,x)
-        // NOTE: lambda expression itself does not have
-        // an effect, so body block should not count as
-        // latent effect of the lambda
-        val block = Adapter.g.reify(arity, gf)
-        val res = Adapter.g.reflect(fn1,"λ",block)(hardSummary(fn))
-        Adapter.funTable = Adapter.funTable.map {
-          case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
-        }
-        res
-    }
-  }
-  // Top-Level Functions
-  // XXX: is this data structure needed? should it move elsewhere?
-  // could we use funTable instead?
-  val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
-  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
-    lazy val ff = {
-      val fn = Backend.Sym(Adapter.g.fresh)
-      Adapter.g.reflect(fn,"λ", Adapter.g.reify(arity, gf), Backend.Const(0))()
-      fn
-    }
-    try {
-      val can = canonicalize(f)
-      topLevelFunctions.getOrElseUpdate(can, ff)
-    } catch {
-      case _: Throwable => ff
-    }
-  }
-  def topFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Rep[A => B] =
-    Wrap[A=>B](__topFun(f, 1, xn => Unwrap(f(Wrap[A](xn(0))))))
-
-  def topFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
-    Wrap[(A,B)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1))))))
-
-  def topFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
-    Wrap[(A,B,C)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2))))))
-
-  def topFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
-    Wrap[(A,B,C,D)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3))))))
-
-  // IfThenElse
-  def __ifThenElse[T:Manifest](c: Rep[Boolean], a: => Rep[T], b: => Rep[T])(implicit pos: SourceContext): Rep[T] = c match {
-    case Wrap(Backend.Const(true))  => a
-    case Wrap(Backend.Const(false)) => b
-    case _ =>
-      Wrap[T](Adapter.IF(Adapter.BOOL(Unwrap(c)))
-                     (Adapter.INT(Unwrap(a)))
-                     (Adapter.INT(Unwrap(b))).x)
-  }
-
-  // ImplicitOps
-  // TR: I'm concerned about this because it is overly general -- it doesn't appear to be used anyways?
-  // def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
-
-  // MiscOps
-  def exit(res: Rep[Int]): Unit = Adapter.g.reflectWrite("exit", Unwrap(res))(Adapter.CTRL)
-  def println(x: Rep[Any]): Unit =
-    Adapter.g.reflectWrite("P",Unwrap(x))(Adapter.CTRL)
-
-  def printf(f: String, x: Rep[Any]*): Unit = {
-    Adapter.g.reflectWrite("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
-  }
-
-  def switch[T:Manifest](x: Rep[T], default: Option[() => Unit] = None)(cases: (Seq[T], Rep[T] => Unit)*): Unit = {
-    var isPure = true
-    val bCases: Seq[Backend.Def]  = cases.flatMap {
-      case (Seq(), _)  => ???
-      case (s, f) =>
-        val block = Adapter.g.reifyHere({f(if (s.length == 1) unit(s.head) else x); Backend.Const(())})
-        isPure &&= block.isPure
-        Seq(Backend.Const(s.map(Backend.Const(_))), block)
-    }
-
-    val bDefault = default.map { f =>
-      val block = Adapter.g.reifyHere({ f(); Backend.Const(()) })
-      isPure &&= block.isPure
-      block
-    }
-
-    if (isPure)
-      Adapter.g.reflect("switch", Unwrap(x) +: bDefault.getOrElse(Backend.Const(())) +: bCases: _*)
-    else
-      Adapter.g.reflectEffectSummaryHere("switch", Unwrap(x) +: bDefault.getOrElse(Backend.Const(())) +: bCases:_*)((Set[Backend.Exp](), Set[Backend.Exp]()))
-  }
-
-  // TimingOps
-  def timeGeneratedCode[A: Manifest](f: => Rep[A], msg: Rep[String] = unit("")): Rep[A] = {
-    val ff = Adapter.g.reify(Unwrap(f))
-    val summary = Adapter.g.getEffKeys(ff)
-    Wrap[A](Adapter.g.reflectEffectSummary("timeGenerated", Unwrap(msg), ff)(summary))
-  }
-  def timestamp: Rep[Long] = Wrap[Long](Adapter.g.reflectWrite("timestamp")(Adapter.CTRL))
-
-
-  // case class GenerateComment(l: String) extends Def[Unit]
-  // case class Comment[A:Manifest](l: String, verbose: Boolean, b: Block[A]) extends Def[A]
-  def generate_comment(l: String): Rep[Unit] = {
-    Wrap[Unit](Adapter.g.reflectWrite("generate-comment", Backend.Const(l))(Adapter.CTRL))
-  }
-  def comment[A:Manifest](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A] = {
-    val g = Adapter.g
-    val bb = g.reify(Unwrap(b))
-    if (bb.isPure)
-      Wrap[A](g.reflect("comment",Backend.Const(l),Backend.Const(verbose),bb))
-    else {
-      val summary = Adapter.g.getEffKeys(bb)
-      Wrap[A](g.reflectEffectSummary("comment",Backend.Const(l),Backend.Const(verbose),bb)(summary))
-    }
-  }
-
-  // RangeOps
-  // NOTE(trans): it has to be called 'intWrapper' to shadow the standard Range constructor
-  implicit class intWrapper(start: Int) {
-    // Note that these are ambiguous - need to use type ascription here (e.g. 1 until 10 : Rep[Range])
-
-    def until(end: Rep[Int])(implicit pos: SourceContext) = range_until(unit(start),end)
-    def until(end: Int)(implicit pos: SourceContext): Rep[Range] = range_until(unit(start),unit(end))
-
-    def until(end: Int)(implicit pos: SourceContext, o: Overloaded1): Range = new Range(start,end,1)
-  }
-  def range_until(start: Rep[Int], end: Rep[Int]): Rep[Range] = {
-    Wrap[Range](Adapter.g.reflect("range_until", Unwrap(start), Unwrap(end)))
-  }
-
-  implicit class RangeConstrOps(lhs: Rep[Int]) {
-    def until(y: Rep[Int]): Rep[Range] = range_until(lhs,y)
-
-    // unrelated
-    def ToString: Rep[String] =
-      Wrap[String](Adapter.g.reflect("Object.toString", Unwrap(lhs)))
-  }
-
-  implicit class RangeOps(lhs: Rep[Range]) {
-    def foreach(f: Rep[Int] => Rep[Unit])(implicit __pos: SourceContext): Rep[Unit] = {
-
-      // XXX TODO: it would be good to do this as lowering/codegen
-      // (as done previously in LMS), but for now just construct
-      // a while loop directly
-
-      val Adapter.g.Def("range_until", List(x0:Backend.Exp,x1:Backend.Exp)) = Unwrap(lhs)
-
-      // val b = Adapter.g.reify(i => Unwrap(f(Wrap(i))))
-      // val f1 = Adapter.g.reflect("λ",b)
-      // Wrap(Adapter.g.reflect("range_foreach", x0, x1, b))
-
-      val i = var_new(Wrap[Int](x0))
-      __whileDo(notequals(readVar(i), Wrap[Int](x1)), {
-        f(readVar(i))
-        i += 1
-      })
-    }
-  }
-
-  trait LongRange
-  implicit class longWrapper(start: Long) {
-    // Note that these are ambiguous - need to use type ascription here (e.g. 1 until 10 : Rep[LongRange])
-
-    def until(end: Rep[Long])(implicit pos: SourceContext) = longrange_until(unit(start),end)
-    def until(end: Long)(implicit pos: SourceContext): Rep[LongRange] = longrange_until(unit(start),unit(end))
-
-    def until(end: Long)(implicit pos: SourceContext, o: Overloaded1): immutable.NumericRange.Exclusive[Long] = new immutable.NumericRange.Exclusive(start,end,1L)
-  }
-  def longrange_until(start: Rep[Long], end: Rep[Long]): Rep[LongRange] = {
-    Wrap[LongRange](Adapter.g.reflect("longrange_until", Unwrap(start), Unwrap(end)))
-  }
-
-  implicit class LongRangeConstrOps(lhs: Rep[Long]) {
-    def until(y: Rep[Long]): Rep[LongRange] = longrange_until(lhs,y)
-
-    // unrelated
-    def ToString: Rep[String] =
-      Wrap[String](Adapter.g.reflect("Object.toString", Unwrap(lhs)))
-  }
-
-  implicit class LongRangeOps(lhs: Rep[LongRange]) {
-    def foreach(f: Rep[Long] => Rep[Unit])(implicit __pos: SourceContext): Rep[Unit] = {
-
-      // XXX TODO: it would be good to do this as lowering/codegen
-      // (as done previously in LMS), but for now just construct
-      // a while loop directly
-
-      val Adapter.g.Def("longrange_until", List(x0:Backend.Exp,x1:Backend.Exp)) = Unwrap(lhs)
-
-      // val b = Adapter.g.reify(i => Unwrap(f(Wrap(i))))
-      // val f1 = Adapter.g.reflect("λ",b)
-      // Wrap(Adapter.g.reflect("range_foreach", x0, x1, b))
-
-      val i = var_new(Wrap[Long](x0))
-      __whileDo(notequals(readVar(i), Wrap[Long](x1)), {
-        f(readVar(i))
-        i += 1L
-      })
-    }
-  }
-
-  // StringOps
-  implicit class StringOps(lhs: Rep[String]) {
-    def charAt(i: Rep[Int]): Rep[Char] = Wrap[Char](Adapter.g.reflect("String.charAt", Unwrap(lhs), Unwrap(i))) // XXX: may fail! effect?
-    def apply(i: Rep[Int]): Rep[Char] = charAt(i)
-    def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.length", Unwrap(lhs)))
-    def substring(idx: Rep[Int], end: Rep[Int]): Rep[String] = Wrap[String](Adapter.g.reflect("String.slice", Unwrap(lhs), Unwrap(idx), Unwrap(end))) // FIXME: View
-    def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("String.toInt", Unwrap(lhs))) // XXX: may fail!
-    def toDouble: Rep[Double] = Wrap[Double](Adapter.g.reflect("String.toDouble", Unwrap(lhs))) // XXX: may fail!
-  }
-
-  // UncheckedOps
-  private def uncheckedHelp(xs: Seq[Any]) = {
-    val str = xs map {
-      case s: String => s
-      case e: Exp[Any] => "[ ]"
-      case e: Var[Any] => "[ ]"
-      case e => e.toString
-    } mkString("")
-    var effs = Set[Backend.Exp]()
-    val args = xs collect {
-      case e: Exp[Any] =>
-        val res = Unwrap(e)
-        if (res.isInstanceOf[Backend.Sym])
-          effs += res
-        res
-      case v: Var[Any] =>
-        val res = UnwrapV(v)
-        effs += res
-        res
-    }
-    (str, args, effs)
-  }
-
-  // TODO:
-  // - More than one
-  // - filter non mutable or detect arrays?
-  def unchecked[T:Manifest](xs: Any*): Rep[T] = {
-    val (strings, args, effs) = uncheckedHelp(xs)
-    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()((effs + Adapter.CTRL).toSeq:_*))
-  }
-  def uncheckedWrite[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
-    val (strings, args, effs) = uncheckedHelp(xs)
-    x match {
-      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedWrite, please use unchecked")
-      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedWrite, please use unchecked")
-    }
-    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()((effs + Adapter.CTRL).toSeq:_*))
-  }
-  def uncheckedRead[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
-    val (strings, args, effs) = uncheckedHelp(xs)
-    x match {
-      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedRead, please use unchecked")
-      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedRead, please use unchecked")
-    }
-    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)(Adapter.CTRL))
-  }
-  def uncheckedPure[T:Manifest](xs: Any*): Rep[T] = {
-    val (strings, args, _) = uncheckedHelp(xs)
-    // assert(effs.isEmpty, "variable detected in uncheckedPure, please use unchecked*Write, unchecked*Read, or unchecked")
-    Wrap[T](Adapter.g.reflect("unchecked" + strings, args:_*))
-  }
-
-  def uncheckedPureRead[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
-    val (strings, args, effs) = uncheckedHelp(xs)
-    x match {
-      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedRead, please use unchecked")
-      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedRead, please use unchecked")
-    }
-    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)(effs.toSeq:_*)())
-  }
-  def uncheckedPureWrite[T:Manifest](xs: Any*)(x: Any): Rep[T] = {
-    val (strings, args, effs) = uncheckedHelp(xs)
-    x match {
-      case x: Var[_] => assert(effs.size == 1 && effs(UnwrapV(x)), "additional effects detected in uncheckedPureWrite, please use unchecked")
-      case x: Exp[_] => assert(effs.size == 1 && effs(Unwrap(x)), "additional effects detected in uncheckedPureWrite, please use unchecked")
-    }
-    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()(effs.toSeq:_*))
-  }
-
-  // Variables
-  implicit def readVar[T:Manifest](x: Var[T]): Rep[T] = Wrap[T](Adapter.g.reflectRead("var_get", UnwrapV(x))(UnwrapV(x)))
-  def var_new[T:Manifest](x: Rep[T]): Var[T] = WrapV[T](Adapter.g.reflectMutable("var_new", Unwrap(x)))
-  def __assign[T:Manifest](lhs: Var[T], rhs: Rep[T]): Unit = Wrap[Unit](Adapter.g.reflectWrite("var_set", UnwrapV(lhs), Unwrap(rhs))(UnwrapV(lhs)))
-  def __assign[T:Manifest](lhs: Var[T], rhs: Var[T]): Unit = __assign(lhs,readVar(rhs))
-  def __assign[T:Manifest](lhs: Var[T], rhs: T): Unit = __assign(lhs,unit(rhs)) // shouldn't unit lift T to Rep[T] implicitly?
-
-
-  def numeric_plus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
-    Wrap[T]((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
-  def numeric_minus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
-    Wrap[T]((Adapter.INT(Unwrap(lhs)) - Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
-  def numeric_mult[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
-    Wrap[T]((Adapter.INT(Unwrap(lhs)) * Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
-
-  implicit class OpsInfixVarT[T:Manifest:Numeric](lhs: Var[T]) {
-    def +=(rhs: T): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
-    def +=(rhs: Rep[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),rhs))
-    def +=(rhs: Var[T]): Unit = __assign(lhs,numeric_plus(readVar(lhs),readVar(rhs)))
-    def -=(rhs: T): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
-    def -=(rhs: Rep[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),rhs))
-    def -=(rhs: Var[T]): Unit = __assign(lhs,numeric_minus(readVar(lhs),readVar(rhs)))
-    def *=(rhs: T): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
-    def *=(rhs: Rep[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),rhs))
-    def *=(rhs: Var[T]): Unit = __assign(lhs,numeric_mult(readVar(lhs),readVar(rhs)))
-  }
-
-  // While
-  def __whileDo(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
-      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
-  }
-  def __whileDoInternal(c: => Rep[Boolean], b: => Rep[Unit]): Rep[Unit] = {
-      Adapter.WHILE(Adapter.BOOL(Unwrap(c)))(b)
-  }
-
 }
 
-trait Compile
-trait CompileScala
-
-trait BaseExp
-trait ScalaGenBase extends ExtendedScalaCodeGen {
-  val IR: Base
-  import IR._
-  implicit class CodegenHelper(sc: StringContext) {
-    def src(args: Any*): String = ???
-  }
-  // def remap[A](m: Manifest[A]): String = ???
-  // def quote(x: Exp[Any]) : String = ???
-  def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A: Manifest, B: Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
-    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
-    // stream.println(src)
-    statics.toList
-  }
-  def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
-}
-
-trait CGenBase extends ExtendedCCodeGen {
-  val IR: Base
-  import IR._
-  // def remap[A](m: Manifest[A]): String = ???
-  // def quote(x: Exp[Any]) : String = ???
-  def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
-    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
-    // stream.println(src)
-    statics.toList
-  }
-  def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
-}
-
-// trait PrimitiveOps
-trait NumericOps
-trait BooleanOps
-trait LiftString
-// trait LiftPrimitives
-trait LiftNumeric
-trait LiftBoolean
-trait IfThenElse
-// trait Equal
-trait RangeOps
-// trait OrderingOps
-trait MiscOps
-trait ArrayOps
 trait StringOps
 trait SeqOps
 trait Functions

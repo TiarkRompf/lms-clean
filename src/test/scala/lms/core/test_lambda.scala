@@ -408,4 +408,20 @@ class LambdaTest extends TutorialFunSuite {
       driver.eval(2)
     })
   }
+
+  test("mutual_recursion") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(a: Rep[Int]) = {
+        lazy val odd: Rep[Int=>Boolean] = fun { (x: Rep[Int]) =>
+          if (x == 1) true else even(x - 1)
+        }
+        lazy val even: Rep[Int=>Boolean] = fun { (x: Rep[Int]) =>
+          if (x == 0) true else odd(x - 1)
+        }
+        printf("%d", even(a))
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
 }
