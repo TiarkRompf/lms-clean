@@ -457,6 +457,9 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def __assign[T:Manifest](lhs: Var[T], rhs: Rep[T]): Unit = Wrap[Unit](Adapter.g.reflectWrite("var_set", UnwrapV(lhs), Unwrap(rhs))(UnwrapV(lhs)))
   def __assign[T:Manifest](lhs: Var[T], rhs: Var[T]): Unit = __assign(lhs,readVar(rhs))
   def __assign[T:Manifest](lhs: Var[T], rhs: T): Unit = __assign(lhs,unit(rhs)) // shouldn't unit lift T to Rep[T] implicitly?
+  def __newVar[T:Manifest](init: T)(implicit pos: SourceContext) = var_new(unit(init))
+  def __newVar[T](init: Rep[T])(implicit o: Overloaded1, mT: Manifest[T], pos: SourceContext) = var_new(init)
+  def __newVar[T](init: Var[T])(implicit o: Overloaded2, mT: Manifest[T], pos: SourceContext) = var_new(init)
 
   def numeric_plus[T:Numeric:Manifest](lhs: Rep[T], rhs: Rep[T]): Rep[T] =
     Wrap[T]((Adapter.INT(Unwrap(lhs)) + Adapter.INT(Unwrap(rhs))).x) // XXX: not distinguishing types here ...
@@ -645,60 +648,20 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
 }
 
-// DSLAPI CODE
 
-//@virtualize
-trait UtilOps extends Base { this: Dsl =>
-  type Typ[T] = Manifest[T]
-  def typ[T:Typ] = manifest[T]
-  def manifestTyp[T:Typ] = manifest[T]
-  implicit class HashCls[T: Typ](o: Rep[T]) {
-    def HashCode(implicit pos: SourceContext):Rep[Long] = infix_HashCode(o)
-    def HashCode(len: Rep[Int])(implicit pos: SourceContext):Rep[Long] = o match {
-      case s:Rep[String] => infix_HashCodeS(s, len)
-      //case _ => infix_HashCode(o) //FIXME is this an ok dispatch?
-    }
-  }
-  def infix_HashCode[T:Typ](a: Rep[T])(implicit pos: SourceContext): Rep[Long]
-  def infix_HashCodeS(s: Rep[String], len: Rep[Int])(implicit v: Overloaded1, pos: SourceContext): Rep[Long]
-}
-
-//@virtualize
-trait UtilOpsExp extends UtilOps with BaseExp { this: DslExp =>
-
-  case class ObjHashCode[T:Typ](o: Rep[T])(implicit pos: SourceContext) extends Def[Long] { def m = typ[T] }
-  case class StrSubHashCode(o: Rep[String], len: Rep[Int])(implicit pos: SourceContext) extends Def[Long]
-  def infix_HashCode[T:Typ](o: Rep[T])(implicit pos: SourceContext) = ObjHashCode(o)
-  def infix_HashCodeS(o: Rep[String], len: Rep[Int])(implicit v: Overloaded1, pos: SourceContext) = StrSubHashCode(o,len)
-
-  //STUB
-  // override def mirror[A:Typ](e: Def[A], f: Transformer)(implicit pos: SourceContext): Exp[A] = (e match {
-  //   case e@ObjHashCode(a) => infix_HashCode(f(a))(e.m, pos)
-  //   case e@StrSubHashCode(o,len) => infix_HashCodeS(f(o),f(len))
-  //   case _ => super.mirror(e,f)
-  // }).asInstanceOf[Exp[A]]
-}
-
-// @virtualize
-trait Dsl extends PrimitiveOps with NumericOps with BooleanOps with LiftString with LiftPrimitives
-    with LiftNumeric with LiftBoolean with IfThenElse with Equal with RangeOps with OrderingOps
-    with MiscOps with ArrayOps with StringOps with SeqOps with Functions with While with StaticData
-    with Variables with LiftVariables with ObjectOps with UtilOps {
+trait Dsl extends PrimitiveOps with LiftPrimitives with Equal with RangeOps with OrderingOps with ArrayOps with UtilOps {
 
   class SeqOpsCls[T](x: Rep[Seq[Char]])
   implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
-  def generate_comment(l: String): Rep[Unit]
-  def comment[A:Typ](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A]
 }
 
-// @virtualize
+// FIXME(feiw) I want to get rid of DslExp, DslGen, DslImpl, and DslGenC but failed to do so for now.
 trait DslExp extends Dsl with PrimitiveOpsExpOpt with NumericOpsExpOpt with BooleanOpsExp
     with IfThenElseExpOpt with EqualExpBridgeOpt with RangeOpsExp with OrderingOpsExp
     with MiscOpsExp with EffectExp with ArrayOpsExpOpt with StringOpsExp with SeqOpsExp
     with FunctionsRecursiveExp with WhileExp with StaticDataExp with VariablesExpOpt
     with ObjectOpsExpOpt with UtilOpsExp
 
-// @virtualize
 trait DslGen extends ScalaGenNumericOps
     with ScalaGenPrimitiveOps with ScalaGenBooleanOps with ScalaGenIfThenElse
     with ScalaGenEqual with ScalaGenRangeOps with ScalaGenOrderingOps
@@ -711,7 +674,6 @@ trait DslGen extends ScalaGenNumericOps
   import IR._
 }
 
-// @virtualize
 trait DslImpl extends DslExp { q =>
   val codegen = new DslGen {
     val IR: q.type = q
@@ -719,7 +681,6 @@ trait DslImpl extends DslExp { q =>
 }
 
 // TODO: currently part of this is specific to the query tests. generalize? move?
-// @virtualize
 trait DslGenC extends CGenBase with CGenNumericOps
     with CGenPrimitiveOps with CGenBooleanOps with CGenIfThenElse
     with CGenEqual with CGenRangeOps with CGenOrderingOps
@@ -734,14 +695,13 @@ trait DslGenC extends CGenBase with CGenNumericOps
 
 
 
-// @virtualize
 abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
   def wrapper(x: Rep[A]): Rep[B] = snippet(x)
   def snippet(x: Rep[A]): Rep[B]
 }
 
 // @virtualize
-abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl with CompileScala {
+abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl {
   lazy val f = { val (c1,s1) = (code,statics); time("scalac") { Global.sc.compile[A,B]("Snippet", c1, s1) }}
 
   def precompile: Unit = f
@@ -752,14 +712,12 @@ abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with Dsl
 
   lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
-    val statics = codegen.emitSource(wrapper, "Snippet", new java.io.PrintStream(source))(manifestTyp[A],manifestTyp[B])
+    val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
     (source.toString, statics)
   }
 }
 
-// @virtualize
-abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] with DslExp {
-  q =>
+abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] with DslExp { q =>
   val codegen = new DslGenC {
     val IR: q.type = q
   }
@@ -787,44 +745,49 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
   def eval(a: A): Unit = { val f1 = f; time("eval")(f1(a)) }
 }
 
-// STUB CODE
-
-
-
-trait Compile
-trait CompileScala
-
-trait BaseExp
 trait ScalaGenBase extends ExtendedScalaCodeGen {
   val IR: Base
   import IR._
   implicit class CodegenHelper(sc: StringContext) {
     def src(args: Any*): String = ???
   }
-  // def remap[A](m: Manifest[A]): String = ???
-  // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
   def emitSource[A: Manifest, B: Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
     val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
-    // stream.println(src)
     statics.toList
   }
-  // def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
 }
 
 trait CGenBase extends ExtendedCCodeGen {
   val IR: Base
   import IR._
-  // def remap[A](m: Manifest[A]): String = ???
-  // def quote(x: Exp[Any]) : String = ???
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
   def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
     val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
-    // stream.println(src)
     statics.toList
   }
-  // def emitSource[A : Manifest](args: List[Sym[_]], body: Block[A], className: String, stream: java.io.PrintStream): List[(Sym[Any], Any)] = ???
 }
+
+
+// Useful Extension of Base
+trait UtilOps extends Base {
+  type Typ[T] = Manifest[T]
+  def typ[T:Typ] = manifest[T]
+  def manifestTyp[T:Typ] = manifest[T]
+  implicit class HashCls[T: Typ](o: Rep[T]) {
+    def HashCode(implicit pos: SourceContext):Rep[Long] = infix_HashCode(o)
+    def HashCode(len: Rep[Int])(implicit pos: SourceContext):Rep[Long] = o match {
+      case s:Rep[String] => infix_HashCodeS(s, len)
+      //case _ => infix_HashCode(o) //FIXME is this an ok dispatch?
+    }
+  }
+
+  case class ObjHashCode[T:Typ](o: Rep[T])(implicit pos: SourceContext) extends Def[Long] { def m = typ[T] }
+  case class StrSubHashCode(o: Rep[String], len: Rep[Int])(implicit pos: SourceContext) extends Def[Long]
+  def infix_HashCode[T:Typ](o: Rep[T])(implicit pos: SourceContext) = ObjHashCode(o)
+  def infix_HashCodeS(o: Rep[String], len: Rep[Int])(implicit v: Overloaded1, pos: SourceContext) = StrSubHashCode(o,len)
+}
+
 
 trait ArrayOps { b: Base =>
 
@@ -876,12 +839,6 @@ trait ArrayOps { b: Base =>
   }
 }
 
-trait NumericOps
-trait BooleanOps
-trait LiftString
-trait LiftNumeric
-trait LiftBoolean
-trait IfThenElse
 
 trait RangeOps extends Equal {
 
@@ -963,82 +920,6 @@ trait RangeOps extends Equal {
       })
     }
   }
-}
-
-trait MiscOps
-trait StringOps
-trait SeqOps
-trait Functions
-trait While
-trait StaticData
-trait Variables
-trait ObjectOps
-trait UncheckedOps
-trait Timing
-
-trait PrimitiveOpsExpOpt
-trait NumericOpsExpOpt
-trait BooleanOpsExp
-trait IfThenElseExpOpt
-trait EqualExpBridgeOpt
-trait RangeOpsExp
-trait OrderingOpsExp
-trait MiscOpsExp
-trait EffectExp
-trait ArrayOpsExpOpt
-trait StringOpsExp
-trait SeqOpsExp
-trait FunctionsRecursiveExp
-trait WhileExp
-trait StaticDataExp
-trait VariablesExpOpt
-trait ObjectOpsExpOpt
-trait UncheckedOpsExp
-
-trait ScalaGenNumericOps extends ScalaGenBase
-trait ScalaGenPrimitiveOps extends ScalaGenBase
-trait ScalaGenBooleanOps extends ScalaGenBase
-trait ScalaGenIfThenElse extends ScalaGenBase
-trait ScalaGenEqual extends ScalaGenBase
-trait ScalaGenRangeOps extends ScalaGenBase
-trait ScalaGenOrderingOps extends ScalaGenBase
-trait ScalaGenMiscOps extends ScalaGenBase
-trait ScalaGenArrayOps extends ScalaGenBase
-trait ScalaGenStringOps extends ScalaGenBase
-trait ScalaGenSeqOps extends ScalaGenBase
-trait ScalaGenFunctions extends ScalaGenBase
-trait ScalaGenWhile extends ScalaGenBase
-trait ScalaGenStaticData extends ScalaGenBase
-trait ScalaGenVariables extends ScalaGenBase
-trait ScalaGenObjectOps extends ScalaGenBase
-trait ScalaGenUtilOps extends ScalaGenBase
-trait ScalaGenUncheckedOps extends ScalaGenBase
-trait ScalaGenEffect extends ScalaGenBase
-
-trait CGenNumericOps
-trait CGenPrimitiveOps
-trait CGenBooleanOps
-trait CGenIfThenElse
-trait CGenEqual
-trait CGenRangeOps
-trait CGenOrderingOps
-trait CGenMiscOps
-trait CGenArrayOps
-trait CGenStringOps
-trait CGenSeqOps
-trait CGenFunctions
-trait CGenWhile
-trait CGenStaticData
-trait CGenVariables
-trait CGenObjectOps
-trait CGenUtilOps
-trait CGenUncheckedOps
-
-
-trait LiftVariables extends Base {
-  def __newVar[T:Manifest](init: T)(implicit pos: SourceContext) = var_new(unit(init))
-  def __newVar[T](init: Rep[T])(implicit o: Overloaded1, mT: Manifest[T], pos: SourceContext) = var_new(init)
-  def __newVar[T](init: Var[T])(implicit o: Overloaded2, mT: Manifest[T], pos: SourceContext) = var_new(init)
 }
 
 
@@ -1529,3 +1410,85 @@ trait PrimitiveOps extends Base with OverloadHack {
   }
 
 }
+
+// These empty traits have to be here for backward compatibility :(
+trait MiscOps
+trait StringOps
+trait SeqOps
+trait Functions
+trait While
+trait StaticData
+trait Variables
+trait ObjectOps
+trait UncheckedOps
+trait Timing
+trait LiftVariables
+trait NumericOps
+trait BooleanOps
+trait LiftString
+trait LiftNumeric
+trait LiftBoolean
+trait IfThenElse
+
+trait PrimitiveOpsExpOpt
+trait NumericOpsExpOpt
+trait BooleanOpsExp
+trait IfThenElseExpOpt
+trait EqualExpBridgeOpt
+trait RangeOpsExp
+trait OrderingOpsExp
+trait MiscOpsExp
+trait EffectExp
+trait ArrayOpsExpOpt
+trait StringOpsExp
+trait SeqOpsExp
+trait FunctionsRecursiveExp
+trait WhileExp
+trait StaticDataExp
+trait VariablesExpOpt
+trait ObjectOpsExpOpt
+trait UncheckedOpsExp
+trait UtilOpsExp
+
+trait ScalaGenNumericOps extends ScalaGenBase
+trait ScalaGenPrimitiveOps extends ScalaGenBase
+trait ScalaGenBooleanOps extends ScalaGenBase
+trait ScalaGenIfThenElse extends ScalaGenBase
+trait ScalaGenEqual extends ScalaGenBase
+trait ScalaGenRangeOps extends ScalaGenBase
+trait ScalaGenOrderingOps extends ScalaGenBase
+trait ScalaGenMiscOps extends ScalaGenBase
+trait ScalaGenArrayOps extends ScalaGenBase
+trait ScalaGenStringOps extends ScalaGenBase
+trait ScalaGenSeqOps extends ScalaGenBase
+trait ScalaGenFunctions extends ScalaGenBase
+trait ScalaGenWhile extends ScalaGenBase
+trait ScalaGenStaticData extends ScalaGenBase
+trait ScalaGenVariables extends ScalaGenBase
+trait ScalaGenObjectOps extends ScalaGenBase
+trait ScalaGenUtilOps extends ScalaGenBase
+trait ScalaGenUncheckedOps extends ScalaGenBase
+trait ScalaGenEffect extends ScalaGenBase
+
+trait CGenNumericOps
+trait CGenPrimitiveOps
+trait CGenBooleanOps
+trait CGenIfThenElse
+trait CGenEqual
+trait CGenRangeOps
+trait CGenOrderingOps
+trait CGenMiscOps
+trait CGenArrayOps
+trait CGenStringOps
+trait CGenSeqOps
+trait CGenFunctions
+trait CGenWhile
+trait CGenStaticData
+trait CGenVariables
+trait CGenObjectOps
+trait CGenUtilOps
+trait CGenUncheckedOps
+
+trait Compile
+trait CompileScala
+trait BaseExp
