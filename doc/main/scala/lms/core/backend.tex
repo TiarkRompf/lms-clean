@@ -1,0 +1,111 @@
+\section{LMS IR}
+
+In the file core/backend.scala, object Backend, the core LMS IR is described.
+
+\begin{listing}[scala]
+abstract class Def // Definition: used in right-hand-side of all nodes
+abstract class Exp extends Def
+case class Sym(n: Int) extends Exp   // Symbol
+case class Const(x: Any) extends Exp // Constant
+case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def
+case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary)
+\end{listing}
+
+\subsection{Sea Of Nodes}\label{sec:node}
+
+The LMS IR follows the ``sea of nodes'' design (cite?), where the IR is composed of
+a list of \texttt{Node}s, and the \texttt{Block}s do not explicitly scope the nodes.
+Instead, the \texttt{Block}s describe their \emph{inputs} (via \texttt{in: List[Sym]}),
+\emph{result} (via \texttt{res: Exp}), \emph{world} (via \texttt{ein: Sym}), and
+\emph{effects} (via \texttt{eff: EffectSummary}).
+
+The \emph{world} (by \texttt{ein: Sym}) is probably unfamiliar to many readers. It is
+used to scope the nodes that belong to this block. That is to say, if a node depends on
+the world of a block, then it should be scheduled within that block. For example:
+
+\begin{listing}[scala]
+Give an example?
+\end{listing}
+
+If a node depends on the inputs of a block, very likely it has to be scheduled in the block
+too. So both inputs and world are scoping the beginning of the block. That is why the world
+is also called the ``effect input''.
+So if the world marks the beginning of a block, which component of the Block marks the
+end of a block? The answer is the result and the effects of the block. When scheduling the
+nodes for a block, we can start from the result and effects, and pick nodes that are depended
+on by them.
+
+Why using the sea of node IR in LMS? One of the key reasons is that it offers easy
+optimization of code-motion. Since the blocks do not explicitly scope the nodes, whether
+a node is scheduled in or out of a block is flexibly determined based on effects, using
+frequency, and et al. It does make IR traversal and transformation different from IRs with
+explicit scopes, which we will talk about in core/traversal.scala.
+
+\subsection{Effect Summary}
+
+In Section~\ref{sec:node}, we talked about the dependencies between nodes and blocks (via EffectSummary).
+EffectSummary can be course-grained or fine-grained. More fine-grained effect summary will have
+higher compilation time cost, but provide more optimized target program.
+
+First of all, we want to be sure of the two intertwined concepts here: effects and dependencies.
+Effects refer to node behaviors such as printing, variable read, variable write, et al.
+Dependencies refer to both data dependencies and dependencies caused by effects, such as
+printing cannot be missed or reordered, and we cannot reorder two writes on the same variable.
+
+The general work flow is that at node constructions, the effects of nodes are tracked. using
+the node effects we compute the dependencies. The dependencies are then used to schedule nodes
+for each block. Our current EffectSummary is like this:
+
+\begin{listing}[scala]
+case class EffectSummary(sdeps: Set[Sym], hdeps: Set[Sym], rkeys: Set[Exp], wkeys: Set[Exp])
+\end{listing}
+
+It tracks soft dependencies (via \texttt{sdeps: Set[Sym]}), hard dependencies (via \texttt{hdeps: Set[Sym]}),
+read keys (via \texttt{Set[Exp]}), and write keys (via \texttt{Set[Exp]}).
+Hard dependencies are the normal dependencies. If node A hard-depends on node B, then scheduling A ensures
+that B is scheduled before A.
+Soft dependencies are soft in the sense that, if node A soft-depends on node B, node B cannot be scheduled after
+A. However, scheduling A does not ensure that B is scheduled.
+Read keys and write keys are easy to understand: they track @Exp@s that are read or written to by the node
+or block. However, the read keys and write keys can also be @Const@, indicating that they have other
+semantics related to other types of effects. For instance, printing nodes have write effect on @Const("CTLR")@,
+which ensures that printings are all scheduled with the order unchanged.
+Allocating variables/arrays have read effects on @Const("Store")@.
+
+\section{LMS Graph}
+
+In this section, we will talk about how LMS Graph are constructed using the LMS IR components.
+It shows how the LMS IRs are used in constructing LMS Graphs, and how effects and dependencies are
+tracked and generated.
+All LMS snippets are function. As the result, all LMS Graph have a list of nodes (already in topological order)
+and a block describing the function. That is captured by the
+\begin{listing}[scala]
+case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: immutable.Map[Sym,Node])
+\end{listing}
+at core/backend.scala. The LMS Graph is constructed by @class GraphBuilder@ at core/backend.scala.
+
+Besides the basic functionality of storing nodes, searching nodes by symbols, and generating fresh symbols,
+GraphBuilder offers two keys functionalities
+
+\begin{enumerate}
+\item Building nodes by the @reflect*@ family of methods.
+\item Building blocks by the @reify*@ family of methods.
+\end{enumerate}
+
+Note that the @reify*@ family of methods not only generate the Block object, but also the nodes that are
+used in the block. However, the nodes are not explicitly scoped in the block, but rather implicitly
+scoped via effect summaries. This implicit scoping allows flexible code motion as long as effects and dependencies
+are respected.
+
+\subsection{High-level Design of the Effect System}
+
+
+
+\subsection{Code Walk: reflectEffect}
+
+The core method in the \texttt{reflect*} family of methods is the \text{reflectEffect} method.
+\begin{listing}[scala]
+def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp
+\end{listing}
+
+\subsection{Code Walk: reify}
