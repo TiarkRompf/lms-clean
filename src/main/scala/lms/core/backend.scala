@@ -222,42 +222,27 @@ class GraphBuilder {
       case Some(e) => e // found optimization (resulting in pure expressions only)
       case None => // no available optimization
         // latent effects? closures, mutable vars, ... (these are the keys!)
-        val (reads, _writes) = if (s == "λ") { // NOTE: block in lambda is a latent effect for app, not declaration
-          (readEfKeys.toSet, writeEfKeys.toSet)
-        } else {
-          val (ref, wef) = getLatentEffect(s, as:_*)
-          ((ref ++ readEfKeys).toSet, (wef ++ writeEfKeys).toSet)
-        }
+        val (latent_ref, latent_wef) = getLatentEffect(s, as:_*)
+        val (reads, _writes) = ((latent_ref ++ readEfKeys).toSet, (latent_wef ++ writeEfKeys).toSet)
         // FIXME(feiw) get this special case refactored.
         val writes = if (s == "reset1") _writes filter (_ != stub.Adapter.CPS) else _writes
 
         if (reads.nonEmpty || writes.nonEmpty) {
-          lazy val res = {
-            val sm = Sym(fresh)
-            val (prevHard, prevSoft) = gatherEffectDeps(reads, writes, s, as:_*)
-            // prevSoft --= prevHard
-            val summary = EffectSummary(prevSoft, prevHard, reads, writes)
-            val res = reflect(sm, s, as:_*)(summary)
-            // update effect environments (curEffects, curLocalReads, and curLocalWrites)
-            curLocalReads ++= reads
-            curLocalWrites ++= writes
-            for (key <- reads) {
-              val (lw, lrs) = curEffects.getOrElse(key, (curBlock, Nil)) // FIXME really?
-              curEffects += key -> (lw, res::lrs)
-              if (key == STORE) curEffects += res -> (res, Nil) // Needed to notify res was defined locally
-            }                                                            // Do we want it?
-            for (key <- writes) { curEffects += key -> (res, Nil) }
-            res
-          }
-
-          // if (writes.isEmpty) // cse for reads effects
-          //   findDefinition(s,as).filter({ n =>
-          //     val curValue = reads.forall(src => src != STORE && isCurrentValue(src, n.n))
-          //     // if (curValue) System.out.println(s"$s $as -- DCE with ${n.n} (${reads.mkString(", ")})")
-          //     curValue
-          //   }).map(_.n).getOrElse(res)
-          // else
-            res
+          val sm = Sym(fresh)
+          val (prevHard, prevSoft) = gatherEffectDeps(reads, writes, s, as:_*)
+          // prevSoft --= prevHard
+          val summary = EffectSummary(prevSoft, prevHard, reads, writes)
+          val res = reflect(sm, s, as:_*)(summary)
+          // update effect environments (curEffects, curLocalReads, and curLocalWrites)
+          curLocalReads ++= reads
+          curLocalWrites ++= writes
+          for (key <- reads) {
+            val (lw, lrs) = curEffects.getOrElse(key, (curBlock, Nil)) // FIXME really?
+            curEffects += key -> (lw, res::lrs)
+            if (key == STORE) curEffects += res -> (res, Nil) // Needed to notify res was defined locally
+          }                                                            // Do we want it?
+          for (key <- writes) { curEffects += key -> (res, Nil) }
+          res
         } else {
           // We can run Common Subexpression Elimination (CSE) for pure nodes
           findDefinition(s,as) match {
@@ -392,7 +377,7 @@ class GraphBuilder {
       case Some(e) =>
         ??? // FIXME what about @, ?, array_apply => conservative write on all args?
       // Cleary the current solution is not complete and needs to be extended for more constructs or re-do in a different manner:
-      // Effects: 1. overly types on variables
+      // Effects: 1. overlay types on variables
       //          2. be conservative (with stop-the-world)
       // Aliasing: 1. track precisesly
       //           2. (like rust) cannot alias mutable variables (onwership tracking)
@@ -424,6 +409,7 @@ class GraphBuilder {
   // The main function for getting latent effects
   // Latent effects are effects in Blocks (conditional, loop, lambda)
   def getLatentEffect(op: String, xs: Def*): (Set[Exp], Set[Exp]) = (op, xs) match {
+    case ("λ", _) => (Set[Exp](), Set[Exp]())
     case ("@", (f: Sym)+:args) => getApplyLatentEffect(f, args:_*)._1
     case _ => getLatentEffect(xs:_*)
   }

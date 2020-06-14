@@ -16,68 +16,188 @@ case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary)
 The LMS IR follows the ``sea of nodes'' design (cite?), where the IR is composed of
 a list of \texttt{Node}s, and the \texttt{Block}s do not explicitly scope the nodes.
 Instead, the \texttt{Block}s describe their \emph{inputs} (via \texttt{in: List[Sym]}),
-\emph{result} (via \texttt{res: Exp}), \emph{world} (via \texttt{ein: Sym}), and
+\emph{result} (via \texttt{res: Exp}), \emph{input-effect} (via \texttt{ein: Sym}), and
 \emph{effects} (via \texttt{eff: EffectSummary}).
 
-The \emph{world} (by \texttt{ein: Sym}) is probably unfamiliar to many readers. It is
-used to scope the nodes that belong to this block. That is to say, if a node depends on
-the world of a block, then it should be scheduled within that block. For example:
+Using ``sea of nodes'' has perfound implications to LMS IR. The advantage is that
+the scopes of nodes are determined dynamically based on correctness and using frequency,
+which allows easy code-motion and optimization. However, using ``sea of nodes'' means that
+we must have a way to dynamically determine what nodes are in each block. We compute that
+based on \emph{dependencies}.  It does make IR traversal and transformation different from
+IRs with explicit scopes, which we will talk about in core/traversal.scala.
+
+Dependencies controls how nodes are scheduled. There are some simple rules about it.
+If node A depends on node B, then scheduling A means B must be scheduled before A.
+If a block's results or effects depend on node A, then A must be schedule within or before this block.
+If a node depends on the input-effect or the inputs of a block, then the node is bound by
+this block (i.e., it must be scheduled within this block or an inner block).
+
+Here is one example of scala snippet:
+\begin{listing}[scala]
+def snippet(x: Int, y: Int) = {
+  var idx = 0
+  var agg = 0
+  while (idx < x) {
+    val p = y * y
+    agg = agg + p * idx
+    idx += 1
+  }
+  agg
+}
+\end{listing}
+If we determine that every statement from this snippet depends on its previous statement,
+we can have a list of nodes and blocks with the following dependencies.
 
 \begin{listing}[scala]
-Give an example?
+Graph(nodes, Block([x0, x1], x19, x2, [dep: x19]))
+
+nodes = [
+  x3 = "var_new" 0    [dep: x2]   // idx
+  x4 = "var_new" 0    [dep: x3]   // agg
+
+  x18 = "W" Block([], x7, x5, [dep: x7])
+            Block([], (), x8, [dep: x17]) [dep: x4]
+
+    x6 = "var_get" x3       [dep: x5]
+    x7 = "<" x6 x0          [dep: x6]
+
+    x9 = "*" x1 x1          [dep: x8]
+    x10 = "var_get" x4      [dep: x9]
+    x11 = "var_get" x3      [dep: x10]
+    x12 = "*" x9 x11        [dep: x11]
+    x13 = "+" x10 x12       [dep: x12]
+    x14 = "var_set" x4 x13  [dep: x13]
+    x15 = "var_get" x3      [dep: x14]
+    x16 = "+" x15 1         [dep: x15]
+    x17 = "var_set" x3 x16  [dep: x16]
+
+  x19 = "var_get" x4  [dep: x18]
+]
 \end{listing}
 
-If a node depends on the inputs of a block, very likely it has to be scheduled in the block
-too. So both inputs and world are scoping the beginning of the block. That is why the world
-is also called the ``effect input''.
-So if the world marks the beginning of a block, which component of the Block marks the
-end of a block? The answer is the result and the effects of the block. When scheduling the
-nodes for a block, we can start from the result and effects, and pick nodes that are depended
-on by them.
+In this example, we first have two nodes that declare to new variables (x3 and x4).
+Then we have a while loop (x18) that has two blocks (the condition block and the
+loop body block). The condition block has input-effect x5 and result x7. So it scopes
+node x6 and x7 into the condition block. The loop body block has input-effect x8
+and effects x17, so it scopes node x9 to x17 in the loop body block.
+The while loop node depends on x4, and the final node x19 depends on x18.
+Thus a linear ordering of all nodes with two blocks is fully determined by the
+dependencies.
 
-Why using the sea of node IR in LMS? One of the key reasons is that it offers easy
-optimization of code-motion. Since the blocks do not explicitly scope the nodes, whether
-a node is scheduled in or out of a block is flexibly determined based on effects, using
-frequency, and et al. It does make IR traversal and transformation different from IRs with
-explicit scopes, which we will talk about in core/traversal.scala.
+% If a node depends on the inputs of a block, very likely it has to be scheduled in the block
+% too. So both inputs and world are scoping the beginning of the block. That is why the world
+% is also called the ``effect input''.
+% So if the world marks the beginning of a block, which component of the Block marks the
+% end of a block? The answer is the result and the effects of the block. When scheduling the
+% nodes for a block, we can start from the result and effects, and pick nodes that are depended
+% on by them.
 
-\subsection{Effect Summary}
+\subsection{Effects in Categories}
 
-In Section~\ref{sec:node}, we talked about the dependencies between nodes and blocks (via EffectSummary).
-EffectSummary can be course-grained or fine-grained. More fine-grained effect summary will have
-higher compilation time cost, but provide more optimized target program.
+In Section~\ref{sec:node}, we talked about the dependencies between nodes and blocks
+(via EffectSummary). In that example, the effect summary simply stores the depdendencies of the nodes.
+That is a very coarse-grained effect summary, and more fine-grained effect summaries can offer
+more optimization and flexible code motions. But before going into the details of the fine-grained
+effect summary, let's first get clear of two related and intertwined concepts: effects and dependencies.
 
-First of all, we want to be sure of the two intertwined concepts here: effects and dependencies.
 Effects refer to node behaviors such as printing, variable read, variable write, et al.
 Dependencies refer to both data dependencies and dependencies caused by effects, such as
 printing cannot be missed or reordered, and we cannot reorder two writes on the same variable.
-
 The general work flow is that at node constructions, the effects of nodes are tracked. using
 the node effects we compute the dependencies. The dependencies are then used to schedule nodes
-for each block. Our current EffectSummary is like this:
+for each block.
+
+To make our effect summary more fine-grained, the first step is to realize that there are different
+kinds of effects. The effects of printing is clearly not so related to the effect of variable reading,
+thus there should be no scheduling enforcement between them. We chose to support the following categories
+of effects:
+
+\begin{enumerate}
+\item Statements that create mutable objects belong to the category keyed by STORE.
+\item Statements that read/write a mutable object belong to the category keyed by the symbol of this object
+      (result of an allocation node).
+\item For all remaining effectful statements (such as printf), they belong to the category keyed by CTRL
+     (for control flow dependent).
+\end{enumerate}
+
+\subsubsection{Latent Effects}
+Effects can be latent, such as the effects of a function block. The function block may have printing
+statements and variable reads/writes, but they are not happening until they are called in function
+applications. Tracking latent effects can be tricky if we allow first-order functions, where functions
+can be returned from other functions and control flows, passed in as parameters, and stored in data
+structures such as arrays, lists, and et al.
+
+\subsubsection{Aliasing and Borrowing}
+Handling the read and write effects of data structures can be really tricky too, when considering
+aliasing and borrowing.
+
+\begin{listing}[scala]
+// aliasing
+val arr = new Array[Int](10)
+val arr2 = arr.slice(0, 5)
+arr2(0) = 5
+printf("%d\n", arr(0))
+
+// borrowing
+val arr = new Array[Int](10)
+var arr2 = arr
+arr2(0) = 5
+printf("%d\n", arr(0))
+\end{listing}
+
+These are currently unsolved problems in LMS clean :).
+
+\subsubsection{From Effects to Dependencies}
+
+After collection read and write effects, we need to compute dependencies from them. The
+rules for computing dependencies from effects are listed below:
+
+\begin{enumerate}
+\item Read-After-Write (RAW): there should be a hard dependency from R to W,
+  since the correctness of the R depends on the W to be scheduled)
+\item Write-After-Read (WAR): there should be a soft dependency from W to R,
+  since the correctness of the W does not depend on the R to be scheduled, but the order of them matters.
+\item Write-After-Write (WAW): the first idea is to generate a soft dependency,
+  since the second W simply overwrite the first W.
+  However, write to array is more complicated, such as arr(0) = 1; arr(1) = 2,
+  where the second W doesn’t overwrite the first W, and both Ws have to be generated.
+  For now, we just issue a hard dependency from the second W to the first W.
+\item Read-After-Read (RAR): there is no effect dependency between them.
+\end{enumerate}
+
+Note that we introduced soft dependencies in the rules.
+Soft dependencies are soft in the sense that, if node A soft-depends on node B,
+node B cannot be scheduled after A. However, scheduling A does not ensure that B is scheduled.
+
+\subsubsection{Const Effects}
+
+The STORE and CTRL keys are also handled in our read/write system in a case-by-case manner.
+For instances, allocating heap memory can be modeled as a read on the STORE key,
+if we don’t care about the order of heap allocation.
+However, printf should be modeled as write on the CTRL key, since all prints should be
+scheduled in the same order.
+Some trickier cases include getting a random number from a pseudo-random generator.
+It really depends on the expected behavior.
+
+More details about effect system can be found and Gregory's write up:
+\url{https://hackmd.io/_-VGqPBiR3qToam7YTDdRw?view}.
+
+\section{Building EffectSummary in LMS Graph}
+
+Our fine-grained current EffectSummary is like below.
+It tracks soft dependencies (via \texttt{sdeps: Set[Sym]}),
+hard dependencies (via \texttt{hdeps: Set[Sym]}),
+read keys (via \texttt{Set[Exp]}), and write keys (via \texttt{Set[Exp]}).
 
 \begin{listing}[scala]
 case class EffectSummary(sdeps: Set[Sym], hdeps: Set[Sym], rkeys: Set[Exp], wkeys: Set[Exp])
 \end{listing}
 
-It tracks soft dependencies (via \texttt{sdeps: Set[Sym]}), hard dependencies (via \texttt{hdeps: Set[Sym]}),
-read keys (via \texttt{Set[Exp]}), and write keys (via \texttt{Set[Exp]}).
-Hard dependencies are the normal dependencies. If node A hard-depends on node B, then scheduling A ensures
-that B is scheduled before A.
-Soft dependencies are soft in the sense that, if node A soft-depends on node B, node B cannot be scheduled after
-A. However, scheduling A does not ensure that B is scheduled.
-Read keys and write keys are easy to understand: they track @Exp@s that are read or written to by the node
-or block. However, the read keys and write keys can also be @Const@, indicating that they have other
-semantics related to other types of effects. For instance, printing nodes have write effect on @Const("CTLR")@,
-which ensures that printings are all scheduled with the order unchanged.
-Allocating variables/arrays have read effects on @Const("Store")@.
-
-\section{LMS Graph}
-
 In this section, we will talk about how LMS Graph are constructed using the LMS IR components.
 It shows how the LMS IRs are used in constructing LMS Graphs, and how effects and dependencies are
 tracked and generated.
-All LMS snippets are function. As the result, all LMS Graph have a list of nodes (already in topological order)
+All LMS snippets are function. As the result, all LMS Graph have a list of nodes
+(already in topological order)
 and a block describing the function. That is captured by the
 \begin{listing}[scala]
 case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: immutable.Map[Sym,Node])
@@ -92,20 +212,184 @@ GraphBuilder offers two keys functionalities
 \item Building blocks by the @reify*@ family of methods.
 \end{enumerate}
 
+The core reflect method is defined as below (with some simplification):
+
+\begin{listing}[scala]
+def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
+    // simple pre-construction optimization
+    rewrite(s, as.toList) match {
+      case Some(e) => e // found optimization (resulting in pure expressions only)
+      case None => // no available optimization
+        val (latent_ref, latent_wef) = getLatentEffect(s, as:_*)
+        val (reads, writes) = ((latent_ref ++ readEfKeys).toSet, (latent_wef ++ writeEfKeys).toSet)
+
+        if (reads.nonEmpty || writes.nonEmpty) {
+            // build node with the help of `gatherEffectDeps'
+            val (prevHard, prevSoft) = gatherEffectDeps(reads, writes, s, as:_*)
+            val summary = EffectSummary(prevSoft, prevHard, reads, writes)
+            val res = reflect(Sym(fresh), s, as:_*)(summary)
+
+            // update effect environments (curEffects, curLocalReads, and curLocalWrites)
+            curLocalReads ++= reads
+            curLocalWrites ++= writes
+            for (key <- reads) {
+              val (lw, lrs) = curEffects.getOrElse(key, (curBlock, Nil))
+              curEffects += key -> (lw, res::lrs)
+              if (key == STORE) curEffects += res -> (res, Nil)
+            }
+            for (key <- writes) { curEffects += key -> (res, Nil) }
+            res
+        } else {
+            // We can run Common Subexpression Elimination (CSE) for pure nodes
+            findDefinition(s,as) match {
+                case Some(n) => n.n
+                case None =>
+                reflect(Sym(fresh), s, as:_*)()
+            }
+        }
+    }
+}
+\end{listing}
+
+This method first tries to run pre-construction optimization via @rewrite@.
+The optimized result is a pure Exp that can be returned directly. If not optimized,
+the method computes the latent effects via @getLatentEffect@ helper method,
+and then combine the results with the user provided @readEfkeys@ and @writeEfKeys@.
+If the effect keys are empty, the methods go to the else branch and try Common
+Subexpression Elimination (CSE) via @findDefinition@ helper method. Otherwise,
+the method compute dependencies from the effect keys via @gatherEffectDeps@ method
+and then creates the node. The last thing to do is updating the effect environments,
+including @curEffects@, @curLocalReads@, and @curLocalWrites@. The @curEffects@ is
+a map of type: Exp -> (Sym, List[Sym]), which tracks the last write and the reads
+after last write for each Exp key.
+
+The getLatentEffect family of methods are like below. They essentially recursively
+call each other to dig out all latent effects of nodes.
+
+\begin{listing}[scala]
+def getLatentEffect(op: String, xs: Def*): (Set[Exp], Set[Exp]) = (op, xs) match {
+    case ("lambda", _) => (Set[Exp](), Set[Exp]()) // no latent effect for function declaration
+    case ("@", (f: Sym)+:args) => getApplyLatentEffect(f, args:_*)._1
+    case _ => getLatentEffect(xs:_*)
+}
+def getApplyLatentEffect(f: Sym, args: Def*): ((Set[Exp], Set[Exp]), Option[Exp]) = {
+    // Just collecting the latent effects of arguments
+    val (reads, writes) = getLatentEffect(args: _*)
+
+    // the freads/fwrites are read/write keys of the function (excluding parameters)
+    // the preads/pwrites are read/write keys of the function parameters (they are Set[Int] as indices, rather than Set[Exp])
+    // the res is the result of the function body. It is needed because the result of the body can be another function that
+    //     we need to get the latent effects of.
+    val ((freads, fwrites), (preads, pwrites), res) = getFunctionLatentEffect(f)
+
+    // For @ we need to replace the effect on parameters to the actual arguments.
+    // the asInstanceOf seems unsafe at first glance. However, it is not a problem since a standalone block
+    // should never be an argument in function application.
+    ((reads ++ freads ++ preads.map(args(_).asInstanceOf[Exp]), writes ++ fwrites ++ pwrites.map(args(_).asInstanceOf[Exp])), res)
+}
+def getFunctionLatentEffect(f: Exp): ((Set[Exp], Set[Exp]),(Set[Int], Set[Int]), Option[Exp]) = findDefinition(f) match {
+      case Some(Node(_, "lambda", List(b:Block), _)) =>
+        getEffKeysWithParam(b)
+      case Some(Node(_, "lambdaforward", _, _)) => // what about doubly recursive?
+        ((Set[Exp](), Set[Exp](Const("CTRL"))), (Set[Int](), Set[Int]()), None)
+      case None => // FIXME: function argument? fac-01 test used for recursive function...
+        ((Set[Exp](), Set[Exp](Const("CTRL"))), (Set[Int](), Set[Int]()), None)
+      case Some(Node(_, "@", (f: Sym)+:args, _)) =>
+        val ((rk, wk), Some(f_res)) = getApplyLatentEffect(f, args: _*)
+        val ((rk2, wk2), (prk2, pwk2), f_res_res) = getFunctionLatentEffect(f_res)
+        ((rk ++ rk2, wk ++ wk2), (prk2, pwk2), f_res_res)
+      case Some(Node(_, "?", c::Block(ins, out, ein, eout)::Block(ins2, out2, ein2, eout2)::Nil, _)) =>
+        val ((rk, wk), (prk, pwk), _) = getFunctionLatentEffect(out)
+        val ((rk2, wk2), (prk2, pwk2), _) = getFunctionLatentEffect(out2)
+        ((rk ++ rk2, wk ++ wk2), (prk ++ prk2, pwk ++ pwk2), None) // FIXME(feiw)
+      case Some(e) => ???
+}
+def getLatentEffect(xs: Def*): (Set[Exp], Set[Exp]) =
+    xs.foldLeft((Set[Exp](), Set[Exp]())) { case ((r, w), x) =>
+      val (ref, wef) = getLatentEffect(x)
+      (r ++ ref, w ++ wef)
+    }
+def getLatentEffect(x: Def): (Set[Exp], Set[Exp]) = x match {
+    case b: Block => getEffKeys(b)
+    case s: Sym => findDefinition(s) match {
+        case Some(Node(_, "lambda", (b@Block(ins, out, ein, eout))::_, _)) => getEffKeys(b)
+        case _ => (Set[Exp](), Set[Exp]())
+    }
+    case _ => (Set[Exp](), Set[Exp]())
+}
+\end{listing}
+
+However, the complex code here is not yet fully correct. There are several issues:
+\begin{enumerate}
+\item We have a specical function (getApplyLatentEffect) to dig out latent effects
+      of functions (since they are applied via ``$\at$'' syntax). However, the LMS IR may
+      have other syntax to apply a function, such as (``map'', List(array, f)).
+      It is still not clear when to dig latent effects out and when to not.
+\item Depending on whether we want to support first-order functions, the functions
+      may be wrapped in complex data structures (as array element) or returned from
+      other functions or conditionals. The getFunctionLatentEffect function might have
+      too many cases to check and too many branches to consider, which is both expensive
+      and inaccurate.
+\item The read and write effects on data structures are currently at the most coarse
+      granularity (for the whole data structure). Also the aliasing and borrowing effects
+      are not yet considered.
+\end{enumerate}
+Potential solutions are listed here:
+\begin{enumerate}
+\item be conservative and cheap at some cases with a ``stop the world'' effect
+\item track aliasing with some frontend constraint (like rust, separation logic, regions)
+\end{enumerate}
+
+The gatherEffectDeps method computes dependencies from effect keys:
+
+\begin{listing}[scala]
+def gatherEffectDeps(reads: Set[Exp], writes: Set[Exp], s: String, as: Def*): (Set[Sym], Set[Sym]) = {
+    val (prevHard, prevSoft) = (new mutable.ListBuffer[Sym], new mutable.ListBuffer[Sym])
+    // gather effect dependencies 1): handle the write keys
+    for (key <- writes) {
+      curEffects.get(key) match {
+        case Some((lw, lr)) =>
+          val (sdeps, hdeps) = gatherEffectDepsWrite(s, as, lw, lr)
+          prevSoft ++= sdeps; prevHard ++= hdeps
+        case _ =>
+          // write has hard dependencies on declaration (if declared locally) or block (if declared globally, i.e., out of current block)
+          prevHard += latest(key);
+      }
+    }
+    // gather effect dependencies 2): handling of reifyHere
+    // reifyHere is an Effect Optimization for conditionals (if and switch)
+    // it allows the block of conditionals to be aware of the `curEffects` out of the block
+    // The exact demonstration of the optimization is in test IfDCETest "if_effect_reifyHere".
+    if (reifyHere) prevHard += curBlock
+    // gather effect dependencies 3): handle read keys (i.e., reads have hard dependencies on previous write)
+    for (key <- reads) {
+      prevHard += getLastWrite(key)
+    }
+    (prevHard.toSet, prevSoft.toSet)
+}
+\end{listing}
+
 Note that the @reify*@ family of methods not only generate the Block object, but also the nodes that are
 used in the block. However, the nodes are not explicitly scoped in the block, but rather implicitly
 scoped via effect summaries. This implicit scoping allows flexible code motion as long as effects and dependencies
 are respected.
+The withBlockScopedEnv method is the subroutine that saves old effect environments.
 
-\subsection{High-level Design of the Effect System}
-
-
-
-\subsection{Code Walk: reflectEffect}
-
-The core method in the \texttt{reflect*} family of methods is the \text{reflectEffect} method.
 \begin{listing}[scala]
-def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp
+def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block =
+withBlockScopedEnv(here){
+    val args = (0 until arity).toList.map(_ => Sym(fresh))
+    val res = f(args)
+    // remove local definitions from visible effect keys
+    val reads = curLocalReads.filterNot(curLocalDefs)
+    val writes = curLocalWrites.filterNot(curLocalDefs)
+    var hard = writes.map(curEffects.map(_)._1)
+    if (curEffects.map contains res) // if res is a local mutable (e.g. Array)
+      hard += curEffects.map(res)._1
+    if (hard.isEmpty)
+      hard = Set(curBlock)
+
+    Block(args, res, curBlock, EffectSummary(Set(), hard, reads, writes))
+}
 \end{listing}
 
-\subsection{Code Walk: reify}
