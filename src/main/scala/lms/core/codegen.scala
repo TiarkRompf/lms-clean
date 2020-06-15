@@ -132,8 +132,20 @@ trait ExtendedCodeGen {
 
 abstract class CompactCodeGen extends CompactTraverser {
 
+  // this Map set up connection for lambda-forward node (x2 -> x3 if x2 = lambda_forward(x3))
+  // Note that we only keep one `global` forwardMap for all scopes (blocks).
+  // This is correct because we know that in LMS IR, names do not colide even across blocks.
+  // However, how to use this forwardMap depends on the backend.
+  // For instance, in ScalaCodeGen, we should be able to always replace the usage of x2 with x3.
+  // However, in C/C++, we cannot do so for mutually recursive functions/closures.
+  val forwardMap = mutable.Map[Sym, Sym]()
+
   // process and print block results
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
+    // At the beginning of the traverseCompact, we collect information for forwardMap
+    for (node <- ns if node.op == "λforward") {
+      forwardMap += ((node.n, node.rhs.head.asInstanceOf[Sym]))
+    }
     wraper(numStms, lastNode, y) {
       super.traverseCompact(ns, y)
     }
