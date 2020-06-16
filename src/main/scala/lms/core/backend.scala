@@ -522,7 +522,7 @@ class GraphBuilder {
 
 case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: immutable.Map[Sym,Node]) {
   // contract: nodes is sorted topologically
-  def show() = {
+  def show: Unit = {
     for (node <- nodes)
       System.out.println(node)
     System.out.println(block)
