@@ -20,8 +20,10 @@ trait PointerOps { b: Base =>
 
 trait CCodeGenPointer extends ExtendedCCodeGen {
   override def remap(m: Manifest[_]): String = {
-    System.out.println(m.runtimeClass.getName)
-    super.remap(m)
+    if (m.runtimeClass.getName == "lms.collection.PointerOps$Pointer") {
+      val List(inner) = m.typeArguments
+      s"${super.remap(inner)} *"
+    } else { super.remap(m) }
   }
 
   override def shallow(n: Node): Unit = n match {
