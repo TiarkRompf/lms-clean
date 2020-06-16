@@ -34,11 +34,6 @@ trait MPIOps { b: Base with PointerOps =>
 
   def mpi_finalize(): Rep[Unit] = Wrap[Unit](Adapter.g.reflectWrite("mpi-finalize")(Adapter.CTRL))
 
-  // this mutate method is a made up method
-  def mutate(x: Rep[Int]): Rep[Unit] = {
-    Wrap[Unit](Adapter.g.reflectWrite("macro-mutate", Unwrap(x))(Unwrap(x)))
-  }
-
   object DataStructure1 {
     def apply()(implicit pos: SourceContext): Rep[DataStructure1] = {
       Wrap[DataStructure1](Adapter.g.reflect("datastructure1-new"))
