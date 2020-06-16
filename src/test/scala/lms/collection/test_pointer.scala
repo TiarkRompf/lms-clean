@@ -6,7 +6,7 @@ import lms.core.virtualize
 import macros.SourceContext
 
 class PointerTest extends TutorialFunSuite {
-  val under = "experimental/pointer/"
+  val under = "collection/pointer/"
 
   abstract class DslDriverCPointer[A:Manifest, B:Manifest] extends DslDriverC[A,B]
     with lms.collection.PointerOps { q =>

@@ -15,17 +15,6 @@ class MPITest extends TutorialFunSuite {
       }
   }
 
-  test("mpi-macro-1") {
-    val driver = new DslDriverCMPI[Int,Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        mutate(arg)
-        printf("%d", arg)
-      }
-    }
-    System.out.println(indent(driver.code))
-  }
-
   test("mpi-hello-world") {
     val driver = new DslDriverCMPI[Int,Unit] {
       @virtualize

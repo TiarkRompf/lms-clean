@@ -35,8 +35,7 @@ trait CCodeGenPointer extends ExtendedCCodeGen {
 
   override def shallow(n: Node): Unit = n match {
     case Node(s, "pointer-new", List(x: Sym), _) =>
-      emit("&")
-      shallow(x)
+      emit("&"); shallow(x)
     case _ => super.shallow(n)
   }
 }
