@@ -298,7 +298,7 @@ class GraphBuilder {
   // 1) write has hard dependencies on previous write (this is conservative for array case, Store, Ctrl,...)
   // 2) write has soft dependencies on previous read (just enforcing order, do not enforcing the reads to be scheduled)
   def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Set[Sym], Set[Sym]) =
-    (if (!reflectHere) lr.toSet else Set(), Set(latest(lw))) // FIXME(feiw) why not adding soft dependencies when not reflectHere?
+    (if (!reflectHere) lr.toSet else Set(), Set(latest(lw))) // FIXME(feiw) why not adding soft dependencies when reflectHere?
 
   // FIXME: take EffectSummary as argument?
   def reflect(x: Sym, s: String, as: Def*)(summary: EffectSummary = emptySummary): Sym = {
