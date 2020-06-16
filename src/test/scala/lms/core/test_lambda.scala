@@ -422,6 +422,6 @@ class LambdaTest extends TutorialFunSuite {
         printf("%d", even(a))
       }
     }
-    System.out.println(indent(driver.code))
+    check("mutual_recursion", driver.code, "scala")
   }
 }
