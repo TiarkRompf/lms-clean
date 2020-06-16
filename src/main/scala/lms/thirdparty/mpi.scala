@@ -8,7 +8,8 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
 
-trait MPIOps extends lms.collection.PointerOps { b: Base =>
+import lms.collection._
+trait MPIOps { b: Base with PointerOps =>
   /* LMS support for MPI library */
 
   def mpi_init(): Rep[Unit] = Wrap[Unit](Adapter.g.reflectWrite("mpi-init")(Adapter.CTRL))
