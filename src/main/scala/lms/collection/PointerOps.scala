@@ -16,10 +16,10 @@ trait PointerOps { b: Base =>
       cache += ((Unwrap(a), UnwrapV(x)))
       a
     }
-    def deref[A: Manifest](x: Rep[Pointer[A]])(implicit pos: SourceContext) = {
+    def deref[A: Manifest](x: Rep[Pointer[A]]) = {
       Wrap[A](cache.getOrElse(Unwrap(x), ???))
     }
-    val cache = HashMap[lms.core.Backend.Exp, lms.core.Backend.Exp]()
+    private[this] val cache = HashMap[lms.core.Backend.Exp, lms.core.Backend.Exp]()
   }
 
   abstract class Pointer[T] extends Manifest[T]
