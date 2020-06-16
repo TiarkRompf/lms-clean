@@ -9,7 +9,7 @@ class MPITest extends TutorialFunSuite {
   val under = "thirdparty/mpi/"
 
   abstract class DslDriverCMPI[A:Manifest, B:Manifest] extends DslDriverC[A,B]
-    with lms.thirdparty.MPIOps { q =>
+    with lms.thirdparty.MPIOps with lms.collection.PointerOps { q =>
       override val codegen = new DslGenC with lms.thirdparty.CCodeGenMPI {
         val IR: q.type = q
       }
