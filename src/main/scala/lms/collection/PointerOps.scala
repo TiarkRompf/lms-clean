@@ -7,12 +7,19 @@ import lms.core.Backend._
 import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
+import scala.collection.mutable.HashMap
 
 trait PointerOps { b: Base =>
   object Pointer {
-    def apply[A: Manifest](x: Rep[A])(implicit pos: SourceContext) = {
-      Wrap[Pointer[A]](Adapter.g.reflect("pointer-new", Unwrap(x)))
+    def apply[A: Manifest](x: Var[A])(implicit pos: SourceContext) = {
+      val a = Wrap[Pointer[A]](Adapter.g.reflect("pointer-new", UnwrapV(x)))
+      cache += ((Unwrap(a), UnwrapV(x)))
+      a
     }
+    def deref[A: Manifest](x: Rep[Pointer[A]])(implicit pos: SourceContext) = {
+      Wrap[A](cache.getOrElse(Unwrap(x), ???))
+    }
+    val cache = HashMap[lms.core.Backend.Exp, lms.core.Backend.Exp]()
   }
 
   abstract class Pointer[T] extends Manifest[T]

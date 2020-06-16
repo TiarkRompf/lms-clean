@@ -926,7 +926,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Adapter.g.reflectWrite("P",Unwrap(x))(Adapter.CTRL)
 
   def printf(f: String, x: Rep[Any]*): Unit = {
-    Adapter.g.reflectWrite("printf",Backend.Const(f)::x.map(Unwrap).toList:_*)(Adapter.CTRL)
+    val args = x.map(Unwrap).toList
+    Adapter.g.reflectEffect("printf", Backend.Const(f)::args: _*)(args: _*)(Adapter.CTRL)
   }
 
   def switch[T:Manifest](x: Rep[T], default: Option[() => Unit] = None)(cases: (Seq[T], Rep[T] => Unit)*): Unit = {
