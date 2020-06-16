@@ -375,7 +375,7 @@ class GraphBuilder {
   // FIXME(feiw) Dig further to see if/why lambda_forward or None cases are correct
   // FIXME(feiw) in the conditional case, the handling of result is still wrong.
   def getFunctionLatentEffect(f: Exp): ((Set[Exp], Set[Exp]),(Set[Int], Set[Int]), Option[Exp]) = findDefinition(f) match {
-      case Some(Node(_, "λ", List(b:Block), _)) =>
+      case Some(Node(_, "λ", (b:Block)::_, _)) =>
         getEffKeysWithParam(b)
       case Some(Node(_, "λforward", _, _)) => // what about doubly recursive?
         ((Set[Exp](), Set[Exp](Const("CTRL"))), (Set[Int](), Set[Int]()), None)

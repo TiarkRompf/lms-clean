@@ -32,7 +32,7 @@ class MPITest extends TutorialFunSuite {
         mpi_get_processor_name(processor_name, Pointer(name_len))
 
         printf("Hellw world from processor %s, rank %d out of %d processors\n",
-          processor_name, world_rank, world_size)
+          processor_name.ArrayOfCharToString, world_rank, world_size)
         mpi_finalize()
       }
     }

@@ -761,6 +761,12 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     def sort(size: Rep[Int] /* , sort: (Rep[A], Rep[A]) => Rep[Int] */) = Wrap[Array[A]](Adapter.g.reflectMutable("array_sort_scala", Unwrap(x), Unwrap(size))) //, Adapter.g.reify((x, y) => Unwrap(sort(Wrap[A](x), Wrap[A](y)))))(Unwrap(x))(Unwrap(x))
   }
 
+  implicit class CharArrayOps(x: Rep[Array[Char]]) {
+    def ArrayOfCharToString(): Rep[String] = {
+      Wrap[String](Adapter.g.reflectRead("array-of-char-to-string", Unwrap(x))(Unwrap(x)))
+    }
+  }
+
   trait LongArray[+T]
   def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int] = None): Rep[LongArray[T]] = init match {
     case Some(v) => Wrap[LongArray[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x), Backend.Const(v)))
@@ -926,8 +932,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Adapter.g.reflectWrite("P",Unwrap(x))(Adapter.CTRL)
 
   def printf(f: String, x: Rep[Any]*): Unit = {
-    val args = x.map(Unwrap).toList
-    Adapter.g.reflectEffect("printf", Backend.Const(f)::args: _*)(args: _*)(Adapter.CTRL)
+    Adapter.g.reflectEffect("printf", Backend.Const(f)::x.map(Unwrap).toList: _*)()(Adapter.CTRL)
   }
 
   def switch[T:Manifest](x: Rep[T], default: Option[() => Unit] = None)(cases: (Seq[T], Rep[T] => Unit)*): Unit = {
