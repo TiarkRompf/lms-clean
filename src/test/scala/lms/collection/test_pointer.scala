@@ -1,7 +1,7 @@
 package lms
-package core
+package collection
 
-import stub._
+import lms.core.stub._
 import macros.SourceContext
 
 class PointerTest extends TutorialFunSuite {
