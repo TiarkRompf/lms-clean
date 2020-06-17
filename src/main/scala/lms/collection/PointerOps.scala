@@ -27,7 +27,7 @@ trait PointerOps { b: Base =>
     private[this] val cache = HashMap[lms.core.Backend.Exp, lms.core.Backend.Exp]()
   }
 
-  abstract class Pointer[T] extends Manifest[T]
+  abstract class Pointer[T]
 }
 
 trait CCodeGenPointer extends ExtendedCCodeGen {
