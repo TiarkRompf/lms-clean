@@ -40,4 +40,31 @@ class PointerTest extends TutorialFunSuite {
     }
     System.out.println(indent(driver.code))
   }
+
+  test("pointer-3") {
+    val driver = new DslDriverCPointer[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val arr = NewArray[Int](arg)
+        arr(0) = 1
+        val a = Pointer(arr)
+        printf("address is %p and element is %d", a, arr(1))
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
+  test("pointer-4") {
+    val driver = new DslDriverCPointer[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val arr = NewArray[Int](arg)
+        val f = topFun { (a: Rep[Pointer[Int]]) =>
+          printf("A library function that asks for pointers as parameter")
+        }
+        f(Pointer(arr))
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
 }

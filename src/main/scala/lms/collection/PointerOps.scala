@@ -16,6 +16,11 @@ trait PointerOps { b: Base =>
       cache += ((Unwrap(a), UnwrapV(x)))
       a
     }
+    def apply[A:Manifest](x: Rep[Array[A]])(implicit pos: SourceContext) = {
+      val a = Wrap[Pointer[A]](Adapter.g.reflect("pointer-from-array", Unwrap(x)))
+      cache += ((Unwrap(a), Unwrap(x)))
+      a
+    }
     def deref[A: Manifest](x: Rep[Pointer[A]]) = {
       Wrap[A](cache.getOrElse(Unwrap(x), ???))
     }
@@ -36,6 +41,8 @@ trait CCodeGenPointer extends ExtendedCCodeGen {
   override def shallow(n: Node): Unit = n match {
     case Node(s, "pointer-new", List(x: Sym), _) =>
       emit("&"); shallow(x)
+    case Node(s, "pointer-from-array", List(x: Sym), _) =>
+      shallow(x);
     case _ => super.shallow(n)
   }
 }
