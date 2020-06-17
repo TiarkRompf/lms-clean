@@ -263,6 +263,8 @@ abstract class CPSTraverser extends Traverser {
 
 class CompactTraverser extends Traverser {
 
+  val mustInline = mutable.HashMap[Sym, Node]()
+
   def mayInline(n: Node): Boolean = n match {
     case Node(s, "var_new", _, _) => false
     case Node(s, "local_struct", _, _) => false
@@ -280,7 +282,7 @@ class CompactTraverser extends Traverser {
   var lastNode: Option[Node] = None
 
   object InlineSym {
-    def unapply(x: Sym) = shouldInline(x)
+    def unapply(x: Sym) = shouldInline(x) orElse mustInline.get(x)
   }
 
   override def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
@@ -291,6 +293,12 @@ class CompactTraverser extends Traverser {
   }
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
+    // collect macros
+    for (node <- ns) {
+      if (!mustInline.contains(node.n) && node.op.startsWith("INLINE"))
+        mustInline += ((node.n, node))
+    }
+
     // ----- forward pass -----
 
     // lookup sym -> node for locally defined nodes
@@ -350,14 +358,17 @@ class CompactTraverser extends Traverser {
       }
     }
 
-    def checkInline(res: Sym) = shouldInline(res) match {
-      case Some(n) =>
-        // want to inline, now check that all successors are already there, else disable
-        if (mayInline(n) && succ.getOrElse(n.n,Nil).forall(seen))
-          processNodeHere(n)
-        else
-          df -= n.n
-      case _ =>
+    def checkInline(res: Sym) = mustInline.get(res) match {
+      case Some(n) => processNodeHere(n)
+      case _ => shouldInline(res) match {
+        case Some(n) =>
+          // want to inline, now check that all successors are already there, else disable
+          if (mayInline(n) && succ.getOrElse(n.n,Nil).forall(seen))
+            processNodeHere(n)
+          else
+            df -= n.n
+        case _ =>
+      }
     }
 
     if (y.res.isInstanceOf[Sym])
@@ -380,7 +391,7 @@ class CompactTraverser extends Traverser {
   def traverseCompact(ns: Seq[Node], y: Block): Unit = {
     // only emit statements if not inlined
     for (n <- ns) {
-      if (shouldInline(n.n).isEmpty)
+      if (shouldInline(n.n).isEmpty && !mustInline.contains(n.n))
         traverse(n)
     }
   }

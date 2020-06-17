@@ -24,7 +24,7 @@ class MPITest extends TutorialFunSuite {
         var world_size = 0
         mpi_comm_size(mpi_comm_world, Pointer(world_size))
 
-        var world_rank = 1
+        var world_rank = 0
         mpi_comm_rank(mpi_comm_world, Pointer(world_rank))
 
         val processor_name = NewArray[Char](mpi_max_processor_name)
@@ -33,6 +33,30 @@ class MPITest extends TutorialFunSuite {
 
         printf("Hellw world from processor %s, rank %d out of %d processors\n",
           processor_name.ArrayOfCharToString, world_rank, world_size)
+        mpi_finalize()
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
+  test("mpi-hello-world2") {
+    val driver = new DslDriverCMPI[Int,Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        mpi_init()
+
+        val f = fun { x: Rep[Int] =>
+          var world_size = 0
+          mpi_comm_size(mpi_comm_world, Pointer(world_size))
+
+          var world_rank = 0
+          mpi_comm_rank(mpi_comm_world, Pointer(world_rank))
+
+          printf("%d, %d", world_size, world_rank)
+        }
+
+        f(arg)
+
         mpi_finalize()
       }
     }

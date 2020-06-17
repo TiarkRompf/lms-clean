@@ -15,7 +15,7 @@ trait MPIOps { b: Base with PointerOps =>
   def mpi_init(): Rep[Unit] = Wrap[Unit](Adapter.g.reflectWrite("mpi-init")(Adapter.CTRL))
 
   abstract class MPIWorld extends Manifest[MPIWorld]
-  lazy val mpi_comm_world: Rep[MPIWorld] = Wrap[MPIWorld](Adapter.g.reflect("mpi-comm-world"))
+  lazy val mpi_comm_world: Rep[MPIWorld] = Wrap[MPIWorld](Adapter.g.reflect("INLINE_mpi-comm-world"))
 
   def mpi_comm_size(world: Rep[MPIWorld], size: Rep[Pointer[Int]]): Rep[Unit] = {
     Wrap[Unit](Adapter.g.reflectWrite("mpi-comm-size", Unwrap(world), Unwrap(size))(Unwrap(Pointer.deref(size))))
@@ -25,7 +25,7 @@ trait MPIOps { b: Base with PointerOps =>
     Wrap[Unit](Adapter.g.reflectWrite("mpi-comm-rank", Unwrap(world), Unwrap(rank))(Unwrap(Pointer.deref(rank))))
   }
 
-  lazy val mpi_max_processor_name: Rep[Int] = Wrap[Int](Adapter.g.reflect("mpi-max-processor-name"))
+  lazy val mpi_max_processor_name: Rep[Int] = Wrap[Int](Adapter.g.reflect("INLINE_mpi-max-processor-name"))
 
   def mpi_get_processor_name(name: Rep[Array[Char]], len: Rep[Pointer[Int]]): Rep[Unit] = {
     Wrap[Unit](Adapter.g.reflectWrite("mpi-get-processor-name", Unwrap(name), Unwrap(len))
@@ -53,7 +53,7 @@ trait CCodeGenMPI extends ExtendedCCodeGen with lms.collection.CCodeGenPointer {
   override def shallow(n: Node): Unit = n match {
     case Node(s, "macro-mutate", List(x), _) =>
       emit("MUTATE("); shallow(x); emit(")")
-    case Node(s, "mpi-comm-world", _, _) =>
+    case Node(s, "INLINE_mpi-comm-world", _, _) =>
       emit("MPI_COMM_WORLD")
     case Node(s, "mpi-init", _, _) =>
       emit("MPI_INIT(NULL, NULL)")
@@ -61,7 +61,7 @@ trait CCodeGenMPI extends ExtendedCCodeGen with lms.collection.CCodeGenPointer {
       emit("MPI_COMM_SIZE("); shallow(a); emit(", "); shallow(b); emit(")")
     case Node(s, "mpi-comm-rank", List(a, b), _) =>
       emit("MPI_COMM_RANK("); shallow(a); emit(", "); shallow(b); emit(")")
-    case Node(s, "mpi-max-processor-name", _, _) =>
+    case Node(s, "INLINE_mpi-max-processor-name", _, _) =>
       emit("MPI_MAX_PROCESSOR_NAME")
     case Node(s, "mpi-get-processor-name", List(a, b), _) =>
       emit("MPI_Get_processor_name("); shallow(a); emit(", "); shallow(b); emit(")")
