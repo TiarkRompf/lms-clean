@@ -47,7 +47,7 @@ class PointerTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]) = {
         val arr = NewArray[Int](arg)
         arr(0) = 1
-        val a = Pointer(arr)
+        val a = Pointer.applyArray(arr)
         printf("address is %p and element is %d", a, arr(1))
       }
     }
@@ -62,7 +62,7 @@ class PointerTest extends TutorialFunSuite {
         val f = topFun { (a: Rep[Pointer[Int]]) =>
           printf("A library function that asks for pointers as parameter")
         }
-        f(Pointer(arr))
+        f(Pointer.applyArray(arr))
       }
     }
     System.out.println(indent(driver.code))

@@ -39,15 +39,20 @@ trait MPIOps { b: Base with PointerOps =>
       Wrap[DataStructure1](Adapter.g.reflect("datastructure1-new"))
     }
   }
-  abstract class DataStructure1 extends Manifest[DataStructure1]
+  abstract class DataStructure1 extends CStruct
 }
 
-trait CCodeGenMPI extends ExtendedCCodeGen with lms.collection.CCodeGenPointer {
-  override def remap(m: Manifest[_]): String = {
-    System.out.println(m.runtimeClass.getName)
-    if (m.runtimeClass.getName == "lms.thirdparty.MPIOps$MPIWorld") {
-      "auto" // can this be delt with in a better way?
-    } else { super.remap(m) }
+trait CCodeGenMPI extends ExtendedCCodeGen {
+  override def remap(m: Manifest[_]): String =
+    m.runtimeClass.getName match {
+      case "lms.thirdparty.MPIOps$MPIWorld" => "MPIWorld"
+      case "lms.thirdparty.MPIOps$DataStructure1" => "DataStructure1"
+      case _ => super.remap(m)
+    }
+
+  override def mayInline(n: Node): Boolean = n match {
+    case Node(_, "datastructure1-new", _, _) => false
+    case _ => super.mayInline(n)
   }
 
   override def shallow(n: Node): Unit = n match {
@@ -68,5 +73,11 @@ trait CCodeGenMPI extends ExtendedCCodeGen with lms.collection.CCodeGenPointer {
     case Node(s, "mpi-finalize", _, _) =>
       emit("MPI_FINALIZE()")
     case _ => super.shallow(n)
+  }
+
+  override def traverse(n: Node): Unit = n match {
+    case Node(s, "datastructure1-new", _, _) =>
+      emit("DataStructure1 "); shallow(s); emitln(";")
+    case _ => super.traverse(n)
   }
 }

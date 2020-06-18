@@ -16,8 +16,13 @@ trait PointerOps { b: Base =>
       cache += ((Unwrap(a), UnwrapV(x)))
       a
     }
-    def apply[A:Manifest](x: Rep[Array[A]])(implicit pos: SourceContext) = {
+    def applyArray[A:Manifest](x: Rep[Array[A]])(implicit pos: SourceContext) = {
       val a = Wrap[Pointer[A]](Adapter.g.reflect("pointer-from-array", Unwrap(x)))
+      cache += ((Unwrap(a), Unwrap(x)))
+      a
+    }
+    def apply[A<:CStruct:Manifest](x: Rep[A])(implicit pos: SourceContext) = {
+      val a = Wrap[Pointer[A]](Adapter.g.reflect("pointer-new", Unwrap(x)))
       cache += ((Unwrap(a), Unwrap(x)))
       a
     }
@@ -28,15 +33,17 @@ trait PointerOps { b: Base =>
   }
 
   abstract class Pointer[T]
+  abstract class CStruct
 }
 
 trait CCodeGenPointer extends ExtendedCCodeGen {
-  override def remap(m: Manifest[_]): String = {
-    if (m.runtimeClass.getName == "lms.collection.PointerOps$Pointer") {
-      val List(inner) = m.typeArguments
-      s"${super.remap(inner)} *"
-    } else { super.remap(m) }
-  }
+  override def remap(m: Manifest[_]): String =
+    m.runtimeClass.getName match {
+      case "lms.collection.PointerOps$Pointer" =>
+        val List(inner) = m.typeArguments
+        s"${super.remap(inner)} *"
+      case _ => super.remap(m)
+    }
 
   override def shallow(n: Node): Unit = n match {
     case Node(s, "pointer-new", List(x: Sym), _) =>

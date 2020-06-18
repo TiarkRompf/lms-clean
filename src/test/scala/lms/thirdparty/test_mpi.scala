@@ -4,15 +4,15 @@ package thirdparty
 import lms.core.stub._
 import lms.core.virtualize
 import macros.SourceContext
+import lms.collection._
 
 class MPITest extends TutorialFunSuite {
   val under = "thirdparty/mpi/"
 
-  abstract class DslDriverCMPI[A:Manifest, B:Manifest] extends DslDriverC[A,B]
-    with lms.thirdparty.MPIOps with lms.collection.PointerOps { q =>
-      override val codegen = new DslGenC with lms.thirdparty.CCodeGenMPI {
-        val IR: q.type = q
-      }
+  abstract class DslDriverCMPI[A:Manifest, B:Manifest] extends DslDriverC[A,B] with PointerOps with MPIOps { q =>
+    override val codegen = new DslGenC with CCodeGenMPI with CCodeGenPointer {
+      val IR: q.type = q
+    }
   }
 
   test("mpi-hello-world") {
@@ -58,6 +58,25 @@ class MPITest extends TutorialFunSuite {
         f(arg)
 
         mpi_finalize()
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
+  test("mpi-data-structure") {
+    val driver = new DslDriverCMPI[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val a = DataStructure1()
+        val b = NewArray[Int](10)
+        val f = topFun { (a: Rep[Pointer[DataStructure1]]) =>
+          printf("a library function that asks for pointers as parameter")
+        }
+        val g = topFun { (a: Rep[Pointer[Int]]) =>
+          printf("a")
+        }
+        f(Pointer(a))
+        g(Pointer.applyArray(b))
       }
     }
     System.out.println(indent(driver.code))
