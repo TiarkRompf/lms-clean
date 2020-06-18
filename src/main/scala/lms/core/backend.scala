@@ -121,15 +121,6 @@ object Backend {
       case _ => Nil
     }
 
-  // TODO: remove filter syms
-  def filterSym(x: List[Exp]): Set[Sym] = x collect { case s: Sym => s } toSet
-  def symsAndEffectSyms(x: Node): (Set[Sym], Set[Sym]) = ((Set[Sym](), x.eff.hdeps.toSet) /: x.rhs) {
-    case ((syms, symsEffect), s: Sym) => (syms + s, symsEffect)
-    case ((syms, symsEffect), Block(_, res: Sym, _, eff)) => (syms + res, symsEffect ++ eff.hdeps)
-    case ((syms, symsEffect), Block(_, _, _, eff)) => (syms, symsEffect ++ eff.hdeps)
-    case (agg, _) => agg
-  }
-
   def syms(x: Node): List[Sym] = {
     x.rhs.flatMap {
       case s: Sym => List(s)
@@ -354,6 +345,7 @@ class GraphBuilder {
     case _ =>
       (Set[Exp](), Set[Exp]())
   }
+
   // getLaternEffect(xs: Def*) wrappers getLatentEffect(x: Def) and accumulate effects of multiple Defs
   def getLatentEffect(xs: Def*): (Set[Exp], Set[Exp]) =
     xs.foldLeft((Set[Exp](), Set[Exp]())) { case ((r, w), x) =>
@@ -543,6 +535,113 @@ class DeadCodeElim extends Phase {
       if (live(d.n)) live ++= syms(d)
 
     g.copy(nodes = g.nodes.filter(d => live(d.n)))
+  }
+}
+
+/*
+ * Resolve may dependencies
+ */
+class DeadCodeElimCG {
+
+  final val fixDeps = true // remove deps on removed nodes
+  // it is interesting to discuss the difference between `live` and `reach`.
+  // `reach` is the set of nodes (or Syms of nodes) that are reachable via hard-dependencies.
+  // the reachable set can include values that are needed (data dependencies) and side-effects
+  // (printing, mutation, et. al.)
+  // `live` is the set of ndoes (or Syms of nodes) whose values are needed (only data dependencies).
+  // For instance, a conditional can have side-effects and return values. If the side-effects
+  // are relevant, then the conditional is reachable. If the values are relevant, the conditional
+  // is live. The property of `live` and `reach` can be independent.
+  var live: collection.Set[Sym] = _
+  var reach: collection.Set[Sym] = _
+
+  def valueSyms(n: Node): List[Sym] =
+    directSyms(n) ++ blocks(n).flatMap {
+      case Block(ins, res:Sym, ein, _) => res::ein::ins
+      case Block(ins, _, ein, _) => ein::ins
+    }
+
+  // staticData -- not really a DCE task, but hey
+  var statics: collection.Set[Node] = _
+
+  def apply(g: Graph): Graph = utils.time("DeadCodeElimCG") {
+
+    live = new mutable.HashSet[Sym]
+    reach = new mutable.HashSet[Sym]
+    statics = new mutable.HashSet[Node]
+    var newNodes: List[Node] = Nil
+    val used = new mutable.HashSet[Exp]
+    var size = 0
+
+    // First pass liveness and reachability
+    // Only a single pass that reduce input size and first step of the next loop
+    utils.time("A_First_Path") {
+      reach ++= g.block.used
+      if (g.block.res.isInstanceOf[Sym]) {
+        live += g.block.res.asInstanceOf[Sym]
+        used += g.block.res.asInstanceOf[Sym]
+      }
+      used ++= g.block.bound
+      for (d <- g.nodes.reverseIterator) {
+        if (reach(d.n)) {
+          val nn = d match {
+            case n @ Node(s, "?", c::(a:Block)::(b:Block)::t, eff) if !live(s) =>
+              n.copy(rhs = c::a.copy(res = Const(()))::b.copy(res = Const(()))::t) // remove result deps if dead
+            case _ => d
+          }
+          live ++= valueSyms(nn)
+          reach ++= hardSyms(nn)
+
+          // if (!used(nn.n)) {
+          //   if (nn.eff.hasSimpleEffect || nn.eff.wkeys.exists(used)) {
+          //     used += nn.n
+          //     used ++= valueSyms(nn)
+          //   }
+          // } else {
+          //   used ++= valueSyms(nn)
+          // }
+          newNodes = nn::newNodes
+        }
+      }
+    }
+
+    // Second pass remove unused variables
+    var idx: Int = 1
+    while (size != used.size) {
+      utils.time(s"Extra_Path_$idx") {
+        size = used.size
+        for (d <- newNodes.reverseIterator) {
+          if (used(d.n)) {
+            used ++= valueSyms(d)
+          } else if (d.eff.hasSimpleEffect || d.eff.wkeys.exists(used)) {
+            used += d.n
+            used ++= valueSyms(d)
+          }
+        }
+      }
+      idx += 1
+    }
+
+    utils.time(s"Recreate_the_graph") {
+      var newGlobalDefsCache = Map[Sym,Node]()
+      newNodes = for (d <- newNodes if used(d.n)) yield {
+        newGlobalDefsCache += d.n -> d
+        if (d.op == "staticData") statics += d
+        if (fixDeps)
+          d.copy(rhs = d.rhs.map {
+            case b: Block => b.copy(eff = b.eff.filter(used))
+            case o => o
+          }, eff = d.eff.filter(used))
+        else
+          d
+      }
+      val newBlock = if (fixDeps)
+        g.block.copy(eff = g.block.eff.filter(used))
+      else
+        g.block
+
+      Graph(newNodes, newBlock, newGlobalDefsCache)
+    }
   }
 }
 
