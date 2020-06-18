@@ -14,8 +14,11 @@ trait MPIOps { b: Base with PointerOps =>
 
   def mpi_init(): Rep[Unit] = Wrap[Unit](Adapter.g.reflectWrite("mpi-init")(Adapter.CTRL))
 
-  abstract class MPIWorld extends Manifest[MPIWorld]
-  lazy val mpi_comm_world: Rep[MPIWorld] = Wrap[MPIWorld](Adapter.g.reflect("INLINE_mpi-comm-world"))
+  class MPIWorld
+  object MPICommWorld extends MPIWorld {
+    override def toString = "MPI_COMM_WORLD"
+  }
+  lazy val mpi_comm_world: Rep[MPIWorld] = unit(MPICommWorld)
 
   def mpi_comm_size(world: Rep[MPIWorld], size: Rep[Pointer[Int]]): Rep[Unit] = {
     Wrap[Unit](Adapter.g.reflectWrite("mpi-comm-size", Unwrap(world), Unwrap(size))(Unwrap(Pointer.deref(size))))
@@ -36,7 +39,7 @@ trait MPIOps { b: Base with PointerOps =>
 
   object DataStructure1 {
     def apply()(implicit pos: SourceContext): Rep[DataStructure1] = {
-      Wrap[DataStructure1](Adapter.g.reflect("datastructure1-new"))
+      Wrap[DataStructure1](Adapter.g.reflect("local_struct"))
     }
   }
   abstract class DataStructure1 extends CStruct
@@ -50,16 +53,9 @@ trait CCodeGenMPI extends ExtendedCCodeGen {
       case _ => super.remap(m)
     }
 
-  override def mayInline(n: Node): Boolean = n match {
-    case Node(_, "datastructure1-new", _, _) => false
-    case _ => super.mayInline(n)
-  }
-
   override def shallow(n: Node): Unit = n match {
     case Node(s, "macro-mutate", List(x), _) =>
       emit("MUTATE("); shallow(x); emit(")")
-    case Node(s, "INLINE_mpi-comm-world", _, _) =>
-      emit("MPI_COMM_WORLD")
     case Node(s, "mpi-init", _, _) =>
       emit("MPI_INIT(NULL, NULL)")
     case Node(s, "mpi-comm-size", List(a, b), _) =>
@@ -75,9 +71,4 @@ trait CCodeGenMPI extends ExtendedCCodeGen {
     case _ => super.shallow(n)
   }
 
-  override def traverse(n: Node): Unit = n match {
-    case Node(s, "datastructure1-new", _, _) =>
-      emit("DataStructure1 "); shallow(s); emitln(";")
-    case _ => super.traverse(n)
-  }
 }
