@@ -212,4 +212,18 @@ class ArrayTest extends TutorialFunSuite {
     }
     check("array_opt_set_equal", driver.code, "c")
   }
+
+  test("extraThroughSoft_is_necessary") {
+    val driver = new DslDriverC[Int,Unit] {
+      @virtualize
+      def snippet(in: Rep[Int]) = {
+        val x = NewArray[Int](in + 3)
+        val y = x(in)
+        x(in) = 5
+        if (in == 0) printf("%d\n", y)
+        printf("%d", x(in + 2))
+      }
+    }
+    check("extraThroughSoft_is_necessary", driver.code, "c")
+  }
 }

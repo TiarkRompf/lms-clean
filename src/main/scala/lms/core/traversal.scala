@@ -28,40 +28,84 @@ abstract class Traverser {
   }
 
 
+  // This `bound` is used to track the dependent bound variable of each node
+  // See the implementation in src/main/scala/lms/core/backend.scala `class Bound`
+  // It is initialized in the `apply()` function of this class
   val bound = new Bound
 
+  // This `path` is used to track the available bound variables at the current block
+  // New Syms are pushed when entering a new block, and popped when exiting a block
+  // Its content is maintained by the `withScope` family of functions.
   var path = List[Sym]()
+  // This `inner` is used to track the current unscheduled nodes for this block.
+  // For each block, the `inner` is split into 2 groups, the first one to be scheduled in this block,
+  //    and the second one to be scheduled later.
+  // This splitting is done via the `scheduleBlock_` function.
+  // Just as the `path`, the content of `inner` is maintained via the `withScope` family of functions.
   var inner: Seq[Node] = _
-  val blockEffectPath = new mutable.HashMap[Block,Set[Exp]]
 
-  def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
+  // This `blockEffectPath` is currently unused.
+  val blockEffectPath = new mutable.HashMap[Block, Set[Exp]]
+
+  // This `withScope` function maintains the old `path` and `inner` when entering a new block
+  // with new `path` (as parameter `p`) and new `inner` (as parameter `ns`).
+  // The block function `b` takes no parameters
+  def withScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     val (path0, inner0) = (path, inner)
     path = p; inner = ns;
     try b finally { path = path0; inner = inner0 }
   }
 
-  def withScope1[T](p: List[Sym], ns: Seq[Node])(b: (List[Sym], Seq[Node]) => T): T = {
+  // This `withScopeCPS` function maintains the old `path` and `inner` when entering a new block
+  // with new `path` (as parameter `p`) and new `inner` (as parameter `ns`).
+  // The block function `b` take a pair of `path` and `inner` as parameters,
+  // which are feed with the old `path` and `inner` values.
+  // This might seem to be a strange "scoping behavior". Indeed, it is used for CPSTraverser/Transformer.
+  // The reason is in continuation-passing style (CPS), the control flow never comes back to the old scope.
+  // Instead, it keeps calling the continuations. As the continuations need to use the "old" environment,
+  // we have to pass the "old" environment to the `b`.
+  // Checkout the `CPSTraverser` and `CPSTransformer` below for more details.
+  def withScopeCPS[T](p: List[Sym], ns: Seq[Node])(b: (List[Sym], Seq[Node]) => T): T = {
     val (path0, inner0) = (path, inner)
     path = p; inner = ns;
     try b(path0, inner0) finally { path = path0; inner = inner0 }
   }
 
-  def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
+  // This `withResetScope` function maintains the old `inner` when entering a new block
+  // with new `inner` (as paramtere `ns`).
+  // It is so far only used in test6_tensors.scala for ???
+  def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     assert(path.takeRight(p.length) == p, s"$path -- $p")
     val inner0 = inner
     inner = ns
     try b finally { inner = inner0 }
-
   }
 
-  def focus[T](y: Block, extra: Sym*)(f: (Seq[Node], Block) => T): T =
-    focus0(y, extra: _*) { (path1, inner1, outer1, y) =>
+  // This `scheduleBlock` function wraps on the `scheduleBlock_` function, while
+  // applying the logic of setting new path (`path1`) and new inner (`inner1`) environment,
+  // and traversing nodes for the current block: `traverse(outer1, y)`
+  def scheduleBlock[T](y: Block, extra: Sym*)(traverse: (Seq[Node], Block) => T): T =
+    scheduleBlock_(y, extra: _*) { (path1, inner1, outer1, y) =>
       withScope(path1, inner1) {
-        f(outer1, y)
+        traverse(outer1, y)
       }
     }
 
-  def focus0[T](y: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
+  /**
+   * This `scheduleBlock_` is the core function in traversal. The main purpose of this function is to
+   * separate the currently unscheduled nodes into the `outer1` and `inner1`, where
+   * `outer1` is to be scheduled for the current block, and `inner1` is to be scheduled later.
+   * It should be noted that this is strongly tied to the fact that LMS IR uses `sea-of-node`
+   * representation, where the blocks do not explicitly scope the nodes. Instead, the nodes
+   * in each block are collected lazily from this scheduleBlock_ function, from the result and effects
+   * of the (to be scheduled) block.
+   * The function takes another function `f` as curried parameter, which is applied with
+   * the new path, new inner, new outer, and the block.
+   */
+  def scheduleBlock_[T](y: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
+
+    // when entering a block, we get more bound variables (from the block and possibly supplimented
+    // via `extra)
     val path1 = y.bound ++ extra.toList ++ path
 
     // a node is available if all bound vars
@@ -73,27 +117,28 @@ abstract class Traverser {
     // warm path (not only via if/else branches)
     val g = new Graph(inner, y, null)
 
+    // Step 1: compute `reach` and `reachInner`
+    // These are nodes that are reachable from for the current block and for an inner block
+    // We start from `y.used`, where `y` is the current block as seeds, and back track all
+    // nodes that are hard-depended from the seeds.
+    // The `reachInner` is seeded by reachable Syms that have low frequency.
     val reach = new mutable.HashSet[Sym]
     val reachInner = new mutable.HashSet[Sym]
-
     reach ++= y.used
 
-    // for (d <- g.nodes) {
-    //   println("check "+d + " " + bound.hm(d.n) + " " + path1.toSet + " " + reach(d.n) + " " + available(d))
-    // }
-
     for (d <- g.nodes.reverseIterator) {
-      if ((reach contains d.n)) {
+      if (reach contains d.n) {
         if (available(d)) {
           // node will be sched here, don't follow if branches!
           // other statement will be scheduled in an inner block
           for ((e:Sym,f) <- symsFreq(d))
             if (f > 0.5) reach += e else reachInner += e
         } else {
+          // QUESTION(feiw): why we don't split via frequency here?
           reach ++= hardSyms(d)
         }
       }
-      if (reachInner(d.n)) {
+      if (reachInner.contains(d.n)) {
         reachInner ++= hardSyms(d)
       }
     }
@@ -149,10 +194,18 @@ abstract class Traverser {
     def scheduleHere(d: Node) =
       available(d) && reach(d.n)
 
+    // Step 2: with the computed `reach` and `reachInner`, we can split the nodes
+    // to `outer1` (for current block) and `inner1` (for inner blocks)
+    // The logic is simply: `outer1` has nodes that are reachable and available.
     var outer1 = Seq[Node]()
     var inner1 = Seq[Node]()
 
     // Extra reachable statement from soft dependencies
+    // It is important to track softDeps too because if we don't, the soft-dependent
+    //   nodes might go to `inner1` and be scheduled after the node that soft-depends on it.
+    // If a node is only soft-depended by other nodes, we make sure that we can remove it
+    //   by DCE pass before traversal passes. (see DeadCodeElimCG class in codegen.scala)
+    // the test "extraThroughSoft_is_necessary" show cases the importance of `extraThroughSoft`.
     val extraThroughSoft = new mutable.HashSet[Sym]
     for (n <- inner.reverseIterator) {
       if (reach(n.n) || extraThroughSoft(n.n)) {
@@ -170,6 +223,7 @@ abstract class Traverser {
       }
     }
 
+    // These Prints Are Very Useful for Debugging!
     // System.out.println(s"================ $y ==============")
     // for (n <- inner)
     //   System.out.println(s"\t$n")
@@ -188,20 +242,15 @@ abstract class Traverser {
   }
 
   def traverse(b: Block, extra: Sym*): Unit = {
-    focus(b, extra:_*)(traverse)
+    scheduleBlock(b, extra:_*)(traverse)
   }
 
-  def getFreeVarBlock(y: Block, extra: Sym*): Set[Sym] = focus(y, extra:_*) { (ns: Seq[Node], res: Block) =>
+  def getFreeVarBlock(y: Block, extra: Sym*): Set[Sym] = scheduleBlock(y, extra:_*) { (ns: Seq[Node], res: Block) =>
     val used = new mutable.HashSet[Sym]
     val bound = new mutable.HashSet[Sym]
     used ++= y.used
     bound ++= path
-    for (n <- inner) {
-      used ++= syms(n)
-      bound += n.n
-      bound ++= boundSyms(n)
-    }
-    for (n <- ns) {
+    for (n <- ns ++ inner) {
       used ++= syms(n)
       bound += n.n
       bound ++= boundSyms(n)
@@ -229,15 +278,27 @@ abstract class Traverser {
 
 }
 
+/**
+ * CPSTraverser is an adaptation of regular Traverser, where the traverse calls
+ * are carried out in Continuation-Passing Style (CPS). The CPS style is featured
+ * by the `k` parameter of each `traverse` function, which is the `continuation`
+ * after each `traverse` function. The main idea is that for each `traverse` call,
+ * what needs to happen after are captured in the `continuation`, such that when
+ * a `traverse` function returns, the traverse of all the nodes are done already.
+ */
 abstract class CPSTraverser extends Traverser {
 
+  // Note that the continuation of `traverse(block)` need to use the original
+  // `path0` and `inner0`, as shown in the `(v => withScope(path0, inner0)(k(v)))`
   def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit =
-    focus0(y, extra: _*) { (path1, inner1, outer1, y) =>
-      withScope1(path1, inner1) { (path0, inner0) =>
+    scheduleBlock_(y, extra: _*) { (path1, inner1, outer1, y) =>
+      withScopeCPS(path1, inner1) { (path0, inner0) =>
         traverse(outer1, y){ v => withScope(path0, inner0)(k(v)) }
       }
     }
 
+  // Similarly, when traversing a list of nodes or blocks (the next function),
+  // the rest of the blocks are traversed in the continuation of the first node/block
   def traverse(ns: Seq[Node], y: Block)(k: Exp => Unit): Unit = {
     if (!ns.isEmpty) traverse(ns.head)(traverse(ns.tail, y)(k)) else k(y.res)
   }
@@ -249,8 +310,7 @@ abstract class CPSTraverser extends Traverser {
     case n @ Node(f, "λ", (y:Block)::_, _) =>
       traverse(y, f)(v => k)
     case n @ Node(f, op, es, _) =>
-      val blocks = es.filter{ case Block(_,_,_,_) => true; case _ => false}.map(_.asInstanceOf[Block])
-      traverse(blocks)(k)
+      traverse(blocks(n))(k)
   }
 
   def apply(g: Graph)(k: Int): Unit = {
@@ -511,8 +571,8 @@ abstract class CPSTransformer extends Transformer {
   }
 
   def traverse(y: Block, extra: Sym*)(k: Exp => Exp): Exp =
-    focus0(y, extra: _*) { (path1, inner1, outer1, y) =>
-      withScope1(path1, inner1) { (path0, inner0) =>
+    scheduleBlock_(y, extra: _*) { (path1, inner1, outer1, y) =>
+      withScopeCPS(path1, inner1) { (path0, inner0) =>
         traverse(outer1, y){ v => withScope(path0, inner0)(k(v)) }
       }
     }

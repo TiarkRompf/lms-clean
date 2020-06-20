@@ -73,19 +73,7 @@ class FrontEnd {
   }
 
 
-  def APP(f: Exp, x: INT): INT = {
-    // XXX lookup lambda ...
-    g.findDefinition(f) match {
-      case Some(Node(f, "λ", List(b: Block), _)) =>
-        if (b.isPure)
-          INT(g.reflect("@",f,x.x))
-        else {
-          INT(g.reflectEffectSummary("@",f,x.x)(g.getEffKeys(b)))
-        }
-      case _ =>
-        INT(g.reflectWrite("@",f,x.x)(CTRL))
-    }
-  }
+  def APP(f: Exp, x: INT): INT = INT(g.reflect("@", f, x.x))
 
   def PRINT(x: INT): Unit =
     g.reflectWrite("P",x.x)(CTRL)
