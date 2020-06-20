@@ -16,6 +16,7 @@ class MPITest extends TutorialFunSuite {
   }
 
   test("pointer-var") {
+    // maybe we should remove this test later?
     val driver = new DslDriverCMPI[Int, Unit] {
       @virtualize
       def snippet(arg:Rep[Int]) = {
@@ -54,31 +55,7 @@ class MPITest extends TutorialFunSuite {
         mpi_finalize()
       }
     }
-    System.out.println(indent(driver.code))
-  }
-
-  test("mpi-hello-world2") {
-    val driver = new DslDriverCMPI[Int,Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        mpi_init()
-
-        val f = fun { x: Rep[Int] =>
-          var world_size = 0
-          mpi_comm_size(mpi_comm_world, world_size)
-
-          var world_rank = 0
-          mpi_comm_rank(mpi_comm_world, world_rank)
-
-          printf("%d, %d", world_size, world_rank)
-        }
-
-        f(arg)
-
-        mpi_finalize()
-      }
-    }
-    System.out.println(indent(driver.code))
+    check("mpi_hello_world", driver.code, "c")
   }
 
   test("mpi-data-structure") {
@@ -93,19 +70,7 @@ class MPITest extends TutorialFunSuite {
         f(a)
       }
     }
-    System.out.println(indent(driver.code))
+    check("mpi-data-structure", driver.code, "c")
   }
 
-  test("mpi-macro-const-2") {
-    val driver = new DslDriverCMPI[Int, Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        val f = topFun { (a: Rep[Int]) => a + 1 }
-        val a = f(mpi_max_processor_name)
-        val b = f(mpi_max_processor_name + 1)
-        printf("%d %d\n", a, b)
-      }
-    }
-    System.out.println(indent(driver.code))
-  }
 }
