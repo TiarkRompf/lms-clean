@@ -15,6 +15,7 @@ void Snippet(int x0) {
   DataStructure1 x4;
   x1(x3);
   x1(x4);
+  printf("a int field %d", x3.fieldA);
 }
 /*****************************************
 End of C Generated Code

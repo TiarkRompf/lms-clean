@@ -37,6 +37,9 @@ trait MPIOps extends CMacro with LibStruct { b: Base =>
 
   // this is how we bind to library structs
   abstract class DataStructure1
+  implicit class DataStructure1Ops(x: Rep[DataStructure1]) {
+    val fieldA: Rep[Int] = readField[DataStructure1, Int](x, "fieldA")
+  }
   def dataStructure1 = libStruct[DataStructure1]("DataStructure1")
 
   // some example (dummy code). Please remove later :)

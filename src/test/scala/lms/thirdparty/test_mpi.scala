@@ -69,6 +69,7 @@ class MPITest extends TutorialFunSuite {
         val b = dataStructure1
         f(a)
         f(b)
+        printf("a int field %d", a.fieldA)
       }
     }
     check("mpi-data-structure", driver.code, "c")
