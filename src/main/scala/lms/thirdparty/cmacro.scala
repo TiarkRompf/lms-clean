@@ -23,3 +23,21 @@ trait CCodeGenCMacro extends ExtendedCCodeGen {
     case _ => super.shallow(n)
   }
 }
+
+trait LibStruct { b : Base =>
+  def libStruct[T:Manifest](m:String):Rep[T] = {
+    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", lms.core.Backend.Const(m)))
+  }
+}
+trait CCodeGenLibStruct extends ExtendedCCodeGen {
+  override def mayInline(n: Node): Boolean = n match {
+    case Node(_, "lib-struct", _, _) => false
+    case _ => super.mayInline(n)
+  }
+
+  override def traverse(n: Node): Unit = n match {
+    case Node(s, "lib-struct", List(Const(m: String)), _) =>
+      emit(s"$m "); shallow(s); emitln(";")
+    case _ => super.traverse(n)
+  }
+}

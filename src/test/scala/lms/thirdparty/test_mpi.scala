@@ -10,7 +10,7 @@ class MPITest extends TutorialFunSuite {
   val under = "thirdparty/mpi/"
 
   abstract class DslDriverCMPI[A:Manifest, B:Manifest] extends DslDriverC[A,B] with MPIOps { q =>
-    override val codegen = new DslGenC with CCodeGenMPI with CCodeGenCMacro {
+    override val codegen = new DslGenC with CCodeGenMPI with CCodeGenCMacro with CCodeGenLibStruct {
       val IR: q.type = q
     }
   }
@@ -26,7 +26,7 @@ class MPITest extends TutorialFunSuite {
         val arr = NewArray[Int](10)
         test_pointer(arr);
 
-        val obj = DataStructure1()
+        val obj = dataStructure1
         test_struct_pointer(obj);
         test_struct_reference(obj)
       }
@@ -62,12 +62,13 @@ class MPITest extends TutorialFunSuite {
     val driver = new DslDriverCMPI[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val a = DataStructure1()
-        val b = NewArray[Int](10)
         val f = topFun { (a: Rep[DataStructure1]) =>
           printf("a library function that asks for pointers as parameter")
         }
+        val a = dataStructure1
+        val b = dataStructure1
         f(a)
+        f(b)
       }
     }
     check("mpi-data-structure", driver.code, "c")

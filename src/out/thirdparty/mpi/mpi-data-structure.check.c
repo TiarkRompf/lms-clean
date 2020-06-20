@@ -6,13 +6,15 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /************* Functions **************/
-void x2(DataStructure1 x3) {
+void x1(DataStructure1 x2) {
   printf("a library function that asks for pointers as parameter");
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  DataStructure1 x1 = { 0 };
-  x2(x1);
+  DataStructure1 x3;
+  DataStructure1 x4;
+  x1(x3);
+  x1(x4);
 }
 /*****************************************
 End of C Generated Code

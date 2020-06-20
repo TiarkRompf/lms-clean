@@ -10,7 +10,7 @@ import lms.macros.SourceContext
 
 import lms.collection._
 
-trait MPIOps extends CMacro { b: Base =>
+trait MPIOps extends CMacro with LibStruct { b: Base =>
   /* LMS support for MPI library */
 
   // this is how we deal with constant macros
@@ -36,12 +36,8 @@ trait MPIOps extends CMacro { b: Base =>
   }
 
   // this is how we bind to library structs
-  object DataStructure1 {
-    def apply()(implicit pos: SourceContext): Rep[DataStructure1] = {
-      Wrap[DataStructure1](Adapter.g.reflect("local_struct"))
-    }
-  }
   abstract class DataStructure1
+  def dataStructure1 = libStruct[DataStructure1]("DataStructure1")
 
   // some example (dummy code). Please remove later :)
   def test_pointer(x: Var[Int]): Rep[Unit] = {
@@ -61,7 +57,6 @@ trait MPIOps extends CMacro { b: Base =>
 trait CCodeGenMPI extends ExtendedCCodeGen {
   override def remap(m: Manifest[_]): String =
     m.runtimeClass.getName match {
-      case "lms.thirdparty.MPIOps$MPIWorld" => "MPIWorld"
       case "lms.thirdparty.MPIOps$DataStructure1" => "DataStructure1"
       case _ => super.remap(m)
     }
