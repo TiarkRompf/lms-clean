@@ -10,7 +10,7 @@ import lms.macros.SourceContext
 
 import lms.collection._
 
-trait MPIOps extends CMacro with LibStruct { b: Base =>
+trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
   /* LMS support for MPI library */
 
   // this is how we deal with constant macros
@@ -18,31 +18,32 @@ trait MPIOps extends CMacro with LibStruct { b: Base =>
   def mpi_comm_world: Rep[MPIWorld] = cmacro[MPIWorld]("MPI_COMM_WORLD")
   def mpi_max_processor_name: Rep[Int] = cmacro[Int]("MPI_MAX_PROCESSOR_NAME")
 
+  class CNull
+  def cNull: Rep[CNull] = cmacro[CNull]("NULL")
+
   // this is how we deal with library functions (may need pointers)
-  def mpi_init(): Rep[Unit] = Wrap[Unit](Adapter.g.reflectWrite("mpi-init")(Adapter.CTRL))
-  def mpi_finalize(): Rep[Unit] = Wrap[Unit](Adapter.g.reflectWrite("mpi-finalize")(Adapter.CTRL))
+  def mpi_init() = libFunction[Unit]("MPI_INIT", Unwrap(cNull), Unwrap(cNull))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+  def mpi_finalize() = libFunction[Unit]("MPI_FINALIZE")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   def mpi_comm_size(world: Rep[MPIWorld], size: Var[Int]): Rep[Unit] = {
-    Wrap[Unit](Adapter.g.reflectWrite("mpi-comm-size", Unwrap(world), UnwrapV(size))(UnwrapV(size)))
+    libFunction[Unit]("MPI_COMM_SIZE", Unwrap(world), UnwrapV(size))(Seq[Int](), Seq(1), Set(1))
   }
-
   def mpi_comm_rank(world: Rep[MPIWorld], rank: Var[Int]): Rep[Unit] = {
-    Wrap[Unit](Adapter.g.reflectWrite("mpi-comm-rank", Unwrap(world), UnwrapV(rank))(UnwrapV(rank)))
+    libFunction[Unit]("MPI_COMM_RANK", Unwrap(world), UnwrapV(rank))(Seq[Int](), Seq(1), Set(1))
   }
 
   def mpi_get_processor_name(name: Rep[Array[Char]], len: Var[Int]): Rep[Unit] = {
-    Wrap[Unit](Adapter.g.reflectWrite("mpi-get-processor-name", Unwrap(name), UnwrapV(len))
-    (Unwrap(name), UnwrapV(len)))
+    libFunction[Unit]("MPI_Get_processor_name", Unwrap(name), UnwrapV(len))(Seq[Int](), Seq(0, 1), Set(1))
   }
 
-  // this is how we bind to library structs
+  // this is how we bind to library structs with field read access
   abstract class DataStructure1
   implicit class DataStructure1Ops(x: Rep[DataStructure1]) {
     val fieldA: Rep[Int] = readField[DataStructure1, Int](x, "fieldA")
   }
   def dataStructure1 = libStruct[DataStructure1]("DataStructure1")
 
-  // some example (dummy code). Please remove later :)
+  // some example (dummy code). this is using the old way of reflecting new nodes, which requires changes in code gen :)
   def test_pointer(x: Var[Int]): Rep[Unit] = {
     Wrap[Unit](Adapter.g.reflectWrite("test-pointer", UnwrapV(x))(Adapter.CTRL, UnwrapV(x)))
   }
@@ -65,16 +66,6 @@ trait CCodeGenMPI extends ExtendedCCodeGen {
     }
 
   override def shallow(n: Node): Unit = n match {
-    case Node(s, "mpi-init", _, _) =>
-      emit("MPI_INIT(NULL, NULL)")
-    case Node(s, "mpi-comm-size", List(a, b), _) =>
-      emit("MPI_COMM_SIZE("); shallow(a); emit(", &"); shallow(b); emit(")")
-    case Node(s, "mpi-comm-rank", List(a, b), _) =>
-      emit("MPI_COMM_RANK("); shallow(a); emit(", &"); shallow(b); emit(")")
-    case Node(s, "mpi-get-processor-name", List(a, b), _) =>
-      emit("MPI_Get_processor_name("); shallow(a); emit(", &"); shallow(b); emit(")")
-    case Node(s, "mpi-finalize", _, _) =>
-      emit("MPI_FINALIZE()")
 
     case Node(s, "test-pointer", List(x:Sym), _) =>
       emit("test_pointer(&"); shallow(x); emit(")");

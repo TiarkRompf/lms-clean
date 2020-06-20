@@ -51,3 +51,27 @@ trait CCodeGenLibStruct extends ExtendedCCodeGen {
     case _ => super.traverse(n)
   }
 }
+
+trait LibFunction { b: Base =>
+  def libFunction[T:Manifest](m:String, rhs:lms.core.Backend.Exp*)(rkeys:Seq[Int], wkeys:Seq[Int], pkeys:Set[Int], keys: lms.core.Backend.Const*): Rep[T] = {
+    val readKeys = rkeys.map(rhs(_))
+    val writeKeys = wkeys.map(rhs(_)) ++ keys
+    val defs = Seq(lms.core.Backend.Const(m), lms.core.Backend.Const(pkeys)) ++ rhs
+    Wrap[T](Adapter.g.reflectEffect("lib-function", defs:_*)(readKeys: _*)(writeKeys: _*))
+  }
+}
+
+trait CCodeGenLibFunction extends ExtendedCCodeGen {
+  override def shallow(n: Node): Unit = n match {
+    case Node(s, "lib-function", Const(m:String) :: Const(pkeys: Set[Int]) :: rhs, _) =>
+      val last = rhs.length - 1
+      emit(s"$m(");
+      rhs.zipWithIndex.foreach { case(r, index) =>
+        if (pkeys.contains(index)) emit("&")
+        shallow(r)
+        if (index < last) emit(", ")
+      }
+      emit(")")
+    case _ => super.shallow(n)
+  }
+}
