@@ -8,7 +8,7 @@ class Snippet() extends (Int => Unit) {
     def x4(x3:Array[Int]): Unit = {
       x3(2) = 3
     }
-    def x6(x5:Array[Int]): scala.Function1[Array[Int], Unit] = {
+    def x6(x5:Array[Int]): Function1[Array[Int], Unit] = {
       x5(1) = 2
       x4
     }
