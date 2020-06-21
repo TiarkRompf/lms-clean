@@ -511,6 +511,190 @@ class GraphBuilder {
   }
 }
 
+class GraphBuilderOpt extends GraphBuilder {
+
+  // fine grained dependency computation for array
+  override def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Set[Sym], Set[Sym]) =
+  findDefinition(latest(lw)) match {
+    case Some(Node(_, "array_set", as2, deps)) if (s == "array_set" && as.init == as2.init) =>
+      // If latest(lw) is setting the same array at the same index, we do not add hard dependence but soft dependence
+      // In addition, we need to inherite the soft and hard deps of latest(lw)
+      (deps.sdeps + latest(lw), deps.hdeps)
+    case _ => super.gatherEffectDepsWrite(s, as, lw, lr)
+  }
+
+  // graph pre-node-construction optimization
+  override def rewrite(s: String, as: List[Def]): Option[Exp] = (s,as) match {
+    // staticData(as)(i) => staticData(as(i))
+    case ("array_get", List(Def("staticData", List(Const(as: Array[_]))), Const(i:Int))) =>
+      as(i) match {
+        case a: Int => Some(Const(a))
+        case a => Some(reflect("staticData", Const(a)))
+      }
+
+    // FIXME: Can we generalize that for mutable objects?
+    // as(i) = as(i) => ()   side condition: no write in-between!
+    case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1: Exp, i1))))
+      if as == as1 && i == i1 && {
+        // rs is part of the list of read since the last write
+        curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined } =>
+      Some(Const(()))
+
+    // as(i) = rs; ...; as(i) = rs => as(i) = rs; ...; () side condition no write in-between
+    case ("array_set", List(as: Exp, i, rs)) if ({curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw)}) match {
+        case Some(Node(_, "array_set", List(as2, idx2, value2), _)) if (as == as2 && i == idx2 && value2 == rs) => true
+        case _ => false
+      }
+    }) => Some(Const(()))
+
+    // TODO: should be handle by the case below. However it doesn't because of aliasing issues!
+    // (x + idx)->i = (x + idx)->i => ()    side condition: no write in-between! (on x)
+    case ("reffield_set", List(Def("array_slice", (as: Exp)::idx::_), i, rs @ Def("reffield_get", List(Def("array_slice", (as1: Exp)::idx1::_), i1)))) =>
+      // System.out.println(s">>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
+      if (as == as1 && idx == idx1 && i == i1 && {
+          // rs is part of the list of read since the last write
+          // System.out.println(s">>> ${curEffects.get(as)}")
+          // System.out.println(s"  |->>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
+          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
+        Some(Const(()))
+      else None
+
+    // x-> i = x->i => ()    side condition: no write in-between!
+    case ("reffield_set", List(as:Exp, i, rs @ Def("reffield_get", List(as1: Exp, i1)))) =>
+      // System.out.println(s">>> $as -> $i == $as1 -> $i1")
+      if (as == as1 && i == i1 && {
+          // rs is part of the list of read since the last write
+          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
+        Some(Const(()))
+      else
+        None
+
+    // x = x => ()    side condition: no write in-between!
+    case ("var_set", List(as:Exp, rs @ Def("var_get", List(as1: Exp)))) =>
+      // System.out.println(s">>> $as -> $i == $as1 -> $i1")
+      if (as == as1 && {
+          // rs is part of the list of read since the last write
+          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
+        Some(Const(()))
+      else
+        None
+
+    // [var] x = y; ....; x => [var] x = y; ....; y    side condition: no write in-between!
+    case ("var_get", List(as:Exp)) =>
+      curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw) collect {
+        case Node(_, "var_new", List(init: Exp), _) => init
+        case Node(_, "var_set", List(_, value: Exp), _) => value
+      }})
+
+    // x[i] = y; ....; x => x[i] = y; ....; y    side condition: no write in-between!
+    case ("array_get", List(as:Exp,i:Exp)) =>
+      curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw) collect {
+        case Node(_, "array_set", List(_, i2: Exp, value: Exp), _) if i == i2 => value
+      }})
+
+    case ("array_slice", List(as: Exp, Const(0), Const(-1))) => Some(as)
+    case ("array_length", List(Def("NewArray", Const(n)::_))) =>
+      Some(Const(n))
+    case ("array_length", List(Def("Array", List(Const(as: Array[_]))))) =>
+      Some(Const(as.length))
+
+    case ("String.length", List(Const(as: String))) =>
+      Some(Const(as.length))
+    case ("String.charAt", List(Const(as: String), Const(idx: Int))) =>
+      Some(Const(as.charAt(idx)))
+
+    case ("!", List(Const(b: Boolean))) => Some(Const(!b))
+    case ("==", List(Const(a: Double), _)) if a.isNaN => Some(Const(false))
+    case ("==", List(_, Const(b: Double))) if b.isNaN => Some(Const(false))
+    case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
+    case ("!=", List(Const(a: Double), _)) if a.isNaN => Some(Const(true))
+    case ("!=", List(_, Const(b: Double))) if b.isNaN => Some(Const(true))
+    case ("!=", List(Const(a), Const(b))) => Some(Const(a != b))
+    case ("^", List(Const(a: Boolean), Const(b: Boolean))) => Some(Const(a ^ b))
+    case ("<=", List(Const(a: Int), Const(b: Int))) => Some(Const(a <= b))
+    case ("<=", List(Const(a: Float), Const(b: Float))) => Some(Const(a <= b))
+    case ("<=", List(Const(a: Long), Const(b: Long))) => Some(Const(a <= b))
+    case ("<=", List(Const(a: Double), Const(b: Double))) => Some(Const(a <= b))
+    // idea 1:
+    // case ("<=", List(Const(a), Const(b))) if isNum(a) => Some(Const(a.asInstanceOf[Double] <= b.asInstanceOf[Double]))
+    // idea 2:
+    //   implicit val m: Manifest[Int] = typeMap(Const(a)).asInstanceOf[Manifest[Int]]
+    //   val tmp = num[Int](m).lteq(wrap[Int](a), wrap[Int](b))
+    //   Some(Const(tmp))
+    // }
+    case (">=", List(Const(a: Int), Const(b: Int))) => Some(Const(a >= b))
+    case (">=", List(Const(a: Long), Const(b: Long))) => Some(Const(a >= b))
+    case (">=", List(Const(a: Float), Const(b: Float))) => Some(Const(a >= b))
+    case (">=", List(Const(a: Double), Const(b: Double))) => Some(Const(a >= b))
+    case ("<", List(Const(a: Int), Const(b: Int))) => Some(Const(a < b))
+    case ("<", List(Const(a: Long), Const(b: Long))) => Some(Const(a < b))
+    case ("<", List(Const(a: Float), Const(b: Float))) => Some(Const(a < b))
+    case ("<", List(Const(a: Double), Const(b: Double))) => Some(Const(a < b))
+    case (">", List(Const(a: Int), Const(b: Int))) => Some(Const(a > b))
+    case (">", List(Const(a: Long), Const(b: Long))) => Some(Const(a > b))
+    case (">", List(Const(a: Float), Const(b: Float))) => Some(Const(a > b))
+    case (">", List(Const(a: Double), Const(b: Double))) => Some(Const(a > b))
+
+    case ("?", c::(t: Block)::(e: Block)::_) if t.isPure && e.isPure && t.res == e.res => Some(t.res)
+    case ("?", (c: Sym)::(t: Block)::(e: Block)::_) if t.isPure && e.isPure => (t.res, e.res) match {
+      case (Const(t: Double), Const(e: Double)) if t.isNaN && e.isNaN => Some(Const(Double.NaN))
+      // c && true or c || false => if (c) true else false
+      // if (c) false else true
+      case (Const(t: Boolean), Const(e: Boolean)) /* if t != e */ => Some(if (t) c else reflect("!", c))
+      case _ => None
+    }
+
+    case _  =>
+      super.rewrite(s,as)
+  }
+
+  // From miniscala CPSOptimizer.scala
+  val leftNeutral: Set[(Any, String)] =
+    Set((0, "+"), (1, "*"), (~0, "&"), (0, "|"), (0, "^"))
+  val rightNeutral: Set[(String, Any)] =
+      Set(("+", 0), ("-", 0), ("*", 1), ("/", 1),
+          ("<<", 0), (">>", 0), (">>>", 0),
+          ("&", ~0), ("|", 0), ("^", 0))
+  val leftAbsorbing: Set[(Any, String)] =
+    Set((0, "*"), (0, "&"), (~0, "|"))
+  val rightAbsorbing: Set[(String, Any)] =
+    Set(("*", 0), ("&", 0), ("|", ~0))
+
+  val sameArgReduce: Map[String, Any] =
+    Map("-" -> 0, "/" -> 1, "%" -> 0, "^" -> 0,
+      "<=" -> true, ">=" -> true, "==" -> true,
+      "<" -> false, ">" -> false, "!=" -> false)
+
+  // graph pre-node-construction optimization
+  override def reflect(s: String, as: Def*): Exp = (s,as.toList) match {
+    case ("+", List(Const(a:Int),Const(b:Int))) => Const(a+b)
+    case ("-", List(Const(a:Int),Const(b:Int))) => Const(a-b)
+    case ("*", List(Const(a:Int),Const(b:Int))) => Const(a*b)
+    case ("/", List(Const(a:Int),Const(b:Int))) => Const(a/b)
+    case ("/", List(Const(a:Long),Const(b:Long))) => Const(a/b)
+    case ("/", List(Const(a:Double),Const(b:Double))) => Const(a/b)
+    case ("%", List(Const(a:Int),Const(b:Int))) => Const(a%b)
+    case (">>>", List(Const(a: Int),Const(b:Int))) => Const(a >>> b)
+    case (">>>", List(Const(a: Long),Const(b:Int))) => Const(a >>> b)
+    case ("<<",  List(Const(a: Int),Const(b:Int))) => Const(a << b)
+    case ("<<", List(Const(a: Long),Const(b:Int))) => Const(a << b)
+    case ("&", List(Const(a: Long),Const(b:Long))) => Const(a & b)
+    case (op, List(Const(x),b:Exp)) if leftNeutral((x, op)) => b
+    case (op, List(a:Exp,Const(x))) if rightNeutral((op, x)) => a
+    case (op, List(Const(x),b:Exp)) if leftAbsorbing((x, op)) => Const(x)
+    case (op, List(a:Exp,Const(x))) if rightAbsorbing((op, x)) => Const(x)
+    case (op, List(a,b)) if a == b && sameArgReduce.contains(op) => Const(sameArgReduce(op))
+
+    // TBD: can't just rewrite, need to reflect block!
+    // case ("?", List(Const(true),a:Block,b:Block)) => a
+
+    // for now we implement the front-end method as a
+    // a smart constructor (might revisit later)
+
+    case p =>
+      super.reflect(s, as:_*)
+  }
+}
 
 case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: immutable.Map[Sym,Node]) {
   // contract: nodes is sorted topologically
