@@ -19,7 +19,7 @@ trait CPPOps { b: Base =>
   }
   case class Share(s: String) extends Capture
   case class UniqueCopy[T:Manifest](s: Rep[T]) extends Capture
-  case class UniqueRef[T:Manifest](s: Rep[T]) extends Capture
+  case class UniqueRef[T: Manifest](s: Rep[T]) extends Capture
   implicit def liftCapture(s:String) = Capture(s)
   private def unwrap(c: Capture) = c match {
     case Share(s: String) => lms.core.Backend.Const(s)
