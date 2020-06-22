@@ -33,6 +33,11 @@ trait ArrayOps { b: Base =>
     // FIXME: currently copy!!
     def sort(size: Rep[Int] /* , sort: (Rep[A], Rep[A]) => Rep[Int] */) = Wrap[Array[A]](Adapter.g.reflectMutable("array_sort_scala", Unwrap(x), Unwrap(size))) //, Adapter.g.reify((x, y) => Unwrap(sort(Wrap[A](x), Wrap[A](y)))))(Unwrap(x))(Unwrap(x))
   }
+  implicit class CharArrayOps(x: Rep[Array[Char]]) {
+    def ArrayOfCharToString(): Rep[String] = {
+      Wrap[String](Adapter.g.reflectRead("array-of-char-to-string", Unwrap(x))(Unwrap(x)))
+    }
+  }
 
   trait LongArray[+T]
   def NewLongArray[T:Manifest](x: Rep[Long], init: Option[Int] = None): Rep[LongArray[T]] = init match {

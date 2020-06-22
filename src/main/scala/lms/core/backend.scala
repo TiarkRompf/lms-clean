@@ -166,8 +166,8 @@ class GraphBuilder {
     reflectEffect(s, as:_*)()()
   }
 
-  def reflectRead(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)(efKeys)()
-  def reflectWrite(s: String, as: Def*)(efKeys: Exp) = reflectEffect(s, as:_*)()(efKeys)
+  def reflectRead(s: String, as: Def*)(efKeys: Exp*) = reflectEffect(s, as:_*)(efKeys: _*)()
+  def reflectWrite(s: String, as: Def*)(efKeys: Exp*) = reflectEffect(s, as:_*)()(efKeys: _*)
   def reflectMutable(s: String, as: Def*) = reflectEffect(s, as:_*)(STORE)()
 
   // FIXME: issues:
@@ -367,7 +367,7 @@ class GraphBuilder {
   // FIXME(feiw) Dig further to see if/why lambda_forward or None cases are correct
   // FIXME(feiw) in the conditional case, the handling of result is still wrong.
   def getFunctionLatentEffect(f: Exp): ((Set[Exp], Set[Exp]),(Set[Int], Set[Int]), Option[Exp]) = findDefinition(f) match {
-      case Some(Node(_, "λ", List(b:Block), _)) =>
+      case Some(Node(_, "λ", (b:Block)::_, _)) =>
         getEffKeysWithParam(b)
       case Some(Node(_, "λforward", _, _)) => // what about doubly recursive?
         ((Set[Exp](), Set[Exp](Const("CTRL"))), (Set[Int](), Set[Int]()), None)
@@ -514,6 +514,11 @@ class GraphBuilder {
 
 case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: immutable.Map[Sym,Node]) {
   // contract: nodes is sorted topologically
+  def show: Unit = {
+    for (node <- nodes)
+      System.out.println(node)
+    System.out.println(block)
+  }
 }
 
 

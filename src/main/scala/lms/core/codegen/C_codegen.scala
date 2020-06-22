@@ -396,6 +396,8 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case n @ Node(s,"array_resize", List(arr, nsize), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"($tpe*)realloc("); shallow(arr); emit(", "); shallowP(nsize, precedence("*")); emit(s" * sizeof($tpe))")
+    case n @ Node(s, "array-of-char-to-string", List(x:Sym), _) =>
+      shallow(x) // FIXME(feiw): this is currently wrong: should have array copy
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
     case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
