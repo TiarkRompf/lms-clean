@@ -18,7 +18,7 @@ trait CPPOps { b: Base =>
     def RefExcept[T: Manifest](s: Rep[T]*) = Seq(Share("&")) ++ s.map(UniqueCopy(_))
   }
   case class Share(s: String) extends Capture
-  case class UniqueCopy[T:Manifest](s: Rep[T]) extends Capture
+  case class UniqueCopy[T: Manifest](s: Rep[T]) extends Capture
   case class UniqueRef[T: Manifest](s: Rep[T]) extends Capture
   implicit def liftCapture(s:String) = Capture(s)
   private def unwrap(c: Capture) = c match {
