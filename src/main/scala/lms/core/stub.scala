@@ -718,9 +718,12 @@ abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with Dsl
 
   def eval(x: A): B = { val f1 = f; time("eval")(f1(x)) }
 
+  val prelude = ""
+
   lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
-    val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
+    source.write(prelude.getBytes)
+    val statics = codegen.emitSource(wrapper, "Snippet", new java.io.PrintStream(source))
     (source.toString, statics)
   }
 }
