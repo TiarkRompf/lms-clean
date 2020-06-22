@@ -5,10 +5,10 @@ class Snippet() extends (Int => Unit) {
   def apply(x0: Int): Unit = {
     val x1 = new Array[Int](10)
     val x2 = new Array[Int](5)
-    def x4(x3:Array[Int]): Unit = {
+    def x4(x3: Array[Int]): Unit = {
       x3(2) = 3
     }
-    def x6(x5:Array[Int]): Function1[Array[Int], Unit] = {
+    def x6(x5: Array[Int]): Function1[Array[Int], Unit] = {
       x5(1) = 2
       x4
     }
