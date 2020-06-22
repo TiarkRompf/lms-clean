@@ -7,7 +7,7 @@ class Snippet() extends (Int => Unit) {
     var x2: Function1[Int, Int] = null.asInstanceOf[Function1[Int, Int]]
     x1 = 0
     x2 = x3
-    def x3(x4:Int): Int = if (x4 > 0) x1 * x2(x4 - x0) else 1
+    def x3(x4: Int): Int = if (x4 > 0) x1 * x2(x4 - x0) else 1
     while (x1 < 10) {
       println(x3(x1))
       x1 = x1 + 1

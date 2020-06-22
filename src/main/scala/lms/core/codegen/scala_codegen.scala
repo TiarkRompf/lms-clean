@@ -475,7 +475,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       val retType = remap(typeMap.getOrElse(y.res, manifest[Unit]))
       val eff = quoteEff(y.ein)
 
-      val argsStr = (args zip types).map{ case (x, a) => s"${quote(x)}:$a" }.mkString(", ")
+      val argsStr = (args zip types).map { case (x, a) => s"${quote(x)}: $a" }.mkString(", ")
       emit(s"def ${quote(f)}($argsStr): $retType$eff = ")
       quoteBlockP(traverse(y,f))
       emitln()
