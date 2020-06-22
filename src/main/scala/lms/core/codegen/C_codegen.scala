@@ -148,7 +148,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     }
     withWraper(wraper _)(f)
   }
-  def quoteBlock(b: Block): Unit = quoteTypedBlock(b, true, false)
+  def quoteBlock(b: Block): Unit = ???
   def quoteBlock(header: String)(f: => Unit): Unit = ()
   def quoteBlock(b: Block, argType: Boolean = false): Unit = ()
 
@@ -208,31 +208,6 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       }
     }
     withWraper(wraper _)(f)
-  }
-
-  // emit closures with explicit argument types and return type
-  // `argMod`/`retMod` specifies pass by copy or reference
-  def quoteTypedBlock(b: Block, autoArgType: Boolean, retType: Boolean,
-                      capture: String = "&", argMod: Option[List[String]] = None, retMod: Option[String] = None): Unit = {
-    val eff = quoteEff(b.ein)
-    val args = argMod match {
-      case Some(mods) =>
-        assert(mods.length == b.in.length, s"argMod should have same length as block inputs ${mods.length} ${b.in.length}")
-        b.in.zipWithIndex.map{
-          case (s, i) =>
-            val mod = mods(i)
-            if (autoArgType) s"auto$mod ${quote(s)}"
-            else s"${remap(typeMap(s))}$mod ${quote(s)}"
-        }.mkString(", ")
-      case None => b.in.map{s =>
-          if (autoArgType) s"auto ${quote(s)}"
-          else s"${remap(typeMap(s))} ${quote(s)}"
-      }.mkString(", ")
-    }
-    val mod = retMod.getOrElse("")
-    val ret: String = if (retType) "->"+remap(typeBlockRes(b.res))+mod else ""
-    emit(s"[$capture](${args})$ret $eff")
-    quoteBlockPReturn(traverse(b))
   }
 
   override def shallow(n: Def): Unit = n match {

@@ -161,7 +161,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))()())
   }
 
-  def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
+  def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, captures: Backend.Exp*): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
       case Some((funSym, _)) =>
@@ -183,7 +183,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
         // Step 3. build the "λ" node with fn1 as the function name
         //    fix the funTable such that it pairs (fn1, can) for non-recursive uses.
-        val res = Adapter.g.reflect(fn1,"λ",block)(hardSummary(fn))
+        val res = Adapter.g.reflect(fn1,"λ",(block+:captures):_*)(hardSummary(fn))
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }
@@ -1146,6 +1146,13 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
   def eval(a: A): Unit = { val f1 = f; time("eval")(f1(a)) }
 }
 
+// Basic DslDriverCPP for CPP CodeGen
+abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] with CPPOps { q =>
+  override val codegen = new DslGenC with ExtendedCPPCodeGen {
+    val IR: q.type = q
+  }
+  compilerCommand = "g++ -std=c++17 -O3"
+}
 
 // These empty traits have to be here for backward compatibility :(
 trait MiscOps
