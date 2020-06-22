@@ -1,6 +1,6 @@
 package lms.core
 
-import lms.macros.RefinedManifest
+import lms.macros.{RefinedManifest, CustomManifest}
 
 import scala.collection.mutable
 
@@ -95,6 +95,7 @@ trait ExtendedCodeGen {
   def remap(m: Manifest[_]): String = m.typeArguments match {
     case Nil => m match {
       case ref: RefinedManifest[_] => record(ref)
+      case cus: CustomManifest[_] => m.toString
       case _ => primitive(m.toString)
     }
     case List(inner) => array(remap(inner))

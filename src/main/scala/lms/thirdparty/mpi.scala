@@ -6,7 +6,7 @@ import lms.core.stub._
 import lms.core.Backend._
 import lms.core.virtualize
 import lms.core.utils.time
-import lms.macros.SourceContext
+import lms.macros.{SourceContext, CustomManifest}
 
 import lms.collection._
 
@@ -37,13 +37,21 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
   }
 
   // this is how we bind to library structs with field read access
+  // 1. define the abstract class (if not abstract, works too)
   abstract class DataStructure1
+  // 2. handle type mapping by CustomManifest[T] with the implicit object and toString method
+  implicit object ManifestDataStructure1 extends CustomManifest[DataStructure1] {
+    override def toString = "DataStructure1" // C type
+  }
+  // 3. add any field access functions
   implicit class DataStructure1Ops(x: Rep[DataStructure1]) {
     val fieldA: Rep[Int] = readField[DataStructure1, Int](x, "fieldA")
   }
+  // 4. add a way to declare a new data struct
   def dataStructure1 = libStruct[DataStructure1]("DataStructure1")
 
   // some example (dummy code). this is using the old way of reflecting new nodes, which requires changes in code gen :)
+  // Not recommended to use :)
   def test_pointer(x: Var[Int]): Rep[Unit] = {
     Wrap[Unit](Adapter.g.reflectWrite("test-pointer", UnwrapV(x))(Adapter.CTRL, UnwrapV(x)))
   }
@@ -59,11 +67,6 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
 }
 
 trait CCodeGenMPI extends ExtendedCCodeGen {
-  override def remap(m: Manifest[_]): String =
-    m.runtimeClass.getName match {
-      case "lms.thirdparty.MPIOps$DataStructure1" => "DataStructure1"
-      case _ => super.remap(m)
-    }
 
   override def shallow(n: Node): Unit = n match {
 
