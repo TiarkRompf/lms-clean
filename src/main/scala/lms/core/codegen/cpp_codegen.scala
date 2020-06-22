@@ -13,18 +13,18 @@ trait CPPOps { b: Base =>
 
   abstract class Capture
   object Capture {
-    def apply(s: String) = Seq(Share(s))
-    def CopyExcept[T: Manifest](s: Rep[T]*) = Seq(Share("=")) ++ s.map(UniqueRef(_))
-    def RefExcept[T: Manifest](s: Rep[T]*) = Seq(Share("&")) ++ s.map(UniqueCopy(_))
+    def apply(s: String) = Seq(CapAll(s))
+    def CopyExcept[T: Manifest](s: Rep[T]*) = Seq(CapAll("=")) ++ s.map(RefOne(_))
+    def RefExcept[T: Manifest](s: Rep[T]*) = Seq(CapAll("&")) ++ s.map(CopyOne(_))
   }
-  case class Share(s: String) extends Capture
-  case class UniqueCopy[T: Manifest](s: Rep[T]) extends Capture
-  case class UniqueRef[T: Manifest](s: Rep[T]) extends Capture
+  case class CapAll(s: String) extends Capture
+  case class CopyOne[T: Manifest](s: Rep[T]) extends Capture
+  case class RefOne[T: Manifest](s: Rep[T]) extends Capture
   implicit def liftCapture(s:String) = Capture(s)
   private def unwrap(c: Capture) = c match {
-    case Share(s: String) => lms.core.Backend.Const(s)
-    case UniqueCopy(s: Rep[_]) => Unwrap(s)
-    case UniqueRef(s: Rep[_]) => Unwrap(s)
+    case CapAll(s: String) => lms.core.Backend.Const(s)
+    case CopyOne(s: Rep[_]) => Unwrap(s)
+    case RefOne(s: Rep[_]) => Unwrap(s)
   }
 
   def fun[A:Manifest,B:Manifest](capture: Seq[Capture], f: Rep[A] => Rep[B]): Rep[A => B] =
