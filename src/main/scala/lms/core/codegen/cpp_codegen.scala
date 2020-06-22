@@ -14,8 +14,8 @@ trait CPPOps { b: Base =>
   abstract class Capture
   object Capture {
     def apply(s: String) = Seq(Share(s))
-    def CopyExcept[T:Manifest](s: Rep[T]*) = Seq(Share("=")) ++ s.map(UniqueRef(_))
-    def RefExcept[T:Manifest](s: Rep[T]*) = Seq(Share("&")) ++ s.map(UniqueCopy(_))
+    def CopyExcept[T: Manifest](s: Rep[T]*) = Seq(Share("=")) ++ s.map(UniqueRef(_))
+    def RefExcept[T: Manifest](s: Rep[T]*) = Seq(Share("&")) ++ s.map(UniqueCopy(_))
   }
   case class Share(s: String) extends Capture
   case class UniqueCopy[T:Manifest](s: Rep[T]) extends Capture
