@@ -417,7 +417,7 @@ class LambdaTest extends TutorialFunSuite {
           printf("%d\n", x(c))
           if (c > 0) {
             val na = Array(c,c,c,c,c)
-            na(c-1) = 100 // this line of code is removed :(
+            na(c-1) = 100 // this line of code should not be removed!
             f(c-1, na)
           }
         }
