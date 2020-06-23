@@ -18,9 +18,13 @@ trait RefinedManifest[T] extends Manifest[T] {
     case m: RefinedManifest[_] => (m canEqual this) && (this.erasure == m.erasure) && (this.fields == m.fields)
     case _                     => false
   }
+
   override def hashCode = this.erasure.##
 
-  override def toString = s"Anon${(0xdeadbeef /: fields.zipWithIndex) { case (agg, ((name, man), idx)) => (agg * 5) + (1 + idx) * (name.## + man.##) }.abs}"
+  override def toString = s"Anon${(0xdeadbeef /: fields.zipWithIndex) {
+    case (agg, ((name, man), idx)) => (agg * 5) + (1 + idx) * (name.## + man.##)
+  }.abs}"
+
   def fields: List[(String, Manifest[_])]
 }
 
