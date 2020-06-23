@@ -24,16 +24,31 @@ trait CCodeGenCMacro extends ExtendedCCodeGen {
   }
 }
 
+// Use for libStruct Type Mapping
+class CustomManifest[T: Manifest] extends Manifest[T] {
+  def runtimeClass = manifest[T].runtimeClass
+}
+
 trait LibStruct { b : Base =>
-  def libStruct[T:Manifest](m:String):Rep[T] = {
-    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", lms.core.Backend.Const(m)))
+  def registerCType[T:Manifest](m: String) = new CustomManifest[T] { override def toString = m }
+
+  def newStruct[T:CustomManifest]: Rep[T] = {
+    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", lms.core.Backend.Const(manifest[T].toString)))
   }
+
   // T: type of struct . U: type of field
   def readField[T:Manifest, U:Manifest](x: Rep[T], m:String): Rep[U] = {
     Wrap[U](Adapter.g.reflectRead("read-field", Unwrap(x), lms.core.Backend.Const(m))(Unwrap(x)))
   }
 }
+
 trait CCodeGenLibStruct extends ExtendedCCodeGen {
+
+  override def remap(m: Manifest[_]) = m match {
+    case cus: CustomManifest[_] => m.toString
+    case _ => super.remap(m)
+  }
+
   override def mayInline(n: Node): Boolean = n match {
     case Node(_, "lib-struct", _, _) => false
     case _ => super.mayInline(n)
