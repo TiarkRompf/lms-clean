@@ -44,7 +44,7 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
   def dataStructure1: Rep[DataStructure1] = newStruct[DataStructure1]
   // 3. add any field read access functions
   implicit class DataStructure1Ops(x: Rep[DataStructure1]) {
-    val fieldA: Rep[Int] = readField[DataStructure1, Int](x, "fieldA")
+    def fieldA: Rep[Int] = readField[DataStructure1, Int](x, "fieldA")
   }
 
   // some example (dummy code). this is using the old way of reflecting new nodes, which requires changes in code gen :)
