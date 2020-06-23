@@ -39,7 +39,7 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
   // this is how we bind to library structs with field read access
   class DataStructure1
   // 1. define an implicit value for c-type registration (internally it is a CustomManifest)
-  implicit val registCTypeForDataStructure1 = registerCType[DataStructure1]("DataStructure1")
+  // implicit val registCTypeForDataStructure1 = registerCType[DataStructure1]("DataStructure1")
   // 2. define the instantiation function
   def dataStructure1: Rep[DataStructure1] = newStruct[DataStructure1]
   // 3. add any field read access functions
@@ -64,9 +64,13 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
 }
 
 trait CCodeGenMPI extends ExtendedCCodeGen {
+  override def remap(m: Manifest[_]) = {
+    val mStr = m.toString
+    if (mStr.endsWith("$DataStructure1")) "DataStructure1"
+    else super.remap(m)
+  }
 
   override def shallow(n: Node): Unit = n match {
-
     case Node(s, "test-pointer", List(x:Sym), _) =>
       emit("test_pointer(&"); shallow(x); emit(")");
     case Node(s, "test-pointer-array", List(x:Sym), _) =>
