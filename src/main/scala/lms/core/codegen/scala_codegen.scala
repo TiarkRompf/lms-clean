@@ -91,7 +91,7 @@ class ScalaCodeGen extends Traverser {
       emit(s"val $s = ${quote(x)} >= ${quote(y)}")
     case n @ Node(s,"<=",List(x,y), _) =>
       emit(s"val $s = ${quote(x)} <= ${quote(y)}")
-    case n @ Node(s,"λforward",List(x), _) =>
+    case n @ Node(s,"λforward",List(x, arity), _) =>
       emit(s"lazy val $s = ${quote(x)} _")
     case n @ Node(s, "define_exit", _, _) =>
       emit(s"def exit(res: Int): Int = res")
@@ -352,7 +352,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   // (either inline or as part of val def)
   // XXX TODO: precedence of nested expressions!!
   override def shallow(n: Node): Unit = n match {
-    case n @ Node(f,"λforward",List(y),_) => emit(quote(y))
+    case n @ Node(f,"λforward",List(y, arity),_) => emit(quote(y))
     case n @ Node(f, "λ", (y:Block)::_, _) =>
       // XXX what should we do for functions?
       // proper inlining will likely work better

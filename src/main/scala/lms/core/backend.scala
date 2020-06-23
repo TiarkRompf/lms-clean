@@ -369,8 +369,8 @@ class GraphBuilder {
   def getFunctionLatentEffect(f: Exp): ((Set[Exp], Set[Exp]),(Set[Int], Set[Int]), Option[Exp]) = findDefinition(f) match {
       case Some(Node(_, "λ", (b:Block)::_, _)) =>
         getEffKeysWithParam(b)
-      case Some(Node(_, "λforward", _, _)) => // what about doubly recursive?
-        ((Set[Exp](), Set[Exp](Const("CTRL"))), (Set[Int](), Set[Int]()), None)
+      case Some(Node(_, "λforward", xf::Const(arity:Int)::Nil, _)) => // what about doubly recursive?
+        ((Set[Exp](), Set[Exp](Const("CTRL"))), (0.until(arity).toSet, 0.until(arity).toSet), None)
       case None => // FIXME: function argument? fac-01 test used for recursive function...
         ((Set[Exp](), Set[Exp](Const("CTRL"))), (Set[Int](), Set[Int]()), None)
       case Some(Node(_, "@", (f: Sym)+:args, _)) =>
