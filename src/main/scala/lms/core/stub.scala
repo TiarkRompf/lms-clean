@@ -170,7 +170,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         // Step 1. set up "λforward" node with 2 new fresh Syms
         val fn = Backend.Sym(Adapter.g.fresh)
         val fn1 = Backend.Sym(Adapter.g.fresh)
-        Adapter.g.reflect(fn, "λforward", fn1)()
+        Adapter.g.reflect(fn, "λforward", fn1, Backend.Const(arity))()
 
         // Step 2. register (fn, can) in funTable, so that recursive calls
         //    will find fn as the function Sym. Reify the block.

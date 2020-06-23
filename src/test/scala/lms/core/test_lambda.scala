@@ -399,6 +399,29 @@ class LambdaTest extends TutorialFunSuite {
     })
   }
 
+  test("recursion_lambda_forward_effect") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(a: Rep[Int]) = {
+        lazy val f: Rep[(Int, Array[Int]) => Unit] = fun { (c: Rep[Int], x: Rep[Array[Int]]) =>
+          printf("%d\n", x(c))
+          if (c > 0) {
+            val na = Array(c,c,c,c,c)
+            na(c-1) = 100 // this line of code should not be removed!
+            f(c-1, na)
+          }
+        }
+        val arr = Array(1,1,1,1,1)
+        f(3, arr)
+      }
+    }
+    checkOut("recursion_lambda_forward_effect", "scala", {
+      println(driver.code)
+      println("// output:")
+      driver.eval(7)
+    })
+  }
+
   test("mutual_recursion") {
     val driver = new DslDriver[Int,Unit] {
       @virtualize

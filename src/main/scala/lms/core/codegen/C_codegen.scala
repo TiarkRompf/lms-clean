@@ -375,7 +375,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       shallow(x) // FIXME(feiw): this is currently wrong: should have array copy
     case n @ Node(s,op,args,_) if nameMap contains op =>
       shallow(n.copy(op = nameMap(n.op)))
-    case n @ Node(f, "λforward",List(y),_) => ??? // this case is short cut at traverse function!
+    case n @ Node(f, "λforward", _, _) => ??? // this case is short cut at traverse function!
     case n @ Node(s,op,args,_) if op.startsWith("unchecked") => // unchecked
       var next = 9 // skip unchecked
       for (a <- args) {
@@ -494,7 +494,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
         traverse(b)
       }
       emitln(";\n//# " + str)
-    case n @ Node(s, "λforward", List(y), _) =>
+    case n @ Node(s, "λforward", List(y, arity), _) =>
       emitln("//# lambda forward is here!")
       // for this case, adding (f, y) in forwardMap is all we need
       // XXX: this is most likely not enough in the general case

@@ -629,12 +629,12 @@ abstract class CPSTransformer extends Transformer {
       val cont = reflectHelper(es, "λ", g.reify{e => subst(s) = e; k})
       withSubst(s)(reflectHelper(es, "@", transform(x), cont, transform(y)))
 
-    case Node(s,"λforward",List(y:Sym), _) =>
+    case Node(s,"λforward",List(y:Sym, arity), _) =>
       assert(!(subst contains y), "should not have handled lambda yet")
       val sFrom = Sym(g.fresh); val sTo = Sym(g.fresh)
       subst(s) = sFrom; subst(y) = sTo
       forwardMap(sTo) = sFrom
-      g.reflect(sFrom, "λforward", sTo)()
+      g.reflect(sFrom, "λforward", sTo, arity)()
       k
 
     case Node(s,op,rs,es) =>
@@ -670,7 +670,7 @@ abstract class SelectiveCPSTransformer extends CPSTransformer {
 
     case Node(s,"shift1",List(y:Block),_) => super.traverse(n)(k)
     case Node(s,"reset1",List(y:Block),_) => super.traverse(n)(k)
-    case Node(s,"λforward",List(y:Sym), _) => super.traverse(n)(k)
+    case Node(s,"λforward", _, _) => super.traverse(n)(k)
     case Node(f,"?",c::(a:Block)::(b:Block)::_,es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
     case Node(f,"W",(c:Block)::(b:Block)::e, es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
     // the es.keys of "@" node may have Adapter.CPS, if and only if the lambda has Adapter.CPS
