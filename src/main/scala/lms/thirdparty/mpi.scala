@@ -7,7 +7,6 @@ import lms.core.Backend._
 import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
-import lms.thirdparty.CustomManifest
 
 import lms.collection._
 
