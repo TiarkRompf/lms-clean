@@ -1068,6 +1068,7 @@ trait Dsl extends PrimitiveOps with LiftPrimitives with Equal with RangeOps with
   implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
 }
 trait DslExp extends Dsl // For backward compatibility
+trait DslCPP extends Dsl with CPPOps
 
 
 trait DslGen extends ExtendedScalaCodeGen {
@@ -1092,6 +1093,8 @@ trait DslGenC extends ExtendedCCodeGen {
     statics.toList
   }
 }
+
+trait DslGenCPP extends DslGenC with ExtendedCPPCodeGen
 
 abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
   def wrapper(x: Rep[A]): Rep[B] = snippet(x)
@@ -1148,7 +1151,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
 
 // Basic DslDriverCPP for CPP CodeGen
 abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] with CPPOps { q =>
-  override val codegen = new DslGenC with ExtendedCPPCodeGen {
+  override val codegen = new DslGenCPP {
     val IR: q.type = q
   }
   compilerCommand = "g++ -std=c++17 -O3"
