@@ -38,6 +38,25 @@ trait CPPOps { b: Base =>
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](capture: Seq[Capture], f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
     Wrap[(A,B,C,D)=>E](__fun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), capture.map(unwrap): _*))
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](capture: Seq[Capture], f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]):
+    Rep[(A, B, C, D, E) => F] =
+    Wrap[(A,B,C,D,E)=>F](__fun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)))), capture.map(unwrap): _*))
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest]
+    (capture: Seq[Capture], f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]): Rep[(A, B, C, D, E, F) => G] =
+    Wrap[(A,B,C,D,E,F)=>G](__fun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), capture.map(unwrap): _*))
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest]
+    (capture: Seq[Capture], f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G]) => Rep[H]): Rep[(A, B, C, D, E, F, G) => H] =
+    Wrap[(A,B,C,D,E,F,G)=>H](__fun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)))),
+                                   capture.map(unwrap): _*))
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest]
+    (capture: Seq[Capture], f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]): Rep[(A, B, C, D, E, F, G, H) => I] =
+    Wrap[(A,B,C,D,E,F,G,H)=>I](__fun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)))),
+                                   capture.map(unwrap): _*))
+
 }
 
 trait ExtendedCPPCodeGen extends ExtendedCCodeGen {
