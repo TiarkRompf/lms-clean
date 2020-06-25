@@ -161,6 +161,70 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))()())
   }
 
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]): Rep[(A, B, C, D, E) => F] =
+    Wrap[(A,B,C,D,E)=>F](__fun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]): Rep[(A, B, C, D, E) => F] = fun(f)
+  implicit class FunOps5[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: Rep[(A,B,C,D,E) => F]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E]): Rep[F] =
+      Wrap[F](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]): Rep[(A, B, C, D, E, F) => G] =
+    Wrap[(A,B,C,D,E,F)=>G](__fun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]): Rep[(A, B, C, D, E, F) => G] = fun(f)
+  implicit class FunOps6[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: Rep[(A,B,C,D,E,F) => G]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F]): Rep[G] =
+      Wrap[G](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G]) => Rep[H]):
+    Rep[(A, B, C, D, E, F, G) => H] =
+    Wrap[(A,B,C,D,E,F,G)=>H](__fun(f, 7, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G]) => Rep[H]):
+    Rep[(A, B, C, D, E, F, G) => H] = fun(f)
+  implicit class FunOps7[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest](f: Rep[(A,B,C,D,E,F,G) => H]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G]): Rep[H] =
+      Wrap[H](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]):
+    Rep[(A, B, C, D, E, F, G, H) => I] =
+    Wrap[(A,B,C,D,E,F,G,H)=>I](__fun(f, 8, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]):
+    Rep[(A, B, C, D, E, F, G, H) => I] = fun(f)
+  implicit class FunOps8[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: Rep[(A,B,C,D,E,F,G,H) => I]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G], n: Rep[H]): Rep[I] =
+      Wrap[I](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m),Unwrap(n))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I]) => Rep[J]) =
+    Wrap[(A,B,C,D,E,F,G,H,I)=>J](__fun(f, 8,
+      xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I]) => Rep[J]) = fun(f)
+  implicit class FunOps9[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest](f: Rep[(A,B,C,D,E,F,G,H,I) => J]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G], n: Rep[H], o: Rep[I]): Rep[J] =
+      Wrap[J](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m),Unwrap(n),Unwrap(o))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J]) => Rep[K]) =
+    Wrap[(A,B,C,D,E,F,G,H,I,J)=>K](__fun(f, 9,
+      xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J]) => Rep[K]) = fun(f)
+  implicit class FunOps10[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest](f: Rep[(A,B,C,D,E,F,G,H,I,J) => K]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G], n: Rep[H], o: Rep[I], p: Rep[J]): Rep[K] =
+      Wrap[K](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m),Unwrap(n),Unwrap(o),Unwrap(p))()())
+  }
+
   def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, captures: Backend.Exp*): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
@@ -422,6 +486,12 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()(effs.toSeq:_*))
   }
 
+  // full user control of the effects
+  def uncheckedEffect[T:Manifest](xs: Any*)(rkeys: Rep[_]*)(wkeys: Rep[_]*): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    val writeKeys = Adapter.CTRL +: wkeys.map(Unwrap)
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args: _*)(rkeys.map(Unwrap): _*)(writeKeys: _*))
+  }
 
   // Def[T]: FIXME(feiw) Do we still need them?
   implicit def toAtom[T:Manifest](x: Def[T]): Exp[T] = {
