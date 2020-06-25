@@ -80,5 +80,5 @@ trait CCodeGenLibFunction extends ExtendedCCodeGen {
   }
 }
 
-trait CLibs extends CMacro with LibStruct with LibFunction
+trait CLibs extends Base with CMacro with LibStruct with LibFunction
 trait CCodeGenLibs extends CCodeGenCMacro with CCodeGenLibStruct with CCodeGenLibFunction
