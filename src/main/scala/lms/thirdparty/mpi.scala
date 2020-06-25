@@ -37,13 +37,18 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
   }
 
   // this is how we bind to library structs with field read access
-  abstract class DataStructure1
+  class DataStructure1
+  // 1. define an implicit value for c-type registration (internally it is a CustomManifest)
+  // implicit val registCTypeForDataStructure1 = registerCType[DataStructure1]("DataStructure1")
+  // 2. define the instantiation function
+  def dataStructure1: Rep[DataStructure1] = newStruct[DataStructure1]
+  // 3. add any field read access functions
   implicit class DataStructure1Ops(x: Rep[DataStructure1]) {
-    val fieldA: Rep[Int] = readField[DataStructure1, Int](x, "fieldA")
+    def fieldA: Rep[Int] = readField[DataStructure1, Int](x, "fieldA")
   }
-  def dataStructure1 = libStruct[DataStructure1]("DataStructure1")
 
   // some example (dummy code). this is using the old way of reflecting new nodes, which requires changes in code gen :)
+  // Not recommended to use :)
   def test_pointer(x: Var[Int]): Rep[Unit] = {
     Wrap[Unit](Adapter.g.reflectWrite("test-pointer", UnwrapV(x))(Adapter.CTRL, UnwrapV(x)))
   }
@@ -59,14 +64,13 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
 }
 
 trait CCodeGenMPI extends ExtendedCCodeGen {
-  override def remap(m: Manifest[_]): String =
-    m.runtimeClass.getName match {
-      case "lms.thirdparty.MPIOps$DataStructure1" => "DataStructure1"
-      case _ => super.remap(m)
-    }
+  override def remap(m: Manifest[_]) = {
+    val mStr = m.toString
+    if (mStr.endsWith("$DataStructure1")) "DataStructure1"
+    else super.remap(m)
+  }
 
   override def shallow(n: Node): Unit = n match {
-
     case Node(s, "test-pointer", List(x:Sym), _) =>
       emit("test_pointer(&"); shallow(x); emit(")");
     case Node(s, "test-pointer-array", List(x:Sym), _) =>

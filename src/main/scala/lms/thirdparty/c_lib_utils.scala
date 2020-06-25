@@ -25,14 +25,16 @@ trait CCodeGenCMacro extends ExtendedCCodeGen {
 }
 
 trait LibStruct { b : Base =>
-  def libStruct[T:Manifest](m:String):Rep[T] = {
-    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", lms.core.Backend.Const(m)))
+  def newStruct[T: Manifest]: Rep[T] = {
+    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", Backend.Const(manifest[T])))
   }
+
   // T: type of struct . U: type of field
-  def readField[T:Manifest, U:Manifest](x: Rep[T], m:String): Rep[U] = {
-    Wrap[U](Adapter.g.reflectRead("read-field", Unwrap(x), lms.core.Backend.Const(m))(Unwrap(x)))
+  def readField[T: Manifest, U: Manifest](x: Rep[T], m: String): Rep[U] = {
+    Wrap[U](Adapter.g.reflectRead("read-field", Unwrap(x), Backend.Const(m))(Unwrap(x)))
   }
 }
+
 trait CCodeGenLibStruct extends ExtendedCCodeGen {
   override def mayInline(n: Node): Boolean = n match {
     case Node(_, "lib-struct", _, _) => false
@@ -46,8 +48,10 @@ trait CCodeGenLibStruct extends ExtendedCCodeGen {
   }
 
   override def traverse(n: Node): Unit = n match {
-    case Node(s, "lib-struct", List(Const(m: String)), _) =>
-      emit(s"$m "); shallow(s); emitln(";")
+    case Node(s, "lib-struct", List(Const(m: Manifest[_])), _) =>
+      emit(s"${remap(m)} ")
+      shallow(s)
+      emitln(";")
     case _ => super.traverse(n)
   }
 }

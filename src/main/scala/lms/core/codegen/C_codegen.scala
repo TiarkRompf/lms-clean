@@ -244,27 +244,30 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     })._1)(f)
     ongoingFun -= streamId
   }
-  def emitFunctions(out: PrintStream) = if (functionsStreams.size > 0){
-    out.println("\n/************* Functions **************/")
-    for ((_, functionsStream) <- functionsStreams.values.toSeq.reverse) // ensure dependencies
-      functionsStream.writeTo(out)
-  }
+  def emitFunctions(out: PrintStream): Unit =
+    if (functionsStreams.size > 0){
+      out.println("\n/************* Functions **************/")
+      for ((_, functionsStream) <- functionsStreams.values.toSeq.reverse) // ensure dependencies
+        functionsStream.writeTo(out)
+    }
 
   private val registeredDatastructures = mutable.HashSet[String]()
   private val datastructuresStream = new ByteArrayOutputStream()
   private val datastructuresWriter = new PrintStream(datastructuresStream)
   private var ongoingData = false
-  def registerDatastructures(id: String)(f: => Unit) = if (!registeredDatastructures(id)) {
-    if (ongoingData) ???
-    ongoingData = true
+  def registerDatastructures(id: String)(f: => Unit): Unit =
+    if (!registeredDatastructures(id)) {
+      if (ongoingData) ???
+      ongoingData = true
     registeredDatastructures += id
     withStream(datastructuresWriter)(f)
     ongoingData = false
-  }
-  def emitDatastructures(out: PrintStream) = if (datastructuresStream.size > 0) {
-    out.println("\n/*********** Datastructures ***********/")
-    datastructuresStream.writeTo(out)
-  }
+    }
+  def emitDatastructures(out: PrintStream): Unit =
+    if (datastructuresStream.size > 0) {
+      out.println("\n/*********** Datastructures ***********/")
+      datastructuresStream.writeTo(out)
+    }
 
   protected val registeredInit = mutable.HashSet[String]()
   protected val initStream = new ByteArrayOutputStream()
