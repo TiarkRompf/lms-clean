@@ -61,6 +61,11 @@ trait CPPOps { b: Base =>
     (capture: Seq[Capture], f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I]) => Rep[J]): Rep[(A, B, C, D, E, F, G, H, I) => J] =
     Wrap[(A,B,C,D,E,F,G,H,I)=>J](__fun(f, 9, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)))),
                                    capture.map(unwrap): _*))
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest]
+    (capture: Seq[Capture], f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J]) => Rep[K]): Rep[(A, B, C, D, E, F, G, H, I, J) => K] =
+    Wrap[(A,B,C,D,E,F,G,H,I,J)=>K](__fun(f, 9, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9)))),
+                                   capture.map(unwrap): _*))
 }
 
 trait ExtendedCPPCodeGen extends ExtendedCCodeGen {
