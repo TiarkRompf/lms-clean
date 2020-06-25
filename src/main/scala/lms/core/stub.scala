@@ -486,6 +486,12 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()(effs.toSeq:_*))
   }
 
+  // full user control of the effects
+  def uncheckedEffect[T:Manifest](xs: Any*)(rkeys: Rep[_]*)(wkeys: Rep[_]*): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    val writeKeys = Adapter.CTRL +: wkeys.map(Unwrap)
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args: _*)(rkeys.map(Unwrap): _*)(writeKeys: _*))
+  }
 
   // Def[T]: FIXME(feiw) Do we still need them?
   implicit def toAtom[T:Manifest](x: Def[T]): Exp[T] = {
