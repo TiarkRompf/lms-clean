@@ -19,13 +19,7 @@ object Global {
 
 object Adapter extends FrontEnd {
 
-  // def emitScala(name: String)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
-  //   emitCommon(name, new ExtendedScalaCodeGen)(m1, m2)(prog)
-  // }
-
-  // def emitC(name: String)(m1:Manifest[_],m2:Manifest[_])(prog: Exp => Exp) = {
-  //   emitCommon(name, new ExtendedCCodeGen)(m1, m2)(prog)
-  // }
+  override def mkGraphBuilder() = new GraphBuilderOpt
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
@@ -46,7 +40,7 @@ object Adapter extends FrontEnd {
     typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
     funTable = Nil
 
-    var g = time("staging") { program(prog) }
+    var g: Graph = time("staging") { program(prog) }
 
     def extra() = if (verbose) utils.captureOut {
       println("// Raw:")
@@ -75,203 +69,18 @@ object Adapter extends FrontEnd {
       cg.extractAllStatics
     }
   }
-
-  override def mkGraphBuilder() = new MyGraphBuilder()
-
-  class MyGraphBuilder extends GraphBuilder {
-
-    override def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Set[Sym], Set[Sym]) =
-    findDefinition(latest(lw)) match {
-      case Some(Node(_, "array_set", as2, deps)) if (s == "array_set" && as.init == as2.init) =>
-        // If latest(lw) is setting the same array at the same index, we do not add hard dependence but soft dependence
-        // In addition, we need to inherite the soft and hard deps of latest(lw)
-        (deps.sdeps + latest(lw), deps.hdeps)
-      case _ => super.gatherEffectDepsWrite(s, as, lw, lr)
-    }
-
-    // def num[T](m: Manifest[T]): Numeric[T] = m match {
-    //   case t: Manifest[Int] => implicitly[Numeric[Int]]
-    //   case t: Manifest[Float] => implicitly[Numeric[Float]]
-    //   case _ => ???
-    // }
-
-    // def wrap[T:Manifest](x: Any): T = x.asInstanceOf[T]
-
-    // def isNum(x: Any) = x.isInstanceOf[Int] || x.isInstanceOf[Float]
-
-    override def rewrite(s: String, as: List[Def]): Option[Exp] = (s,as) match {
-      // staticData(as)(i) => staticData(as(i))
-      case ("array_get", List(Def("staticData", List(Const(as: Array[_]))), Const(i:Int))) =>
-        as(i) match {
-          case a: Int => Some(Const(a))
-          case a => Some(reflect("staticData", Const(a)))
-        }
-
-      // FIXME: Can we generalize that for mutable objects?
-      // as(i) = as(i) => ()   side condition: no write in-between!
-      case ("array_set", List(as:Exp, i, rs @ Def("array_get", List(as1: Exp, i1))))
-        if as == as1 && i == i1 && {
-          // rs is part of the list of read since the last write
-          curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined } =>
-        Some(Const(()))
-
-      // as(i) = rs; ...; as(i) = rs => as(i) = rs; ...; () side condition no write in-between
-      case ("array_set", List(as: Exp, i, rs)) if ({curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw)}) match {
-          case Some(Node(_, "array_set", List(as2, idx2, value2), _)) if (as == as2 && i == idx2 && value2 == rs) => true
-          case _ => false
-        }
-      }) => Some(Const(()))
-
-      // TODO: should be handle by the case below. However it doesn't because of aliasing issues!
-      // (x + idx)->i = (x + idx)->i => ()    side condition: no write in-between! (on x)
-      case ("reffield_set", List(Def("array_slice", (as: Exp)::idx::_), i, rs @ Def("reffield_get", List(Def("array_slice", (as1: Exp)::idx1::_), i1)))) =>
-        // System.out.println(s">>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
-        if (as == as1 && idx == idx1 && i == i1 && {
-            // rs is part of the list of read since the last write
-            // System.out.println(s">>> ${curEffects.get(as)}")
-            // System.out.println(s"  |->>> $as + $idx -> $i == $as1 + $idx1 -> $i1")
-            curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
-          Some(Const(()))
-        else None
-
-      // x-> i = x->i => ()    side condition: no write in-between!
-      case ("reffield_set", List(as:Exp, i, rs @ Def("reffield_get", List(as1: Exp, i1)))) =>
-        // System.out.println(s">>> $as -> $i == $as1 -> $i1")
-        if (as == as1 && i == i1 && {
-            // rs is part of the list of read since the last write
-            curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
-          Some(Const(()))
-        else
-          None
-
-      // x = x => ()    side condition: no write in-between!
-      case ("var_set", List(as:Exp, rs @ Def("var_get", List(as1: Exp)))) =>
-        // System.out.println(s">>> $as -> $i == $as1 -> $i1")
-        if (as == as1 && {
-            // rs is part of the list of read since the last write
-            curEffects.get(as).filter({ case (_, lrs) => lrs contains rs.asInstanceOf[Sym] }).isDefined })
-          Some(Const(()))
-        else
-          None
-
-      // [var] x = y; ....; x => [var] x = y; ....; y    side condition: no write in-between!
-      case ("var_get", List(as:Exp)) =>
-        curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw) collect {
-          case Node(_, "var_new", List(init: Exp), _) => init
-          case Node(_, "var_set", List(_, value: Exp), _) => value
-        }})
-
-      // x[i] = y; ....; x => x[i] = y; ....; y    side condition: no write in-between!
-      case ("array_get", List(as:Exp,i:Exp)) =>
-        curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw) collect {
-          case Node(_, "array_set", List(_, i2: Exp, value: Exp), _) if i == i2 => value
-        }})
-
-      case ("array_slice", List(as: Exp, Const(0), Const(-1))) => Some(as)
-      case ("array_length", List(Def("NewArray", Const(n)::_))) =>
-        Some(Const(n))
-      case ("array_length", List(Def("Array", List(Const(as: Array[_]))))) =>
-        Some(Const(as.length))
-
-      case ("String.length", List(Const(as: String))) =>
-        Some(Const(as.length))
-      case ("String.charAt", List(Const(as: String), Const(idx: Int))) =>
-        Some(Const(as.charAt(idx)))
-
-      case ("!", List(Const(b: Boolean))) => Some(Const(!b))
-      case ("==", List(Const(a: Double), _)) if a.isNaN => Some(Const(false))
-      case ("==", List(_, Const(b: Double))) if b.isNaN => Some(Const(false))
-      case ("==", List(Const(a), Const(b))) => Some(Const(a == b))
-      case ("!=", List(Const(a: Double), _)) if a.isNaN => Some(Const(true))
-      case ("!=", List(_, Const(b: Double))) if b.isNaN => Some(Const(true))
-      case ("!=", List(Const(a), Const(b))) => Some(Const(a != b))
-      case ("^", List(Const(a: Boolean), Const(b: Boolean))) => Some(Const(a ^ b))
-      case ("<=", List(Const(a: Int), Const(b: Int))) => Some(Const(a <= b))
-      case ("<=", List(Const(a: Float), Const(b: Float))) => Some(Const(a <= b))
-      case ("<=", List(Const(a: Long), Const(b: Long))) => Some(Const(a <= b))
-      case ("<=", List(Const(a: Double), Const(b: Double))) => Some(Const(a <= b))
-      // idea 1:
-      // case ("<=", List(Const(a), Const(b))) if isNum(a) => Some(Const(a.asInstanceOf[Double] <= b.asInstanceOf[Double]))
-      // idea 2:
-      //   implicit val m: Manifest[Int] = typeMap(Const(a)).asInstanceOf[Manifest[Int]]
-      //   val tmp = num[Int](m).lteq(wrap[Int](a), wrap[Int](b))
-      //   Some(Const(tmp))
-      // }
-      case (">=", List(Const(a: Int), Const(b: Int))) => Some(Const(a >= b))
-      case (">=", List(Const(a: Long), Const(b: Long))) => Some(Const(a >= b))
-      case (">=", List(Const(a: Float), Const(b: Float))) => Some(Const(a >= b))
-      case (">=", List(Const(a: Double), Const(b: Double))) => Some(Const(a >= b))
-      case ("<", List(Const(a: Int), Const(b: Int))) => Some(Const(a < b))
-      case ("<", List(Const(a: Long), Const(b: Long))) => Some(Const(a < b))
-      case ("<", List(Const(a: Float), Const(b: Float))) => Some(Const(a < b))
-      case ("<", List(Const(a: Double), Const(b: Double))) => Some(Const(a < b))
-      case (">", List(Const(a: Int), Const(b: Int))) => Some(Const(a > b))
-      case (">", List(Const(a: Long), Const(b: Long))) => Some(Const(a > b))
-      case (">", List(Const(a: Float), Const(b: Float))) => Some(Const(a > b))
-      case (">", List(Const(a: Double), Const(b: Double))) => Some(Const(a > b))
-
-      case ("?", c::(t: Block)::(e: Block)::_) if t.isPure && e.isPure && t.res == e.res => Some(t.res)
-      case ("?", (c: Sym)::(t: Block)::(e: Block)::_) if t.isPure && e.isPure => (t.res, e.res) match {
-        case (Const(t: Double), Const(e: Double)) if t.isNaN && e.isNaN => Some(Const(Double.NaN))
-        // c && true or c || false => if (c) true else false
-        // if (c) false else true
-        case (Const(t: Boolean), Const(e: Boolean)) /* if t != e */ => Some(if (t) c else reflect("!", c))
-        case _ => None
-      }
-
-      case _  =>
-        super.rewrite(s,as)
-    }
-
-    // From miniscala CPSOptimizer.scala
-    val leftNeutral: Set[(Any, String)] =
-      Set((0, "+"), (1, "*"), (~0, "&"), (0, "|"), (0, "^"))
-    val rightNeutral: Set[(String, Any)] =
-       Set(("+", 0), ("-", 0), ("*", 1), ("/", 1),
-           ("<<", 0), (">>", 0), (">>>", 0),
-           ("&", ~0), ("|", 0), ("^", 0))
-    val leftAbsorbing: Set[(Any, String)] =
-      Set((0, "*"), (0, "&"), (~0, "|"))
-    val rightAbsorbing: Set[(String, Any)] =
-      Set(("*", 0), ("&", 0), ("|", ~0))
-
-    val sameArgReduce: Map[String, Any] =
-      Map("-" -> 0, "/" -> 1, "%" -> 0, "^" -> 0,
-        "<=" -> true, ">=" -> true, "==" -> true,
-        "<" -> false, ">" -> false, "!=" -> false)
-
-    override def reflect(s: String, as: Def*): Exp = (s,as.toList) match {
-      case ("+", List(Const(a:Int),Const(b:Int))) => Const(a+b)
-      case ("-", List(Const(a:Int),Const(b:Int))) => Const(a-b)
-      case ("*", List(Const(a:Int),Const(b:Int))) => Const(a*b)
-      case ("/", List(Const(a:Int),Const(b:Int))) => Const(a/b)
-      case ("/", List(Const(a:Long),Const(b:Long))) => Const(a/b)
-      case ("/", List(Const(a:Double),Const(b:Double))) => Const(a/b)
-      case ("%", List(Const(a:Int),Const(b:Int))) => Const(a%b)
-      case (">>>", List(Const(a: Int),Const(b:Int))) => Const(a >>> b)
-      case (">>>", List(Const(a: Long),Const(b:Int))) => Const(a >>> b)
-      case ("<<",  List(Const(a: Int),Const(b:Int))) => Const(a << b)
-      case ("<<", List(Const(a: Long),Const(b:Int))) => Const(a << b)
-      case ("&", List(Const(a: Long),Const(b:Long))) => Const(a & b)
-      case (op, List(Const(x),b:Exp)) if leftNeutral((x, op)) => b
-      case (op, List(a:Exp,Const(x))) if rightNeutral((op, x)) => a
-      case (op, List(Const(x),b:Exp)) if leftAbsorbing((x, op)) => Const(x)
-      case (op, List(a:Exp,Const(x))) if rightAbsorbing((op, x)) => Const(x)
-      case (op, List(a,b)) if a == b && sameArgReduce.contains(op) => Const(sameArgReduce(op))
-
-      // TBD: can't just rewrite, need to reflect block!
-      // case ("?", List(Const(true),a:Block,b:Block)) => a
-
-      // for now we implement the front-end method as a
-      // a smart constructor (might revisit later)
-
-      case p =>
-        super.reflect(s, as:_*)
-    }
-  }
-
 }
 
+/**
+ * Base trait:
+ * 1. definition of iconic Rep[T] and Var[T]
+ * 2. Wrap[T] and Unwrap[T] using Adapter.typeMap to track Rep[T] and metalevel
+ * 3. handing of recursive function definition via Adapter.funTable
+ * 4. control flows such as conditional, loop (with @virtualize macro)
+ * 5. other basics: misc, print, unchecked, timer, et al.
+ * 6. other extentions are at later part of this file or can be extended by DSL writer
+ *    including UtilOps, RangeOps, Equal, OrderingOps, PrimitiveOps, LiftPrimitiveOps, et al.
+ */
 trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompare {
   type Rep[+T] = Exp[T];
 
@@ -352,7 +161,71 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       Wrap[E](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w))()())
   }
 
-  def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]): Rep[(A, B, C, D, E) => F] =
+    Wrap[(A,B,C,D,E)=>F](__fun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]): Rep[(A, B, C, D, E) => F] = fun(f)
+  implicit class FunOps5[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: Rep[(A,B,C,D,E) => F]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E]): Rep[F] =
+      Wrap[F](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]): Rep[(A, B, C, D, E, F) => G] =
+    Wrap[(A,B,C,D,E,F)=>G](__fun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]): Rep[(A, B, C, D, E, F) => G] = fun(f)
+  implicit class FunOps6[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: Rep[(A,B,C,D,E,F) => G]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F]): Rep[G] =
+      Wrap[G](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G]) => Rep[H]):
+    Rep[(A, B, C, D, E, F, G) => H] =
+    Wrap[(A,B,C,D,E,F,G)=>H](__fun(f, 7, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G]) => Rep[H]):
+    Rep[(A, B, C, D, E, F, G) => H] = fun(f)
+  implicit class FunOps7[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest](f: Rep[(A,B,C,D,E,F,G) => H]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G]): Rep[H] =
+      Wrap[H](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]):
+    Rep[(A, B, C, D, E, F, G, H) => I] =
+    Wrap[(A,B,C,D,E,F,G,H)=>I](__fun(f, 8, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]):
+    Rep[(A, B, C, D, E, F, G, H) => I] = fun(f)
+  implicit class FunOps8[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: Rep[(A,B,C,D,E,F,G,H) => I]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G], n: Rep[H]): Rep[I] =
+      Wrap[I](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m),Unwrap(n))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I]) => Rep[J]) =
+    Wrap[(A,B,C,D,E,F,G,H,I)=>J](__fun(f, 8,
+      xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I]) => Rep[J]) = fun(f)
+  implicit class FunOps9[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest](f: Rep[(A,B,C,D,E,F,G,H,I) => J]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G], n: Rep[H], o: Rep[I]): Rep[J] =
+      Wrap[J](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m),Unwrap(n),Unwrap(o))()())
+  }
+
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J]) => Rep[K]) =
+    Wrap[(A,B,C,D,E,F,G,H,I,J)=>K](__fun(f, 9,
+      xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9))))))
+
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J]) => Rep[K]) = fun(f)
+  implicit class FunOps10[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest](f: Rep[(A,B,C,D,E,F,G,H,I,J) => K]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G], n: Rep[H], o: Rep[I], p: Rep[J]): Rep[K] =
+      Wrap[K](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m),Unwrap(n),Unwrap(o),Unwrap(p))()())
+  }
+
+  def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, captures: Backend.Exp*): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
       case Some((funSym, _)) =>
@@ -374,7 +247,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
         // Step 3. build the "λ" node with fn1 as the function name
         //    fix the funTable such that it pairs (fn1, can) for non-recursive uses.
-        val res = Adapter.g.reflect(fn1,"λ",block)(hardSummary(fn))
+        val res = Adapter.g.reflect(fn1,"λ",(block+:captures):_*)(hardSummary(fn))
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }
@@ -613,6 +486,12 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args:_*)()(effs.toSeq:_*))
   }
 
+  // full user control of the effects
+  def uncheckedEffect[T:Manifest](xs: Any*)(rkeys: Rep[_]*)(wkeys: Rep[_]*): Rep[T] = {
+    val (strings, args, effs) = uncheckedHelp(xs)
+    val writeKeys = Adapter.CTRL +: wkeys.map(Unwrap)
+    Wrap[T](Adapter.g.reflectEffect("unchecked" + strings, args: _*)(rkeys.map(Unwrap): _*)(writeKeys: _*))
+  }
 
   // Def[T]: FIXME(feiw) Do we still need them?
   implicit def toAtom[T:Manifest](x: Def[T]): Exp[T] = {
@@ -656,131 +535,6 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // def implicit_convert[A:Manifest,B:Manifest](a: Rep[A]): Rep[B] = Wrap[B](Adapter.g.reflect("convert", Unwrap(a)))
 }
 
-
-trait Dsl extends PrimitiveOps with LiftPrimitives with Equal with RangeOps with OrderingOps with lms.collection.mutable.ArrayOps with UtilOps {
-
-  class SeqOpsCls[T](x: Rep[Seq[Char]])
-  implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
-}
-
-// FIXME(feiw) I want to get rid of DslExp, DslGen, DslImpl, and DslGenC but failed to do so for now.
-trait DslExp extends Dsl with PrimitiveOpsExpOpt with NumericOpsExpOpt with BooleanOpsExp
-    with IfThenElseExpOpt with EqualExpBridgeOpt with RangeOpsExp with OrderingOpsExp
-    with MiscOpsExp with EffectExp with ArrayOpsExpOpt with StringOpsExp with SeqOpsExp
-    with FunctionsRecursiveExp with WhileExp with StaticDataExp with VariablesExpOpt
-    with ObjectOpsExpOpt with UtilOpsExp
-
-trait DslGen extends ScalaGenNumericOps
-    with ScalaGenPrimitiveOps with ScalaGenBooleanOps with ScalaGenIfThenElse
-    with ScalaGenEqual with ScalaGenRangeOps with ScalaGenOrderingOps
-    with ScalaGenMiscOps with ScalaGenArrayOps with ScalaGenStringOps
-    with ScalaGenSeqOps with ScalaGenFunctions with ScalaGenWhile
-    with ScalaGenStaticData with ScalaGenVariables
-    with ScalaGenObjectOps
-    with ScalaGenUtilOps {
-  val IR: DslExp
-  import IR._
-}
-
-trait DslImpl extends DslExp { q =>
-  val codegen = new DslGen {
-    val IR: q.type = q
-  }
-}
-
-// TODO: currently part of this is specific to the query tests. generalize? move?
-trait DslGenC extends CGenBase with CGenNumericOps
-    with CGenPrimitiveOps with CGenBooleanOps with CGenIfThenElse
-    with CGenEqual with CGenRangeOps with CGenOrderingOps
-    with CGenMiscOps with CGenArrayOps with CGenStringOps
-    with CGenSeqOps with CGenFunctions with CGenWhile
-    with CGenStaticData with CGenVariables
-    with CGenObjectOps
-    with CGenUtilOps {
-  val IR: DslExp
-  import IR._
-}
-
-
-
-abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
-  def wrapper(x: Rep[A]): Rep[B] = snippet(x)
-  def snippet(x: Rep[A]): Rep[B]
-}
-
-// @virtualize
-abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl {
-  lazy val f = { val (c1,s1) = (code,statics); time("scalac") { Global.sc.compile[A,B]("Snippet", c1, s1) }}
-
-  def precompile: Unit = f
-
-  def precompileSilently: Unit = utils.devnull(f)
-
-  def eval(x: A): B = { val f1 = f; time("eval")(f1(x)) }
-
-  val prelude = ""
-
-  lazy val (code, statics) = {
-    val source = new java.io.ByteArrayOutputStream()
-    source.write(prelude.getBytes)
-    val statics = codegen.emitSource(wrapper, "Snippet", new java.io.PrintStream(source))
-    (source.toString, statics)
-  }
-}
-
-abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] with DslExp { q =>
-  val codegen = new DslGenC {
-    val IR: q.type = q
-  }
-  lazy val (code, statics) = {
-    val source = new java.io.ByteArrayOutputStream()
-    val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
-    (source.toString, statics)
-  }
-  var compilerCommand = "cc -std=c99 -O3"
-  def libraries = codegen.libraryFlags mkString(" ")
-  lazy val f: A => Unit = {
-    // TBD: should read result of type B?
-    val out = new java.io.PrintStream("/tmp/snippet.c")
-    out.println(code)
-    out.close
-    (new java.io.File("/tmp/snippet")).delete
-    import scala.sys.process._
-    val includes =
-      if (codegen.includePaths.isEmpty) ""
-      else s"-I ${codegen.includePaths.mkString(" -I ")}"
-    val pb: ProcessBuilder = s"$compilerCommand /tmp/snippet.c -o /tmp/snippet $libraries $includes"
-    time("gcc") { pb.lines.foreach(Console.println _) }
-    (a: A) => (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
-  }
-  def eval(a: A): Unit = { val f1 = f; time("eval")(f1(a)) }
-}
-
-trait ScalaGenBase extends ExtendedScalaCodeGen {
-  val IR: Base
-  import IR._
-  implicit class CodegenHelper(sc: StringContext) {
-    def src(args: Any*): String = ???
-  }
-  def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A: Manifest, B: Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
-    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
-    statics.toList
-  }
-}
-
-trait CGenBase extends ExtendedCCodeGen {
-  val IR: Base
-  import IR._
-  def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
-  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
-    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
-    statics.toList
-  }
-}
-
-
-// Useful Extension of Base
 trait UtilOps extends Base {
   type Typ[T] = Manifest[T]
   def typ[T:Typ] = manifest[T]
@@ -881,7 +635,6 @@ trait RangeOps extends Equal {
   }
 }
 
-
 trait Equal extends Base {
   def infix_==[A,B](a: Rep[A], b: Rep[B])(implicit o: Overloaded1, mA: Manifest[A], mB: Manifest[B], pos: SourceContext) : Rep[Boolean] = equals(a,b)
   def infix_==[A,B](a: Rep[A], b: Var[B])(implicit o: Overloaded2, mA: Manifest[A], mB: Manifest[B], pos: SourceContext) : Rep[Boolean] = equals(a, b)
@@ -942,7 +695,6 @@ trait OrderingOps extends Base with OverloadHack {
   def ordering_min     [T:Ordering:Manifest](lhs: Rep[T], rhs: Rep[T])(implicit pos: SourceContext): Rep[T]       = Wrap[T]      (Adapter.g.reflect("min", Unwrap(lhs), Unwrap(rhs)))
   def ordering_compare [T:Ordering:Manifest](lhs: Rep[T], rhs: Rep[T])(implicit pos: SourceContext): Rep[Int]     = Wrap[Int]    (Adapter.g.reflect("compare", Unwrap(lhs), Unwrap(rhs)))
 }
-
 
 trait LiftPrimitives {
   this: PrimitiveOps =>
@@ -1370,6 +1122,111 @@ trait PrimitiveOps extends Base with OverloadHack {
 
 }
 
+
+/**
+ * Here we show how a Domain Specific Language (DSL) is built.
+ * 1. Define a Dsl trait that collects the frontend trait needed (richer DSL can simply extend this Dsl with more traits)
+ * 2. Define a DslDriver that extends the Dsl (DslExp in this case)
+ *                       has a `val codegen` of DslGen where the IR in DslGen binds to the DslDrive itself via
+ *                          ``` val IR: q.type = q ```
+ * 3. For extension, define a DslDriverX that extends DslDriver with more frontent traits.
+ *                   has a `val codegen` that is new DslGen with more codegen traits.
+ */
+trait Dsl extends PrimitiveOps with LiftPrimitives with Equal with RangeOps with OrderingOps with lms.collection.mutable.ArrayOps with UtilOps {
+
+  class SeqOpsCls[T](x: Rep[Seq[Char]])
+  implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
+}
+trait DslExp extends Dsl // For backward compatibility
+trait DslCPP extends Dsl with CPPOps
+
+
+trait DslGen extends ExtendedScalaCodeGen {
+  val IR: Base
+  import IR._
+  implicit class CodegenHelper(sc: StringContext) {
+    def src(args: Any*): String = ???
+  }
+  def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
+  def emitSource[A: Manifest, B: Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
+    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
+    statics.toList
+  }
+}
+
+trait DslGenC extends ExtendedCCodeGen {
+  val IR: Base
+  import IR._
+  def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
+  def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
+    val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
+    statics.toList
+  }
+}
+
+trait DslGenCPP extends DslGenC with ExtendedCPPCodeGen
+
+abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
+  def wrapper(x: Rep[A]): Rep[B] = snippet(x)
+  def snippet(x: Rep[A]): Rep[B]
+}
+
+// Basic DslDriver for Scala CodeGen
+abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslExp { q =>
+  val codegen = new DslGen {
+    val IR: q.type = q
+  }
+  lazy val (code, statics) = {
+    val source = new java.io.ByteArrayOutputStream()
+    val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
+    (source.toString, statics)
+  }
+  lazy val f = { val (c1,s1) = (code,statics); time("scalac") { Global.sc.compile[A,B]("Snippet", c1, s1) }}
+
+  def precompile: Unit = f
+
+  def precompileSilently: Unit = utils.devnull(f)
+
+  def eval(x: A): B = { val f1 = f; time("eval")(f1(x)) }
+}
+
+// Basic DslDriverC for C CodeGen
+abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] with DslExp { q =>
+  val codegen = new DslGenC {
+    val IR: q.type = q
+  }
+  lazy val (code, statics) = {
+    val source = new java.io.ByteArrayOutputStream()
+    val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
+    (source.toString, statics)
+  }
+  var compilerCommand = "cc -std=c99 -O3"
+  def libraries = codegen.libraryFlags mkString(" ")
+  lazy val f: A => Unit = {
+    // TBD: should read result of type B?
+    val out = new java.io.PrintStream("/tmp/snippet.c")
+    out.println(code)
+    out.close
+    (new java.io.File("/tmp/snippet")).delete
+    import scala.sys.process._
+    val includes =
+      if (codegen.includePaths.isEmpty) ""
+      else s"-I ${codegen.includePaths.mkString(" -I ")}"
+    val pb: ProcessBuilder = s"$compilerCommand /tmp/snippet.c -o /tmp/snippet $libraries $includes"
+    time("gcc") { pb.lines.foreach(Console.println _) }
+    (a: A) => (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
+  }
+  def eval(a: A): Unit = { val f1 = f; time("eval")(f1(a)) }
+}
+
+// Basic DslDriverCPP for CPP CodeGen
+abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] with CPPOps { q =>
+  override val codegen = new DslGenCPP {
+    val IR: q.type = q
+  }
+  compilerCommand = "g++ -std=c++17 -O3"
+}
+
 // These empty traits have to be here for backward compatibility :(
 trait MiscOps
 trait StringOps
@@ -1409,6 +1266,8 @@ trait ObjectOpsExpOpt
 trait UncheckedOpsExp
 trait UtilOpsExp
 
+trait CGenBase extends DslGenC
+trait ScalaGenBase extends DslGen
 trait ScalaGenNumericOps extends ScalaGenBase
 trait ScalaGenPrimitiveOps extends ScalaGenBase
 trait ScalaGenBooleanOps extends ScalaGenBase

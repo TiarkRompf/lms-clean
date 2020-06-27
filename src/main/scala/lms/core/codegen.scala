@@ -132,6 +132,10 @@ trait ExtendedCodeGen {
 
 abstract class CompactCodeGen extends CompactTraverser {
 
+  // In code gen of recursive function (with x2 = lambda_forward(x3)), it is tempting to replace
+  // all uses of x2 with x3, so that we don't explicitly have the lambda_forward symbol as forward declaration.
+  // This is however, potentially wrong for mutual recursive functions in some case (check the DFA tutorial tests)
+
   // process and print block results
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
     wraper(numStms, lastNode, y) {

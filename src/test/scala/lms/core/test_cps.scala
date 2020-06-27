@@ -11,7 +11,11 @@ import java.io.PrintWriter
 import scala.util.continuations._
 import scala.util.continuations
 
-abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslImpl with CompileScala {
+abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslExp with CompileScala { q =>
+  val codegen = new DslGen {
+    val IR: q.type = q
+  }
+
   Adapter.typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
   Adapter.funTable = Nil
 

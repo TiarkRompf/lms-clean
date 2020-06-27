@@ -249,11 +249,13 @@ case class PVar(x: Sym) extends Pattern
 case class PTuple(xs: List[Pattern]) extends Pattern
 
 class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
-  // val rename = new mutable.HashMap[Sym,String]
+
   var lastNL = false
   override def emit(s: String): Unit = { stream.print(s); lastNL = false }
   override def emitln(s: String = "") = if (s != "" || !lastNL) { stream.println(s); lastNL = true }
 
+  // these sub-methods for printing types are not necessary, since we are
+  // overriding the main method: remap
   def array(innerType: String): String = ""
   def primitive(rawType: String): String = ""
   def record(man: RefinedManifest[_]): String = ""
@@ -277,7 +279,12 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     }
   }
 
-  val nameMap: Map[String, String] = Map( // FIXME: tutorial-specific
+  // nameMap is a map from node op names to the valid target language operations
+  // the correct logic is when adding new node ops for a certain domain (in DSL),
+  // the codegen should be extended to handle the generation of those ops.
+  // this following nameMap is specific to a tutorial, and should be moved
+  // to that tutorial. FIXME(feiw)
+  val nameMap: Map[String, String] = Map(
     "ScannerNew"     -> "new scala.lms.tutorial.Scanner",
     "ScannerHasNext" -> "Scanner.hasNext",
     "ScannerNext"    -> "Scanner.next",
@@ -318,7 +325,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
   override def quoteBlock(b: Block, emitType: Boolean = false): Unit = {
     def eff = quoteEff(b.ein)
     if (b.in.length == 0) {
-      quoteBlock(traverse(b)) //FIXME(GW): discard eff if arg length == 0?
+      quoteBlock(traverse(b))
     } else {
       val argsStr = b.in.map({ arg =>
         val tp = if (emitType) s": ${remap(typeMap.getOrElse(arg, manifest[Unknown]))}" else ""

@@ -79,3 +79,6 @@ trait CCodeGenLibFunction extends ExtendedCCodeGen {
     case _ => super.shallow(n)
   }
 }
+
+trait CLibs extends Base with CMacro with LibStruct with LibFunction
+trait CCodeGenLibs extends CCodeGenCMacro with CCodeGenLibStruct with CCodeGenLibFunction
