@@ -66,7 +66,7 @@ class CPSScalaCodeGen extends CPSTraverser {
       k
 
     // "λforward" is the used for recursive functions (as a function name declaration)
-    case n @ Node(s,"λforward",List(x), _) =>
+    case n @ Node(s,"λforward",List(x, arity), _) =>
       emitln(s"lazy val $s = ${quote(x)} _"); k
 
     // application needs to be split into 2 cases: function appliation and continuation application
