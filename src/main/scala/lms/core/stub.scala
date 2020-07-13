@@ -1205,9 +1205,11 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
   }
   var compilerCommand = "cc -std=c99 -O3"
   def libraries = codegen.libraryFlags mkString(" ")
+
+  val fileForRun = "/tmp/snippet.c"
   lazy val f: A => Unit = {
     // TBD: should read result of type B?
-    val out = new java.io.PrintStream("/tmp/snippet.c")
+    val out = new java.io.PrintStream(fileForRun)
     out.println(code)
     out.close
     (new java.io.File("/tmp/snippet")).delete
@@ -1215,7 +1217,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     val includes =
       if (codegen.includePaths.isEmpty) ""
       else s"-I ${codegen.includePaths.mkString(" -I ")}"
-    val pb: ProcessBuilder = s"$compilerCommand /tmp/snippet.c -o /tmp/snippet $libraries $includes"
+    val pb: ProcessBuilder = s"$compilerCommand $fileForRun -o /tmp/snippet $libraries $includes"
     time("gcc") { pb.lines.foreach(Console.println _) }
     (a: A) => (s"/tmp/snippet $a": ProcessBuilder).lines.foreach(Console.println _)
   }
