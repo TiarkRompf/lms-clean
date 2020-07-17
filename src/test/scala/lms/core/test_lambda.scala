@@ -98,16 +98,6 @@ class LambdaTest extends TutorialFunSuite {
     check("lambda_05", driver.code, "scala")
   }
 
-  // test("nameless_lambda") {
-  //   val driver = new DslDriver[Int,Unit] {
-  //     @virtualize
-  //     def snippet(arg: Rep[Int]) = {
-  //       printf("%d\n", (fun[Int, Int] { (n: Rep[Int]) => n + 1 })(arg))
-  //     }
-  //   }
-  //   System.out.println(indent(driver.code))
-  // }
-
   // Test for lambdas returned in conditionals
   test("returned_lambda_0") {
     val driver = new DslDriver[Int,Unit] {
@@ -315,9 +305,9 @@ class LambdaTest extends TutorialFunSuite {
     check("lambda_closure_2", driver.code, "scala")
   }
 
-  // FIXME(feiw): need tuple support from Guannan's PR
+  // FIXME(feiw): need to add more cases in getFunctionLatentEffect (backend.scala line 385)
   // test("lambda_closure_3") {
-  //   val driver = new DslDriver[Int, Unit] {
+  //   val driver = new DslDriver[Int, Unit] with lms.collection.immutable.TupleOps {
   //     @virtualize
   //     def snippet(arg: Rep[Int]) = {
   //       val f = fun { (n: Rep[Int]) =>
@@ -407,5 +397,44 @@ class LambdaTest extends TutorialFunSuite {
       driver.eval(1)
       driver.eval(2)
     })
+  }
+
+  test("recursion_lambda_forward_effect") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(a: Rep[Int]) = {
+        lazy val f: Rep[(Int, Array[Int]) => Unit] = fun { (c: Rep[Int], x: Rep[Array[Int]]) =>
+          printf("%d\n", x(c))
+          if (c > 0) {
+            val na = Array(c,c,c,c,c)
+            na(c-1) = 100 // this line of code should not be removed!
+            f(c-1, na)
+          }
+        }
+        val arr = Array(1,1,1,1,1)
+        f(3, arr)
+      }
+    }
+    checkOut("recursion_lambda_forward_effect", "scala", {
+      println(driver.code)
+      println("// output:")
+      driver.eval(7)
+    })
+  }
+
+  test("mutual_recursion") {
+    val driver = new DslDriver[Int,Unit] {
+      @virtualize
+      def snippet(a: Rep[Int]) = {
+        lazy val odd: Rep[Int=>Boolean] = fun { (x: Rep[Int]) =>
+          if (x == 1) true else even(x - 1)
+        }
+        lazy val even: Rep[Int=>Boolean] = fun { (x: Rep[Int]) =>
+          if (x == 0) true else odd(x - 1)
+        }
+        printf("%d", even(a))
+      }
+    }
+    check("mutual_recursion", driver.code, "scala")
   }
 }
