@@ -24,3 +24,7 @@ typed expressions in the input program evaluate to LMS IR. This can be considere
 Then the LMS backend compiles the LMS IR to target programs.
 
 [LMS Core](https://github.com/TiarkRompf/lms-clean/doc/main/scala/lms/core/backend.md)
+
+[LMS Simple Frontend](https://github.com/TiarkRompf/lms-clean/doc/main/scala/lms/core/frontend.md)
+
+[LMS Frontend](https://github.com/TiarkRompf/lms-clean/doc/main/scala/lms/core/stub.md)
