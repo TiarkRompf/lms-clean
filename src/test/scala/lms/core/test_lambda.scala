@@ -437,4 +437,23 @@ class LambdaTest extends TutorialFunSuite {
     }
     check("mutual_recursion", driver.code, "scala")
   }
+
+  test("be_careful_with_lazy") {
+    val driver = new DslDriver[Int, Unit] {
+      @virtualize
+      def snippet(a: Rep[Int]) = {
+        // if the fun1 is `lazy val` the generated code has
+        // 2 instances of the fun2 code, since the `lazy val`
+        // semantics changes the canonicanize result of `fun2`
+        val fun1 = fun { (x: Rep[Int], y: Rep[Int]) =>
+          x + y
+        }
+        def fun2: Rep[Int => Int] = fun { (x: Rep[Int]) =>
+          if (x == 1) 1 else fun1(fun2(x/2), fun2(x/2))
+        }
+        printf("%d %d", fun2(a), fun2(a))
+      }
+    }
+    check("be_careful_with_lazy", driver.code, "scala")
+  }
 }
