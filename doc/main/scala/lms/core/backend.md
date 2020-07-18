@@ -1,39 +1,55 @@
-## LMS IR
+# LMS IR
 
-In the file core/backend.scala, object Backend, the core LMS IR is described.
+In the file lms/core/backend.scala, the core LMS IR is defined in `object Backend`.
 
-\begin{listing}[scala]
+``` scala
 abstract class Def // Definition: used in right-hand-side of all nodes
 abstract class Exp extends Def
 case class Sym(n: Int) extends Exp   // Symbol
 case class Const(x: Any) extends Exp // Constant
 case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def
 case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary)
-\end{listing}
+```
 
-\subsection{Sea Of Nodes}\label{sec:node}
+## Sea Of Nodes
 
-The LMS IR follows the ``sea of nodes'' design (cite?), where the IR is composed of
-a list of \texttt{Node}s, and the \texttt{Block}s do not explicitly scope the nodes.
-Instead, the \texttt{Block}s describe their \emph{inputs} (via \texttt{in: List[Sym]}),
-\emph{result} (via \texttt{res: Exp}), \emph{input-effect} (via \texttt{ein: Sym}), and
-\emph{effects} (via \texttt{eff: EffectSummary}).
+The LMS IR follows the "sea of nodes" design (citations?), where the IR is composed of
+a list of `Node`s, and the `Block`s do not explicitly scope the nodes.
+That is to say, instead of explicitly scoping the IR constructs that should stay in a `Block`,
+the `Block` implicitly express the IR constructs within it via describing the
+`inputs` to the `Block` (`in: List[Sym]`), the `results` of the `Block` (`res: Exp`),
+the `input-effect` of the `Block` (`ein: Sym`), and the `effects` of the `Block`
+(`eff: EffectSummary`).
 
-Using ``sea of nodes'' has perfound implications to LMS IR. The advantage is that
-the scopes of nodes are determined dynamically based on correctness and using frequency,
-which allows easy code-motion and optimization. However, using ``sea of nodes'' means that
-we must have a way to dynamically determine what nodes are in each block. We compute that
-based on \emph{dependencies}.  It does make IR traversal and transformation different from
-IRs with explicit scopes, which we will talk about in core/traversal.scala.
+### Graph Dependencies
 
-Dependencies controls how nodes are scheduled. There are some simple rules about it.
-If node A depends on node B, then scheduling A means B must be scheduled before A.
-If a block's results or effects depend on node A, then A must be schedule within or before this block.
-If a node depends on the input-effect or the inputs of a block, then the node is bound by
-this block (i.e., it must be scheduled within this block or an inner block).
+But how do the effects help scoping the nodes in a block? The details are in the lms/core/travers.scala
+file but we can talk about it in the high level for now.
+
+Generally speaking, the `Node`s in the LMS IR constructs a graph that shows the *data dependencies*
+among all `Node`s. However, data dependency is not the only dependency that should be respected.
+Another important dependency is *control dependency*. For instance, when there are two print
+`Node`s in the LMS IR, both should be generated and in the same order. When there is a mutable variable
+in the LMS IR, a write `Node` and then a read `Node`, then the read `Node` clearly depends on the
+write `Node`. This is not data dependency because the mutable variable already exists before the
+write `Node`.
+
+While data dependencies are captured in the graph structure, the control dependencies have to be
+captured in other means. LMS core handles control dependencies by tracking the effects of nodes and
+blocks (printing, variable read, variable write, et al), and then computed control dependencies based
+on the effects of all nodes/blocks. Effects of nodes and blockes are
+expressed via accompanying `EffectSummary`. Both dependencies contribute to code scheduling. Here are
+a few simple rules:
+1. If node A uses node B, then scheduling A means B must be scheduled before A.
+2. If a block's results or effects depend on node A, then A must be schedule within or before this block.
+3. If a node depends on the inputs or input-effect of a block, then the node is bound by
+this block (i.e., it must be scheduled within this block).
+
+### Example: One Effect System
 
 Here is one example of scala snippet:
-\begin{listing}[scala]
+
+``` scala
 def snippet(x: Int, y: Int) = {
   var idx = 0
   var agg = 0
@@ -44,11 +60,13 @@ def snippet(x: Int, y: Int) = {
   }
   agg
 }
-\end{listing}
-If we determine that every statement from this snippet depends on its previous statement,
+```
+
+If we determine that every statement from this snippet depends on its previous statement
+(there is one kind of effect -- the original order of LMS IR creation),
 we can have a list of nodes and blocks with the following dependencies.
 
-\begin{listing}[scala]
+``` scala
 Graph(nodes, Block([x0, x1], x19, x2, [dep: x19]))
 
 nodes = [
@@ -73,7 +91,7 @@ nodes = [
 
   x19 = "var_get" x4  [dep: x18]
 ]
-\end{listing}
+```
 
 In this example, we first have two nodes that declare to new variables (x3 and x4).
 Then we have a while loop (x18) that has two blocks (the condition block and the
@@ -84,92 +102,41 @@ The while loop node depends on x4, and the final node x19 depends on x18.
 Thus a linear ordering of all nodes with two blocks is fully determined by the
 dependencies.
 
-% If a node depends on the inputs of a block, very likely it has to be scheduled in the block
-% too. So both inputs and world are scoping the beginning of the block. That is why the world
-% is also called the ``effect input''.
-% So if the world marks the beginning of a block, which component of the Block marks the
-% end of a block? The answer is the result and the effects of the block. When scheduling the
-% nodes for a block, we can start from the result and effects, and pick nodes that are depended
-% on by them.
+### Example: Effects in Categories
 
-\subsection{Effects in Categories}
+To make our effect summary more fine-grained (so that more interesting code reordering and
+optimization can be introduced), the first step is to realize that there are different
+kinds of effects. The effects of printing is clearly not so related to the effect of variable
+reading, thus there should be no scheduling enforcement between them.
+We chose to support the following categories of effects:
 
-In Section~\ref{sec:node}, we talked about the dependencies between nodes and blocks
-(via EffectSummary). In that example, the effect summary simply stores the depdendencies of the nodes.
-That is a very coarse-grained effect summary, and more fine-grained effect summaries can offer
-more optimization and flexible code motions. But before going into the details of the fine-grained
-effect summary, let's first get clear of two related and intertwined concepts: effects and dependencies.
-
-Effects refer to node behaviors such as printing, variable read, variable write, et al.
-Dependencies refer to both data dependencies and dependencies caused by effects, such as
-printing cannot be missed or reordered, and we cannot reorder two writes on the same variable.
-The general work flow is that at node constructions, the effects of nodes are tracked. using
-the node effects we compute the dependencies. The dependencies are then used to schedule nodes
-for each block.
-
-To make our effect summary more fine-grained, the first step is to realize that there are different
-kinds of effects. The effects of printing is clearly not so related to the effect of variable reading,
-thus there should be no scheduling enforcement between them. We chose to support the following categories
-of effects:
-
-\begin{enumerate}
-\item Statements that create mutable objects belong to the category keyed by STORE.
-\item Statements that read/write a mutable object belong to the category keyed by the symbol of this object
+1. Statements that create mutable objects belong to the category keyed by STORE.
+2. Statements that read/write a mutable object belong to the category keyed by the symbol of this object
       (result of an allocation node).
-\item For all remaining effectful statements (such as printf), they belong to the category keyed by CTRL
+3. For all remaining effectful statements (such as printf), they belong to the category keyed by CTRL
      (for control flow dependent).
-\end{enumerate}
 
-\subsubsection{Latent Effects}
-Effects can be latent, such as the effects of a function block. The function block may have printing
-statements and variable reads/writes, but they are not happening until they are called in function
-applications. Tracking latent effects can be tricky if we allow first-order functions, where functions
-can be returned from other functions and control flows, passed in as parameters, and stored in data
-structures such as arrays, lists, and et al.
-
-\subsubsection{Aliasing and Borrowing}
-Handling the read and write effects of data structures can be really tricky too, when considering
-aliasing and borrowing.
-
-\begin{listing}[scala]
-// aliasing
-val arr = new Array[Int](10)
-val arr2 = arr.slice(0, 5)
-arr2(0) = 5
-printf("%d\n", arr(0))
-
-// borrowing
-val arr = new Array[Int](10)
-var arr2 = arr
-arr2(0) = 5
-printf("%d\n", arr(0))
-\end{listing}
-
-These are currently unsolved problems in LMS clean :).
-
-\subsubsection{From Effects to Dependencies}
+#### From Effects to Dependencies
 
 After collection read and write effects, we need to compute dependencies from them. The
 rules for computing dependencies from effects are listed below:
 
-\begin{enumerate}
-\item Read-After-Write (RAW): there should be a hard dependency from R to W,
-  since the correctness of the R depends on the W to be scheduled)
-\item Write-After-Read (WAR): there should be a soft dependency from W to R,
+1. Read-After-Write (RAW): there should be a hard dependency from R to W,
+   since the correctness of the R depends on the W to be scheduled)
+2. Write-After-Read (WAR): there should be a soft dependency from W to R,
   since the correctness of the W does not depend on the R to be scheduled, but the order of them matters.
-\item Write-After-Write (WAW): the first idea is to generate a soft dependency,
+3. Write-After-Write (WAW): the first idea is to generate a soft dependency,
   since the second W simply overwrite the first W.
   However, write to array is more complicated, such as arr(0) = 1; arr(1) = 2,
   where the second W doesn’t overwrite the first W, and both Ws have to be generated.
   For now, we just issue a hard dependency from the second W to the first W.
-\item Read-After-Read (RAR): there is no effect dependency between them.
-\end{enumerate}
+4. Read-After-Read (RAR): there is no effect dependency between them.
 
 Note that we introduced soft dependencies in the rules.
 Soft dependencies are soft in the sense that, if node A soft-depends on node B,
 node B cannot be scheduled after A. However, scheduling A does not ensure that B is scheduled.
 
-\subsubsection{Const Effects}
+#### Const Effects
 
 The STORE and CTRL keys are also handled in our read/write system in a case-by-case manner.
 For instances, allocating heap memory can be modeled as a read on the STORE key,
@@ -182,16 +149,88 @@ It really depends on the expected behavior.
 More details about effect system can be found and Gregory's write up:
 \url{https://hackmd.io/_-VGqPBiR3qToam7YTDdRw?view}.
 
-\section{Building EffectSummary in LMS Graph}
+#### Latent Effects
+
+Effects can be latent, such as the effects of a function block. The function block may have printing
+statements and variable reads/writes, but they are not happening until they are called in function
+applications. Tracking latent effects can be tricky if we allow first-order functions, where functions
+can be returned from other functions and control flows, passed in as parameters, and stored in data
+structures such as arrays, lists, and et al. The current approach in LMS_clean doesn't support
+first-order functions. LMS application using first-order functions in LMS IR will trigger errors in
+Latent Effect analysis.
+
+#### Effects in Data Structures
+
+LMS IR supports `Array`, which is a mutable data structure holding a fixed number of same typed elements
+in consecutive memory. The effects on arrays are at the whole-array granularity (reading and writing to
+an element is treated as reading and writing to the whole array). This is less idea.
+
+LMS IR also supports other data strucutures (including `List`, `Tuple`, `Map`, et al). These data
+structures are immutable, pure data structures, thus no effects are needed to use them.
+
+### Watch Out (Silent Failures in Effect System)
+
+The current LMS-clean effect system cannot handle, and silently fails on applications with Aliasing.
+Taking the following two code snippet as examples.
+
+``` scala
+// aliasing
+val arr = new Array[Int](10)
+val arr2 = arr.slice(0, 5)
+arr2(0) = 5
+printf("%d\n", arr(0))
+```
+
+``` scala
+// borrowing
+val arr = new Array[Int](10)
+var arr2 = arr
+arr2(0) = 5
+printf("%d\n", arr(0))
+```
+
+In both examples, the write effects on `arr2` should be on `arr` as well. However, without alias
+analysis, LMS-clean is not aware that the write effects on `arr2` is on `arr`. As a result, the
+write node is discarded in the generated code. Unfortunately, the failure is silent!
+
+The current rational is that it is the users' responsibility to avoid aliasing or borrowing in LMS
+applications. Using them results in *Undefined Behaviors*, including generating code that is invalid and
+cannot compile. It is interesting to see how Rust like syntax (type-checking) can be intergrated in
+LMS-clean to handle alias.
+
+#### Tiny summary of Rust ownership/borrow/slice
+
+Rust heap objects associate with ownership. When the ownership goes out of scope, the heap object is
+deallocated. Rust allows references of heap objects to be borrowed. The life time of reference must
+be smaller than that of the original object. References are immutable by default, but can also be
+mutable. When the reference is mutable, there can only be one reference at a time.
+
+The Rules of References:
+1. At any given time, you can have either one mutable reference or any number of immutable references.
+2. References must always be valid.
+
+Slices are immutable views of the array.
+
+### Sea of Node
+
+Using "sea of nodes" has perfound implications to LMS IR. The advantage is that
+the scopes of nodes are determined dynamically based on correctness and using frequency,
+which allows easy code-motion and optimization. However, using "sea of nodes" means that
+we must have a way to dynamically determine what nodes are in each block. We compute that
+based on *dependencies*.  It does make IR traversal and transformation different from
+IRs with explicit scopes, which we will talk about in lms/core/traversal.scala.
+
+
+### Building EffectSummary in LMS Grap
 
 Our fine-grained current EffectSummary is like below.
-It tracks soft dependencies (via \texttt{sdeps: Set[Sym]}),
-hard dependencies (via \texttt{hdeps: Set[Sym]}),
-read keys (via \texttt{Set[Exp]}), and write keys (via \texttt{Set[Exp]}).
+It tracks soft dependencies (`sdeps: Set[Sym]`),
+hard dependencies (`hdeps: Set[Sym]`),
+read keys (`Set[Exp]`), and write keys (`Set[Exp]`).
 
-\begin{listing}[scala]
+``` scala
 case class EffectSummary(sdeps: Set[Sym], hdeps: Set[Sym], rkeys: Set[Exp], wkeys: Set[Exp])
-\end{listing}
+```
 
 In this section, we will talk about how LMS Graph are constructed using the LMS IR components.
 It shows how the LMS IRs are used in constructing LMS Graphs, and how effects and dependencies are
@@ -199,22 +238,22 @@ tracked and generated.
 All LMS snippets are function. As the result, all LMS Graph have a list of nodes
 (already in topological order)
 and a block describing the function. That is captured by the
-\begin{listing}[scala]
+
+``` scala
 case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: immutable.Map[Sym,Node])
-\end{listing}
-at core/backend.scala. The LMS Graph is constructed by @class GraphBuilder@ at core/backend.scala.
+```
+
+at lms/core/backend.scala. The LMS Graph is constructed by `class GraphBuilder` at lms/core/backend.scala.
 
 Besides the basic functionality of storing nodes, searching nodes by symbols, and generating fresh symbols,
 GraphBuilder offers two keys functionalities
 
-\begin{enumerate}
-\item Building nodes by the @reflect*@ family of methods.
-\item Building blocks by the @reify*@ family of methods.
-\end{enumerate}
+1. Building nodes by the @reflect*@ family of methods.
+2. Building blocks by the @reify*@ family of methods.
 
 The core reflect method is defined as below (with some simplification):
 
-\begin{listing}[scala]
+``` scala
 def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
     // simple pre-construction optimization
     rewrite(s, as.toList) match {
@@ -249,24 +288,24 @@ def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp
         }
     }
 }
-\end{listing}
+```
 
-This method first tries to run pre-construction optimization via @rewrite@.
+This method first tries to run pre-construction optimization via `rewrite`.
 The optimized result is a pure Exp that can be returned directly. If not optimized,
-the method computes the latent effects via @getLatentEffect@ helper method,
-and then combine the results with the user provided @readEfkeys@ and @writeEfKeys@.
+the method computes the latent effects via `getLatentEffect` helper method,
+and then combine the results with the user provided `readEfkeys` and `writeEfKeys`.
 If the effect keys are empty, the methods go to the else branch and try Common
-Subexpression Elimination (CSE) via @findDefinition@ helper method. Otherwise,
-the method compute dependencies from the effect keys via @gatherEffectDeps@ method
+Subexpression Elimination (CSE) via `findDefinition` helper method. Otherwise,
+the method compute dependencies from the effect keys via `gatherEffectDeps` method
 and then creates the node. The last thing to do is updating the effect environments,
-including @curEffects@, @curLocalReads@, and @curLocalWrites@. The @curEffects@ is
-a map of type: Exp -> (Sym, List[Sym]), which tracks the last write and the reads
-after last write for each Exp key.
+including `curEffects`, `curLocalReads`, and `curLocalWrites`. The `curEffects` is
+a map of type: `Exp -> (Sym, List[Sym])`, which tracks the *last write* and the *reads
+after last write* for each Exp key.
 
-The getLatentEffect family of methods are like below. They essentially recursively
+The `getLatentEffect` family of methods are like below. They essentially recursively
 call each other to dig out all latent effects of nodes.
 
-\begin{listing}[scala]
+``` scala
 def getLatentEffect(op: String, xs: Def*): (Set[Exp], Set[Exp]) = (op, xs) match {
     case ("lambda", _) => (Set[Exp](), Set[Exp]()) // no latent effect for function declaration
     case ("@", (f: Sym)+:args) => getApplyLatentEffect(f, args:_*)._1
@@ -317,32 +356,31 @@ def getLatentEffect(x: Def): (Set[Exp], Set[Exp]) = x match {
     }
     case _ => (Set[Exp](), Set[Exp]())
 }
-\end{listing}
+```
 
 However, the complex code here is not yet fully correct. There are several issues:
-\begin{enumerate}
-\item We have a specical function (getApplyLatentEffect) to dig out latent effects
-      of functions (since they are applied via ``$\at$'' syntax). However, the LMS IR may
-      have other syntax to apply a function, such as (``map'', List(array, f)).
+
+1. We have a specical function (`getApplyLatentEffect`) to dig out latent effects
+      of functions (since they are applied via `@` syntax). However, the LMS IR may
+      have other syntax to apply a function, such as `("map", List(array, f))`.
       It is still not clear when to dig latent effects out and when to not.
-\item Depending on whether we want to support first-order functions, the functions
+      Conservatively we have to always do it.
+2. Depending on whether we want to support first-order functions, the functions
       may be wrapped in complex data structures (as array element) or returned from
-      other functions or conditionals. The getFunctionLatentEffect function might have
+      other functions or conditionals. The `getFunctionLatentEffect` function might have
       too many cases to check and too many branches to consider, which is both expensive
       and inaccurate.
-\item The read and write effects on data structures are currently at the most coarse
+3. The read and write effects on data structures are currently at the most coarse
       granularity (for the whole data structure). Also the aliasing and borrowing effects
       are not yet considered.
-\end{enumerate}
+
 Potential solutions are listed here:
-\begin{enumerate}
-\item be conservative and cheap at some cases with a ``stop the world'' effect
-\item track aliasing with some frontend constraint (like rust, separation logic, regions)
-\end{enumerate}
+1. be conservative and cheap at some cases with a *stop the world* effect
+2. track aliasing with some frontend constraint (like rust, separation logic, regions)
 
-The gatherEffectDeps method computes dependencies from effect keys:
+The `gatherEffectDeps` method computes dependencies from effect keys:
 
-\begin{listing}[scala]
+``` scala
 def gatherEffectDeps(reads: Set[Exp], writes: Set[Exp], s: String, as: Def*): (Set[Sym], Set[Sym]) = {
     val (prevHard, prevSoft) = (new mutable.ListBuffer[Sym], new mutable.ListBuffer[Sym])
     // gather effect dependencies 1): handle the write keys
@@ -367,15 +405,15 @@ def gatherEffectDeps(reads: Set[Exp], writes: Set[Exp], s: String, as: Def*): (S
     }
     (prevHard.toSet, prevSoft.toSet)
 }
-\end{listing}
+```
 
-Note that the @reify*@ family of methods not only generate the Block object, but also the nodes that are
+Note that the `reify*` family of methods not only generate the Block object, but also the nodes that are
 used in the block. However, the nodes are not explicitly scoped in the block, but rather implicitly
 scoped via effect summaries. This implicit scoping allows flexible code motion as long as effects and dependencies
 are respected.
-The withBlockScopedEnv method is the subroutine that saves old effect environments.
+The `withBlockScopedEnv` method is the subroutine that saves old effect environments.
 
-\begin{listing}[scala]
+``` scala
 def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block =
 withBlockScopedEnv(here){
     val args = (0 until arity).toList.map(_ => Sym(fresh))
@@ -391,5 +429,5 @@ withBlockScopedEnv(here){
 
     Block(args, res, curBlock, EffectSummary(Set(), hard, reads, writes))
 }
-\end{listing}
+```
 
