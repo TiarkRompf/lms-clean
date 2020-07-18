@@ -1,18 +1,19 @@
 ## Fully Fledged Frontend
 
-After discussing the simple frontend in [LMS Simple Frontend](https://github.com/TiarkRompf/lms-clean/doc/main/scala/lms/core/frontend.md), we want to show
+After discussing the simple frontend in [LMS Simple Frontend](frontend.md), we want to show
 what a normal frontend looks like.
 
 The fully fledged frontend uses an over-arching object to handle graph construction.
 (in the object Adaptor at lms/core/stub.scala).
 
 ``` scala
-object Adapter extends Frontend
+object Adapter extends Frontend {
    var typeMap // map backend Exp to Rep[T]
    var funTable // used to cache scala functions for `reflect "lambda"`
 
    val g = makeGraphBuilder() // graph builder
    def emitCommon // code gen
+}
 ```
 
 The graph construction depends on various supports including the basic support for `Rep[T]`,
