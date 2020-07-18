@@ -23,8 +23,8 @@ into intermediate representations (IR). Instead, the IR is generated via executi
 typed expressions in the input program evaluate to LMS IR. This can be considered as the LMS frontend.
 Then the LMS backend compiles the LMS IR to target programs.
 
-[LMS Core](https://github.com/TiarkRompf/lms-clean/doc/main/scala/lms/core/backend.md)
+[LMS Core](main/scala/lms/core/backend.md)
 
-[LMS Simple Frontend](https://github.com/TiarkRompf/lms-clean/doc/main/scala/lms/core/frontend.md)
+[LMS Simple Frontend](main/scala/lms/core/frontend.md)
 
-[LMS Frontend](https://github.com/TiarkRompf/lms-clean/doc/main/scala/lms/core/stub.md)
+[LMS Frontend](main/scala/lms/core/stub.md)
