@@ -1,6 +1,6 @@
 ## Fully Fledged Frontend
 
-After discussing the simple frontend in [LMS Simple Frontend](https://github.com/TiarkRompf/lms-clean/doc/main/scala/lms/core/frontend.md), we want to show
+After discussing the simple frontend in [LMS Simple Frontend](frontend.md), we want to show
 what a normal frontend looks like.
 
 The fully fledged frontend uses an over-arching object to handle graph construction.
