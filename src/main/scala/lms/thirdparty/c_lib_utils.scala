@@ -121,7 +121,7 @@ trait CudaCodeGenLibFunction extends ExtendedCCodeGen {
 
 
 // Examples of using lib-function for simple file scanning
-trait ScannerOps extends Base with ArrayOps with CLibs {
+trait ScannerOps extends Equal with ArrayOps with CLibs {
 
   // FIXME(feiw): should the open and close function have CTRL effects??
   // open function returns a file discriptor
@@ -144,8 +144,9 @@ trait ScannerOps extends Base with ArrayOps with CLibs {
   def openf(name: Rep[String], mode: Rep[String]) = libFunction[FilePointer]("fopen", Unwrap(name), Unwrap(mode))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
   def closef(fp: Rep[FilePointer]) = libFunction[Unit]("fclose", Unwrap(fp))(Seq[Int](0), Seq[Int](), Set[Int](), Adapter.CTRL)
   @virtualize
-  def checkStatus(code: Rep[Int]) = Adapter.IF(Adapter.BOOL(Unwrap(code == unit(1))))(Adapter.INT(Unwrap(libFunction[Unit]("perror", lms.core.Backend.Const("Error reading file"))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))))(Adapter.INT(lms.core.Backend.Const(())))
-
+  def checkStatus(code: Rep[Int]) = if (code != unit(1)) {
+    libFunction[Unit]("perror", lms.core.Backend.Const("Error reading file"))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+  }
 
   def getFloat(fp: Rep[FilePointer], target: Rep[Array[Float]], target_offset: Rep[Int]) =
     checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%f"), Unwrap(target(target_offset)))(Seq[Int](0), Seq[Int](), Set[Int](2), Unwrap(target)))
@@ -158,17 +159,6 @@ trait ScannerOps extends Base with ArrayOps with CLibs {
   def fprintf(fp: Rep[FilePointer], format: Rep[String], contents: Rep[Any]*) = {
     val inputs = Seq(Unwrap(fp), Unwrap(format)) ++ contents.map(Unwrap)
     libFunction[Unit]("fprintf", inputs: _*)((Range(0, inputs.length): Range).toSeq, Seq(0), Set[Int]())
-  }
-}
-
-trait MyF extends Base {
-  @virtualize
-  def myF(code: Rep[Int]) = {
-    if (code == unit(1)) {
-      printf("is one")
-    } else {
-      printf("is not one")
-    }
   }
 }
 

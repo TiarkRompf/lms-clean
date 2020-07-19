@@ -27,7 +27,7 @@ class ScannerTest extends TutorialFunSuite {
         close(fd)
       }
     }
-    System.out.println(indent(driver.code))
+    check("open_file", driver.code, "c")
     driver.eval(0)
   }
 
@@ -44,18 +44,8 @@ class ScannerTest extends TutorialFunSuite {
         close(fd)
       }
     }
-    System.out.println(indent(driver.code))
+    check("mmap_file", driver.code, "c")
     driver.eval(0)
-  }
-
-  test("a") {
-    val driver = new DslDriverC[Int, Unit] with MyF {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        myF(arg)
-      }
-    }
-    System.out.println(driver.code)
   }
 
   test("openf") {
@@ -75,7 +65,7 @@ class ScannerTest extends TutorialFunSuite {
         closef(fp2)
       }
     }
-    System.out.println(indent(driver.code))
+    check("openf_file", driver.code, "c")
     driver.eval(0)
   }
 }
