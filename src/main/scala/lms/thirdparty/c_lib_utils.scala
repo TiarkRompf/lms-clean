@@ -137,6 +137,7 @@ trait ScannerOps extends Equal with ArrayOps with CLibs {
   def mmap[T:Manifest](fd: Rep[Int], len: Rep[Long]) = static_cast[Array[T], Array[T]](libFunction[Array[T]]("mmap",
     lms.core.Backend.Const(0), Unwrap(len), Unwrap(prot), Unwrap(fd), lms.core.Backend.Const(0))(Seq[Int](), Seq[Int](), Set[Int]()))
   def close(fd: Rep[Int]) = libFunction[Unit]("close", Unwrap(fd))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+  def prints(s: Rep[String]): Rep[Int] = libFunction[Int]("printll", Unwrap(s))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   // establish a File* type
   abstract class FilePointer
@@ -148,6 +149,8 @@ trait ScannerOps extends Equal with ArrayOps with CLibs {
     libFunction[Unit]("perror", lms.core.Backend.Const("Error reading file"))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
   }
 
+  def getFloat(fp: Rep[FilePointer], target: Var[Float]) =
+    checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%f"), UnwrapV(target))(Seq[Int](0), Seq[Int](2), Set[Int](2)))
   def getFloat(fp: Rep[FilePointer], target: Rep[Array[Float]], target_offset: Rep[Int]) =
     checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%f"), Unwrap(target(target_offset)))(Seq[Int](0), Seq[Int](), Set[Int](2), Unwrap(target)))
   def getInt(fp: Rep[FilePointer], target: Var[Int]) =
