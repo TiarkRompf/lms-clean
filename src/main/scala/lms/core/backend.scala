@@ -589,6 +589,8 @@ class GraphBuilderOpt extends GraphBuilder {
       Some(Const(n))
     case ("array_length", List(Def("Array", List(Const(as: Array[_]))))) =>
       Some(Const(as.length))
+    case ("array_length", List(Def("array_slice", List(x, s, e)))) =>
+      Some(reflect("-", e, s))
 
     case ("String.length", List(Const(as: String))) =>
       Some(Const(as.length))
