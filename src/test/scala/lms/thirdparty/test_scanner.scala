@@ -19,8 +19,8 @@ class ScannerTest extends TutorialFunSuite {
     val driver = new DslDriverCScanner[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val lanternPath = System.getProperty("user.dir")
-        val filename = lanternPath + "/src/test/scala/lms/thirdparty/test_scanner.scala"
+        val lmsPath = System.getProperty("user.dir")
+        val filename = lmsPath + "/src/test/scala/lms/thirdparty/test_scanner.scala"
         val fd = open(filename)
         val filelength = filelen(fd)
         printf("file length is %ld\n", filelength)
@@ -28,15 +28,14 @@ class ScannerTest extends TutorialFunSuite {
       }
     }
     check("open_file", driver.code, "c")
-    driver.eval(0)
   }
 
   test("mmap") {
     val driver = new DslDriverCScanner[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val lanternPath = System.getProperty("user.dir")
-        val filename = lanternPath + "/src/test/scala/lms/thirdparty/test_scanner.scala"
+        val lmsPath = System.getProperty("user.dir")
+        val filename = lmsPath + "/src/test/scala/lms/thirdparty/test_scanner.scala"
         val fd = open(filename)
         val array = mmap[Char](fd, unit(50l))
         for (i <- (0 until 50): Rep[Range])
@@ -45,15 +44,14 @@ class ScannerTest extends TutorialFunSuite {
       }
     }
     check("mmap_file", driver.code, "c")
-    driver.eval(0)
   }
 
   test("openf") {
     val driver = new DslDriverCScanner[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val lanternPath = System.getProperty("user.dir")
-        val filename = lanternPath + "/src/test/scala/lms/thirdparty/test_binary"
+        val lmsPath = System.getProperty("user.dir")
+        val filename = lmsPath + "/src/test/scala/lms/thirdparty/test_binary"
         val fp = openf(filename, "w")
         fprintf(fp, "%d", 10)
         closef(fp)
@@ -66,7 +64,6 @@ class ScannerTest extends TutorialFunSuite {
       }
     }
     check("openf_file", driver.code, "c")
-    driver.eval(0)
   }
 }
 
