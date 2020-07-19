@@ -218,6 +218,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
 
   private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
+  def unregisterHeader(nHeaders: String*) = headers --= nHeaders.toSet
   def registerHeader(includePath: String, header: String): Unit = {
     registerIncludePath(includePath)
     registerHeader(header)
