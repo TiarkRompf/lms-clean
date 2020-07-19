@@ -226,7 +226,11 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     registerHeader(header)
   }
   def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
-  def emitDefines(out: PrintStream) = defines.foreach { f => out.println(s"#define $f") }
+  def emitDefines(out: PrintStream) = defines.foreach { f =>
+    out.println(s"#ifndef $f")
+    out.println(s"#define $f")
+    out.println(s"#endif")
+  }
 
   val includePaths = mutable.HashSet[String]()
   def registerIncludePath(paths: String*) = includePaths ++= paths.toSet
