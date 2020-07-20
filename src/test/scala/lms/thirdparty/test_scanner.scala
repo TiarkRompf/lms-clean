@@ -46,21 +46,21 @@ class ScannerTest extends TutorialFunSuite {
     check("mmap_file", driver.code, "c")
   }
 
-  test("openf") {
+  test("fopen") {
     val driver = new DslDriverCScanner[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
         val lmsPath = System.getProperty("user.dir")
         val filename = lmsPath + "/src/test/scala/lms/thirdparty/test_binary"
-        val fp = openf(filename, "w")
+        val fp = fopen(filename, "w")
         fprintf(fp, "%d", 10)
-        closef(fp)
+        fclose(fp)
 
-        val fp2 = openf(filename, "r")
+        val fp2 = fopen(filename, "r")
         var target = 0
         getInt(fp2, target)
         printf("%d", target)
-        closef(fp2)
+        fclose(fp2)
       }
     }
     check("openf_file", driver.code, "c")

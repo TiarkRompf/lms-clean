@@ -144,7 +144,7 @@ trait ScannerOps extends Equal with ArrayOps with CLibs {
   // another API for opening a file
   def fopen(name: Rep[String], mode: Rep[String]) = libFunction[FilePointer]("fopen", Unwrap(name), Unwrap(mode))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
   def fclose(fp: Rep[FilePointer]) = libFunction[Unit]("fclose", Unwrap(fp))(Seq[Int](0), Seq[Int](), Set[Int](), Adapter.CTRL)
-  def checkStatus(code: Rep[Int]): Rep[Unit] = __ifThenElse(notequals(code, unit(1)),
+  def checkStatus(code: Rep[Int])(implicit pos: SourceContext): Rep[Unit] = __ifThenElse(notequals(code, unit(1)),
     libFunction[Unit]("perror", lms.core.Backend.Const("Error reading file"))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL), ())
 
   def getFloat(fp: Rep[FilePointer], target: Var[Float]) =
