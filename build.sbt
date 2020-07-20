@@ -30,6 +30,7 @@ libraryDependencies += "org.scala-lang.plugins" % "scala-continuations-library_2
 
 scalacOptions += "-P:continuations:enable"
 
+val lms_path = sys.props.getOrElseUpdate("LMS_PATH", System.getProperty("user.dir"))
 
 // --- testing ---
 

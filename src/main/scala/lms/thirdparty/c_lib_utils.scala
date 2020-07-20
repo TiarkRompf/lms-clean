@@ -168,7 +168,7 @@ trait ScannerOps extends Equal with ArrayOps with CLibs {
 trait CCodeGenScannerOps extends ExtendedCCodeGen with CCodeGenLibs {
 
   // need to register the headers
-  val workPath = System.getProperty("user.dir")
+  val workPath = sys.props("LMS_PATH")
   val headerPath = "src/main/scala/lms/thirdparty/thirdpartyAdaptor/"
   val headerFile = "<scanner_header.h>"
   registerHeader(s"$workPath/$headerPath", headerFile)
