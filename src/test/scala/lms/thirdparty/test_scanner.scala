@@ -27,7 +27,7 @@ class ScannerTest extends TutorialFunSuite {
         close(fd)
       }
     }
-    check("open_file", driver.code, "c")
+    driver.eval(0)
   }
 
   test("mmap") {
@@ -43,7 +43,7 @@ class ScannerTest extends TutorialFunSuite {
         close(fd)
       }
     }
-    check("mmap_file", driver.code, "c")
+    driver.eval(0)
   }
 
   test("fopen") {
@@ -63,7 +63,7 @@ class ScannerTest extends TutorialFunSuite {
         fclose(fp2)
       }
     }
-    check("openf_file", driver.code, "c")
+    driver.eval(0)
   }
 }
 
