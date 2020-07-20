@@ -142,7 +142,7 @@ trait ScannerOps extends Equal with ArrayOps with CLibs {
   // establish a File* type
   abstract class FilePointer
   // another API for opening a file
-  def openf(name: Rep[String], mode: Rep[String]) = libFunction[FilePointer]("fopen", Unwrap(name), Unwrap(mode))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+  def fopen(name: Rep[String], mode: Rep[String]) = libFunction[FilePointer]("fopen", Unwrap(name), Unwrap(mode))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
   def closef(fp: Rep[FilePointer]) = libFunction[Unit]("fclose", Unwrap(fp))(Seq[Int](0), Seq[Int](), Set[Int](), Adapter.CTRL)
   @virtualize
   def checkStatus(code: Rep[Int]) = if (code != unit(1)) {
@@ -180,4 +180,3 @@ trait CCodeGenScannerOps extends ExtendedCCodeGen with CCodeGenLibs {
     case _ => super.remap(m)
   }
 }
-
