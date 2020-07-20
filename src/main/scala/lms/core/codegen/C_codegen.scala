@@ -216,13 +216,21 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case _ => emit(quote(n))
   }
 
+  private val defines = mutable.HashSet[String]()
+  def registerDefine(define: String*) = defines ++= define.toSet
   private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
+  def unregisterHeader(nHeaders: String*) = headers --= nHeaders.toSet
   def registerHeader(includePath: String, header: String): Unit = {
     registerIncludePath(includePath)
     registerHeader(header)
   }
   def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
+  def emitDefines(out: PrintStream) = defines.foreach { f =>
+    out.println(s"#ifndef $f")
+    out.println(s"#define $f")
+    out.println(s"#endif")
+  }
 
   val includePaths = mutable.HashSet[String]()
   def registerIncludePath(paths: String*) = includePaths ++= paths.toSet
@@ -552,6 +560,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     |*******************************************/
     """.stripMargin)
     val src = run(name, ng)
+    emitDefines(stream)
     emitHeaders(stream)
     emitDatastructures(stream)
     emitFunctions(stream)
