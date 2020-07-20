@@ -147,13 +147,13 @@ trait ScannerOps extends Equal with ArrayOps with CLibs {
   def checkStatus(code: Rep[Int])(implicit pos: SourceContext): Rep[Unit] = __ifThenElse(notequals(code, unit(1)),
     libFunction[Unit]("perror", lms.core.Backend.Const("Error reading file"))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL), ())
 
-  def getFloat(fp: Rep[FilePointer], target: Var[Float]) =
+  def getFloat(fp: Rep[FilePointer], target: Var[Float])(implicit pos: SourceContext) =
     checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%f"), UnwrapV(target))(Seq[Int](0), Seq[Int](2), Set[Int](2)))
-  def getFloat(fp: Rep[FilePointer], target: Rep[Array[Float]], target_offset: Rep[Int]) =
+  def getFloat(fp: Rep[FilePointer], target: Rep[Array[Float]], target_offset: Rep[Int])(implicit pos: SourceContext) =
     checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%f"), Unwrap(target(target_offset)))(Seq[Int](0), Seq[Int](), Set[Int](2), Unwrap(target)))
-  def getInt(fp: Rep[FilePointer], target: Var[Int]) =
+  def getInt(fp: Rep[FilePointer], target: Var[Int])(implicit pos: SourceContext) =
     checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%d"), UnwrapV(target))(Seq[Int](0), Seq[Int](2), Set[Int](2)))
-  def getInt(fp: Rep[FilePointer], target: Rep[Array[Int]], target_offset: Rep[Int]) =
+  def getInt(fp: Rep[FilePointer], target: Rep[Array[Int]], target_offset: Rep[Int])(implicit pos: SourceContext) =
     checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%d"), Unwrap(target(target_offset)))(Seq[Int](0), Seq[Int](), Set[Int](2), Unwrap(target)))
 
   // writing to file in C
