@@ -15,7 +15,7 @@ The basic idea is as follows:
 ### Dead Code Elimination
 
 In a real scenario, we first run a dead code elimination (DCE) pass before we traverse the graph.
-The DCE pass is currently implemented in lms/core/backend.scala, `class DeadCodeElimCG`.
+The DCE pass is currently implemented in `class DeadCodeElimCG` (in file `lms/core/backend.scala`).
 
 The basic idea for DCE is like this. We track 2 categories of `Backend.Sym`s, the *live* and *reach* sets.
 1. The reach set is the set of nodes (or Syms of the nodes) that are reachable via hard-dependencies.
