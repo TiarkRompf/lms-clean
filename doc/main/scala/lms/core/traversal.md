@@ -12,6 +12,19 @@ The basic idea is as follows:
 2. A node is ready to be schedule for the current block when the bound variables the node depends on are already in path (those blocks are enclosing the current block).
 3. A node should be scheduled in the current block (instead of in a inner block) when the node is used often.
 
+### A recap of dependencies
+In LMS IR, the data dependencies refer to dependencies of data (node A uses symbol B).
+There are also control dependencies, such as two print statements should be generated in the same order,
+or the read/write order of a mutable cell cannot be randomly shuffled.
+
+Data dependencies are explicitly presented in the LMS IR. However, control dependencies have to be tracked
+via Effect Systems (see details in [Backend](backend.md)).
+At LMS IR construction, we track the various categories of effects of the LMS nodes, and then build dependencies
+from the effects. The dependencies are captured via either *soft-dependency* or *hard-dependency*.
+If node A hard-depends on node B, then scheduling A means B must be scheduled before A.
+If node A soft-depends on node B, then B should never be scheduled after A (but B might not be scheduled even
+if A is scheduled).
+
 ### Dead Code Elimination
 
 In a real scenario, we first run a dead code elimination (DCE) pass before we traverse the graph.
