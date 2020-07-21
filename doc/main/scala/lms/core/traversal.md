@@ -4,7 +4,7 @@ The `lms/core/traversal.scala` define how one can traverse the LMS IR. Travering
 IR seems trivial, but traversing LMS IR (sea of the nodes) is not. The main challenge is to determine
 the group of nodes that should be scoped in each block. Previously in [Backend](backend.md), we
 talked about how the scope of the blocks are implicitly expressed via data dependencies and control
-dependencies. In traversal.scala, we will see how exactly we collect the nodes for each block using
+dependencies. In `traversal.scala`, we will see how exactly we collect the nodes for each block using
 the dependency information.
 
 The basic idea is as follows:
