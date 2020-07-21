@@ -20,7 +20,7 @@ The DCE pass is currently implemented in `class DeadCodeElimCG` (in file `lms/co
 The basic idea for DCE is like this. We track 2 categories of `Backend.Sym`s, the *live* and *reach* sets.
 1. The reach set is the set of nodes (or Syms of the nodes) that are reachable via hard-dependencies.
 It includes both data dependencies and control dependencies.
-2. The live set is the set of nodes (or Syms of the nodes) that are needed only via data dependencies.
+2. The live set is the set of nodes (or `Backend.Sym`s of the nodes) that are needed only via data dependencies.
 
 Then we run three steps for DCE:
 1. Collect reach set and live set. The two sets are initialized via block result and block effects. Then
