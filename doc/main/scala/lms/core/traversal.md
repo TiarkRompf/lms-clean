@@ -10,7 +10,7 @@ the dependency information.
 The basic idea is as follows:
 1. Each block has input-variables and input-effect-variables. We call them *bound variables*.
 2. A node is ready to be schedule for the current block when the bound variables the node depends on are already in path (those blocks are enclosing the current block).
-3. A node should be schedule in the current block (instead of in a inner block) when the node is used often.
+3. A node should be scheduled in the current block (instead of in a inner block) when the node is used often.
 
 ### Dead Code Elimination
 
