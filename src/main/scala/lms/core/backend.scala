@@ -724,14 +724,14 @@ class DeadCodeElim extends Phase {
 /*
  * Resolve may dependencies
  */
-class DeadCodeElimCG {
+class DeadCodeElimCG extends Phase {
 
-  final val fixDeps = true // remove deps on removed nodes
+  final val fixDeps = true // remove dependencies on removed nodes
   // it is interesting to discuss the difference between `live` and `reach`.
   // `reach` is the set of nodes (or Syms of nodes) that are reachable via hard-dependencies.
   // the reachable set can include values that are needed (data dependencies) and side-effects
   // (printing, mutation, et. al.)
-  // `live` is the set of ndoes (or Syms of nodes) whose values are needed (only data dependencies).
+  // `live` is the set of nodes (or Syms of nodes) whose values are needed (only data dependencies).
   // For instance, a conditional can have side-effects and return values. If the side-effects
   // are relevant, then the conditional is reachable. If the values are relevant, the conditional
   // is live. The property of `live` and `reach` can be independent.
@@ -775,14 +775,6 @@ class DeadCodeElimCG {
           live ++= valueSyms(nn)
           reach ++= hardSyms(nn)
 
-          // if (!used(nn.n)) {
-          //   if (nn.eff.hasSimpleEffect || nn.eff.wkeys.exists(used)) {
-          //     used += nn.n
-          //     used ++= valueSyms(nn)
-          //   }
-          // } else {
-          //   used ++= valueSyms(nn)
-          // }
           newNodes = nn::newNodes
         }
       }
@@ -828,49 +820,6 @@ class DeadCodeElimCG {
   }
 }
 
-// Compute frequency information (i.e., how
-// many times a node's result is going to
-// be used, in expectation)
-class Flow extends Phase {
-
-  val freq = new mutable.HashMap[Sym,Double]
-
-  // XXX: not clear how to count effect deps
-  // (e.g. 'if' shouldn't count effect as 0.5, b/c together with
-  // a normal dep this is 1.0, and would thus hoist stuff)
-
-  // XXX perhaps we need to count freqs differently (?)
-
-  def symsFreq(x: Node): List[(Def,Double)] = x match {
-    case Node(f, "λ", Block(in, y, ein, eff)::_, _) =>
-      List((y,100.0)) ++ eff.deps.map(e => (e,0.001))
-    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::_, _) =>
-      List((c,1.0),(ae,0.5),(be,0.5)) ++ af.deps.map(e => (e,0.001)) ++ bf.deps.map(e => (e,0.001))
-    case _ => syms(x) map (s => (s,1.0))
-  }
-
-  def apply(g: Graph): Graph = {
-
-    if (g.block.res.isInstanceOf[Sym])
-      freq(g.block.res.asInstanceOf[Sym]) = 1.0
-
-    for (e <- g.block.eff.deps)
-      if (e.isInstanceOf[Sym])
-        freq(e.asInstanceOf[Sym]) = 1.0
-
-    for (d <- g.nodes.reverseIterator) {
-      if (freq contains d.n) {
-        val s = freq(d.n)
-        for ((e:Sym,f) <- symsFreq(d))
-          if (f > 0.5) freq(e) = (freq.getOrElse(e, 0.0) + (f*s))
-      }
-    }
-
-    //freq.toList.sortBy(_._1.n).foreach(println)
-
-    g
-  }
-}
 
 // Compute bound structure information
 // (i.e., which bound variables a node depends on)
@@ -917,4 +866,49 @@ class Bound extends Phase {
     g
   }
 
+}
+
+
+// Compute frequency information (i.e., how
+// many times a node's result is going to
+// be used, in expectation)
+class Flow extends Phase {
+
+  val freq = new mutable.HashMap[Sym,Double]
+
+  // XXX: not clear how to count effect deps
+  // (e.g. 'if' shouldn't count effect as 0.5, b/c together with
+  // a normal dep this is 1.0, and would thus hoist stuff)
+
+  // XXX perhaps we need to count freqs differently (?)
+
+  def symsFreq(x: Node): List[(Def,Double)] = x match {
+    case Node(f, "λ", Block(in, y, ein, eff)::_, _) =>
+      List((y,100.0)) ++ eff.deps.map(e => (e,0.001))
+    case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::_, _) =>
+      List((c,1.0),(ae,0.5),(be,0.5)) ++ af.deps.map(e => (e,0.001)) ++ bf.deps.map(e => (e,0.001))
+    case _ => syms(x) map (s => (s,1.0))
+  }
+
+  def apply(g: Graph): Graph = {
+
+    if (g.block.res.isInstanceOf[Sym])
+      freq(g.block.res.asInstanceOf[Sym]) = 1.0
+
+    for (e <- g.block.eff.deps)
+      if (e.isInstanceOf[Sym])
+        freq(e.asInstanceOf[Sym]) = 1.0
+
+    for (d <- g.nodes.reverseIterator) {
+      if (freq contains d.n) {
+        val s = freq(d.n)
+        for ((e:Sym,f) <- symsFreq(d))
+          if (f > 0.5) freq(e) = (freq.getOrElse(e, 0.0) + (f*s))
+      }
+    }
+
+    //freq.toList.sortBy(_._1.n).foreach(println)
+
+    g
+  }
 }

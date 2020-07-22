@@ -165,7 +165,7 @@ abstract class Traverser {
 
     // We could improve this by using a proper call to SCC instead of just
     // iterating over g.nodes in reverse order. The performance implications
-    // aren't clear, to we decided to postpone this.
+    // aren't clear, so we decided to postpone this.
 
     // Code would look like this:
 
