@@ -29,6 +29,14 @@ trait SizeTOps extends Base with CLibs {
       case _ => ???
     }
   }
+
+  // void * memset ( void * ptr, int value, size_t num );
+  def memset[T:Manifest](ptr: Rep[Array[T]], value: Rep[Int], num: Rep[SizeT]) =
+    libFunction[Unit]("memset", Unwrap(ptr), Unwrap(value), Unwrap(num))(Seq(2), Seq(0), Set[Int]())
+
+  // void * memcpy ( void * destination, const void * source, size_t num );
+  def memcpy[T:Manifest](destination: Rep[Array[T]], source: Rep[Array[T]], num: Rep[SizeT]) =
+    libFunction[Unit]("memcpy", Unwrap(destination), Unwrap(source), Unwrap(num))(Seq(1, 2), Seq(0), Set[Int]())
 }
 
 trait CCodeGenSizeTOps extends ExtendedCCodeGen {
