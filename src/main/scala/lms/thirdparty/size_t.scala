@@ -15,13 +15,14 @@ trait SizeTOps extends Base with PrimitiveOps with CLibs {
   implicit def sizeTFromInt(x: Int) = SizeT(x)
 
   // NOTE(feiw) as a normal Rep[SizeT] construction from Rep[Int]
-  def SizeT(x: Rep[Int]): Rep[SizeT] = Wrap[SizeT](Adapter.g.reflect("cast", Unwrap(x)))
+  def SizeT(x: Rep[Int]): Rep[SizeT] =
+    Wrap[SizeT](Adapter.g.reflectUnsafe("cast", Unwrap(x), Backend.Const("SizeT")))
 
   // we offer SizeT to Int type casting as a method
   implicit def sizeTRepToOps(x: Rep[SizeT])(implicit __pos: SourceContext): SizeTOps = new SizeTOps(x)(__pos)
   implicit def sizeTVarToOps(x: Var[SizeT])(implicit __pos: SourceContext): SizeTOps = new SizeTOps(readVar(x))(__pos)
   class SizeTOps(x: Rep[SizeT])(implicit __pos: SourceContext) {
-    def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("cast", Unwrap(x)))
+    def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("cast", Unwrap(x), Backend.Const("Int")))
   }
 
   // void * memset ( void * ptr, int value, size_t num );
@@ -43,7 +44,7 @@ trait SizeTOps extends Base with PrimitiveOps with CLibs {
   def mallocOfT[T:Manifest](count: Rep[Int]) = malloc(SizeT(count * sizeOf[T]))
 
   // also add sizeOf here
-  def sizeOf[T:Manifest]: Rep[Int] = Wrap[Int](Adapter.g.reflect("sizeof"))
+  def sizeOf[T:Manifest]: Rep[Int] = Wrap[Int](Adapter.g.reflectUnsafe("sizeof", Backend.Const(manifest[T])))
 }
 
 trait CCodeGenSizeTOps extends ExtendedCCodeGen with CCodeGenLibs {
