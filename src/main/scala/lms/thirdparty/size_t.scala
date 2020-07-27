@@ -29,19 +29,19 @@ trait SizeTOps extends Base with PrimitiveOps with CLibs {
   // Note that the `value: Rep[Int]` is viewed as unsigned char
   def memset[T:Manifest](ptr: Rep[Array[T]], value: Rep[Int], num: Rep[SizeT]) =
     libFunction[Unit]("memset", Unwrap(ptr), Unwrap(value), Unwrap(num))(Seq(2), Seq(0), Set[Int]())
-  def memsetOfT[T:Manifest](ptr: Rep[Array[T]], value: Rep[Int], count: Rep[Int]) =
+  def memsetOfT[T:Manifest](ptr: Rep[Array[T]], value: Rep[Int], count: Rep[Int])(implicit __pos: SourceContext) =
     memset(ptr, value, SizeT(count * sizeOf[T]))
 
   // void * memcpy ( void * destination, const void * source, size_t num );
   def memcpy[T:Manifest](destination: Rep[Array[T]], source: Rep[Array[T]], num: Rep[SizeT]) =
     libFunction[Unit]("memcpy", Unwrap(destination), Unwrap(source), Unwrap(num))(Seq(1, 2), Seq(0), Set[Int]())
-  def memcpyOfT[T:Manifest](dst: Rep[Array[T]], src: Rep[Array[T]], count: Rep[Int]) =
+  def memcpyOfT[T:Manifest](dst: Rep[Array[T]], src: Rep[Array[T]], count: Rep[Int])(implicit __pos: SourceContext) =
     memcpy[T](dst, src, SizeT(count * sizeOf[T]))
 
   // void* malloc( size_t size );
   def malloc[T:Manifest](size: Rep[SizeT]) =
     libFunction[Array[T]]("malloc", Unwrap(size))(Seq(0), Seq[Int](), Set[Int]())
-  def mallocOfT[T:Manifest](count: Rep[Int]) = malloc(SizeT(count * sizeOf[T]))
+  def mallocOfT[T:Manifest](count: Rep[Int])(implicit __pos: SourceContext) = malloc(SizeT(count * sizeOf[T]))
 
   // also add sizeOf here
   def sizeOf[T:Manifest]: Rep[Int] = Wrap[Int](Adapter.g.reflectUnsafe("sizeof", Backend.Const(manifest[T])))
