@@ -238,6 +238,17 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       temp_out.close
       registerIncludePath(curPath)
     }
+    if (f == "<cuda_header.h>") {
+      // this is a resouce in LMS clean
+      val curPath = System.getProperty("user.dir")
+      val path = new File(curPath + "/cuda_header.h")
+      val src = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/cuda_header.h"))
+      val temp_out = new PrintWriter(path)
+      temp_out.println(src.getLines.mkString("\n"))
+      temp_out.flush
+      temp_out.close
+      registerIncludePath(curPath)
+    }
   }
 
   def emitDefines(out: PrintStream) = defines.foreach { f =>
