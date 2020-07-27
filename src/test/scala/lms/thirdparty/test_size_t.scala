@@ -29,4 +29,19 @@ class SizeTTest extends TutorialFunSuite {
     check("size_t", driver.code, "c")
     driver.eval(0)
   }
+
+  test("size_of") {
+    val driver = new DslDriverCSizeT[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val arr = malloc[Int](SizeT(10))
+        val arr2 = mallocOfT[Int](10)
+        memset(arr, 0, SizeT(10))
+        memcpy(arr2, arr, SizeT(10))
+        printf("%d %d", arr(1), arr2(1))
+      }
+    }
+    check("size_of", driver.code, "c")
+    driver.eval(9)
+  }
 }

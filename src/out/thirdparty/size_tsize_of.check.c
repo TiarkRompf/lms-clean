@@ -6,14 +6,13 @@ Emitting C Generated Code
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-/************* Functions **************/
-void x1(size_t x2) {
-  printf("size t is %d", (int)x2);
-}
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  x1(5);
-  x1((size_t)(x0 * 6));
+  int* x1 = malloc(10);
+  int* x2 = malloc((size_t)(10 * sizeof(int)));
+  memset(x1, 0, 10);
+  memcpy(x2, x1, 10);
+  printf("%d %d", x1[1], x2[1]);
 }
 /*****************************************
 End of C Generated Code
