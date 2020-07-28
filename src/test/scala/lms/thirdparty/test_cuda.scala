@@ -38,5 +38,39 @@ class CudaTest extends TutorialFunSuite {
     check("malloc", driver.code, "cu")
   }
 
+  test("fill") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val cuda_arr = cudaMalloc2[Int](5)
+        cudaArrayFill(cuda_arr, 8, 5)
+        val arr = NewArray[Int](5)
+        cudaCall(cudaMemcpyOfT(arr, cuda_arr, 5, device2host))
+        printf("%d %d", arr(1), arr(4))
+        cudaCall(cudaFree(cuda_arr))
+      }
+    }
+    check("fill", driver.code, "cu")
+    driver.eval(9)
+  }
+
+  test("cap") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val arr = Array(1, 2, 3, 4, 5)
+        val cuda_arr = cudaMalloc2[Int](5)
+        cudaCall(cudaMemcpyOfT(cuda_arr, arr, 5, host2device))
+        cudaArrayClipAt(cuda_arr, 2, 5)
+        val res = NewArray[Int](5)
+        cudaCall(cudaMemcpyOfT(res, cuda_arr, 5, device2host))
+        printf("%d, %d", res(0), res(4))
+        cudaCall(cudaFree(cuda_arr))
+      }
+    }
+    check("cap", driver.code, "cu")
+    driver.eval(8)
+  }
+
 }
 

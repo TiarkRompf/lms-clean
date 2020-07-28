@@ -47,9 +47,144 @@ trait CudaOps extends Base with SizeTOps with StackArrayOps with CLibs with Cuda
     libFunction[CudaErrorT]("cudaMemcpy", Unwrap(dst), Unwrap(src), Unwrap(size), Unwrap(kind))(Seq(1,2,3), Seq(0), Set[Int]())
   def cudaMemcpyOfT[T:Manifest](dst: Rep[Array[T]], src: Rep[Array[T]], count: Rep[Int], kind: Rep[CudaMemcpyKind])(implicit __pos: SourceContext) =
     cudaMemcpy(dst, src, SizeT(count * sizeOf[T]), kind)
+
+  // CUDA Kernel Basics:
+
+  // CUDA is a scalable parallel programming model and a software environment for parallel computing
+  // NVIDIA’s TESLA architecture accelerates CUDA
+
+  // Each thread has an ID that it uses to compute memory addresses and make control decisions (threadID)
+  // Cooperation within smaller batches of threads is scalable
+
+  // Kernel launches a grid of thread blocks
+  // Threads within a block cooperate via shared memory Threads within a block can synchronize
+  // Threads in different blocks cannot cooperate
+
+  // Each Multiprocess has several Thread processors with one shared memory
+
+  // Each Thread has access to Register (on chip memory) and Local Memory (off chip memory, avoid using)
+  // Each Block has access to Shared Memory (on chip memory)
+  // Each Kernel has access to Global Memory (off chip, persistent, I/O)
+  // Host can read and write global memory but not shared memory
+
+  // Threads are executed by thread processors.
+  // Thread-blocks are executed on multiprocessors (containing several thread processors and shared memory).
+  // Several concurrent thread-blocks can reside on one multiprocessor if the resource is enough
+  // A kernel is launched as a grid of thread blocks.
+  // Only one kernel can execute on a device at a time.
+
+  // Kernels are C functions with some restrictions
+  // 1. Cannot access host memory
+  // 2. Must have void return type
+  // 3. No variable number of arguments (“varargs”) Not recursive
+  // 4. No static variables
+  // Function arguments automatically copied from host to device
+
+  // Kernels designated by function qualifier: __global__
+  // Function called from host and executed on device。 Must return void
+
+  // Other CUDA function qualifiers：__device__
+  // Function called from device and run on device。Cannot be called from host code
+
+  // __host__: Function called from host and executed on host (default)
+  // __host__ and __device__ qualifiers can be combined to generate both CPU and GPU code
+
+  // Modified C function call syntax: kernel<<<dim3 dG, dim3 dB>>>(...)
+  // Execution Configuration (“<<< >>>”)
+  // dG - dimension and size of grid in blocks Two-dimensional: x and y
+  //   Blocks launched in the grid: dG.x * dG.y
+  // dB - dimension and size of blocks in threads: Three-dimensional: x, y, and z
+  //   Threads per block: dB.x * dB.y * dB.z
+  //          Unspecified dim3 fields initialize to 1
+
+  // example:
+    // dim3 grid, block;
+    // grid.x = 2; grid.y = 4; block.x = 8; block.y = 16;
+    // // or equvilently: dim3 grid(2, 4), block(8,16);
+    // kernel<<<grid, block>>>(...);
+
+  // kernel<<<32,512>>>(...); 1D dG or dB can be just int
+
+  // All __global__ and __device__ functions have access to these automatically defined variables
+  //   dim3 gridDim;  Dimensions of the grid in blocks (at most 2D)
+  //   dim3 blockDim; Dimensions of the block in threads
+  //   dim3 blockIdx; Block index within the grid
+  //   dim3 threadIdx; Thread index within the block
+  // Note: Grid contains Blocks, Blocks contains Threads.
+
+  // All kernel launches are asynchronous
+    // control returns to CPU immediately
+    // kernel executes after all previous CUDA calls have completed
+  // cudaMemcpy() is synchronous
+    // control returns to CPU after copy completes
+    // copy starts after all previous CUDA calls have completed
+  // cudaThreadSynchronize()
+    // blocks until all previous CUDA calls complete
+
+  // Variable Qualifiers (GPU code)
+  // __device__: Stored in global memory (large, high latency, no cache)
+  // Allocated with cudaMalloc (__device__ qualifier implied)
+  // Accessible by all threads
+  // Lifetime: application
+  // __shared__: Stored in on-chip shared memory (very low latency)
+  // Specified by execution configuration or at compile time
+  // Accessible by all threads in the same thread block
+  // Lifetime: thread block
+  // Unqualified variables:
+  // Scalars and built-in vector types are stored in registers
+  // What doesn’t fit in registers spills to “local” memory
+
+  // Using shared memory
+  // Size known at compile time
+  // __global__ void kernel(...) {
+  //   ...
+  //   __shared__ float sData[256]; ...
+  // }
+  // int main(void) {
+  //   ...
+  //   kernel<<<nBlocks,blockSize>>>(...); ...
+  // }
+
+  // Size known at kernel launch
+  // __global__ void kernel(...) {
+  //   ...
+  //   extern __shared__ float sData[]; ...
+  // }
+  // int main(void) {
+  //   ...
+  //   smBytes = blockSize*sizeof(float);
+  //   kernel<<<nBlocks, blockSize, smBytes>>>(...);
+  //   ...
+  // }
+
+  // GPU Thread Synchronization
+  // void __syncthreads();
+  // Synchronizes all threads in a block: No thread can pass this barrier until all threads in the block reach it
+
+  // All CUDA calls return error code:
+  // Except for kernel launches cudaError_t type
+  // cudaError_t cudaGetLastError(void)
+  // Returns the code for the last error (no error has a code) Can be used to get error from kernel execution
+  // char* cudaGetErrorString(cudaError_t code)
+  // Returns a null-terminated character string describing the error
+  // printf(“%s\n”, cudaGetErrorString( cudaGetLastError() ) );
+
+
+  // Some global values for our GPU
+  val gridSize = 28
+  val blockSize = 512
+  val basic_config = Seq(Backend.Const(gridSize), Backend.Const(blockSize))
+
+  // How to bind to manually written kernels (see cuda_header.h)
+  // this CUDA kernel fills a value to the cuda array
+  def cudaArrayFill[T:Manifest](res: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =
+    cudaFunction[Unit]("arrayFill", basic_config, Unwrap(res), Unwrap(value), Unwrap(size))(Seq[Int](), Seq(0), Set[Int]())
+
+  def cudaArrayClipAt[T:Manifest](res: Rep[Array[T]], bound: Rep[T], size: Rep[Int]) =
+    cudaFunction[Unit]("clipAt", basic_config, Unwrap(res), Unwrap(bound), Unwrap(size))(Seq(0), Seq(0), Set[Int]())
 }
 
-trait CCodeGenCudaOps extends CCodeGenSizeTOps with CCodeGenLibs {
+trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
   // need to register the headers
   registerHeader("<cuda_header.h>")
 }
