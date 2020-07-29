@@ -86,7 +86,7 @@ class CudaTest extends TutorialFunSuite {
 
         // now let's use the fill function
         val cuda_arr = cudaMalloc2[Int](5)
-        fill(cuda_arr, 3, 5)
+        fill.apply2(28, 512, cuda_arr, 3, 5)
         val arr = NewArray[Int](5)
         cudaCall(cudaMemcpyOfT(arr, cuda_arr, 5, device2host))
         printf("%d %d", arr(2), arr(3))

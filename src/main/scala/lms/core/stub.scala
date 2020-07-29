@@ -150,6 +150,10 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
     def apply(x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =
       Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))()())
+
+    def apply2(a: Int, b: Int, x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =  {
+      Wrap[D](Adapter.g.reflectEffect("@_cuda", Unwrap(f), Backend.Const(Seq(a, b)), Unwrap(x), Unwrap(y), Unwrap(z))()())
+    }
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
