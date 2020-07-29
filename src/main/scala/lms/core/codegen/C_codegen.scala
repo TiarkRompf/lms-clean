@@ -4,7 +4,7 @@ import lms.macros.RefinedManifest
 
 import scala.collection.mutable
 
-import java.io.{ByteArrayOutputStream, PrintStream}
+import java.io.{ByteArrayOutputStream, PrintStream, File, PrintWriter}
 
 import Backend._
 
@@ -225,7 +225,32 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     registerIncludePath(includePath)
     registerHeader(header)
   }
-  def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
+  def emitHeaders(out: PrintStream) = headers.foreach { f =>
+    out.println(s"#include $f")
+    if (f == "<scanner_header.h>") {
+      // this is a resource in LMS clean
+      val curPath = System.getProperty("user.dir")
+      val path = new File(curPath + "/scanner_header.h")
+      val src = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/scanner_header.h"))
+      val temp_out = new PrintWriter(path)
+      temp_out.println(src.getLines.mkString("\n"))
+      temp_out.flush
+      temp_out.close
+      registerIncludePath(curPath)
+    }
+    if (f == "<cuda_header.h>") {
+      // this is a resouce in LMS clean
+      val curPath = System.getProperty("user.dir")
+      val path = new File(curPath + "/cuda_header.h")
+      val src = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/cuda_header.h"))
+      val temp_out = new PrintWriter(path)
+      temp_out.println(src.getLines.mkString("\n"))
+      temp_out.flush
+      temp_out.close
+      registerIncludePath(curPath)
+    }
+  }
+
   def emitDefines(out: PrintStream) = defines.foreach { f =>
     out.println(s"#ifndef $f")
     out.println(s"#define $f")

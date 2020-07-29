@@ -38,7 +38,7 @@ class ScannerTest extends TutorialFunSuite {
         val filename = lmsPath + "/src/test/scala/lms/thirdparty/test_scanner.scala"
         val fd = open(filename)
         val array = mmap[Char](fd, unit(50l))
-        for (i <- (0 until 50): Rep[Range])
+        for (i <- (0 until 10): Rep[Range])
           printf("%c", array(i))
         close(fd)
       }
@@ -66,5 +66,4 @@ class ScannerTest extends TutorialFunSuite {
     driver.eval(0)
   }
 }
-
 
