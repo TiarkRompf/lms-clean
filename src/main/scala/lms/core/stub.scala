@@ -150,10 +150,6 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   implicit class FunOps3[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: Rep[(A,B,C) => D]) {
     def apply(x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =
       Wrap[D](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z))()())
-
-    def apply2(a: Int, b: Int, x: Rep[A], y: Rep[B], z: Rep[C]): Rep[D] =  {
-      Wrap[D](Adapter.g.reflectEffect("@_cuda", Unwrap(f), Backend.Const(Seq(a, b)), Unwrap(x), Unwrap(y), Unwrap(z))()())
-    }
   }
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
@@ -263,7 +259,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // XXX: is this data structure needed? should it move elsewhere?
   // could we use funTable instead?
   val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
-  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, prefix: String = ""): Backend.Exp = {
+  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, decorator: String = ""): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
       case Some((funSym, _)) => funSym
@@ -271,8 +267,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
         val block = Adapter.g.reify(arity, gf)
-        val res = if (prefix == "") Adapter.g.reflect(fn, "λ", block, Backend.Const(0))()
-                  else Adapter.g.reflect(fn, "λ", block, Backend.Const(0), Backend.Const(prefix))()
+        val res = if (decorator == "") Adapter.g.reflect(fn, "λ", block, Backend.Const(0))()
+                  else Adapter.g.reflect(fn, "λ", block, Backend.Const(0), Backend.Const(decorator))()
         topLevelFunctions.getOrElseUpdate(can, fn)
         fn
     }
