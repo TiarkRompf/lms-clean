@@ -51,7 +51,6 @@ class CudaTest extends TutorialFunSuite {
       }
     }
     check("fill", driver.code, "cu")
-    driver.eval(9)
   }
 
   test("cap") {
@@ -69,7 +68,6 @@ class CudaTest extends TutorialFunSuite {
       }
     }
     check("cap", driver.code, "cu")
-    driver.eval(8)
   }
 
   test("cudaGlobalFun") {
@@ -97,6 +95,5 @@ class CudaTest extends TutorialFunSuite {
     }
     System.out.println(indent(driver.code))
   }
-
 }
 
