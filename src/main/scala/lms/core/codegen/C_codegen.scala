@@ -4,7 +4,7 @@ import lms.macros.RefinedManifest
 
 import scala.collection.mutable
 
-import java.io.{ByteArrayOutputStream, PrintStream}
+import java.io.{ByteArrayOutputStream, PrintStream, File, PrintWriter}
 
 import Backend._
 
@@ -216,13 +216,46 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case _ => emit(quote(n))
   }
 
+  private val defines = mutable.HashSet[String]()
+  def registerDefine(define: String*) = defines ++= define.toSet
   private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
+  def unregisterHeader(nHeaders: String*) = headers --= nHeaders.toSet
   def registerHeader(includePath: String, header: String): Unit = {
     registerIncludePath(includePath)
     registerHeader(header)
   }
-  def emitHeaders(out: PrintStream) = headers.foreach { f => out.println(s"#include $f") }
+  def emitHeaders(out: PrintStream) = headers.foreach { f =>
+    out.println(s"#include $f")
+    if (f == "<scanner_header.h>") {
+      // this is a resource in LMS clean
+      val curPath = System.getProperty("user.dir")
+      val path = new File(curPath + "/scanner_header.h")
+      val src = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/scanner_header.h"))
+      val temp_out = new PrintWriter(path)
+      temp_out.println(src.getLines.mkString("\n"))
+      temp_out.flush
+      temp_out.close
+      registerIncludePath(curPath)
+    }
+    if (f == "<cuda_header.h>") {
+      // this is a resouce in LMS clean
+      val curPath = System.getProperty("user.dir")
+      val path = new File(curPath + "/cuda_header.h")
+      val src = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/cuda_header.h"))
+      val temp_out = new PrintWriter(path)
+      temp_out.println(src.getLines.mkString("\n"))
+      temp_out.flush
+      temp_out.close
+      registerIncludePath(curPath)
+    }
+  }
+
+  def emitDefines(out: PrintStream) = defines.foreach { f =>
+    out.println(s"#ifndef $f")
+    out.println(s"#define $f")
+    out.println(s"#endif")
+  }
 
   val includePaths = mutable.HashSet[String]()
   def registerIncludePath(paths: String*) = includePaths ++= paths.toSet
@@ -552,6 +585,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     |*******************************************/
     """.stripMargin)
     val src = run(name, ng)
+    emitDefines(stream)
     emitHeaders(stream)
     emitDatastructures(stream)
     emitFunctions(stream)

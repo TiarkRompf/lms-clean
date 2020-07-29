@@ -30,7 +30,6 @@ libraryDependencies += "org.scala-lang.plugins" % "scala-continuations-library_2
 
 scalacOptions += "-P:continuations:enable"
 
-
 // --- testing ---
 
 // tests are not thread safe

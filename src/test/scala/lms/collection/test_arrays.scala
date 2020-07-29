@@ -226,4 +226,16 @@ class ArrayTest extends TutorialFunSuite {
     }
     check("extraThroughSoft_is_necessary", driver.code, "c")
   }
+
+  test("array_slice_length") {
+    val driver = new DslDriverC[Int, Unit] {
+      @virtualize
+      def snippet(in: Rep[Int]) = {
+        val x = NewArray[Int](in + 10)
+        val y = x.slice(in, in + 6)
+        printf("slice length is %d", y.length)
+      }
+    }
+    check("array_slice_length", driver.code, "c")
+  }
 }
