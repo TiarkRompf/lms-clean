@@ -259,7 +259,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // XXX: is this data structure needed? should it move elsewhere?
   // could we use funTable instead?
   val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
-  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
+  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, prefix: String = ""): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
       case Some((funSym, _)) => funSym
@@ -267,7 +267,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
         val block = Adapter.g.reify(arity, gf)
-        val res = Adapter.g.reflect(fn, "λ", block, Backend.Const(0))()
+        val res = if (prefix == "") Adapter.g.reflect(fn, "λ", block, Backend.Const(0))()
+                  else Adapter.g.reflect(fn, "λ", block, Backend.Const(0), Backend.Const(prefix))()
         topLevelFunctions.getOrElseUpdate(can, fn)
         fn
     }

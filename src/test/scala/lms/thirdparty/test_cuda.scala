@@ -72,5 +72,31 @@ class CudaTest extends TutorialFunSuite {
     driver.eval(8)
   }
 
+  test("cudaGlobalFun") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+
+        // generate a cuda global function
+        val fill = cudaGlobalFun { (data: Rep[Array[Int]], value: Rep[Int], size: Rep[Int]) =>
+          val stride = cmacro[Int]("gridDim.x") * cmacro[Int]("blockDim.x")
+          val tid = cmacro[Int]("threadIdx.x") + cmacro[Int]("blockIdx.x") * cmacro[Int]("blockDim.x")
+          for (i <- tid.until(size, stride)) {
+            data(i) = value
+          }
+        }
+
+        // now let's use the fill function
+        val cuda_arr = cudaMalloc2[Int](5)
+        fill(cuda_arr, 3, 5)
+        val arr = NewArray[Int](5)
+        cudaCall(cudaMemcpyOfT(arr, cuda_arr, 5, device2host))
+        printf("%d %d", arr(2), arr(3))
+        cudaCall(cudaFree(cuda_arr))
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
 }
 
