@@ -127,11 +127,11 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case _ => 20
   }
 
-  def emitFunction(name: String, body: Block, prefix: String = "") = {
+  def emitFunction(name: String, body: Block, decorator: String = "") = {
     val res = body.res
     val args = body.in
-    val ret = if (prefix == "") s"${remap(typeBlockRes(res))} "
-              else s"$prefix ${remap(typeBlockRes(res))} "
+    val ret = if (decorator == "") s"${remap(typeBlockRes(res))} "
+              else s"$decorator ${remap(typeBlockRes(res))} "
     val params = "(" + args.map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}").mkString(", ") + ") "
     val sig = ret + name + params
     emit(sig)
@@ -383,9 +383,9 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
         emitFunction(quote(s), block)
       }
       emit(quote(s))
-    case n @ Node(s, "λ", (block: Block)::Const(0)::Const(prefix: String)::Nil, _) =>
+    case n @ Node(s, "λ", (block: Block)::Const(0)::Const(decorator: String)::Nil, _) =>
       registerTopLevelFunction(quote(s)) {
-        emitFunction(quote(s), block, prefix)
+        emitFunction(quote(s), block, decorator)
       }
       emit(quote(s))
     case n @ Node(s, "reffield_get", List(ptr, Const(field: String)), _) =>
@@ -545,9 +545,9 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
       }
-    case n @ Node(s, "λ", (block: Block)::Const(0)::Const(prefix: String)::Nil, _) =>
+    case n @ Node(s, "λ", (block: Block)::Const(0)::Const(decorator: String)::Nil, _) =>
       registerTopLevelFunction(quote(s)) {
-        emitFunction(quote(s), block, prefix)
+        emitFunction(quote(s), block, decorator)
       }
     case n @ Node(s, "timestamp", _, _) =>
       registerHeader("<sys/time.h>")

@@ -286,11 +286,6 @@ abstract class CompactCodeGen extends CompactTraverser {
     case n @ Node(s,"@",x::y,_) =>
       shallowP(x); emit("("); y.headOption.foreach(h => { shallowP(h, 0); y.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
 
-    case n @ Node(s,"@_cuda", f::Backend.Const(Seq(a:Int, b:Int))::args , _) =>
-      shallowP(f);
-      emit("<<<"); emit(a.toString); emit(", "); emit(b.toString); emit(">>>");
-      emit("("); args.headOption.foreach(h => { shallowP(h, 0); args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
-
     case n @ Node(_,op,args,_) =>
       emit(op); emit("("); args.headOption.foreach(h => { shallowP(h, 0); args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
   }

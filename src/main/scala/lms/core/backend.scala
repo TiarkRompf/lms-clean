@@ -409,7 +409,6 @@ class GraphBuilder {
   def getLatentEffect(op: String, xs: Def*): (Set[Exp], Set[Exp]) = (op, xs) match {
     case ("λ", _) => (Set[Exp](), Set[Exp]())
     case ("@", (f: Sym)+:args) => getApplyLatentEffect(f, args:_*)._1
-    case ("@_cuda", (f: Sym)+:args) => getApplyLatentEffect(f, args:_*)._1
     case _ => getLatentEffect(xs:_*)
   }
 
