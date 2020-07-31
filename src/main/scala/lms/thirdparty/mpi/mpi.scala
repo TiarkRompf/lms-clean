@@ -22,7 +22,8 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
   def cNull: Rep[CNull] = cmacro[CNull]("NULL")
 
   // this is how we deal with library functions (may need pointers)
-  def mpi_init() = libFunction[Unit]("MPI_INIT", Unwrap(cNull), Unwrap(cNull))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+  def mpi_init() =
+    libFunction[Unit]("MPI_INIT", Unwrap(cNull), Unwrap(cNull))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
   def mpi_finalize() = libFunction[Unit]("MPI_FINALIZE")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   def mpi_comm_size(world: Rep[MPIWorld], size: Var[Int]): Rep[Unit] = {
@@ -70,16 +71,17 @@ trait CCodeGenMPI extends ExtendedCCodeGen {
     else super.remap(m)
   }
 
-  override def shallow(n: Node): Unit = n match {
-    case Node(s, "test-pointer", List(x:Sym), _) =>
-      emit("test_pointer(&"); shallow(x); emit(")");
-    case Node(s, "test-pointer-array", List(x:Sym), _) =>
-      emit("test_pointer("); shallow(x); emit(")");
-    case Node(s, "test-struct-pointer", List(x:Sym), _) =>
-      emit("test_struct_pointer(&"); shallow(x); emit(")")
-    case Node(s, "test-struct-ref", List(x:Sym), _) =>
-      emit("test_struct_pointer("); shallow(x); emit(")")
-    case _ => super.shallow(n)
-  }
+  override def shallow(n: Node): Unit =
+    n match {
+      case Node(s, "test-pointer", List(x: Sym), _) =>
+        emit("test_pointer(&"); shallow(x); emit(")");
+      case Node(s, "test-pointer-array", List(x: Sym), _) =>
+        emit("test_pointer("); shallow(x); emit(")");
+      case Node(s, "test-struct-pointer", List(x: Sym), _) =>
+        emit("test_struct_pointer(&"); shallow(x); emit(")")
+      case Node(s, "test-struct-ref", List(x: Sym), _) =>
+        emit("test_struct_pointer("); shallow(x); emit(")")
+      case _ => super.shallow(n)
+    }
 
 }

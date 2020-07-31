@@ -20,8 +20,7 @@ This macro implements the following translations:
   def foo(x1: T1, x2: T2): Tn = reflect[Tn]("foo",ref(x1),ref(x2))
   def foo_next(x1: T1, x2: T2): Tn = body
   lower((x1:T1,x2:T2) => Rewrite(foo(x1,x2), foo_next(x1,x2)))
-*/
-
+ */
 
 object ir_impl {
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
@@ -33,12 +32,12 @@ object ir_impl {
     println(a)
     a.tree match {
       case q"def $name[..$t](..$args): $tpe" =>
-        val args1 = args map { case ValDef(_,x,_,_) => q"ref($x)" }
+        val args1 = args map { case ValDef(_, x, _, _) => q"ref($x)" }
         return c.Expr(q"def $name[..$t](..$args): $tpe = reflect[$tpe](${name.toString},..$args1)")
       case q"def $name[..$t](..$args): $tpe = $body" =>
         // TODO: strip by-name type
-        val args0 = args map { case ValDef(_,x,_,_) => q"$x" }
-        val args1 = args map { case ValDef(_,x,_,_) => q"ref($x)" }
+        val args0 = args map { case ValDef(_, x, _, _) => q"$x" }
+        val args1 = args map { case ValDef(_, x, _, _) => q"ref($x)" }
         val name_next = TermName(name.toString + "_next")
         // TODO: what if we have type parameters? just disallow?
         return c.Expr(q"""
@@ -47,7 +46,7 @@ object ir_impl {
           def $name[..$t](..$args): $tpe = reflect[$tpe](${name.toString},..$args1)
           def $name_next[..$t](..$args): $tpe = $body
         """)
-     // TODO class def
+      // TODO class def
       //case t@ClassDef(_,_,_,_) =>
     }
   }

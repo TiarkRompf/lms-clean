@@ -15,13 +15,13 @@ trait ScalaCompile {
 
   var compiler: Global = _
   var reporter: ConsoleReporter = _
-  //var output: ByteArrayOutputStream = _ 
+  //var output: ByteArrayOutputStream = _
 
   def setupCompiler() = {
     /*
       output = new ByteArrayOutputStream()
       val writer = new PrintWriter(new OutputStreamWriter(output))
-    */
+     */
     val settings = new Settings()
     val pathSeparator = System.getProperty("path.separator")
 
@@ -39,25 +39,24 @@ trait ScalaCompile {
     //settings.verbose.value = true
     // -usejavacp needed on windows?
 
-    reporter = new ConsoleReporter(settings, null, new PrintWriter(System.out))//writer
+    reporter = new ConsoleReporter(settings, null, new PrintWriter(System.out)) //writer
     compiler = new Global(settings, reporter)
   }
 
   var compileCount = 0
-  
+
   var dumpGeneratedCode = false
 
   def nextClassName = "staged$" + compileCount
 
-
   // NOTE: class name must be unique (e.g. use nextClassName)
   //def compile[A,B](f: Exp[A] => Exp[B])(implicit mA: Typ[A], mB: Typ[B]): A=>B = {
-  def compile[A,B](className: String, source: String, staticData: List[(Class[_],Any)]): A=>B = {
+  def compile[A, B](className: String, source: String, staticData: List[(Class[_], Any)]): A => B = {
     if (this.compiler eq null)
       setupCompiler()
-    
+
     compileCount += 1
-    
+
     // val source = new StringWriter()
     // val writer = new PrintWriter(source)
     // val staticData = codegen.emitSource(f, className, writer)
@@ -90,9 +89,9 @@ trait ScalaCompile {
     val loader = new AbstractFileClassLoader(fileSystem, this.getClass.getClassLoader)
 
     val cls: Class[_] = loader.loadClass(className)
-    val cons = cls.getConstructor(staticData.map(_._1):_*)
-    
-    val obj: A=>B = cons.newInstance(staticData.map(_._2.asInstanceOf[AnyRef]):_*).asInstanceOf[A=>B]
+    val cons = cls.getConstructor(staticData.map(_._1): _*)
+
+    val obj: A => B = cons.newInstance(staticData.map(_._2.asInstanceOf[AnyRef]): _*).asInstanceOf[A => B]
     obj
   }
 }

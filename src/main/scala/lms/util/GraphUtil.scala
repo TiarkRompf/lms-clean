@@ -2,47 +2,51 @@ package lms.util
 
 import java.util.{ArrayDeque, HashMap}
 
-
 object GraphUtil {
-  
+
   class Ref[T](init: T) {
     var value: T = init
   }
-  
+
   /* test cases
 
      stronglyConnectedComponents[String](List("A"), { case "A" => List("B") case "B" => List("C") case "C" => List("A","D") case "D" => Nil})
      List(List(A, B, C), List(D))
 
      stronglyConnectedComponents[String](List("A","B","C"), { case "A" => List("B") case "B" => List("C") case "C" => List("A","D") case "D" => Nil})
-  */
-
-  /** 
-      Returns the strongly connected components
-      of the graph rooted at the first argument,
-      whose edges are given by the function argument.
-
-      The scc are returned in topological order.
-      Tarjan's algorithm (linear).
    */
-  def stronglyConnectedComponents[T](start: List[T], succ: T=>List[T]): List[List[T]] = {
+
+  /**
+    *      Returns the strongly connected components
+    *      of the graph rooted at the first argument,
+    *      whose edges are given by the function argument.
+    *
+    *      The scc are returned in topological order.
+    *      Tarjan's algorithm (linear).
+    */
+  def stronglyConnectedComponents[T](start: List[T], succ: T => List[T]): List[List[T]] = {
 
     val id: Ref[Int] = new Ref(0)
     val stack = new ArrayDeque[T]
-    val mark = new HashMap[T,Int]
+    val mark = new HashMap[T, Int]
 
     val res = new Ref[List[List[T]]](Nil)
     for (node <- start)
-      visit(node,succ,id,stack,mark,res)
+      visit(node, succ, id, stack, mark, res)
 
     res.value
   }
 
-  def visit[T](node: T, succ: T=>List[T], id: Ref[Int], stack: ArrayDeque[T], 
-            mark: HashMap[T,Int], res: Ref[List[List[T]]]): Int = {
+  def visit[T](
+      node: T,
+      succ: T => List[T],
+      id: Ref[Int],
+      stack: ArrayDeque[T],
+      mark: HashMap[T, Int],
+      res: Ref[List[List[T]]]
+  ): Int = {
 
-    
-    if (mark.containsKey(node)) 
+    if (mark.containsKey(node))
       mark.get(node)
     else {
       id.value = id.value + 1
@@ -55,7 +59,7 @@ object GraphUtil {
       for (child <- succ(node)) {
         val m = visit(child, succ, id, stack, mark, res)
 
-        if (m < min) 
+        if (m < min)
           min = m
       }
 
@@ -74,5 +78,5 @@ object GraphUtil {
       min
     }
   }
-  
+
 }

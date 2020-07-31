@@ -8,25 +8,27 @@ import lms.core.stub.Adapter
 abstract class Traverser {
 
   // freq/block computation
-  def symsFreq(x: Node): Set[(Def,Double)] = x match {
-    case Node(f, "λ", Block(in, y, ein, eff)::_, _) =>
-      eff.deps.map((e: Def) => (e,100.0)) + ((y, 100.0))
+  def symsFreq(x: Node): Set[(Def, Double)] =
+    x match {
+      case Node(f, "λ", Block(in, y, ein, eff) :: _, _) =>
+        eff.deps.map((e: Def) => (e, 100.0)) + ((y, 100.0))
       // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
-    case Node(_, "?", c::(a: Block)::(b: Block)::_, eff) =>
-      eff.hdeps.map((e: Def) => (e,1.0)) + ((c, 1.0)) ++ (a.used ++ b.used).map((e: Def) => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
-    case Node(_, "W", (a: Block)::(b: Block)::_, eff) =>
-      eff.hdeps.map((e: Def) => (e,1.0)) ++ (a.used ++ b.used).map(e => (e,100.0)) // XXX why eff.deps?
-    case Node(_, "switch", guard::rhs, eff) => // 1 / # blocks instead of 0.5?
-      var freqs = Set[(Def,Double)]()
-      rhs.foreach {
-        case b: Block => freqs ++= b.used.map(e => (e, 0.5))
-        case _ =>
-      }
-      freqs + ((guard, 1.0)) ++ eff.hdeps.map((e: Def) => (e,1.0))
-    case _ => hardSyms(x).map((s: Def) => (s,1.0))
-  }
-
+      case Node(_, "?", c :: (a: Block) :: (b: Block) :: _, eff) =>
+        eff.hdeps.map((e: Def) => (e, 1.0)) + ((c, 1.0)) ++ (a.used ++ b.used).map((e: Def) =>
+          (e, 0.5)
+        ) // XXX why eff.deps? would lose effect-only statements otherwise!
+      case Node(_, "W", (a: Block) :: (b: Block) :: _, eff) =>
+        eff.hdeps.map((e: Def) => (e, 1.0)) ++ (a.used ++ b.used).map(e => (e, 100.0)) // XXX why eff.deps?
+      case Node(_, "switch", guard :: rhs, eff) => // 1 / # blocks instead of 0.5?
+        var freqs = Set[(Def, Double)]()
+        rhs.foreach {
+          case b: Block => freqs ++= b.used.map(e => (e, 0.5))
+          case _ =>
+        }
+        freqs + ((guard, 1.0)) ++ eff.hdeps.map((e: Def) => (e, 1.0))
+      case _ => hardSyms(x).map((s: Def) => (s, 1.0))
+    }
 
   // This `bound` is used to track the dependent bound variable of each node
   // See the implementation in src/main/scala/lms/core/backend.scala `class Bound`
@@ -53,7 +55,8 @@ abstract class Traverser {
   def withScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     val (path0, inner0) = (path, inner)
     path = p; inner = ns;
-    try b finally { path = path0; inner = inner0 }
+    try b
+    finally { path = path0; inner = inner0 }
   }
 
   // This `withScopeCPS` function maintains the old `path` and `inner` when entering a new block
@@ -68,7 +71,8 @@ abstract class Traverser {
   def withScopeCPS[T](p: List[Sym], ns: Seq[Node])(b: (List[Sym], Seq[Node]) => T): T = {
     val (path0, inner0) = (path, inner)
     path = p; inner = ns;
-    try b(path0, inner0) finally { path = path0; inner = inner0 }
+    try b(path0, inner0)
+    finally { path = path0; inner = inner0 }
   }
 
   // This `withResetScope` function maintains the old `inner` when entering a new block
@@ -78,7 +82,8 @@ abstract class Traverser {
     assert(path.takeRight(p.length) == p, s"$path -- $p")
     val inner0 = inner
     inner = ns
-    try b finally { inner = inner0 }
+    try b
+    finally { inner = inner0 }
   }
 
   // This `scheduleBlock` function wraps on the `scheduleBlock_` function, while
@@ -92,16 +97,16 @@ abstract class Traverser {
     }
 
   /**
-   * This `scheduleBlock_` is the core function in traversal. The main purpose of this function is to
-   * separate the currently unscheduled nodes into the `outer1` and `inner1`, where
-   * `outer1` is to be scheduled for the current block, and `inner1` is to be scheduled later.
-   * It should be noted that this is strongly tied to the fact that LMS IR uses `sea-of-node`
-   * representation, where the blocks do not explicitly scope the nodes. Instead, the nodes
-   * in each block are collected lazily from this scheduleBlock_ function, from the result and effects
-   * of the (to be scheduled) block.
-   * The function takes another function `f` as curried parameter, which is applied with
-   * the new path, new inner, new outer, and the block.
-   */
+    * This `scheduleBlock_` is the core function in traversal. The main purpose of this function is to
+    * separate the currently unscheduled nodes into the `outer1` and `inner1`, where
+    * `outer1` is to be scheduled for the current block, and `inner1` is to be scheduled later.
+    * It should be noted that this is strongly tied to the fact that LMS IR uses `sea-of-node`
+    * representation, where the blocks do not explicitly scope the nodes. Instead, the nodes
+    * in each block are collected lazily from this scheduleBlock_ function, from the result and effects
+    * of the (to be scheduled) block.
+    * The function takes another function `f` as curried parameter, which is applied with
+    * the new path, new inner, new outer, and the block.
+    */
   def scheduleBlock_[T](y: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
 
     // when entering a block, we get more bound variables (from the block and possibly supplimented
@@ -131,7 +136,7 @@ abstract class Traverser {
         if (available(d)) {
           // node will be sched here, don't follow if branches!
           // other statement will be scheduled in an inner block
-          for ((e:Sym,f) <- symsFreq(d))
+          for ((e: Sym, f) <- symsFreq(d))
             if (f > 0.5) reach += e else reachInner += e
         } else {
           // QUESTION(feiw): why we don't split via frequency here?
@@ -184,8 +189,7 @@ abstract class Traverser {
     // for (n <- inner) {
     //   println(s"// ${tb(available(n))} ${tb(reach(n.n))} $n ${symsFreq(n)}")
     // }
-    */
-
+     */
 
     // Should node d be scheduled here? It must be:
     // (1) available: not dependent on other bound vars
@@ -242,32 +246,33 @@ abstract class Traverser {
   }
 
   def traverse(b: Block, extra: Sym*): Unit = {
-    scheduleBlock(b, extra:_*)(traverse)
+    scheduleBlock(b, extra: _*)(traverse)
   }
 
-  def getFreeVarBlock(y: Block, extra: Sym*): Set[Sym] = scheduleBlock(y, extra:_*) { (ns: Seq[Node], res: Block) =>
-    val used = new mutable.HashSet[Sym]
-    val bound = new mutable.HashSet[Sym]
-    used ++= y.used
-    bound ++= path
-    for (n <- ns ++ inner) {
-      used ++= syms(n)
-      bound += n.n
-      bound ++= boundSyms(n)
+  def getFreeVarBlock(y: Block, extra: Sym*): Set[Sym] =
+    scheduleBlock(y, extra: _*) { (ns: Seq[Node], res: Block) =>
+      val used = new mutable.HashSet[Sym]
+      val bound = new mutable.HashSet[Sym]
+      used ++= y.used
+      bound ++= path
+      for (n <- ns ++ inner) {
+        used ++= syms(n)
+        bound += n.n
+        bound ++= boundSyms(n)
+      }
+      (used diff bound).toSet
     }
-    (used diff bound).toSet
-  }
 
-
-  def traverse(n: Node): Unit = n match {
-    case n @ Node(f, "λ", (y:Block)::_, _) =>
-      // special case λ: add free var f
-      traverse(y, f)
-    case n @ Node(f, op, es, _) =>
-      // generic traversal: go into all blocks
-      for (e @ Block(_,_,_,_) <- es)
-        traverse(e)
-  }
+  def traverse(n: Node): Unit =
+    n match {
+      case n @ Node(f, "λ", (y: Block) :: _, _) =>
+        // special case λ: add free var f
+        traverse(y, f)
+      case n @ Node(f, op, es, _) =>
+        // generic traversal: go into all blocks
+        for (e @ Block(_, _, _, _) <- es)
+          traverse(e)
+    }
 
   def apply(g: Graph): Unit = {
     bound(g)
@@ -279,13 +284,13 @@ abstract class Traverser {
 }
 
 /**
- * CPSTraverser is an adaptation of regular Traverser, where the traverse calls
- * are carried out in Continuation-Passing Style (CPS). The CPS style is featured
- * by the `k` parameter of each `traverse` function, which is the `continuation`
- * after each `traverse` function. The main idea is that for each `traverse` call,
- * what needs to happen after are captured in the `continuation`, such that when
- * a `traverse` function returns, the traverse of all the nodes are done already.
- */
+  * CPSTraverser is an adaptation of regular Traverser, where the traverse calls
+  * are carried out in Continuation-Passing Style (CPS). The CPS style is featured
+  * by the `k` parameter of each `traverse` function, which is the `continuation`
+  * after each `traverse` function. The main idea is that for each `traverse` call,
+  * what needs to happen after are captured in the `continuation`, such that when
+  * a `traverse` function returns, the traverse of all the nodes are done already.
+  */
 abstract class CPSTraverser extends Traverser {
 
   // Note that the continuation of `traverse(block)` need to use the original
@@ -293,7 +298,7 @@ abstract class CPSTraverser extends Traverser {
   def traverse(y: Block, extra: Sym*)(k: Exp => Unit): Unit =
     scheduleBlock_(y, extra: _*) { (path1, inner1, outer1, y) =>
       withScopeCPS(path1, inner1) { (path0, inner0) =>
-        traverse(outer1, y){ v => withScope(path0, inner0)(k(v)) }
+        traverse(outer1, y) { v => withScope(path0, inner0)(k(v)) }
       }
     }
 
@@ -306,12 +311,13 @@ abstract class CPSTraverser extends Traverser {
   def traverse(bs: List[Block])(k: => Unit): Unit =
     if (!bs.isEmpty) traverse(bs.head)(v => traverse(bs.tail)(k)) else k
 
-  def traverse(n: Node)(k: => Unit): Unit = n match {
-    case n @ Node(f, "λ", (y:Block)::_, _) =>
-      traverse(y, f)(v => k)
-    case n @ Node(f, op, es, _) =>
-      traverse(blocks(n))(k)
-  }
+  def traverse(n: Node)(k: => Unit): Unit =
+    n match {
+      case n @ Node(f, "λ", (y: Block) :: _, _) =>
+        traverse(y, f)(v => k)
+      case n @ Node(f, op, es, _) =>
+        traverse(blocks(n))(k)
+    }
 
   def apply(g: Graph)(k: Int): Unit = {
     bound(g)
@@ -320,20 +326,20 @@ abstract class CPSTraverser extends Traverser {
   }
 }
 
-
 class CompactTraverser extends Traverser {
 
-  def mayInline(n: Node): Boolean = n match {
-    case Node(s, "var_new", _, _) => false
-    case Node(s, "local_struct", _, _) => false
-    case Node(s, "timestamp", _, _) => false
-    case Node(s, "NewArray", List(_, _), _) => false
-    case Node(s, "Array", _, _) => false
-    case Node(s, "String.##", List(_, _), _) => false
-    case Node(s, "comment", _, _) => false
-    case Node(s, "array_sort_scala", _, _) => true
-    case _ => true
-  }
+  def mayInline(n: Node): Boolean =
+    n match {
+      case Node(s, "var_new", _, _) => false
+      case Node(s, "local_struct", _, _) => false
+      case Node(s, "timestamp", _, _) => false
+      case Node(s, "NewArray", List(_, _), _) => false
+      case Node(s, "Array", _, _) => false
+      case Node(s, "String.##", List(_, _), _) => false
+      case Node(s, "comment", _, _) => false
+      case Node(s, "array_sort_scala", _, _) => true
+      case _ => true
+    }
 
   var shouldInline: Sym => Option[Node] = (_ => None)
   var numStms = 0
@@ -343,24 +349,25 @@ class CompactTraverser extends Traverser {
     def unapply(x: Sym) = shouldInline(x)
   }
 
-  override def withScope[T](p: List[Sym], ns: Seq[Node])(b: =>T): T = {
+  override def withScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     val save = shouldInline
     val save1 = numStms
     val save2 = lastNode
-    try super.withScope(p, ns)(b) finally { shouldInline = save; numStms = save1; lastNode = save2 }
+    try super.withScope(p, ns)(b)
+    finally { shouldInline = save; numStms = save1; lastNode = save2 }
   }
 
   override def traverse(ns: Seq[Node], y: Block): Unit = {
     // ----- forward pass -----
 
     // lookup sym -> node for locally defined nodes
-    val df = new mutable.HashMap[Sym,Node]
+    val df = new mutable.HashMap[Sym, Node]
 
     // how many times a sym is used locally (excl blocks and effects)
-    val hm = new mutable.HashMap[Sym,Int]
+    val hm = new mutable.HashMap[Sym, Int]
 
     // local successor nodes (incl blocks and effects)
-    val succ = new mutable.HashMap[Sym,List[Sym]]
+    val succ = new mutable.HashMap[Sym, List[Sym]]
 
     // check if a node is used from some inner scope
     val hmi = new mutable.HashSet[Sym]
@@ -370,11 +377,11 @@ class CompactTraverser extends Traverser {
     for (n <- ns) {
       df(n.n) = n
       for (s <- directSyms(n) if df.contains(s) || n.op == "λforward") // do not count refs through blocks or effects
-        hm(s) = hm.getOrElse(s,0) + 1                                  // NOTE: λforward is to deal with recursive defs
+        hm(s) = hm.getOrElse(s, 0) + 1 // NOTE: λforward is to deal with recursive defs
       for (s <- syms(n) if df.contains(s))
-        succ(s) = n.n::succ.getOrElse(s,Nil)
+        succ(s) = n.n :: succ.getOrElse(s, Nil)
       blocks(n).foreach(hmi ++= _.used) // block results count as inner
-    }                                   // syms(n) -- directSyms(n)
+    } // syms(n) -- directSyms(n)
 
     for (n <- inner) hmi ++= hardSyms(n)
 
@@ -390,13 +397,15 @@ class CompactTraverser extends Traverser {
 
     // should a definition be inlined or let-inserted?
     shouldInline = { (n: Sym) =>
-      if ((df contains n) &&              // locally defined
-          (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
-          (!hmi(n)))                      // not used in nested scopes
-          Some(df(n))
-      else None }
+      if (
+        (df contains n) && // locally defined
+        (hm.getOrElse(n, 0) == 1) && // locally used exactly once
+        (!hmi(n))
+      ) // not used in nested scopes
+        Some(df(n))
+      else None
+    }
     // (shouldInline is protected by withScope)
-
 
     // ----- backward pass -----
 
@@ -410,15 +419,16 @@ class CompactTraverser extends Traverser {
       }
     }
 
-    def checkInline(res: Sym) = shouldInline(res) match {
-      case Some(n) =>
-        // want to inline, now check that all successors are already there, else disable
-        if (mayInline(n) && succ.getOrElse(n.n,Nil).forall(seen))
-          processNodeHere(n)
-        else
-          df -= n.n
-      case _ =>
-    }
+    def checkInline(res: Sym) =
+      shouldInline(res) match {
+        case Some(n) =>
+          // want to inline, now check that all successors are already there, else disable
+          if (mayInline(n) && succ.getOrElse(n.n, Nil).forall(seen))
+            processNodeHere(n)
+          else
+            df -= n.n
+        case _ =>
+      }
 
     if (y.res.isInstanceOf[Sym])
       checkInline(y.res.asInstanceOf[Sym]) // try to inline y.res, state after must be y.eff
@@ -448,84 +458,89 @@ class CompactTraverser extends Traverser {
   // subclass responsibility:
 
   // -- disabled here because don't want to fix result type
-  def traverseShallow(n: Def): Unit = n match {
-    case InlineSym(n) => traverseShallow(n)
-    case b:Block => traverse(b)
-    case _ =>
-  }
+  def traverseShallow(n: Def): Unit =
+    n match {
+      case InlineSym(n) => traverseShallow(n)
+      case b: Block => traverse(b)
+      case _ =>
+    }
 
-  def traverseShallow(n: Node): Unit = n match {
-    case n @ Node(_,op,args,_) =>
-      args.foreach(traverseShallow)
-  }
+  def traverseShallow(n: Node): Unit =
+    n match {
+      case n @ Node(_, op, args, _) =>
+        args.foreach(traverseShallow)
+    }
 
-  override def traverse(n: Node): Unit = n match {
-    case n @ Node(f, "λ", (y:Block)::_, _) =>
-      // special case λ: add free var f
-      traverse(y,f)
-    case n @ Node(f, op, es, _) =>
-      // generic traversal
-      es.foreach(traverseShallow)
-  }
+  override def traverse(n: Node): Unit =
+    n match {
+      case n @ Node(f, "λ", (y: Block) :: _, _) =>
+        // special case λ: add free var f
+        traverse(y, f)
+      case n @ Node(f, op, es, _) =>
+        // generic traversal
+        es.foreach(traverseShallow)
+    }
 }
-
 
 abstract class Transformer extends Traverser {
 
   var g: GraphBuilder = null
 
-  val subst = new mutable.HashMap[Sym,Exp]
+  val subst = new mutable.HashMap[Sym, Exp]
 
-  def transform(s: Exp): Exp = s match {
-    case s @ Sym(_) if subst contains s => subst(s)
-    case s @ Sym(_) => println(s"Warning: not found in subst $subst: "+s); s
-    case a => a // must be const
-  }
+  def transform(s: Exp): Exp =
+    s match {
+      case s @ Sym(_) if subst contains s => subst(s)
+      case s @ Sym(_) => println(s"Warning: not found in subst $subst: " + s); s
+      case a => a // must be const
+    }
 
-  def transform(b: Block): Block = b match {
-    case b @ Block(Nil, res, block, eff) =>
-      g.reify {
-        //subst(block) = g.effectToExp(g.curBlock) //XXX
-        traverse(b); transform(res)
-      }
-    case b @ Block(arg::Nil, res, block, eff) =>
-      g.reify { e =>
-        if (subst contains arg)
-          println(s"Warning: already have a subst for $arg")
-        try {
-          subst(arg) = e
+  def transform(b: Block): Block =
+    b match {
+      case b @ Block(Nil, res, block, eff) =>
+        g.reify {
           //subst(block) = g.effectToExp(g.curBlock) //XXX
-          traverse(b)
-          transform(res)
-        } finally subst -= arg
-      }
-    case _ => ???
-  }
+          traverse(b); transform(res)
+        }
+      case b @ Block(arg :: Nil, res, block, eff) =>
+        g.reify { e =>
+          if (subst contains arg)
+            println(s"Warning: already have a subst for $arg")
+          try {
+            subst(arg) = e
+            //subst(block) = g.effectToExp(g.curBlock) //XXX
+            traverse(b)
+            transform(res)
+          } finally subst -= arg
+        }
+      case _ => ???
+    }
 
-  def transform(n: Node): Exp = n match {
-    case Node(s, "λ", (b @ Block(in, y, ein, eff))::_, _) =>
-      // need to deal with recursive binding!
-      val s1 = Sym(g.fresh)
-      subst(s) = s1
-      g.reflect(s1, "λ", transform(b))()
-    case Node(s,op,rs,es) =>
-      // effect dependencies in target graph are managed by
-      // graph builder, so we drop all effects here
-      val (effects,pure) = (es.deps,rs)
-      val args = pure.map {
-        case b @ Block(_,_,_,_) =>
-          transform(b)
-        case s : Exp =>
-          transform(s)
-        case a =>
-          a
-      }
-      // NOTE: we're not transforming 'effects' here (just the keys)
-      if (effects.nonEmpty)
-        g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
-      else
-        g.reflect(op,args:_*)
-  }
+  def transform(n: Node): Exp =
+    n match {
+      case Node(s, "λ", (b @ Block(in, y, ein, eff)) :: _, _) =>
+        // need to deal with recursive binding!
+        val s1 = Sym(g.fresh)
+        subst(s) = s1
+        g.reflect(s1, "λ", transform(b))()
+      case Node(s, op, rs, es) =>
+        // effect dependencies in target graph are managed by
+        // graph builder, so we drop all effects here
+        val (effects, pure) = (es.deps, rs)
+        val args = pure.map {
+          case b @ Block(_, _, _, _) =>
+            transform(b)
+          case s: Exp =>
+            transform(s)
+          case a =>
+            a
+        }
+        // NOTE: we're not transforming 'effects' here (just the keys)
+        if (effects.nonEmpty)
+          g.reflectEffect(op, args: _*)(es.rkeys.map(transform).toSeq: _*)(es.wkeys.map(transform).toSeq: _*)
+        else
+          g.reflect(op, args: _*)
+    }
 
   override def traverse(n: Node): Unit = {
     subst(n.n) = transform(n)
@@ -539,30 +554,33 @@ abstract class Transformer extends Traverser {
       assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
-      super.apply(graph); transform(graph.block.res) }
-    Graph(g.globalDefs,block, g.globalDefsCache.toMap)
+      super.apply(graph); transform(graph.block.res)
+    }
+    Graph(g.globalDefs, block, g.globalDefsCache.toMap)
   }
 
 }
 
 abstract class CPSTransformer extends Transformer {
 
-  val forwardMap = mutable.Map[Sym, Sym]()  // this Map set up connection for lambda-forward node (sTo -> sFrom)
-  val forwardCPSSet = mutable.Set[Exp]()    // this Set collect sFrom, whose sTo has CPS effect
-  val contSet = mutable.Set.empty[Exp]      // this Set collect all continuation captured by shift1 (so that their application doesn't take more continuations)
+  val forwardMap = mutable.Map[Sym, Sym]() // this Map set up connection for lambda-forward node (sTo -> sFrom)
+  val forwardCPSSet = mutable.Set[Exp]() // this Set collect sFrom, whose sTo has CPS effect
+  val contSet =
+    mutable.Set
+      .empty[Exp] // this Set collect all continuation captured by shift1 (so that their application doesn't take more continuations)
 
-  def withSubst(s: Sym)(e: => Exp) = { subst(s) = e; subst(s) }  // syntactic helper
+  def withSubst(s: Sym)(e: => Exp) = { subst(s) = e; subst(s) } // syntactic helper
   def withSubstScope(args: Sym*)(actuals: Exp*)(k: => Exp) = {
     args foreach { arg => if (subst contains arg) println(s"Warning: already have a subst for $arg") }
     try {
-      args.zip(actuals).foreach{ case (arg, e) => subst(arg) = e}; k
-    } finally args.foreach{ arg => subst -= arg }
+      args.zip(actuals).foreach { case (arg, e) => subst(arg) = e }; k
+    } finally args.foreach { arg => subst -= arg }
   }
 
   def traverse(y: Block, extra: Sym*)(k: Exp => Exp): Exp =
     scheduleBlock_(y, extra: _*) { (path1, inner1, outer1, y) =>
       withScopeCPS(path1, inner1) { (path0, inner0) =>
-        traverse(outer1, y){ v => withScope(path0, inner0)(k(v)) }
+        traverse(outer1, y) { v => withScope(path0, inner0)(k(v)) }
       }
     }
 
@@ -571,79 +589,99 @@ abstract class CPSTransformer extends Transformer {
   }
 
   def transform(b: Block)(k: Exp => Exp): Block =
-    g.reify(b.in.length, (es: List[Exp]) =>
-      withSubstScope(b.in:_*)(es:_*){
-        traverse(b)(k)
-      })
+    g.reify(
+      b.in.length,
+      (es: List[Exp]) =>
+        withSubstScope(b.in: _*)(es: _*) {
+          traverse(b)(k)
+        }
+    )
 
   // need to add additional input to the block, XXX CAN SIMPLIFY ?
   def transformLambda(b: Block): Block = {
     val c = Sym(g.fresh)
-    val block = transform(b)(v => g.reflectWrite("@",c,v)(Adapter.CTRL))
-    Block(c::block.in, block.res, block.ein, block.eff)
+    val block = transform(b)(v => g.reflectWrite("@", c, v)(Adapter.CTRL))
+    Block(c :: block.in, block.res, block.ein, block.eff)
   }
 
   def reflectHelper(es: EffectSummary, op: String, args: Def*): Exp =
     if (es.deps.nonEmpty)
-      g.reflectEffect(op, args: _*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
+      g.reflectEffect(op, args: _*)(es.rkeys.map(transform).toSeq: _*)(es.wkeys.map(transform).toSeq: _*)
     else
-      g.reflect(op, args:_*)
+      g.reflect(op, args: _*)
 
-  def traverse(n: Node)(k: => Exp): Exp = n match {
+  def traverse(n: Node)(k: => Exp): Exp =
+    n match {
 
-    case n @ Node(s,"shift1",List(y:Block),es) =>
-      contSet += y.in.head
-      subst(y.in.head) = g.reflectEffect("λ", g.reify(e => withSubstScope(s)(e)(k)))()()
-      traverse(y)(v => v)
+      case n @ Node(s, "shift1", List(y: Block), es) =>
+        contSet += y.in.head
+        subst(y.in.head) = g.reflectEffect("λ", g.reify(e => withSubstScope(s)(e)(k)))()()
+        traverse(y)(v => v)
 
-    case n @ Node(s,"reset1",List(y:Block),_) =>
-      subst(s) = g.reflectWrite("reset0", transform(y)(v => v))(Adapter.CTRL)
-      k
+      case n @ Node(s, "reset1", List(y: Block), _) =>
+        subst(s) = g.reflectWrite("reset0", transform(y)(v => v))(Adapter.CTRL)
+        k
 
-    case Node(s,"λ", (b: Block)::_, es) =>
-      if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
-        if (b.eff.keys contains Adapter.CPS) forwardCPSSet += forwardMap(subst(s).asInstanceOf[Sym])
-        val s1: Sym = subst(s).asInstanceOf[Sym]
-        g.reflect(s1, "λ", transformLambda(b))(hardSummary(forwardMap(s1)))
-      } else {
-        subst(s) = g.reflect("λ", transformLambda(b))
-      }
-      k
+      case Node(s, "λ", (b: Block) :: _, es) =>
+        if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
+          if (b.eff.keys contains Adapter.CPS) forwardCPSSet += forwardMap(subst(s).asInstanceOf[Sym])
+          val s1: Sym = subst(s).asInstanceOf[Sym]
+          g.reflect(s1, "λ", transformLambda(b))(hardSummary(forwardMap(s1)))
+        } else {
+          subst(s) = g.reflect("λ", transformLambda(b))
+        }
+        k
 
-    case Node(f,"?",c::(a:Block)::(b:Block)::_,es) =>
-      val sIf = g.reflectWrite("λ", g.reify(e => withSubstScope(f)(e)(k)))(Adapter.CTRL) // XXX without this Effect, If branch is repeated!!
-      val kIf = (v:Exp) => g.reflectWrite("@",sIf,v)(Adapter.CTRL)
-      withSubst(f) {
-        reflectHelper(es, "?", c match {case c: Exp => transform(c); case c => ???},
-          transform(a)(kIf), transform(b)(kIf))
-      }
+      case Node(f, "?", c :: (a: Block) :: (b: Block) :: _, es) =>
+        val sIf =
+          g.reflectWrite("λ", g.reify(e => withSubstScope(f)(e)(k)))(
+            Adapter.CTRL
+          ) // XXX without this Effect, If branch is repeated!!
+        val kIf = (v: Exp) => g.reflectWrite("@", sIf, v)(Adapter.CTRL)
+        withSubst(f) {
+          reflectHelper(
+            es,
+            "?",
+            c match { case c: Exp => transform(c); case c => ??? },
+            transform(a)(kIf),
+            transform(b)(kIf)
+          )
+        }
 
-    case Node(f,"W",(c:Block)::(b:Block)::e, es) =>
-      val sLoop = Sym(g.fresh)
-      g.reflect(sLoop, "λ", transform(c)(v =>
-        reflectHelper(es, "?", v, transform(b)(v =>
-          g.reflectWrite("@", sLoop)(Adapter.CTRL)), g.reify(k))))(writeSummary(Adapter.CTRL))
-      withSubst(f)(reflectHelper(es, "@", sLoop))
+      case Node(f, "W", (c: Block) :: (b: Block) :: e, es) =>
+        val sLoop = Sym(g.fresh)
+        g.reflect(
+          sLoop,
+          "λ",
+          transform(c)(v =>
+            reflectHelper(es, "?", v, transform(b)(v => g.reflectWrite("@", sLoop)(Adapter.CTRL)), g.reify(k))
+          )
+        )(writeSummary(Adapter.CTRL))
+        withSubst(f)(reflectHelper(es, "@", sLoop))
 
-    case n @ Node(s,"@",(x:Exp)::(y:Exp)::_,es) if !(contSet contains x) =>
-      val cont = reflectHelper(es, "λ", g.reify{e => subst(s) = e; k})
-      withSubst(s)(reflectHelper(es, "@", transform(x), cont, transform(y)))
+      case n @ Node(s, "@", (x: Exp) :: (y: Exp) :: _, es) if !(contSet contains x) =>
+        val cont = reflectHelper(es, "λ", g.reify { e => subst(s) = e; k })
+        withSubst(s)(reflectHelper(es, "@", transform(x), cont, transform(y)))
 
-    case Node(s,"λforward",List(y:Sym, arity), _) =>
-      assert(!(subst contains y), "should not have handled lambda yet")
-      val sFrom = Sym(g.fresh); val sTo = Sym(g.fresh)
-      subst(s) = sFrom; subst(y) = sTo
-      forwardMap(sTo) = sFrom
-      g.reflect(sFrom, "λforward", sTo, arity)()
-      k
+      case Node(s, "λforward", List(y: Sym, arity), _) =>
+        assert(!(subst contains y), "should not have handled lambda yet")
+        val sFrom = Sym(g.fresh); val sTo = Sym(g.fresh)
+        subst(s) = sFrom; subst(y) = sTo
+        forwardMap(sTo) = sFrom
+        g.reflect(sFrom, "λforward", sTo, arity)()
+        k
 
-    case Node(s,op,rs,es) =>
-      subst(s) = reflectHelper(es, op, rs.map {
-        case b: Block => transform(b)(v => v)
-        case s: Exp => transform(s)
-        case a => a
-      }:_*); k
-  }
+      case Node(s, op, rs, es) =>
+        subst(s) = reflectHelper(
+          es,
+          op,
+          rs.map {
+            case b: Block => transform(b)(v => v)
+            case s: Exp => transform(s)
+            case a => a
+          }: _*
+        ); k
+    }
 
   def applyExp(graph: Graph): Exp = {
     bound(graph)
@@ -666,34 +704,42 @@ abstract class CPSTransformer extends Transformer {
 
 abstract class SelectiveCPSTransformer extends CPSTransformer {
 
-  override def traverse(n: Node)(k: => Exp): Exp = n match {
+  override def traverse(n: Node)(k: => Exp): Exp =
+    n match {
 
-    case Node(s,"shift1",List(y:Block),_) => super.traverse(n)(k)
-    case Node(s,"reset1",List(y:Block),_) => super.traverse(n)(k)
-    case Node(s,"λforward", _, _) => super.traverse(n)(k)
-    case Node(f,"?",c::(a:Block)::(b:Block)::_,es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
-    case Node(f,"W",(c:Block)::(b:Block)::e, es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
-    // the es.keys of "@" node may have Adapter.CPS, if and only if the lambda has Adapter.CPS
-    case Node(s,"@",(x:Exp)::(y:Exp)::_,es) if (es.keys.contains(Adapter.CPS) ||
-      forwardCPSSet.contains(subst(x.asInstanceOf[Sym]))) => super.traverse(n)(k)
-    // lambda need to capture the CPS effect of its body block
-    case Node(s,"λ", List(b: Block),es) if (b.eff.keys contains Adapter.CPS) => super.traverse(n)(k)
+      case Node(s, "shift1", List(y: Block), _) => super.traverse(n)(k)
+      case Node(s, "reset1", List(y: Block), _) => super.traverse(n)(k)
+      case Node(s, "λforward", _, _) => super.traverse(n)(k)
+      case Node(f, "?", c :: (a: Block) :: (b: Block) :: _, es) if (es.keys contains Adapter.CPS) =>
+        super.traverse(n)(k)
+      case Node(f, "W", (c: Block) :: (b: Block) :: e, es) if (es.keys contains Adapter.CPS) => super.traverse(n)(k)
+      // the es.keys of "@" node may have Adapter.CPS, if and only if the lambda has Adapter.CPS
+      case Node(s, "@", (x: Exp) :: (y: Exp) :: _, es)
+          if (es.keys.contains(Adapter.CPS) ||
+            forwardCPSSet.contains(subst(x.asInstanceOf[Sym]))) =>
+        super.traverse(n)(k)
+      // lambda need to capture the CPS effect of its body block
+      case Node(s, "λ", List(b: Block), es) if (b.eff.keys contains Adapter.CPS) => super.traverse(n)(k)
 
-    case Node(s,"λ", List(b: Block),es) =>
-      if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
-        val s1: Sym = subst(s).asInstanceOf[Sym]
-        g.reflect(s1, "λ", transform(b)(v => v))(hardSummary(forwardMap(s1)))
-      } else {
-        subst(s) = g.reflect("λ", transform(b)(v => v))
-      }
-      k
+      case Node(s, "λ", List(b: Block), es) =>
+        if (subst contains s) { // "subst of $s has be handled by lambda forward to be ${subst(s)}"
+          val s1: Sym = subst(s).asInstanceOf[Sym]
+          g.reflect(s1, "λ", transform(b)(v => v))(hardSummary(forwardMap(s1)))
+        } else {
+          subst(s) = g.reflect("λ", transform(b)(v => v))
+        }
+        k
 
-    case Node(s,op,rs,es) => // catch-all case is not calling super, but transforming everything without CPS
-      subst(s) = reflectHelper(es, op, rs.map {
-        case b: Block => transform(b)(v => v)
-        case s: Exp => transform(s)
-        case a => a
-      }:_*);
-      k
-  }
+      case Node(s, op, rs, es) => // catch-all case is not calling super, but transforming everything without CPS
+        subst(s) = reflectHelper(
+          es,
+          op,
+          rs.map {
+            case b: Block => transform(b)(v => v)
+            case s: Exp => transform(s)
+            case a => a
+          }: _*
+        );
+        k
+    }
 }

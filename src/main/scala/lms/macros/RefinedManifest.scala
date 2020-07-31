@@ -5,25 +5,28 @@ import scala.language.dynamics
 import scala.reflect.macros.whitebox.Context
 
 trait RefinedManifest[T] extends Manifest[T] {
-  override def canEqual(other: Any) = other match {
-    case _: RefinedManifest[_] => true
-    case _                     => false
-  }
+  override def canEqual(other: Any) =
+    other match {
+      case _: RefinedManifest[_] => true
+      case _ => false
+    }
 
   /** Tests whether the type represented by this manifest is equal to
     * the type represented by `that` manifest, subject to the limitations
     * described in the header.
     */
-  override def equals(that: Any): Boolean = that match {
-    case m: RefinedManifest[_] => (m canEqual this) && (this.erasure == m.erasure) && (this.fields == m.fields)
-    case _                     => false
-  }
+  override def equals(that: Any): Boolean =
+    that match {
+      case m: RefinedManifest[_] => (m canEqual this) && (this.erasure == m.erasure) && (this.fields == m.fields)
+      case _ => false
+    }
 
   override def hashCode = this.erasure.##
 
-  override def toString = s"Anon${(0xdeadbeef /: fields.zipWithIndex) {
-    case (agg, ((name, man), idx)) => (agg * 5) + (1 + idx) * (name.## + man.##)
-  }.abs}"
+  override def toString =
+    s"Anon${(0xdeadbeef /: fields.zipWithIndex) {
+      case (agg, ((name, man), idx)) => (agg * 5) + (1 + idx) * (name.## + man.##)
+    }.abs}"
 
   def fields: List[(String, Manifest[_])]
 }
@@ -34,20 +37,20 @@ trait RecordOps {
 
   type Rep[+T]
 
-  def record_new[T:RefinedManifest](fields: (String, Rep[_])*): Rep[T]
+  def record_new[T: RefinedManifest](fields: (String, Rep[_])*): Rep[T]
 
-  def record_select[T:Manifest](record: Rep[Record], field: String): Rep[T]
+  def record_select[T: Manifest](record: Rep[Record], field: String): Rep[T]
 
   /* User interface for create anonymous Records with named fields */
   object Record extends Dynamic {
 
     /**
-     * Create a "literal record" with field value pairs `v` using named
-     * parameters:
-     * {{{
-     * Record(name = "Hans", age = 7)
-     * }}}
-     */
+      * Create a "literal record" with field value pairs `v` using named
+      * parameters:
+      * {{{
+      * Record(name = "Hans", age = 7)
+      * }}}
+      */
 
     def applyDynamicNamed(method: String)(v: (String, Any)*): Any =
       macro RecordMacros.apply_impl[Rep[_]]
@@ -61,7 +64,7 @@ trait RecordOps {
     ev(rec)
 
   sealed trait RecordEvidence[+T]
-  implicit def ev[T <: Record]: RecordEvidence[T] = new RecordEvidence[T]{}
+  implicit def ev[T <: Record]: RecordEvidence[T] = new RecordEvidence[T] {}
   implicit def __$materializeManifest[T <: Record](implicit ev: RecordEvidence[T]): RefinedManifest[T] =
     macro RecordMacros.materializeManifest[T]
 
@@ -88,18 +91,19 @@ class RecordMacros(val c: Context) {
   }
 
   /**
-   * Macro that implements [[Record.applyDynamicNamed]].
-   */
+    * Macro that implements [[Record.applyDynamicNamed]].
+    */
   def recordApply(tp: Type)(v: Seq[c.Expr[(String, Any)]]): c.Expr[Any] = {
     val constantLiteralsMsg = "Records can only be constructed with constant keys (string literals)."
     val noEmptyStrMsg = "Records may not have a field with an empty name"
 
     object Tuple2 {
-      def unapply(tree: Tree): Option[(Tree, Tree)] = tree match {
-        case q"($a, $b)" => Some((a, b))
-        case q"scala.this.Tuple2.apply[..${ _ }]($a, $b)" => Some((a, b))
-        case _ => None
-      }
+      def unapply(tree: Tree): Option[(Tree, Tree)] =
+        tree match {
+          case q"($a, $b)" => Some((a, b))
+          case q"scala.this.Tuple2.apply[..${_}]($a, $b)" => Some((a, b))
+          case _ => None
+        }
     }
     val tuples = v.map(_.tree).map {
       case Tuple2(Literal(Constant(s: String)), v) =>
@@ -139,11 +143,13 @@ class RecordMacros(val c: Context) {
 
     val srcMembers = c.weakTypeTag[A].tpe.members.collect { case x: MethodSymbol if x.isStable => x }
     val dstTpeMembers = srcMembers.map(x => q"""def ${x.name}: Rep[${x.returnType}]""")
-    val dstMembers = srcMembers.map {x => q"""
+    val dstMembers = srcMembers.map { x =>
+      q"""
       def ${x.name}: Rep[${x.returnType}] =
         record_select[${x.returnType}](rec,${x.name.toString})(
           ${tpeManifest(x.returnType)}.asInstanceOf[Manifest[${x.returnType}]])
-    """}
+    """
+    }
 
     val accessor = q"""new RecordAccessor[Rep[${weakTypeOf[A]}],{..$dstTpeMembers}]{
       def apply(rec: Rep[${weakTypeOf[A]}]): {..$dstTpeMembers} = new {
@@ -154,12 +160,11 @@ class RecordMacros(val c: Context) {
     accessor
   }
 
-  def materializeManifest[A <: Record : c.WeakTypeTag](ev: Tree): Tree ={
+  def materializeManifest[A <: Record: c.WeakTypeTag](ev: Tree): Tree = {
     val tp = c.weakTypeTag[A].tpe
 
     q"${refinedManifest(recordTypes(tp))}.asInstanceOf[_root_.org.scala_lang.virtualized.RefinedManifest[$tp]]"
   }
-
 
   private def checkDuplicate(schema: Seq[(String, c.Type)]): Unit = {
     val duplicateFields = schema.groupBy(_._1).filter(_._2.size > 1)
@@ -172,13 +177,14 @@ class RecordMacros(val c: Context) {
     }
   }
 
-  private def recordTypes(tpe: Type): Seq[(String, Type)] = for {
-    mem <- tpe.declarations.sorted
-    if mem.asMethod.isStable
-  } yield (mem.name.encoded, mem.asMethod.returnType)
+  private def recordTypes(tpe: Type): Seq[(String, Type)] =
+    for {
+      mem <- tpe.declarations.sorted
+      if mem.asMethod.isStable
+    } yield (mem.name.encoded, mem.asMethod.returnType)
 
   private def tpeManifest(tpe: Type): Tree =
-    if(tpe <:< typeOf[Record]) refinedManifest(recordTypes(tpe)) else q"manifest[$tpe]"
+    if (tpe <:< typeOf[Record]) refinedManifest(recordTypes(tpe)) else q"manifest[$tpe]"
 
   private def refinedManifest(schema: Seq[(String, Type)]): Tree = q"""
     new _root_.org.scala_lang.virtualized.RefinedManifest[Record] {
