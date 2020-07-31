@@ -267,8 +267,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
         val block = Adapter.g.reify(arity, gf)
-        val res = if (decorator == "") Adapter.g.reflect(fn, "λ", block, Backend.Const(0))()
-                  else Adapter.g.reflect(fn, "λ", block, Backend.Const(0), Backend.Const(decorator))()
+        val res = Adapter.g.reflect(fn, "λ", block, Backend.Const(0), Backend.Const(decorator))()
         topLevelFunctions.getOrElseUpdate(can, fn)
         fn
     }

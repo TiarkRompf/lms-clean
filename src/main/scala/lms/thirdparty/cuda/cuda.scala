@@ -10,7 +10,7 @@ import lms.macros.{SourceContext, RefinedManifest}
 
 import lms.collection.mutable.{StackArrayOps}
 
-trait CudaOps extends Base with SizeTOps with StackArrayOps with CLibs with CudaFunction {
+trait CudaOps extends Base with RangeOps with SizeTOps with StackArrayOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */
   // 1. support bindings to manual cuda kernels
   // 2. support bindings to cublas library ???
@@ -205,6 +205,9 @@ trait CudaOps extends Base with SizeTOps with StackArrayOps with CLibs with Cuda
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]) =
     Wrap[(A,B,C,D,E,Dim3,Dim3)=>F](__topFun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)))), "__global__"))
+
+  def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]) =
+    Wrap[(A,B,C,D,E,F,Dim3,Dim3)=>G](__topFun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), "__global__"))
 
   // When coding kernel functions, we often need some kernel variables
   def gridDimX = cmacro[Int]("gridDim.x")
