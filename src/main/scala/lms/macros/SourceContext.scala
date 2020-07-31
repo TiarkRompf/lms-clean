@@ -6,44 +6,41 @@ import scala.language.experimental.macros
 import scala.collection.mutable.HashMap
 
 /** A SourceContext is a descriptor for the invocation of a method that takes
- *  an implicit parameter of type SourceContext. It provides information about the
- *  location in the source where the method is invoked, such as the source file name
- *  and line number.
- */
+  *  an implicit parameter of type SourceContext. It provides information about the
+  *  location in the source where the method is invoked, such as the source file name
+  *  and line number.
+  */
 
 trait SourceContext {
 
   /** The full path of the source file of the calling location
-   */
+    */
   def path: String
 
   /** The name of the source file of the calling location
-   */
+    */
   def fileName: String
 
   /** The line number of the calling location
-   */
+    */
   def line: Int
 
   /** The column of the calling location
-   */
+    */
   def column: Int
 
   /** The name of the method being called
-   */
+    */
   def methodName: String
 
   /** The name of the value / variable instantiated to hold the result of the method
-   */
+    */
   def assignedVariable: Option[String]
-
 
   // Not yet supported
   // def parent: Option[SourceContext]
 
-
   override def toString(): String = fileName + ":" + line + ":" + column
-
 
   // def update(context: SourceContext): SourceContext
   // def receiver: Option[String]
@@ -54,10 +51,24 @@ object SourceContext {
 
   implicit def _sc: SourceContext = macro SourceContextMacro.impl
 
-  def apply(path: String, fileName: String, line: Int, column: Int, methodName: String, assignedVariable: Option[String]): SourceContext =
+  def apply(
+      path: String,
+      fileName: String,
+      line: Int,
+      column: Int,
+      methodName: String,
+      assignedVariable: Option[String]
+  ): SourceContext =
     ConcreteSourceContext(path, fileName, line, column, methodName, assignedVariable)
 
-  private case class ConcreteSourceContext(val path: String, val fileName: String, val line: Int, val column: Int, val methodName: String, val assignedVariable: Option[String]) extends SourceContext {
+  private case class ConcreteSourceContext(
+      val path: String,
+      val fileName: String,
+      val line: Int,
+      val column: Int,
+      val methodName: String,
+      val assignedVariable: Option[String]
+  ) extends SourceContext {
     override def toString(): String = fileName + ":" + line + ":" + column
   }
 }
@@ -81,7 +92,6 @@ private object SourceContextMacro {
     val owner = c.internal.enclosingOwner
     val assignedVariable = if (!owner.isMethod && owner.isTerm) Some(owner.name.toString) else None
 
-
     def isBreak(x: Char) = x == ' ' || x == '.' || x == '(' || x == ')' || x == ';'
 
     // HACK: Haven't yet found a simpler way of determining which method call this is in reference to
@@ -93,17 +103,17 @@ private object SourceContextMacro {
     // TODO: pos.source.lineToString occassionally doesn't match up with the given column?
     val methodName = if (line > 0 && column > 0) {
       try {
-        val str = pos.source.lineToString(line-1)
+        val str = pos.source.lineToString(line - 1)
 
-        var start = column-1
-        var end = column-1
-        if (isBreak(str(column-1))) start -= 1
+        var start = column - 1
+        var end = column - 1
+        if (isBreak(str(column - 1))) start -= 1
 
         while (start >= 0 && !isBreak(str(start))) start -= 1
         while (end < str.length && !isBreak(str(end))) end += 1
         if (start < 0 || isBreak(str(start))) start = start + 1
         if (end >= str.length || isBreak(str(end))) end = end - 1
-        val tight = str.slice(start, end+1).trim
+        val tight = str.slice(start, end + 1).trim
 
         // The scala compiler MUST have had this information at some point to give us the correct column,
         // but it seems there's no way to get it?
@@ -111,48 +121,50 @@ private object SourceContextMacro {
         // c.info(c.enclosingPosition, "Tight: " + tight, true)
         // c.info(c.enclosingPosition, showRaw(tightTree), true)
 
-        def extractMethod(tree: Tree, depth: Int = 0): String = tree match {
-          case Select(term,func) => func.decodedName.toString //tight.replace(name,"")
-          case Apply(Select(term,func), _) if depth == 0 => func.decodedName.toString
-          case Apply(Select(term,func), _) => extractMethod(term, depth-1)
-          case _ => tight
-        }
+        def extractMethod(tree: Tree, depth: Int = 0): String =
+          tree match {
+            case Select(term, func) => func.decodedName.toString //tight.replace(name,"")
+            case Apply(Select(term, func), _) if depth == 0 => func.decodedName.toString
+            case Apply(Select(term, func), _) => extractMethod(term, depth - 1)
+            case _ => tight
+          }
+
         /**
-        Given a call val x = a+b-c
-
-        We see something for a+b-c that looks like:
-              Apply(
-                Select(
-                  Apply(
-                    Select(a, TermName(+)),
-                    List(b)
-                  ),
-                  TermName(-)
-                ),
-                List(c)
-              )
-
-          Essentially means the operators are in a reversed linked list,
-          so we need to know depth of list (number of times we'll see this string)
-          and we need to count the number of times we've seen this same string so far
-        **/
-        def getMethodDepth(tree: Tree, depth: Int = 0): Int = tree match {
-          case Select(term,func) => depth+1
-          case Apply(Select(term,func), _) => getMethodDepth(term, depth+1)
-          case _ => depth
-        }
+          *        Given a call val x = a+b-c
+          *
+          *        We see something for a+b-c that looks like:
+          *              Apply(
+          *                Select(
+          *                  Apply(
+          *                    Select(a, TermName(+)),
+          *                    List(b)
+          *                  ),
+          *                  TermName(-)
+          *                ),
+          *                List(c)
+          *              )
+          *
+          *          Essentially means the operators are in a reversed linked list,
+          *          so we need to know depth of list (number of times we'll see this string)
+          *          and we need to count the number of times we've seen this same string so far
+          */
+        def getMethodDepth(tree: Tree, depth: Int = 0): Int =
+          tree match {
+            case Select(term, func) => depth + 1
+            case Apply(Select(term, func), _) => getMethodDepth(term, depth + 1)
+            case _ => depth
+          }
 
         val depth = depths.getOrElseUpdate(tight, getMethodDepth(tightTree) - 1)
         val visit = visits.getOrElse(tight, 0)
         visits += tight -> (visit + 1)
 
-        extractMethod(tightTree, depth-visit) // Go to the last operator for the first, and so on
+        extractMethod(tightTree, depth - visit) // Go to the last operator for the first, and so on
+      } catch {
+        case e: Throwable =>
+          "<unknown>"
       }
-      catch {case e:Throwable =>
-        "<unknown>"
-      }
-    }
-    else {
+    } else {
       "<unknown>"
     }
 

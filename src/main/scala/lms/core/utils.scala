@@ -15,9 +15,10 @@ object utils {
   def time[A](key: String)(a: => A) = {
     val start = System.nanoTime
     val saveTime = timeInSub
-    scope = key::scope
+    scope = key :: scope
     timeInSub = 0
-    try a finally {
+    try a
+    finally {
       val timeElapsed = (System.nanoTime - start) / 1000
       val timeHere = timeElapsed - timeInSub
 
@@ -54,11 +55,12 @@ object utils {
   def devnull(f: => Unit): Unit = {
     withOutput(nullout)(f)
   }
-  def nullout = new PrintStream(new OutputStream() {
-    override def write(b: Int) = {}
-    override def write(b: Array[Byte]) = {}
-    override def write(b: Array[Byte], off: Int, len: Int) = {}
-  })
+  def nullout =
+    new PrintStream(new OutputStream() {
+      override def write(b: Int) = {}
+      override def write(b: Array[Byte]) = {}
+      override def write(b: Array[Byte], off: Int, len: Int) = {}
+    })
   def withOutputFull(out: PrintStream)(func: => Unit): Unit = {
     val oldStdOut = System.out
     val oldStdErr = System.err

@@ -13,7 +13,7 @@ trait SetOps { b: Base =>
     def apply[A: Manifest](xs: Rep[A]*)(implicit pos: SourceContext) = {
       val mA = Backend.Const(manifest[A])
       val unwrapped_xs = Seq(mA) ++ xs.map(Unwrap)
-      Wrap[Set[A]](Adapter.g.reflect("set-new", unwrapped_xs:_*))
+      Wrap[Set[A]](Adapter.g.reflect("set-new", unwrapped_xs: _*))
     }
   }
 
@@ -54,20 +54,23 @@ trait SetOpsOpt extends SetOps { b: Base =>
   implicit override def __liftVarSet[A: Manifest](xs: Var[Set[A]]): SetOps[A] = new SetOpsOpt(readVar(xs))
 
   implicit class SetOpsOpt[A: Manifest](xs: Rep[Set[A]]) extends SetOps[A](xs) {
-    override def ++(ys: Rep[Set[A]]): Rep[Set[A]] = (Unwrap(xs), Unwrap(ys)) match {
-      case (Adapter.g.Def("set-new", mA::(xs: List[Backend.Exp])),
-            Adapter.g.Def("set-new",  _::(ys: List[Backend.Exp]))) =>
-        val unwrapped_xsys = Seq(mA) ++ xs ++ ys
-        Wrap[Set[A]](Adapter.g.reflect("set-new", unwrapped_xsys:_*))
-      case (Adapter.g.Def("set-new", mA::(xs: List[Backend.Exp])), _) if xs.isEmpty =>
-        ys
-      case (_, Adapter.g.Def("set-new", mA::(ys: List[Backend.Exp]))) if ys.isEmpty =>
-        xs
-      case _ => super.++(ys)
-    }
+    override def ++(ys: Rep[Set[A]]): Rep[Set[A]] =
+      (Unwrap(xs), Unwrap(ys)) match {
+        case (
+              Adapter.g.Def("set-new", mA :: (xs: List[Backend.Exp])),
+              Adapter.g.Def("set-new", _ :: (ys: List[Backend.Exp]))
+            ) =>
+          val unwrapped_xsys = Seq(mA) ++ xs ++ ys
+          Wrap[Set[A]](Adapter.g.reflect("set-new", unwrapped_xsys: _*))
+        case (Adapter.g.Def("set-new", mA :: (xs: List[Backend.Exp])), _) if xs.isEmpty =>
+          ys
+        case (_, Adapter.g.Def("set-new", mA :: (ys: List[Backend.Exp]))) if ys.isEmpty =>
+          xs
+        case _ => super.++(ys)
+      }
     override def foldLeft[B: Manifest](z: Rep[B])(f: (Rep[B], Rep[A]) => Rep[B]): Rep[B] =
       Unwrap(xs) match {
-        case Adapter.g.Def("set-new", mA::(xs: List[Backend.Exp])) => 
+        case Adapter.g.Def("set-new", mA :: (xs: List[Backend.Exp])) =>
           xs.map(Wrap[A](_)).foldLeft(z)(f)
         case _ => super.foldLeft(z)(f)
       }
@@ -82,52 +85,55 @@ trait ScalaCodeGen_Set extends ExtendedScalaCodeGen {
     } else { super.remap(m) }
   }
 
-  override def mayInline(n: Node): Boolean = n match {
-    case Node(_, "set-++", _, _) => false
-    case Node(_, "set-intersect", _, _) => false
-    case Node(_, "set-union", _, _) => false
-    case Node(_, "set-subsetOf", _, _) => false
-    case Node(_, "set-map", _, _) => false
-    case Node(_, "set-foldLeft", _, _) => false
-    case Node(_, "set-filter", _, _) => false
-    case _ => super.mayInline(n)
-  }
+  override def mayInline(n: Node): Boolean =
+    n match {
+      case Node(_, "set-++", _, _) => false
+      case Node(_, "set-intersect", _, _) => false
+      case Node(_, "set-union", _, _) => false
+      case Node(_, "set-subsetOf", _, _) => false
+      case Node(_, "set-map", _, _) => false
+      case Node(_, "set-foldLeft", _, _) => false
+      case Node(_, "set-filter", _, _) => false
+      case _ => super.mayInline(n)
+    }
 
-  override def shallow(n: Node): Unit = n match {
-    case Node(s, "set-new", Const(mA: Manifest[_])::xs, _) =>
-      val ty = remap(mA)
-      emit("Set["); emit(ty); emit("](")
-      xs.zipWithIndex.map { case (x, i) =>
-        shallow(x)
-        if (i != xs.length-1) emit(", ")
-      }
-      emit(")")
-    case Node(_, "set-apply", List(s, x), _) =>
-      shallow(s); emit("("); shallow(x); emit(")")
-    case Node(_, "set-size", List(s), _) =>
-      shallow(s); emit(".size")
-    case Node(_, "set-isEmpty", List(s), _) =>
-      shallow(s); emit(".isEmpty")
-    case Node(_, "set-head", List(s), _) =>
-      shallow(s); emit(".head")
-    case Node(_, "set-tail", List(s), _) =>
-      shallow(s); emit(".tail")
-    case Node(_, "set-toList", List(s), _) =>
-      shallow(s); emit(".toList")
-    case Node(_, "set-++", List(s1, s2), _) =>
-      shallow(s1); emit(" ++ "); shallow(s2)
-    case Node(_, "set-intersect", List(s1, s2), _) =>
-      shallow(s1); emit(".intersect("); shallow(s2); emit(")")
-    case Node(_, "set-union", List(s1, s2), _) =>
-      shallow(s1); emit(".union("); shallow(s2); emit(")")
-    case Node(_, "set-subsetOf", List(s1, s2), _) =>
-      shallow(s1); emit(".subsetOf("); shallow(s2); emit(")")
-    case Node(_, "set-map", List(s, b), _) =>
-      shallow(s); emit(".map("); shallow(b); emit(")")
-    case Node(_, "set-foldLeft", List(s, z, b), _) =>
-      shallow(s); emit(".foldLeft("); shallow(z); emit(")("); shallow(b); emit(")")
-    case Node(_, "set-filter", List(s, b), _) =>
-      shallow(s); emit(".filter("); shallow(b); emit(")")
-    case _ => super.shallow(n)
-  }
+  override def shallow(n: Node): Unit =
+    n match {
+      case Node(s, "set-new", Const(mA: Manifest[_]) :: xs, _) =>
+        val ty = remap(mA)
+        emit("Set["); emit(ty); emit("](")
+        xs.zipWithIndex.map {
+          case (x, i) =>
+            shallow(x)
+            if (i != xs.length - 1) emit(", ")
+        }
+        emit(")")
+      case Node(_, "set-apply", List(s, x), _) =>
+        shallow(s); emit("("); shallow(x); emit(")")
+      case Node(_, "set-size", List(s), _) =>
+        shallow(s); emit(".size")
+      case Node(_, "set-isEmpty", List(s), _) =>
+        shallow(s); emit(".isEmpty")
+      case Node(_, "set-head", List(s), _) =>
+        shallow(s); emit(".head")
+      case Node(_, "set-tail", List(s), _) =>
+        shallow(s); emit(".tail")
+      case Node(_, "set-toList", List(s), _) =>
+        shallow(s); emit(".toList")
+      case Node(_, "set-++", List(s1, s2), _) =>
+        shallow(s1); emit(" ++ "); shallow(s2)
+      case Node(_, "set-intersect", List(s1, s2), _) =>
+        shallow(s1); emit(".intersect("); shallow(s2); emit(")")
+      case Node(_, "set-union", List(s1, s2), _) =>
+        shallow(s1); emit(".union("); shallow(s2); emit(")")
+      case Node(_, "set-subsetOf", List(s1, s2), _) =>
+        shallow(s1); emit(".subsetOf("); shallow(s2); emit(")")
+      case Node(_, "set-map", List(s, b), _) =>
+        shallow(s); emit(".map("); shallow(b); emit(")")
+      case Node(_, "set-foldLeft", List(s, z, b), _) =>
+        shallow(s); emit(".foldLeft("); shallow(z); emit(")("); shallow(b); emit(")")
+      case Node(_, "set-filter", List(s, b), _) =>
+        shallow(s); emit(".filter("); shallow(b); emit(")")
+      case _ => super.shallow(n)
+    }
 }
