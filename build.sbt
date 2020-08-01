@@ -4,7 +4,7 @@ organization := "org.scala-lang.virtualized"
 
 version := "0.0.1-SNAPSHOT"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.12.10"
 
 val paradiseVersion = "2.1.0"
 
