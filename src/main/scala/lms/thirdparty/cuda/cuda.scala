@@ -11,7 +11,7 @@ import lms.macros.SourceContext
 import lms.collection.mutable.{ArrayOps, StackArrayOps}
 
 trait WhyOps extends Base with PrimitiveOps with CLibs{
-  def what(a: Rep[Int], b: Rep[Int]) = {
+  def what(a: Rep[Int], b: Rep[Int])(implicit __pos: SourceContext) = {
     val aa = a + b
     val bb = a * b
     val cc = a - b
