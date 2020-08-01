@@ -223,23 +223,10 @@ trait CudaOps extends PrimitiveOps with LiftPrimitives
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
-  // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
-  /**
-    * Here I wanted to use T:Numeric to support generic types in the cudaGlobalFuns
-    * It works locally but cannot compile in GitHub Actions :(
-    * So for now just use a compromised method (let N = Float)
-    */
-  type N = Float
-
-  // cudaFill: fill a `data` of `size` with value `value`
-  @virtualize
-  def cudaFill = cudaGlobalFun { (data: Rep[Array[N]], value: Rep[N], size: Rep[Int]) =>
-    val stride = gridDimX * blockDimX
-    val tid = threadIdxX + blockIdxX * blockDimX
-    for (i <- tid.until(size, stride)) {
-      data(i) = value
-    }
-  }
+  def a: Rep[Int] = gridDimX + gridDimX
+  def a: Rep[Int] = gridDimX - gridDimX
+  def a: Rep[Int] = gridDimX * gridDimX
+  def a: Rep[Int] = gridDimX / gridDimX
 
 }
 
