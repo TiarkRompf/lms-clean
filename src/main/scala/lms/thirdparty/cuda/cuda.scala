@@ -224,12 +224,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
 
   // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
-  /**
-    * Here I wanted to use T:Numeric to support generic types in the cudaGlobalFuns
-    * It works locally but cannot compile in GitHub Actions :(
-    * So for now just use a compromised method (let N = Float)
-    */
-  type N = Float
 
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
@@ -298,33 +292,30 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       xGrad(offset) -= yGrad(tid)
     }
 
-  // // sumGrad: grad operation of a sum op (by a given axis)
-  // // FIXME(feiw) to be tested
-  // @virtualize
-  // def sumGrad(rank: Int, dim: Int) = cudaGlobalFun { (xGrad: Rep[Array[N]], xSize: Rep[Array[Int]],
-  //     size: Rep[Int], yGrad: Rep[Array[N]], yStrides: Rep[Array[Int]]) =>
-  //   val tid = threadIdxX + blockIdxX * blockDimX
-  //   val stride = gridDimX * blockDimX
-  //   for (i <- tid.until(size, stride)) {
-  //     // compute indice of yGrad from flat tid (i)
-  //     val indices = scala.collection.mutable.ArrayBuffer[Rep[Int]]()
-  //     var offset = i
-  //     for (j <- ((0 until rank): Range).reverse) {
-  //       val tempOffset = offset / xSize(j)
-  //       if (j != dim)
-  //         indices.prepend(offset - tempOffset * xSize(j))
-  //       offset = tempOffset
-  //     }
-  //     // compute offset of yGrad from indice
-  //     val yOffset = indices.zipWithIndex.foldLeft(unit(0)) {
-  //       case (o, (d, i)) => o + d * yStrides(i)
-  //     }
-  //     // operate data
-  //     xGrad(i) += yGrad(yOffset)
-  //   }
-  // }
-
-
+  // sumGrad: grad operation of a sum op (by a given axis)
+  // FIXME(feiw) to be tested
+  def sumGrad[N:Numeric:Manifest](rank: Int, dim: Int)(implicit __pos: SourceContext) = cudaGlobalFun {
+    (xGrad: Rep[Array[N]], xSize: Rep[Array[Int]], size: Rep[Int], yGrad: Rep[Array[N]], yStrides: Rep[Array[Int]]) =>
+      val tid = threadIdxX + blockIdxX * blockDimX
+      val stride = gridDimX * blockDimX
+      for (i <- tid.until(size, stride): Rep[Range]) {
+        // compute indice of yGrad from flat tid (i)
+        val indices = scala.collection.mutable.ArrayBuffer[Rep[Int]]()
+        var offset = i
+        for (j <- ((0 until rank): Range).reverse) {
+          val tempOffset = offset / xSize(j)
+          if (j != dim)
+            indices.prepend(offset - tempOffset * xSize(j))
+          offset = tempOffset
+        }
+        // compute offset of yGrad from indice
+        val yOffset = indices.zipWithIndex.foldLeft(unit(0)) {
+          case (o, (d, i)) => o + d * yStrides(i)
+        }
+        // operate data
+        xGrad(i) += yGrad(yOffset)
+      }
+    }
 
 }
 

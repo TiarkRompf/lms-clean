@@ -110,5 +110,35 @@ class CudaTest extends TutorialFunSuite {
     check("cap_gen_kernel", driver.code, "cu")
   }
 
+  test("remove_conditional") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        // now lets use the function with 2 different setting
+        val arr = Array(1, 2, 3, 4, 5)
+        val cuda_arr = cudaMalloc2[Int](5)
+        cudaCall(cudaMemcpyOfT(cuda_arr, arr, 5, host2device))
+        val cuda_grad = cudaMalloc2[Int](5)
+        cudaArrayFill[Int](cuda_grad, 8, 5)
+
+        // not inPlace
+        val cuda_inG = cudaMalloc2[Int](5)
+        val hardTanhGradIntFalse = hardTanhGrad[Int](false)
+        hardTanhGradIntFalse(cuda_arr, cuda_inG, cuda_grad, -2, 2, 5, dim3(28), dim3(512))
+        printf("%d %d %d %d %d", cuda_inG(0), cuda_inG(1), cuda_inG(2), cuda_inG(3), cuda_inG(4))
+
+        // inPlace
+        val hardTanhGradIntTrue = hardTanhGrad[Int](true)
+        hardTanhGradIntTrue(cuda_arr, cuda_grad, cuda_grad, -2, 2, 5, dim3(28), dim3(512))
+        printf("%d %d %d %d %d", cuda_grad(0), cuda_grad(1), cuda_grad(2), cuda_grad(3), cuda_grad(4))
+
+        cudaCall(cudaFree(cuda_arr))
+        cudaCall(cudaFree(cuda_grad))
+        cudaCall(cudaFree(cuda_inG))
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
 }
 
