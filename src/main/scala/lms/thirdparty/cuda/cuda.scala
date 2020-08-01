@@ -250,6 +250,17 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
         __ifThenElse(data(i) < -bound, {data(i) = -bound}, {})
       }
     }
+
+  // hardTanh: cap the value of `data` by `min` and `max`
+  def handTanh[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (data: Rep[Array[N]], out: Rep[Array[N]], min: Rep[N], max: Rep[N], size: Rep[Int]) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(size, stride)) {
+        out(i) = __ifThenElse(data(i) < min, min,
+                 __ifThenElse(data(i) > max, max, data(i)))
+      }
+    }
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
