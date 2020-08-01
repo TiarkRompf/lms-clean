@@ -241,8 +241,8 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     }
 
   // cudaCap: cap the absolute value of `data`
-  def cudaCap(implicit __pos: SourceContext) = cudaGlobalFun {
-    (data: Rep[Array[N]], bound: Rep[N], size: Rep[Int]) =>
+  def cudaCap[T:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (data: Rep[Array[T]], bound: Rep[T], size: Rep[Int]) =>
       val stride = gridDimX * blockDimX
       val tid = threadIdxX + blockIdxX * blockDimX
       for (i <- tid.until(size, stride): Rep[Range]) {

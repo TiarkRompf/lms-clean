@@ -840,6 +840,10 @@ trait PrimitiveOps extends Base with OverloadHack {
     def toLong(implicit __pos: SourceContext): Rep[Long] = cast_helper[Char,Long](self)
   }
 
+  implicit class GenericMathOpsCls[T:Numeric:Manifest](val self: Rep[T])(implicit __pos: SourceContext) {
+    def unary_- = Arithmetic.unary_-[T](self)
+  }
+
   // Int
   object Int {
     def parseInt(s: Rep[String])(implicit __pos: SourceContext): Rep[Int] = ???
