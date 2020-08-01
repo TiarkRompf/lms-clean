@@ -259,7 +259,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // XXX: is this data structure needed? should it move elsewhere?
   // could we use funTable instead?
   val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
-  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp): Backend.Exp = {
+  def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, decorator: String = ""): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
       case Some((funSym, _)) => funSym
@@ -267,7 +267,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
         val block = Adapter.g.reify(arity, gf)
-        val res = Adapter.g.reflect(fn, "λ", block, Backend.Const(0))()
+        val res = Adapter.g.reflect(fn, "λ", block, Backend.Const(0), Backend.Const(decorator))()
         topLevelFunctions.getOrElseUpdate(can, fn)
         fn
     }
@@ -556,7 +556,7 @@ trait UtilOps extends Base {
   def infix_HashCodeS(o: Rep[String], len: Rep[Int])(implicit v: Overloaded1, pos: SourceContext) = StrSubHashCode(o,len)
 }
 
-trait RangeOps extends Equal {
+trait RangeOps extends Equal with OrderingOps {
 
   // NOTE(trans): it has to be called 'intWrapper' to shadow the standard Range constructor
   implicit class intWrapper(start: Int) {
@@ -577,24 +577,39 @@ trait RangeOps extends Equal {
   }
 
   implicit class RangeOps(lhs: Rep[Range]) {
-    def foreach(f: Rep[Int] => Rep[Unit])(implicit __pos: SourceContext): Rep[Unit] = {
+    def foreach(f: Rep[Int] => Rep[Unit])(implicit __pos: SourceContext): Rep[Unit] = Unwrap(lhs) match {
 
       // XXX TODO: it would be good to do this as lowering/codegen
       // (as done previously in LMS), but for now just construct
       // a while loop directly
+      case Adapter.g.Def("range_until", List(x0:Backend.Exp, x1:Backend.Exp)) =>
 
-      val Adapter.g.Def("range_until", List(x0:Backend.Exp,x1:Backend.Exp)) = Unwrap(lhs)
+        // val b = Adapter.g.reify(i => Unwrap(f(Wrap(i))))
+        // val f1 = Adapter.g.reflect("λ",b)
+        // Wrap(Adapter.g.reflect("range_foreach", x0, x1, b))
 
-      // val b = Adapter.g.reify(i => Unwrap(f(Wrap(i))))
-      // val f1 = Adapter.g.reflect("λ",b)
-      // Wrap(Adapter.g.reflect("range_foreach", x0, x1, b))
+        val i = var_new(Wrap[Int](x0))
+        __whileDo(notequals(readVar(i), Wrap[Int](x1)), {
+          f(readVar(i))
+          i += 1
+        })
 
-      val i = var_new(Wrap[Int](x0))
-      __whileDo(notequals(readVar(i), Wrap[Int](x1)), {
-        f(readVar(i))
-        i += 1
-      })
+      case Adapter.g.Def("range_until_step", List(x0:Backend.Exp, x1:Backend.Exp, x2:Backend.Exp)) =>
+        val i = var_new(Wrap[Int](x0))
+        __whileDo(ordering_lt(readVar(i), Wrap[Int](x1)), {
+          f(readVar(i))
+          i += Wrap[Int](x2)
+        })
+
+      case n => ???
     }
+  }
+
+  implicit class SteppedRangeConstrOps(lhs: Rep[Int]) {
+    def until(y: Rep[Int], by: Rep[Int]): Rep[Range] = range_until_step(lhs, y, by)
+  }
+  def range_until_step(start: Rep[Int], end: Rep[Int], by: Rep[Int]): Rep[Range] = {
+    Wrap[Range](Adapter.g.reflect("range_until_step", Unwrap(start), Unwrap(end), Unwrap(by)))
   }
 
   trait LongRange

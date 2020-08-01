@@ -22,7 +22,7 @@ class CudaTest extends TutorialFunSuite {
     override val executable = s"$curPath/snippet"
   }
 
-  test("malloc") {
+  test("malloc_cuda_function") {
     val driver = new DslDriverCCuda[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -38,5 +38,90 @@ class CudaTest extends TutorialFunSuite {
     check("malloc", driver.code, "cu")
   }
 
+  test("fill_manual_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val cuda_arr = cudaMalloc2[Int](5)
+        cudaArrayFill(cuda_arr, 8, 5)
+        val arr = NewArray[Int](5)
+        cudaCall(cudaMemcpyOfT(arr, cuda_arr, 5, device2host))
+        printf("%d %d", arr(1), arr(4))
+        cudaCall(cudaFree(cuda_arr))
+      }
+    }
+    check("fill", driver.code, "cu")
+  }
+
+  test("cap_manual_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val arr = Array(1, 2, 3, 4, 5)
+        val cuda_arr = cudaMalloc2[Int](5)
+        cudaCall(cudaMemcpyOfT(cuda_arr, arr, 5, host2device))
+        cudaArrayClipAt(cuda_arr, 2, 5)
+        val res = NewArray[Int](5)
+        cudaCall(cudaMemcpyOfT(res, cuda_arr, 5, device2host))
+        printf("%d, %d", res(0), res(4))
+        cudaCall(cudaFree(cuda_arr))
+      }
+    }
+    check("cap", driver.code, "cu")
+  }
+
+  test("fill_gen_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+
+        // generate a cuda global function
+        val fill = cudaGlobalFun { (data: Rep[Array[Int]], value: Rep[Int], size: Rep[Int]) =>
+          val stride = gridDimX * blockDimX
+          val tid = threadIdxX + blockIdxX * blockDimX
+          for (i <- tid.until(size, stride)) {
+            data(i) = value
+          }
+        }
+
+        // now let's use the fill function
+        val cuda_arr = cudaMalloc2[Int](5)
+        fill(cuda_arr, 3, 5, dim3(28), dim3(512))
+        val arr = NewArray[Int](5)
+        cudaCall(cudaMemcpyOfT(arr, cuda_arr, 5, device2host))
+        printf("%d %d", arr(2), arr(3))
+        cudaCall(cudaFree(cuda_arr))
+      }
+    }
+    check("cuda_global_fill", driver.code, "cu")
+  }
+
+  test("cap_gen_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        // generate a cuda global function
+        val cap = cudaGlobalFun { (data: Rep[Array[Int]], bound: Rep[Int], size: Rep[Int]) =>
+          val stride = gridDimX * blockDimX
+          val tid = threadIdxX + blockIdxX * blockDimX
+          for (i <- tid.until(size, stride)) {
+            if (data(i) > bound) data(i) = bound
+            if (data(i) < -bound) data(i) = -bound
+          }
+        }
+
+        // now let's use the cap function
+        val arr = Array(1, 2, 3, 4, 5)
+        val cuda_arr = cudaMalloc2[Int](5)
+        cudaCall(cudaMemcpyOfT(cuda_arr, arr, 5, host2device))
+        cap(cuda_arr, 2, 5, dim3(28), dim3(512))
+        val res = NewArray[Int](5)
+        cudaCall(cudaMemcpyOfT(res, cuda_arr, 5, device2host))
+        printf("%d, %d", res(0), res(4))
+        cudaCall(cudaFree(cuda_arr))
+      }
+    }
+    check("cap_gen_kernel", driver.code, "cu")
+  }
 }
 
