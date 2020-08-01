@@ -265,7 +265,7 @@ trait CudaOps extends Dsl with SizeTOps with CLibs with CudaFunction {
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
-  @virtualize
+  // @virtualize
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
       val stride = gridDimX * blockDimX
