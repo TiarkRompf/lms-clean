@@ -10,7 +10,7 @@ import lms.macros.{SourceContext, RefinedManifest}
 
 import lms.collection.mutable.{StackArrayOps}
 
-trait CudaOps extends Base with PrimitiveOps with LiftPrimitives
+trait CudaOps extends PrimitiveOps with LiftPrimitives
   with RangeOps with SizeTOps with StackArrayOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */
   // 1. support bindings to manual cuda kernels
