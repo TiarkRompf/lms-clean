@@ -47,10 +47,10 @@ trait WhyOps extends Base with PrimitiveOps with CLibs{
 trait WhatOps extends Dsl with CLibs {
   def a: Rep[Int] = cmacro[Int]("1")
   def b: Rep[Int] = cmacro[Int]("2")
-  def c = a + b
-  def d = a * b
-  def f = a - b
-  def e = a / b
+  def c(implicit __pos: SourceContext) = a + b
+  def d(implicit __pos: SourceContext) = a * b
+  def f(implicit __pos: SourceContext) = a - b
+  def e(implicit __pos: SourceContext) = a / b
 }
 
 trait CudaOps extends Dsl with SizeTOps with CLibs with CudaFunction {
