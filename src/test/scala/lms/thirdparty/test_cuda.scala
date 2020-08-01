@@ -94,21 +94,13 @@ class CudaTest extends TutorialFunSuite {
     val driver = new DslDriverCCuda[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        // generate a cuda global function
-        val cap = cudaGlobalFun { (data: Rep[Array[Int]], bound: Rep[Int], size: Rep[Int]) =>
-          val stride = gridDimX * blockDimX
-          val tid = threadIdxX + blockIdxX * blockDimX
-          for (i <- tid.until(size, stride)) {
-            if (data(i) > bound) data(i) = bound
-            if (data(i) < -bound) data(i) = -bound
-          }
-        }
 
         // now let's use the cap function
         val arr = Array(1, 2, 3, 4, 5)
         val cuda_arr = cudaMalloc2[Int](5)
         cudaCall(cudaMemcpyOfT(cuda_arr, arr, 5, host2device))
-        cap(cuda_arr, 2, 5, dim3(28), dim3(512))
+        val capInt = cudaCap[Int]
+        capInt(cuda_arr, 2, 5, dim3(28), dim3(512))
         val res = NewArray[Int](5)
         cudaCall(cudaMemcpyOfT(res, cuda_arr, 5, device2host))
         printf("%d, %d", res(0), res(4))
@@ -117,5 +109,6 @@ class CudaTest extends TutorialFunSuite {
     }
     check("cap_gen_kernel", driver.code, "cu")
   }
+
 }
 

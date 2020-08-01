@@ -842,6 +842,10 @@ trait PrimitiveOps extends Base with OverloadHack {
 
   implicit class GenericMathOpsCls[T:Numeric:Manifest](val self: Rep[T])(implicit __pos: SourceContext) {
     def unary_- = Arithmetic.unary_-[T](self)
+    def +(rhs: Rep[T])(implicit __pos: SourceContext, __imp1: Overloaded1) = { Arithmetic.plus[T](self, rhs) }
+    def -(rhs: Rep[T])(implicit __pos: SourceContext, __imp1: Overloaded1) = { Arithmetic.minus[T](self, rhs) }
+    def *(rhs: Rep[T])(implicit __pos: SourceContext, __imp1: Overloaded1) = { Arithmetic.times[T](self, rhs) }
+    def /(rhs: Rep[T])(implicit __pos: SourceContext, __imp1: Overloaded1) = { Arithmetic.divide[T](self, rhs) }
   }
 
   // Int

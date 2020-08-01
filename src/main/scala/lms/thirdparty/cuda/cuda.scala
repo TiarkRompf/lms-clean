@@ -256,27 +256,27 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     (data: Rep[Array[N]], out: Rep[Array[N]], min: Rep[N], max: Rep[N], size: Rep[Int]) =>
       val stride = gridDimX * blockDimX
       val tid = threadIdxX + blockIdxX * blockDimX
-      for (i <- tid.until(size, stride)) {
+      for (i <- tid.until(size, stride): Rep[Range]) {
         out(i) = __ifThenElse(data(i) < min, min,
                  __ifThenElse(data(i) > max, max, data(i)))
       }
     }
 
+  def zero[T:Numeric:Manifest] = cmacro[T]("0")
 
-  // // hardTanhGrad: backward of hardTanh, with `inPlace` option
-  // @virtualize
-  // def hardTanhGrad(inPlace: Boolean) = cudaGlobalFun { (inX: Rep[Array[N]],
-  //     inD: Rep[Array[N]], outD: Rep[Array[N]], minVal: Rep[N], maxVal: Rep[N], size: Rep[Int]) =>
-  //   val stride = gridDimX * blockDimX
-  //   val tid = threadIdxX + blockIdxX * blockDimX
-  //   for (i <- tid.until(size, stride)) {
-  //     if (inPlace) {
-  //       if (inX(i) < minVal || inX(i) > maxVal) inD(i) = unit(0)
-  //     } else {
-  //       if (inX(i) >= minVal && inX(i) <= maxVal) inD(i) += outD(i)
-  //     }
-  //   }
-  // }
+  // hardTanhGrad: backward of hardTanh, with `inPlace` option
+  def hardTanhGrad[N:Numeric:Manifest](inPlace: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
+    (inX: Rep[Array[N]], inD: Rep[Array[N]], outD: Rep[Array[N]], minVal: Rep[N], maxVal: Rep[N], size: Rep[Int]) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(size, stride): Rep[Range]) {
+        if (inPlace) {
+          __ifThenElse(inX(i) < minVal || inX(i) > maxVal, {inD(i) = zero[N]}, {})
+        } else {
+          __ifThenElse(inX(i) >= minVal && inX(i) <= maxVal, {inD(i) += outD(i)}, {})
+        }
+      }
+    }
 
   // // nllLoss: x: prediction with probabiity, x_stride: feature_size of the 2D x
   // //          y: result of nllLoss, label: int-type, true label
