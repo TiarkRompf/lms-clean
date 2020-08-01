@@ -10,50 +10,7 @@ import lms.macros.SourceContext
 
 import lms.collection.mutable.{ArrayOps, StackArrayOps}
 
-trait WhyOps extends Base with PrimitiveOps with CLibs{
-  def what(a: Rep[Int], b: Rep[Int])(implicit __pos: SourceContext) = {
-    val aa = a + b
-    val bb = a * b
-    val cc = a - b
-    val dd = a / b
-  }
-
-  // NOTE(feiw) as a short-cut for constant int :)
-  case class SizeT(x: Int) { override def toString() = x.toString }
-  implicit def sizeTFromInt(x: Int) = SizeT(x)
-
-  // NOTE(feiw) as a normal Rep[SizeT] construction from Rep[Int]
-  def SizeT(x: Rep[Int]): Rep[SizeT] =
-    Wrap[SizeT](Adapter.g.reflectUnsafe("cast", Unwrap(x), Backend.Const("SizeT")))
-
-  // we offer SizeT to Int type casting as a method
-  implicit def sizeTRepToOps(x: Rep[SizeT])(implicit __pos: SourceContext): SizeTOps = new SizeTOps(x)(__pos)
-  implicit def sizeTVarToOps(x: Var[SizeT])(implicit __pos: SourceContext): SizeTOps = new SizeTOps(readVar(x))(__pos)
-  class SizeTOps(x: Rep[SizeT])(implicit __pos: SourceContext) {
-    def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("cast", Unwrap(x), Backend.Const("Int")))
-  }
-
-  // void * memset ( void * ptr, int value, size_t num );
-  // Note that the `value: Rep[Int]` is viewed as unsigned char
-  def memset[T:Manifest](ptr: Rep[Array[T]], value: Rep[Int], num: Rep[SizeT]) =
-    libFunction[Unit]("memset", Unwrap(ptr), Unwrap(value), Unwrap(num))(Seq(2), Seq(0), Set[Int]())
-  def memsetOfT[T:Manifest](ptr: Rep[Array[T]], value: Rep[Int], count: Rep[Int])(implicit __pos: SourceContext) =
-    memset(ptr, value, SizeT(count * sizeOf[T]))
-
-  // also add sizeOf here
-  def sizeOf[T:Manifest]: Rep[Int] = Wrap[Int](Adapter.g.reflectUnsafe("sizeof", Backend.Const(manifest[T])))
-}
-
-trait WhatOps extends Dsl with CLibs {
-  def a: Rep[Int] = cmacro[Int]("1")
-  def b: Rep[Int] = cmacro[Int]("2")
-  def c(implicit __pos: SourceContext) = a + b
-  def d(implicit __pos: SourceContext) = a * b
-  def f(implicit __pos: SourceContext) = a - b
-  def e(implicit __pos: SourceContext) = a / b
-}
-
-trait CudaOps extends Dsl with SizeTOps with CLibs with CudaFunction {
+trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */
   // 1. support bindings to manual cuda kernels
   // 2. support bindings to cublas library ???
@@ -265,12 +222,11 @@ trait CudaOps extends Dsl with SizeTOps with CLibs with CudaFunction {
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
-  // @virtualize
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
       val stride = gridDimX * blockDimX
       val tid = threadIdxX + blockIdxX * blockDimX
-      for (i <- tid.until(size, stride)) {
+      for (i <- tid.until(size, stride): Rep[Range]) {
         data(i) = value
       }
     }
