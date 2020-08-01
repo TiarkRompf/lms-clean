@@ -75,18 +75,12 @@ class CudaTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]) = {
 
-        // generate a cuda global function
-        val fill = cudaGlobalFun { (data: Rep[Array[Int]], value: Rep[Int], size: Rep[Int]) =>
-          val stride = gridDimX * blockDimX
-          val tid = threadIdxX + blockIdxX * blockDimX
-          for (i <- tid.until(size, stride)) {
-            data(i) = value
-          }
-        }
+        // use the CudaFill function in cuda.scala
 
         // now let's use the fill function
         val cuda_arr = cudaMalloc2[Int](5)
-        fill(cuda_arr, 3, 5, dim3(28), dim3(512))
+        val cudaFillInt = cudaFill[Int]
+        cudaFillInt(cuda_arr, 3, 5, dim3(gridSize), dim3(blockSize))
         val arr = NewArray[Int](5)
         cudaCall(cudaMemcpyOfT(arr, cuda_arr, 5, device2host))
         printf("%d %d", arr(2), arr(3))

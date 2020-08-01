@@ -261,6 +261,71 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
                  __ifThenElse(data(i) > max, max, data(i)))
       }
     }
+
+
+  // // hardTanhGrad: backward of hardTanh, with `inPlace` option
+  // @virtualize
+  // def hardTanhGrad(inPlace: Boolean) = cudaGlobalFun { (inX: Rep[Array[N]],
+  //     inD: Rep[Array[N]], outD: Rep[Array[N]], minVal: Rep[N], maxVal: Rep[N], size: Rep[Int]) =>
+  //   val stride = gridDimX * blockDimX
+  //   val tid = threadIdxX + blockIdxX * blockDimX
+  //   for (i <- tid.until(size, stride)) {
+  //     if (inPlace) {
+  //       if (inX(i) < minVal || inX(i) > maxVal) inD(i) = unit(0)
+  //     } else {
+  //       if (inX(i) >= minVal && inX(i) <= maxVal) inD(i) += outD(i)
+  //     }
+  //   }
+  // }
+
+  // // nllLoss: x: prediction with probabiity, x_stride: feature_size of the 2D x
+  // //          y: result of nllLoss, label: int-type, true label
+  // @virtualize
+  // def nllLoss = cudaGlobalFun { (x: Rep[Array[N]], xStride: Rep[Int], y: Rep[Array[N]], label: Rep[Array[Int]]) =>
+  //   // Note: each tid is for a sample in a batch
+  //   // xStride is the number of features
+  //   val tid = threadIdxX + blockIdxX * blockDimX
+  //   val offset = tid * xStride + label(tid)
+  //   y(tid) = -x(offset)
+  // }
+
+  // // nllLoss_grad:
+  // @virtualize
+  // def nllLossGrad = cudaGlobalFun { (xGrad: Rep[Array[N]], xStride: Rep[Int], yGrad: Rep[Array[N]], label: Rep[Array[Int]]) =>
+  //   // Note: each tid is for a sample in a batch
+  //   val tid = threadIdxX + blockIdxX * blockDimX
+  //   val offset = tid * xStride + label(tid)
+  //   xGrad(offset) -= yGrad(tid)
+  // }
+
+  // // sumGrad: grad operation of a sum op (by a given axis)
+  // // FIXME(feiw) to be tested
+  // @virtualize
+  // def sumGrad(rank: Int, dim: Int) = cudaGlobalFun { (xGrad: Rep[Array[N]], xSize: Rep[Array[Int]],
+  //     size: Rep[Int], yGrad: Rep[Array[N]], yStrides: Rep[Array[Int]]) =>
+  //   val tid = threadIdxX + blockIdxX * blockDimX
+  //   val stride = gridDimX * blockDimX
+  //   for (i <- tid.until(size, stride)) {
+  //     // compute indice of yGrad from flat tid (i)
+  //     val indices = scala.collection.mutable.ArrayBuffer[Rep[Int]]()
+  //     var offset = i
+  //     for (j <- ((0 until rank): Range).reverse) {
+  //       val tempOffset = offset / xSize(j)
+  //       if (j != dim)
+  //         indices.prepend(offset - tempOffset * xSize(j))
+  //       offset = tempOffset
+  //     }
+  //     // compute offset of yGrad from indice
+  //     val yOffset = indices.zipWithIndex.foldLeft(unit(0)) {
+  //       case (o, (d, i)) => o + d * yStrides(i)
+  //     }
+  //     // operate data
+  //     xGrad(i) += yGrad(yOffset)
+  //   }
+  // }
+
+
+
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
