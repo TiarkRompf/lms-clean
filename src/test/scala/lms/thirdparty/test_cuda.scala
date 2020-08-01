@@ -98,6 +98,7 @@ class CudaTest extends TutorialFunSuite {
         val cudaCapN = cudaCap
         cudaCapN(cuda_arr, 2, 5, dim3(28), dim3(512))
         val res = NewArray[N](5)
+
         cudaCall(cudaMemcpyOfT(res, cuda_arr, 5, device2host))
         printf("%d, %d", res(0), res(4))
         cudaCall(cudaFree(cuda_arr))

@@ -11,6 +11,157 @@ case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends 
 case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary)
 ```
 
+From this class hierarchy, we can see that the basic unit of the LMS IR is `Exp`,
+which can be `Const(0)`, `Const("hello")`, or `Sym(2)`, which really means `x2` in the
+generated code. We can combine basic units into `Node`, such as
+
+``` scala
+Node(Sym(x3), "+", List(Sym(x2), Const(1)), _)
+```
+the semantics of which is `x3 = x2 + 1`. As you can probably see, the node `op` is just
+a string, which allows eazy extension of various kinds of nodes such as `-`, `print`,
+and et al.
+
+Using `Exp` and `Node`, we can construct program of arbitrary sizes, but there is still
+no blocks or scopes in the IR, which is necessary for constructing conditionals, loops,
+functions, and et al. The `case class Block` is exactly for that purpose. However, it
+might be surprising that the `Block` class doesn't really contain a list of nodes that
+are in the block. Instead, it has `in: List[Sym]` as the inputs of the block, `res: Exp`
+as the output of the block, and then `ein: Sym` and `eff: EffectSummar` for effect-related
+contents (will cover later). Where are the nodes that should go into the block?
+
+It turned out that the nodes are in the graph, but not explicitly scoped in the block.
+when traversing the graph (for analysis, transformation, or code generation), the nodes
+of each block are dynamically computed from all available nodes, using the *dependencies*.
+This is the feature of *sea of nodes* styled IR, which is covered in more details later.
+
+Some may wonder why going for sea of nodes IR, where dynamically computing the nodes
+of a scope seems to be an overhead for any graph traversal. It is true that dynamically
+computing the nodes of a scope adds overhead. However, the advantage is that nodes are
+not fixed to a certain scope, and scheduling the nodes (in or out-of scopes) can be
+a powerful optimization (called code motion) of the IR. For instance, the user of LMS
+might constructed a graph like this:
+
+``` scala
+for (i <- 0 until 100) {
+  val a: Int = f(10) // some heavy and pure function
+  print(a + i)
+}
+```
+
+It would be beneficial to optimize the code to
+
+``` scala
+val a: Int = f(10) // some heavy and pure function
+for (i <- 0 until 100) {
+  print(a + i)
+}
+```
+
+### Dependencies and Effects
+
+From the previous example, hopefully the reader has got a basic understanding of why
+we use sea of node IR. But we have not talked about how (in a high level) we schedule
+nodes of a scope. We briefly mentioned "dependencies" above. What are "dependencies"?
+
+There are 2 kinds of dependencies that we care about in LMS IR:
+1. the data dependency and
+2. the control dependencies.
+
+The data dependency is easier to capture. If a node uses an `Exp`, then the node
+depends on that `Exp`, and the node that generates that `Exp`. The data dependency
+is also captured explicitly by the graph. For instance, in code:
+
+``` scala
+val x1 = 10 + x0
+val x2 = x1 + 100
+```
+Node `x2` depends on node `x1` because it uses `x1` for computation. Since each block
+has `in: List[Sym]` and `res: Exp`, then we know that if `res` depends on node A, A must
+be scheduled in or before the block. In addition, if node A depends on the `in: List[Sym]`,
+then it must be scheduled in the block (if it is needed by the block). For example:
+
+``` scala
+val x1 = 10 + x0
+val x2 = x1 + x3
+Block([x3], x2, _, _)
+```
+means that the block needs to return `x2` as the result, thus node `x2` and node `x1`
+must be scheduled in or before the block. Also since node `x2` depends on `x3`, which is
+an input symbol of the block, it must be scheduled in the block. So we have 2 possible
+schedules for this block:
+
+``` scala
+val x1 = 10 + x0
+block { x3 =>
+  val x2 = x1 + x3
+  x2
+}
+```
+
+or
+
+``` scala
+block { x3 =>
+  val x1 = 10 + x0
+  val x2 = x1 + x3
+  x2
+}
+```
+
+and we can choose the more optimized version of them during graph traversal.
+
+What is control dependency? Instead of offering a definition, I will just enumerate some
+examples:
+
+1. If we have 2 print statements in the IR, we cannot generate the code with any one of them missing or in the wrong order.
+2. If we have a mutable variable or an mutable array, the reading and writing of the mutable elements need to be controled carefully. Some of the reading and writing can be removed or re-ordered, but certainly not all of them.
+3. more ???
+
+We talked about "the wrong order" in entry 1. What is the right order? Well, we have
+the order of user-code (or the order of LMS IR nodes construction) as the golden standard.
+Some of the order can be swapped, but some cannot. Let's just see some examples:
+
+``` scala
+var x = 0
+x = 3
+x = 10
+print(x)
+```
+
+In this small example, the node `x = 10` is not *data-depended* by the print statement.
+However, it is *control-depended* because the value of `x` is mutated by it. However,
+the `x = 3` node can be removed without breaking the code semantics. The order of
+graph construction (the fact that user did `x = 3` before `x = 10`) is the base of
+our control dependency analysis.
+
+Directly keeping track of all control dependencies during LMS IR construction can be
+heavy. In our implementation, we keep track of the *effects* of nodes and blocks, and
+then compute *dependencies* from *effects* when we need to analyze dependencies. The
+design of effects (and effect systems) is an important project currently under development.
+We will talk about the current effect system in details later, but for now, I just want
+to get one thing across: the `ein: Sym` of `case class Block`.
+
+What is the `ein: Sym` in block? Well, `ein` stands for `effect-input`. Previously, we
+talked about normal inputs of blocks `in: List[Sym]`, and we said that "if a node depends
+on `in`, it must be scheduled in the block, if ever needed". Similarly, if a node depends
+on `ein`, it must be scheduled in the block too, if ever needed. However, `ein` is not
+a real input. It is just an effect-input, which is used to control the scheduling of
+nodes when a node must be in a block by control-dependencies. For instance:
+
+``` scala
+fun { x =>
+  print("hello world")
+  x
+}
+```
+
+In this block, the print statement must be in the function block because we expect every
+call of the function to print `hello world`. However, the print statement doesn't depend
+on the block input `x`. In this case, we let the print node depends on the `ein` of the
+block, so that it will be scheduled in the block, but not before.
+
+
 ## Sea Of Nodes
 
 The LMS IR follows the "sea of nodes" design (citations?), where the IR is composed of
