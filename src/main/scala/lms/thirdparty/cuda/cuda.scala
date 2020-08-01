@@ -10,6 +10,15 @@ import lms.macros.{SourceContext, RefinedManifest}
 
 import lms.collection.mutable.{ArrayOps, StackArrayOps}
 
+trait WhatOps extends Dsl with CLibs {
+  def a: Rep[Int] = cmacro[Int]("1")
+  def b: Rep[Int] = cmacro[Int]("2")
+  def c = a + b
+  def d = a * b
+  def f = a - b
+  def e = a / b
+}
+
 trait CudaOps extends Dsl with SizeTOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */
   // 1. support bindings to manual cuda kernels
