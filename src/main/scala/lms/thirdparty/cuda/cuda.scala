@@ -222,6 +222,24 @@ trait CudaOps extends Base with RangeOps with SizeTOps with StackArrayOps with C
   def threadIdxY = cmacro[Int]("threadIdx.y")
   def threadIdxZ = cmacro[Int]("threadIdx.z")
 
+  // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
+  /**
+    * Here I wanted to use T:Numeric to support generic types in the cudaGlobalFuns
+    * It works locally but cannot compile in GitHub Actions :(
+    * So for now just use a compromised method (let N = Float)
+    */
+  type N = Float
+
+  // // cudaFill: fill a `data` of `size` with value `value`
+  // @virtualize
+  // def cudaFill[T:Manifest] = cudaGlobalFun { (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
+  //   val stride = gridDimX * blockDimX
+  //   val tid = threadIdxX + blockIdxX * blockDimX
+  //   for (i <- tid.until(size, stride)) {
+  //     data(i) = value
+  //   }
+  // }
+
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
