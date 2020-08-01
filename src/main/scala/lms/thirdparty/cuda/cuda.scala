@@ -278,25 +278,25 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       }
     }
 
-  // // nllLoss: x: prediction with probabiity, x_stride: feature_size of the 2D x
-  // //          y: result of nllLoss, label: int-type, true label
-  // @virtualize
-  // def nllLoss = cudaGlobalFun { (x: Rep[Array[N]], xStride: Rep[Int], y: Rep[Array[N]], label: Rep[Array[Int]]) =>
-  //   // Note: each tid is for a sample in a batch
-  //   // xStride is the number of features
-  //   val tid = threadIdxX + blockIdxX * blockDimX
-  //   val offset = tid * xStride + label(tid)
-  //   y(tid) = -x(offset)
-  // }
+  // nllLoss: x: prediction with probabiity, x_stride: feature_size of the 2D x
+  //          y: result of nllLoss, label: int-type, true label
+  def nllLoss[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (x: Rep[Array[N]], xStride: Rep[Int], y: Rep[Array[N]], label: Rep[Array[Int]]) =>
+      // Note: each tid is for a sample in a batch
+      // xStride is the number of features
+      val tid = threadIdxX + blockIdxX * blockDimX
+      val offset = tid * xStride + label(tid)
+      y(tid) = -x(offset)
+    }
 
-  // // nllLoss_grad:
-  // @virtualize
-  // def nllLossGrad = cudaGlobalFun { (xGrad: Rep[Array[N]], xStride: Rep[Int], yGrad: Rep[Array[N]], label: Rep[Array[Int]]) =>
-  //   // Note: each tid is for a sample in a batch
-  //   val tid = threadIdxX + blockIdxX * blockDimX
-  //   val offset = tid * xStride + label(tid)
-  //   xGrad(offset) -= yGrad(tid)
-  // }
+  // nllLoss_grad:
+  def nllLossGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (xGrad: Rep[Array[N]], xStride: Rep[Int], yGrad: Rep[Array[N]], label: Rep[Array[Int]]) =>
+      // Note: each tid is for a sample in a batch
+      val tid = threadIdxX + blockIdxX * blockDimX
+      val offset = tid * xStride + label(tid)
+      xGrad(offset) -= yGrad(tid)
+    }
 
   // // sumGrad: grad operation of a sum op (by a given axis)
   // // FIXME(feiw) to be tested
