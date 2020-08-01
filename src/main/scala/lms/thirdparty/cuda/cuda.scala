@@ -8,10 +8,9 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
 
-import lms.collection.mutable.{StackArrayOps}
+import lms.collection.mutable.{ArrayOps, StackArrayOps}
 
-trait CudaOps extends PrimitiveOps with LiftPrimitives
-  with RangeOps with SizeTOps with StackArrayOps with CLibs with CudaFunction {
+trait CudaOps extends PrimitiveOps with LiftPrimitives with ArrayOps with SizeTOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */
   // 1. support bindings to manual cuda kernels
   // 2. support bindings to cublas library ???
@@ -224,9 +223,9 @@ trait CudaOps extends PrimitiveOps with LiftPrimitives
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
   def a: Rep[Int] = gridDimX + gridDimX
-  def a: Rep[Int] = gridDimX - gridDimX
-  def a: Rep[Int] = gridDimX * gridDimX
-  def a: Rep[Int] = gridDimX / gridDimX
+  def b: Rep[Int] = gridDimX - gridDimX
+  def c: Rep[Int] = gridDimX * gridDimX
+  def d: Rep[Int] = gridDimX / gridDimX
 
 }
 
