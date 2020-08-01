@@ -10,7 +10,7 @@ import lms.macros.{SourceContext, RefinedManifest}
 
 import lms.collection.mutable.{ArrayOps, StackArrayOps}
 
-trait WhyOps extends Dsl {
+trait WhyOps extends Base with PrimitiveOps {
   def what(a: Rep[Int], b: Rep[Int]) = {
     val aa = a + b
     val bb = a * b
