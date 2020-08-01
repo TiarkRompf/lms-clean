@@ -222,12 +222,32 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
+
+  // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
+  /**
+    * Here I wanted to use T:Numeric to support generic types in the cudaGlobalFuns
+    * It works locally but cannot compile in GitHub Actions :(
+    * So for now just use a compromised method (let N = Float)
+    */
+  type N = Float
+
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
       val stride = gridDimX * blockDimX
       val tid = threadIdxX + blockIdxX * blockDimX
       for (i <- tid.until(size, stride): Rep[Range]) {
         data(i) = value
+      }
+    }
+
+  // cudaCap: cap the absolute value of `data`
+  def cudaCap(implicit __pos: SourceContext) = cudaGlobalFun {
+    (data: Rep[Array[N]], bound: Rep[N], size: Rep[Int]) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(size, stride): Rep[Range]) {
+        __ifThenElse(data(i) > bound, {data(i) = bound}, {})
+        __ifThenElse(data(i) < -bound, {data(i) = -bound}, {})
       }
     }
 }
