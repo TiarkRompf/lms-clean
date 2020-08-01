@@ -211,17 +211,17 @@ trait CudaOps extends Base with PrimitiveOps with LiftPrimitives
     Wrap[(A,B,C,D,E,F,Dim3,Dim3)=>G](__topFun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), "__global__"))
 
   // When coding kernel functions, we often need some kernel variables
-  def gridDimX = cmacro[Int]("gridDim.x")
-  def gridDimY = cmacro[Int]("gridDim.y")
-  def blockDimX = cmacro[Int]("blockDim.x")
-  def blockDimY = cmacro[Int]("blockDim.y")
-  def blockDimZ = cmacro[Int]("blockDim.z")
+  def gridDimX: Rep[Int] = cmacro[Int]("gridDim.x")
+  def gridDimY: Rep[Int] = cmacro[Int]("gridDim.y")
+  def blockDimX: Rep[Int] = cmacro[Int]("blockDim.x")
+  def blockDimY: Rep[Int] = cmacro[Int]("blockDim.y")
+  def blockDimZ: Rep[Int] = cmacro[Int]("blockDim.z")
 
-  def blockIdxX = cmacro[Int]("blockIdx.x")
-  def blockIdxY = cmacro[Int]("blockIdx.y")
-  def threadIdxX = cmacro[Int]("threadIdx.x")
-  def threadIdxY = cmacro[Int]("threadIdx.y")
-  def threadIdxZ = cmacro[Int]("threadIdx.z")
+  def blockIdxX: Rep[Int] = cmacro[Int]("blockIdx.x")
+  def blockIdxY: Rep[Int] = cmacro[Int]("blockIdx.y")
+  def threadIdxX: Rep[Int] = cmacro[Int]("threadIdx.x")
+  def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
+  def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
   // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
   /**
