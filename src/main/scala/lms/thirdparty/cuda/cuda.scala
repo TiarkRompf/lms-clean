@@ -222,6 +222,107 @@ trait CudaOps extends Base with RangeOps with SizeTOps with StackArrayOps with C
   def threadIdxY = cmacro[Int]("threadIdx.y")
   def threadIdxZ = cmacro[Int]("threadIdx.z")
 
+  // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
+  /**
+    * Here I wanted to use T:Numeric to support generic types in the cudaGlobalFuns
+    * It works locally but cannot compile in GitHub Actions :(
+    * So for now just use a compromised method (let N = Float)
+    */
+  type N = Float
+
+  // cudaFill: fill a `data` of `size` with value `value`
+  @virtualize
+  def cudaFill[T:Manifest] = cudaGlobalFun { (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- tid.until(size, stride)) {
+      data(i) = value
+    }
+  }
+
+  // cudaCap: cap the absolute value of `data`
+  @virtualize
+  def cudaCap = cudaGlobalFun { (data: Rep[Array[N]], bound: Rep[N], size: Rep[Int]) =>
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- tid.until(size, stride)) {
+      if (data(i) > bound) data(i) = bound
+      if (data(i) < -bound) data(i) = -bound
+    }
+  }
+
+  // hardTanh: cap the value of `data` by `min` and `max`
+  @virtualize
+  def handTanh = cudaGlobalFun { (data: Rep[Array[N]], out: Rep[Array[N]],
+      min: Rep[N], max: Rep[N], size: Rep[Int]) =>
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- tid.until(size, stride)) {
+      out(i) = if (data(i) < min) min else (if (data(i) > max) max else data(i))
+    }
+  }
+
+  // hardTanhGrad: backward of hardTanh, with `inPlace` option
+  @virtualize
+  def hardTanhGrad(inPlace: Boolean) = cudaGlobalFun { (inX: Rep[Array[N]],
+      inD: Rep[Array[N]], outD: Rep[Array[N]], minVal: Rep[N], maxVal: Rep[N], size: Rep[Int]) =>
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- tid.until(size, stride)) {
+      if (inPlace) {
+        if (inX(i) < minVal || inX(i) > maxVal) inD(i) = unit(0)
+      } else {
+        if (inX(i) >= minVal && inX(i) <= maxVal) inD(i) += outD(i)
+      }
+    }
+  }
+
+  // nllLoss: x: prediction with probabiity, x_stride: feature_size of the 2D x
+  //          y: result of nllLoss, label: int-type, true label
+  @virtualize
+  def nllLoss = cudaGlobalFun { (x: Rep[Array[N]], xStride: Rep[Int], y: Rep[Array[N]], label: Rep[Array[Int]]) =>
+    // Note: each tid is for a sample in a batch
+    // xStride is the number of features
+    val tid = threadIdxX + blockIdxX * blockDimX
+    val offset = tid * xStride + label(tid)
+    y(tid) = -x(offset)
+  }
+
+  // nllLoss_grad:
+  @virtualize
+  def nllLossGrad = cudaGlobalFun { (xGrad: Rep[Array[N]], xStride: Rep[Int], yGrad: Rep[Array[N]], label: Rep[Array[Int]]) =>
+    // Note: each tid is for a sample in a batch
+    val tid = threadIdxX + blockIdxX * blockDimX
+    val offset = tid * xStride + label(tid)
+    xGrad(offset) -= yGrad(tid)
+  }
+
+  // sumGrad: grad operation of a sum op (by a given axis)
+  // FIXME(feiw) to be tested
+  @virtualize
+  def sumGrad(rank: Int, dim: Int) = cudaGlobalFun { (xGrad: Rep[Array[N]], xSize: Rep[Array[Int]],
+      size: Rep[Int], yGrad: Rep[Array[N]], yStrides: Rep[Array[Int]]) =>
+    val tid = threadIdxX + blockIdxX * blockDimX
+    val stride = gridDimX * blockDimX
+    for (i <- tid.until(size, stride)) {
+      // compute indice of yGrad from flat tid (i)
+      val indices = scala.collection.mutable.ArrayBuffer[Rep[Int]]()
+      var offset = i
+      for (j <- ((0 until rank): Range).reverse) {
+        val tempOffset = offset / xSize(j)
+        if (j != dim)
+          indices.prepend(offset - tempOffset * xSize(j))
+        offset = tempOffset
+      }
+      // compute offset of yGrad from indice
+      val yOffset = indices.zipWithIndex.foldLeft(unit(0)) {
+        case (o, (d, i)) => o + d * yStrides(i)
+      }
+      // operate data
+      xGrad(i) += yGrad(yOffset)
+    }
+  }
+
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
