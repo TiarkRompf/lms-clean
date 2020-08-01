@@ -10,6 +10,15 @@ import lms.macros.{SourceContext, RefinedManifest}
 
 import lms.collection.mutable.{ArrayOps, StackArrayOps}
 
+trait WhyOps extends Dsl {
+  def what(a: Rep[Int], b: Rep[Int]) = {
+    val aa = a + b
+    val bb = a * b
+    val cc = a - b
+    val dd = a / b
+  }
+}
+
 trait WhatOps extends Dsl with CLibs {
   def a: Rep[Int] = cmacro[Int]("1")
   def b: Rep[Int] = cmacro[Int]("2")
