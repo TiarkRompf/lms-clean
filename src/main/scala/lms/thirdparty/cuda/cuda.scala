@@ -265,11 +265,15 @@ trait CudaOps extends Dsl with SizeTOps with CLibs with CudaFunction {
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
-  def a: Rep[Int] = gridDimX + gridDimX
-  def b: Rep[Int] = gridDimX - gridDimX
-  def c: Rep[Int] = gridDimX * gridDimX
-  def d: Rep[Int] = gridDimX / gridDimX
-
+  @virtualize
+  def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(size, stride)) {
+        data(i) = value
+      }
+    }
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
