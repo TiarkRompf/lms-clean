@@ -6,11 +6,11 @@ import lms.core.stub._
 import lms.core.Backend._
 import lms.core.virtualize
 import lms.core.utils.time
-import lms.macros.{SourceContext, RefinedManifest}
+import lms.macros.SourceContext
 
-import lms.collection.mutable.{StackArrayOps}
+import lms.collection.mutable.{ArrayOps, StackArrayOps}
 
-trait CudaOps extends Base with RangeOps with SizeTOps with StackArrayOps with CLibs with CudaFunction {
+trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */
   // 1. support bindings to manual cuda kernels
   // 2. support bindings to cublas library ???
@@ -210,17 +210,112 @@ trait CudaOps extends Base with RangeOps with SizeTOps with StackArrayOps with C
     Wrap[(A,B,C,D,E,F,Dim3,Dim3)=>G](__topFun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), "__global__"))
 
   // When coding kernel functions, we often need some kernel variables
-  def gridDimX = cmacro[Int]("gridDim.x")
-  def gridDimY = cmacro[Int]("gridDim.y")
-  def blockDimX = cmacro[Int]("blockDim.x")
-  def blockDimY = cmacro[Int]("blockDim.y")
-  def blockDimZ = cmacro[Int]("blockDim.z")
+  def gridDimX: Rep[Int] = cmacro[Int]("gridDim.x")
+  def gridDimY: Rep[Int] = cmacro[Int]("gridDim.y")
+  def blockDimX: Rep[Int] = cmacro[Int]("blockDim.x")
+  def blockDimY: Rep[Int] = cmacro[Int]("blockDim.y")
+  def blockDimZ: Rep[Int] = cmacro[Int]("blockDim.z")
 
-  def blockIdxX = cmacro[Int]("blockIdx.x")
-  def blockIdxY = cmacro[Int]("blockIdx.y")
-  def threadIdxX = cmacro[Int]("threadIdx.x")
-  def threadIdxY = cmacro[Int]("threadIdx.y")
-  def threadIdxZ = cmacro[Int]("threadIdx.z")
+  def blockIdxX: Rep[Int] = cmacro[Int]("blockIdx.x")
+  def blockIdxY: Rep[Int] = cmacro[Int]("blockIdx.y")
+  def threadIdxX: Rep[Int] = cmacro[Int]("threadIdx.x")
+  def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
+  def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
+
+
+  // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
+
+  def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(size, stride): Rep[Range]) {
+        data(i) = value
+      }
+    }
+
+  // cudaCap: cap the absolute value of `data`
+  def cudaCap[T:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (data: Rep[Array[T]], bound: Rep[T], size: Rep[Int]) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(size, stride): Rep[Range]) {
+        __ifThenElse(data(i) > bound, {data(i) = bound}, {})
+        __ifThenElse(data(i) < -bound, {data(i) = -bound}, {})
+      }
+    }
+
+  // hardTanh: cap the value of `data` by `min` and `max`
+  def handTanh[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (data: Rep[Array[N]], out: Rep[Array[N]], min: Rep[N], max: Rep[N], size: Rep[Int]) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(size, stride): Rep[Range]) {
+        out(i) = __ifThenElse(data(i) < min, min,
+                 __ifThenElse(data(i) > max, max, data(i)))
+      }
+    }
+
+  def zero[T:Numeric:Manifest] = cmacro[T]("0")
+
+  // hardTanhGrad: backward of hardTanh, with `inPlace` option
+  def hardTanhGrad[N:Numeric:Manifest](inPlace: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
+    (inX: Rep[Array[N]], inD: Rep[Array[N]], outD: Rep[Array[N]], minVal: Rep[N], maxVal: Rep[N], size: Rep[Int]) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(size, stride): Rep[Range]) {
+        if (inPlace) {
+          __ifThenElse(inX(i) < minVal || inX(i) > maxVal, {inD(i) = zero[N]}, {})
+        } else {
+          __ifThenElse(inX(i) >= minVal && inX(i) <= maxVal, {inD(i) += outD(i)}, {})
+        }
+      }
+    }
+
+  // nllLoss: x: prediction with probabiity, x_stride: feature_size of the 2D x
+  //          y: result of nllLoss, label: int-type, true label
+  def nllLoss[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (x: Rep[Array[N]], xStride: Rep[Int], y: Rep[Array[N]], label: Rep[Array[Int]]) =>
+      // Note: each tid is for a sample in a batch
+      // xStride is the number of features
+      val tid = threadIdxX + blockIdxX * blockDimX
+      val offset = tid * xStride + label(tid)
+      y(tid) = -x(offset)
+    }
+
+  // nllLoss_grad:
+  def nllLossGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (xGrad: Rep[Array[N]], xStride: Rep[Int], yGrad: Rep[Array[N]], label: Rep[Array[Int]]) =>
+      // Note: each tid is for a sample in a batch
+      val tid = threadIdxX + blockIdxX * blockDimX
+      val offset = tid * xStride + label(tid)
+      xGrad(offset) -= yGrad(tid)
+    }
+
+  // sumGrad: grad operation of a sum op (by a given axis)
+  // FIXME(feiw) to be tested
+  def sumGrad[N:Numeric:Manifest](rank: Int, dim: Int)(implicit __pos: SourceContext) = cudaGlobalFun {
+    (xGrad: Rep[Array[N]], xSize: Rep[Array[Int]], size: Rep[Int], yGrad: Rep[Array[N]], yStrides: Rep[Array[Int]]) =>
+      val tid = threadIdxX + blockIdxX * blockDimX
+      val stride = gridDimX * blockDimX
+      for (i <- tid.until(size, stride): Rep[Range]) {
+        // compute indice of yGrad from flat tid (i)
+        val indices = scala.collection.mutable.ArrayBuffer[Rep[Int]]()
+        var offset = i
+        for (j <- ((0 until rank): Range).reverse) {
+          val tempOffset = offset / xSize(j)
+          if (j != dim)
+            indices.prepend(offset - tempOffset * xSize(j))
+          offset = tempOffset
+        }
+        // compute offset of yGrad from indice
+        val yOffset = indices.zipWithIndex.foldLeft(unit(0)) {
+          case (o, (d, i)) => o + d * yStrides(i)
+        }
+        // operate data
+        xGrad(i) += yGrad(yOffset)
+      }
+    }
 
 }
 
