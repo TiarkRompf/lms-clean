@@ -1,6 +1,5 @@
 #ifndef NVIDIA_WARP_SIZE
 #define NVIDIA_WARP_SIZE 32 // this is typically 32 (for incl. 1080ti s)
-#endif
 
 #define CUDA_CALL(f)                                                           \
   {                                                                            \
@@ -103,3 +102,5 @@ __global__ void sum_grad(T *in, int inSize0, int inSize1, int inSize2,
     in[i] += out[outOff];
   }
 }
+
+#endif
