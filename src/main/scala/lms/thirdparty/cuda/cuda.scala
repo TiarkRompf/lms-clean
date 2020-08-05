@@ -265,7 +265,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       val tid = threadIdxX + blockIdxX * blockDimX
       for (i <- tid.until(size, stride): Rep[Range]) {
         if (inPlace) {
-          __ifThenElse(inX(i) < minVal || inX(i) > maxVal, {inD(i) = zero[N]}, {})
+          __ifThenElse(inX(i) < minVal || inX(i) > maxVal, {inD(i) = unit(implicitly[Numeric[N]].zero)}, {})
         } else {
           __ifThenElse(inX(i) >= minVal && inX(i) <= maxVal, {inD(i) += outD(i)}, {})
         }
