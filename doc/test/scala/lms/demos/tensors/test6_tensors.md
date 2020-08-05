@@ -1,6 +1,6 @@
 ## Tensor Transformation
 
-Although written in test folder, this demon is showing a way be build `Tensor` types based on the very simple `Frontend` in Frontend.scala.
+Although written in test folder, this demon is showing a way to build `Tensor` types based on the very simple `Frontend` in Frontend.scala.
 Remember that in `Frontend`, we provided a way to nit LMS IR graphs without using
 the iconic `Rep[T]`. Instead, we just used `case classes` to hold `Backend.Exp`s.
 We had basic things like:
