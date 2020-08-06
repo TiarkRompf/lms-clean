@@ -12,7 +12,7 @@ than simply how to use LMS.
 ## Introduction
 
 Multi-Stage Programming (or staging) is a programming language concept that allows various parts of the programs
-to run in different stages. It allows users to code with high-level abstractions (trait, classes, high-order functions),
+to run in different stages. It allows users to code with high-level abstractions (trait, classes, higher-order functions),
 but still gain highly-efficient code after the abstractions are executed (staged away). This offers both high
 productivity and high performance of the target program, thus the slogan "abstract without regret".
 
