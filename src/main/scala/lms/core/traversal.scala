@@ -545,6 +545,75 @@ abstract class Transformer extends Traverser {
 
 }
 
+class AdapterTransformer extends Traverser {
+
+  val subst = new mutable.HashMap[Sym,Exp]
+
+  def transform(s: Exp): Exp = s match {
+    case s @ Sym(_) if subst contains s => subst(s)
+    case s @ Sym(_) => println(s"Warning: not found in subst $subst: "+s); s
+    case a => a // must be const
+  }
+
+  def transform(b: Block): Block = b match {
+    case b @ Block(Nil, res, block, eff) =>
+      Adapter.g.reify {
+        //subst(block) = g.effectToExp(g.curBlock) //XXX
+        traverse(b); transform(res)
+      }
+    case b @ Block(arg::Nil, res, block, eff) =>
+      Adapter.g.reify { e =>
+        if (subst contains arg)
+          println(s"Warning: already have a subst for $arg")
+        try {
+          subst(arg) = e
+          //subst(block) = g.effectToExp(g.curBlock) //XXX
+          traverse(b)
+          transform(res)
+        } finally subst -= arg
+      }
+    case _ => ???
+  }
+
+  def transform(n: Node): Exp = n match {
+    case Node(s, "λ", (b @ Block(in, y, ein, eff))::_, _) =>
+      // need to deal with recursive binding!
+      val s1 = Sym(Adapter.g.fresh)
+      subst(s) = s1
+      Adapter.g.reflect(s1, "λ", transform(b))()
+    case Node(s,op,rs,es) =>
+      // effect dependencies in target graph are managed by
+      // graph builder, so we drop all effects here
+      val (effects,pure) = (es.deps,rs)
+      val args = pure.map {
+        case b @ Block(_,_,_,_) =>
+          transform(b)
+        case s : Exp =>
+          transform(s)
+        case a =>
+          a
+      }
+      // NOTE: we're not transforming 'effects' here (just the keys)
+      if (effects.nonEmpty)
+        Adapter.g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
+      else
+        Adapter.g.reflect(op,args:_*)
+  }
+
+  override def traverse(n: Node): Unit = {
+    subst(n.n) = transform(n)
+  }
+
+  def transform(graph: Graph): Graph = {
+    Adapter.program(Adapter.g.reify { e =>
+      assert(graph.block.in.length == 1)
+      subst(graph.block.in(0)) = e
+      super.apply(graph);
+      transform(graph.block.res)
+    })
+  }
+}
+
 abstract class CPSTransformer extends Transformer {
 
   val forwardMap = mutable.Map[Sym, Sym]()  // this Map set up connection for lambda-forward node (sTo -> sFrom)

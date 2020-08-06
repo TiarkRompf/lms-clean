@@ -24,6 +24,16 @@ object Adapter extends FrontEnd {
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
 
+  def genGraph1(m1: Manifest[_], m2: Manifest[_])(prog: Exp => Exp) = {
+    genGraphCommon(m1, m2)(g.reify(prog))
+  }
+  def genGraphCommon(m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
+    typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
+    funTable = Nil
+    var g: Graph = time("staging") { program(prog) }
+    (typeMap, g)
+  }
+
   def emitCommon1(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
                   verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
                  (m1: Manifest[_], m2: Manifest[_])(prog: Exp => Exp) =
@@ -1255,6 +1265,29 @@ abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] w
     val IR: q.type = q
   }
   compilerCommand = "g++ -std=c++17 -O3"
+}
+
+abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
+
+  // get original graph
+  val (typeMap, g) = Adapter.genGraph1(manifest[A], manifest[B])(x => Unwrap(wrapper(Wrap[A](x))))
+
+  // FIMXE(feiw) typeMap should be updated during transformation
+  // run some transformation
+  val g1: Graph = (new AdapterTransformer).transform(g)
+  val g2: Graph = (new AdapterTransformer).transform(g1)
+
+  // codegen
+  override lazy val (code, statics) = {
+    val source = new java.io.ByteArrayOutputStream()
+    val statics = time("codegen") {
+      codegen.typeMap = typeMap
+      codegen.stream = new java.io.PrintStream(source)
+      codegen.emitAll(g2, "Snippet")(manifest[A], manifest[B])
+      codegen.extractAllStatics.toList
+    }
+    (source.toString, statics)
+  }
 }
 
 // These empty traits have to be here for backward compatibility :(
