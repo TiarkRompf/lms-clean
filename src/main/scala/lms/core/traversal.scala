@@ -558,7 +558,6 @@ class AdapterTransformer extends Traverser {
   def transform(b: Block): Block = b match {
     case b @ Block(Nil, res, block, eff) =>
       Adapter.g.reify {
-        //subst(block) = g.effectToExp(g.curBlock) //XXX
         traverse(b); transform(res)
       }
     case b @ Block(arg::Nil, res, block, eff) =>
@@ -567,7 +566,6 @@ class AdapterTransformer extends Traverser {
           println(s"Warning: already have a subst for $arg")
         try {
           subst(arg) = e
-          //subst(block) = g.effectToExp(g.curBlock) //XXX
           traverse(b)
           transform(res)
         } finally subst -= arg
@@ -605,12 +603,25 @@ class AdapterTransformer extends Traverser {
   }
 
   def transform(graph: Graph): Graph = {
-    Adapter.program(Adapter.g.reify { e =>
-      assert(graph.block.in.length == 1)
-      subst(graph.block.in(0)) = e
-      super.apply(graph);
-      transform(graph.block.res)
-    })
+    // We need to save old typeMap and reset the Adapter state
+    val old_typeMap = Adapter.typeMap
+    Adapter.reset_state
+
+    // run the transformation
+    var g: Graph = utils.time("transform") {
+      Adapter.program(Adapter.g.reify { e =>
+        assert(graph.block.in.length == 1)
+        subst(graph.block.in(0)) = e
+        super.apply(graph);
+        transform(graph.block.res)
+      })
+    }
+    // we need to populate the keys in subst for typeMap
+    for ((k, v) <- subst if v.isInstanceOf[Sym])
+      Adapter.typeMap(v) = old_typeMap.getOrElse(k, manifest[Unknown])
+
+    // return the new Graph with Adapter.typeMap updated (as sideEffect)
+    g
   }
 }
 

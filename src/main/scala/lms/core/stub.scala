@@ -16,22 +16,24 @@ object Global {
   val sc = new lms.util.ScalaCompile {}
 }
 
-
 object Adapter extends FrontEnd {
 
   override def mkGraphBuilder() = new GraphBuilderOpt
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
+  def reset_state = {
+    typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
+    funTable = Nil
+  }
 
   def genGraph1(m1: Manifest[_], m2: Manifest[_])(prog: Exp => Exp) = {
     genGraphCommon(m1, m2)(g.reify(prog))
   }
   def genGraphCommon(m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
-    typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
-    funTable = Nil
+    reset_state
     var g: Graph = time("staging") { program(prog) }
-    (typeMap, g)
+    g
   }
 
   def emitCommon1(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
@@ -47,8 +49,7 @@ object Adapter extends FrontEnd {
   def emitCommon(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
                  verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
                 (m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
-    typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
-    funTable = Nil
+    reset_state
 
     var g: Graph = time("staging") { program(prog) }
 
@@ -1270,7 +1271,7 @@ abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] w
 abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
 
   // get original graph
-  val (typeMap, g) = Adapter.genGraph1(manifest[A], manifest[B])(x => Unwrap(wrapper(Wrap[A](x))))
+  val g = Adapter.genGraph1(manifest[A], manifest[B])(x => Unwrap(wrapper(Wrap[A](x))))
 
   // FIMXE(feiw) typeMap should be updated during transformation
   // run some transformation
@@ -1281,7 +1282,7 @@ abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
   override lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
     val statics = time("codegen") {
-      codegen.typeMap = typeMap
+      codegen.typeMap = Adapter.typeMap
       codegen.stream = new java.io.PrintStream(source)
       codegen.emitAll(g2, "Snippet")(manifest[A], manifest[B])
       codegen.extractAllStatics.toList

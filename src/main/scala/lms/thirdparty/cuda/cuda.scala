@@ -256,8 +256,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       }
     }
 
-  def zero[T:Numeric:Manifest] = cmacro[T]("0")
-
   // hardTanhGrad: backward of hardTanh, with `inPlace` option
   def hardTanhGrad[N:Numeric:Manifest](inPlace: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (inX: Rep[Array[N]], inD: Rep[Array[N]], outD: Rep[Array[N]], minVal: Rep[N], maxVal: Rep[N], size: Rep[Int]) =>
