@@ -1273,7 +1273,6 @@ abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
   // get original graph
   val g = Adapter.genGraph1(manifest[A], manifest[B])(x => Unwrap(wrapper(Wrap[A](x))))
 
-  // FIMXE(feiw) typeMap should be updated during transformation
   // run some transformation
   val g1: Graph = (new AdapterTransformer).transform(g)
   val g2: Graph = (new AdapterTransformer).transform(g1)
