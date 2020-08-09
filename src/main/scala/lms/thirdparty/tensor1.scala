@@ -7,7 +7,6 @@ import lms.core.Backend._
 import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
-import lms.collection.immutable.CCodeGenSeqOps
 import scala.io.Source
 
 trait TensorOps1 extends Dsl {
@@ -58,7 +57,7 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 {
     case _ => super.transform(n)
   }
 
-  def print_tensor(shape: Seq[Dim], arr: Backend.Exp, offset: Rep[Dim] = 0): Rep[Unit] = shape match {
+  def print_tensor(shape: Seq[Dim], arr: Backend.Exp, offset: Rep[Dim] = 0)(implicit pos: lms.macros.SourceContext): Rep[Unit] = shape match {
     case Seq() =>
       val m = typeMap.getOrElse(arr, manifest[Unknown])
       m.typeArguments.head.toString match {
@@ -71,7 +70,7 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 {
       }
     case d +: sh =>
       for (i <- ((0 until d): Rep[Range])) {
-        val off: Rep[Dim] = offset + i * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
+        val off: Rep[Dim] = offset + (i: Rep[Int]) * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
         print_tensor(sh, arr, off)
       }
   }
