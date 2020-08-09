@@ -1,4 +1,6 @@
-#ifndef NVIDIA_WARP_SIZE
+#ifndef CUDA_HEADER_H
+#define CUDA_HEADER_H
+
 #define NVIDIA_WARP_SIZE 32 // this is typically 32 (for incl. 1080ti s)
 
 #define CUDA_CALL(f)                                                           \

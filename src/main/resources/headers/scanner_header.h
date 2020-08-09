@@ -1,3 +1,6 @@
+#ifndef SCANNER_HEADER_H
+#define SCANNER_HEADER_H
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -25,3 +28,5 @@ long hash(char *str0, int len) {
 
   return hash;
 }
+
+#endif

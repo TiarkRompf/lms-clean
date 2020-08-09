@@ -184,3 +184,99 @@ trait ScalaCodeGen_List extends ExtendedScalaCodeGen {
   }
 }
 
+// A List codegen using the immer library
+trait CppCodeGen_List extends ExtendedCPPCodeGen {
+  registerHeader("<immer/immer/flex_vector.hpp>")
+  registerHeader("<immer/immer/algorithm.hpp>")
+  registerHeader("<immer_contrib.hpp>")
+
+  override def remap(m: Manifest[_]): String = {
+    if (m.runtimeClass.getName == "scala.collection.immutable.List") {
+      val kty = m.typeArguments(0)
+      s"immer::flex_vector<${remap(kty)}>"
+    } else { super.remap(m) }
+  }
+
+  override def mayInline(n: Node): Boolean = n match {
+    case Node(_, name, _, _) if name.startsWith("list-") => false
+    case _ => super.mayInline(n)
+  }
+
+  override def quote(s: Def): String = s match {
+    case Const(xs: List[_]) =>
+      "{" + xs.map(x => quote(Const(x))).mkString(", ") + "}"
+    case _ => super.quote(s)
+  }
+
+  override def shallow(n: Node): Unit = n match {
+    case Node(s, "list-new", Const(mA: Manifest[_])::xs, _) =>
+      emit("immer::flex_vector<")
+      emit(remap(mA))
+      emit(">")
+      emit("{")
+      xs.zipWithIndex.map { case (x, i) =>
+        shallow(x)
+        if (i != xs.length-1) emit(", ")
+      }
+      emit("}")
+    case Node(s, "list-apply", List(xs, i), _) =>
+      shallow(xs); emit(".at("); shallow(i); emit(")")
+    case Node(s, "list-head", List(xs), _) =>
+      shallow(xs); emit(".front()")
+    case Node(s, "list-tail", List(xs), _) =>
+      shallow(xs); emit(".drop(1)")
+    case Node(s, "list-size", List(xs), _) =>
+      shallow(xs); emit(".size()")
+    case Node(s, "list-isEmpty", List(xs), _) =>
+      shallow(xs); emit(".size() == 0")
+    case Node(s, "list-take", List(xs, i), _) =>
+      shallow(xs); emit(".take("); shallow(i); emit(")")
+    case Node(s, "list-prepend", List(xs, x), _) =>
+      shallow(x); emit(".push_front("); shallow(xs); emit(")")
+    case Node(s, "list-concat", List(xs, ys), _) =>
+      shallow(xs); emit(" + "); shallow(ys)
+    case Node(s, "list-map", List(xs, b: Block), _) =>
+      val retType = remap(typeBlockRes(b.res))
+      emit(s"ImmerContrib::vmap<$retType>(")
+      shallow(xs)
+      emit(", ")
+      shallow(b)
+      emit(")")
+    case Node(s, "list-flatMap", xs::(b: Block)::Const(mA: Manifest[_])::rest, _) =>
+      // Note: b.res must return a List type, as required by flatMap
+      val retType = remap(typeBlockRes(b.res).typeArguments(0))
+      emit(s"ImmerContrib::flatMap<$retType>(")
+      shallow(xs)
+      emit(", ")
+      shallow(b)
+      emit(")")
+    case Node(s, "list-foldLeft", List(xs, z, b), _) =>
+      emit("ImmerContrib::foldLeft(")
+      shallow(xs); emit(", ")
+      shallow(z); emit(", ")
+      shallow(b); emit(")")
+    case Node(s, "list-zip", List(xs, ys), _) =>
+      emit("ImmerContrib::zip(")
+      shallow(xs); emit(", ")
+      shallow(ys); emit(")")
+    case Node(s, "list-filter", List(xs, b), _) =>
+      emit("ImmerContrib::filter(")
+      shallow(xs); emit(", ")
+      shallow(b); emit(")")
+    // Unsupported operation for immer backend
+    case Node(s, "list-mkString", List(xs, sep), _) =>
+      ???
+    case Node(s, "list-toArray", List(xs), _) =>
+      ???
+    case Node(s, "list-toSeq", List(xs), _) =>
+      ???
+    case Node(s, "list-sortBy", List(xs, b), _) =>
+      ???
+    case Node(s, "list-containsSlice", List(xs, ys), _) =>
+      ???
+    case Node(s, "list-intersect", List(xs, ys), _) =>
+      ???
+    case _ => super.shallow(n)
+  }
+}
+

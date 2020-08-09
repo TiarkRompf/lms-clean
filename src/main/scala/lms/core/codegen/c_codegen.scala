@@ -219,37 +219,33 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
 
   private val defines = mutable.HashSet[String]()
   def registerDefine(define: String*) = defines ++= define.toSet
+
   private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
-  def registerHeader(nHeaders: String*) = headers ++= nHeaders.toSet
-  def unregisterHeader(nHeaders: String*) = headers --= nHeaders.toSet
+  def registerHeader(nHeaders: String*): Unit = headers ++= nHeaders.toSet
   def registerHeader(includePath: String, header: String): Unit = {
     registerIncludePath(includePath)
     registerHeader(header)
   }
+  def unregisterHeader(nHeaders: String*): Unit = headers --= nHeaders.toSet
+
+  def prepareHeaders: Unit = {
+    import java.nio.file._
+    import java.nio.file.StandardCopyOption._
+
+    val classLoader = getClass.getClassLoader
+    val src = Paths.get(classLoader.getResource("headers").getFile)
+    val dst = Paths.get(System.getProperty("user.dir")).resolve("headers")
+    if (!Files.exists(dst)) {
+      Files.walk(src).forEach { f =>
+        Files.copy(f, dst.resolve(src.relativize(f)), REPLACE_EXISTING)
+      }
+    }
+
+    registerIncludePath(dst.toString)
+  }
+
   def emitHeaders(out: PrintStream) = headers.foreach { f =>
     out.println(s"#include $f")
-    if (f == "<scanner_header.h>") {
-      // this is a resource in LMS clean
-      val curPath = System.getProperty("user.dir")
-      val path = new File(curPath + "/scanner_header.h")
-      val src = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/scanner_header.h"))
-      val temp_out = new PrintWriter(path)
-      temp_out.println(src.getLines.mkString("\n"))
-      temp_out.flush
-      temp_out.close
-      registerIncludePath(curPath)
-    }
-    if (f == "<cuda_header.h>") {
-      // this is a resouce in LMS clean
-      val curPath = System.getProperty("user.dir")
-      val path = new File(curPath + "/cuda_header.h")
-      val src = scala.io.Source.fromInputStream(getClass.getResourceAsStream("/cuda_header.h"))
-      val temp_out = new PrintWriter(path)
-      temp_out.println(src.getLines.mkString("\n"))
-      temp_out.flush
-      temp_out.close
-      registerIncludePath(curPath)
-    }
   }
 
   def emitDefines(out: PrintStream) = defines.foreach { f =>
@@ -589,6 +585,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     val ng = init(g)
     val efs = "" //quoteEff(g.block.ein)
     val stt = dce.statics.toList.map(quoteStatic).mkString(", ")
+    prepareHeaders 
     emitln("""
     |/*****************************************
     |Emitting C Generated Code
