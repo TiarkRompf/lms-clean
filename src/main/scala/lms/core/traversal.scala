@@ -602,10 +602,15 @@ class AdapterTransformer extends Traverser {
     subst(n.n) = transform(n)
   }
 
+  var graphCache: Map[Sym,Node] = _
+  var typeMap: mutable.Map[Exp, Manifest[_]] = _
+
   def transform(graph: Graph): Graph = {
     // We need to save old typeMap and reset the Adapter state
-    val old_typeMap = Adapter.typeMap
+    typeMap = Adapter.typeMap
     Adapter.reset_state
+
+    graphCache = graph.globalDefsCache
 
     // run the transformation
     var g: Graph = utils.time("transform") {
@@ -618,7 +623,7 @@ class AdapterTransformer extends Traverser {
     }
     // we need to populate the keys in subst for typeMap
     for ((k, v) <- subst if v.isInstanceOf[Sym])
-      Adapter.typeMap(v) = old_typeMap.getOrElse(k, manifest[Unknown])
+      Adapter.typeMap(v) = typeMap.getOrElse(k, manifest[Unknown])
 
     // return the new Graph with Adapter.typeMap updated (as sideEffect)
     g
