@@ -15,7 +15,7 @@ class CudaTest extends TutorialFunSuite {
     override val codegen = new DslGenC with CCodeGenCudaOps {
       val IR: q.type = q
     }
-    compilerCommand = "nvcc -std=c++11 -O3"
+    override val compilerCommand = "nvcc -std=c++11 -O3"
 
     val curPath = System.getProperty("user.dir")
     override val sourceFile = s"$curPath/snippet.cu"

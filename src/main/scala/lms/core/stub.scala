@@ -6,9 +6,10 @@ import lms.macros.EmbeddedControls
 
 import scala.collection.{mutable, immutable}
 
-import lms.core._
 import lms.util._
-import Backend._
+import lms.core._
+import lms.core.Backend._
+import lms.collection.mutable.ArrayOps
 
 import utils.time
 
@@ -16,9 +17,7 @@ object Global {
   val sc = new lms.util.ScalaCompile {}
 }
 
-
 object Adapter extends FrontEnd {
-
   override def mkGraphBuilder() = new GraphBuilderOpt
 
   private val typeMap: mutable.Map[Backend.Exp, Manifest[_]] = mutable.Map.empty
@@ -52,7 +51,7 @@ object Adapter extends FrontEnd {
     resetTypeMap
     resetFunTable
 
-    var g: Graph = time("staging") { program(prog) }
+    val g: Graph = time("staging") { program(prog) }
 
     def extra() = if (verbose) utils.captureOut {
       println("// Raw:")
@@ -268,7 +267,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // Top-Level Functions
   // XXX: is this data structure needed? should it move elsewhere?
   // could we use funTable instead?
-  val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
+  val topLevelFunctions = new mutable.HashMap[AnyRef,Backend.Sym]()
   def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, decorator: String = ""): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.findFunction(can) match {
@@ -1169,7 +1168,7 @@ trait PrimitiveOps extends Base with OverloadHack {
  * 3. For extension, define a DslDriverX that extends DslDriver with more frontent traits.
  *                   has a `val codegen` that is new DslGen with more codegen traits.
  */
-trait Dsl extends PrimitiveOps with LiftPrimitives with Equal with RangeOps with OrderingOps with lms.collection.mutable.ArrayOps with UtilOps {
+trait Dsl extends PrimitiveOps with LiftPrimitives with Equal with RangeOps with OrderingOps with ArrayOps with UtilOps {
 
   class SeqOpsCls[T](x: Rep[Seq[Char]])
   implicit def repStrToSeqOps(a: Rep[String]) = new SeqOpsCls(a.asInstanceOf[Rep[Seq[Char]]])
@@ -1237,7 +1236,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
     (source.toString, statics)
   }
-  var compilerCommand = "cc -std=c99 -O3"
+  val compilerCommand = "cc -std=c99 -O3"
   def libraries = codegen.libraryFlags mkString(" ")
 
   val sourceFile = "/tmp/snippet.c"
@@ -1264,7 +1263,7 @@ abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] w
   override val codegen = new DslGenCPP {
     val IR: q.type = q
   }
-  compilerCommand = "g++ -std=c++17 -O3"
+  override val compilerCommand = "g++ -std=c++17 -O3"
 }
 
 // These empty traits have to be here for backward compatibility :(
