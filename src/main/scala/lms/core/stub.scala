@@ -21,8 +21,20 @@ object Adapter extends FrontEnd {
 
   override def mkGraphBuilder() = new GraphBuilderOpt
 
-  var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
-  var funTable: List[(Backend.Exp, Any)] = _
+  private val typeMap: mutable.Map[Backend.Exp, Manifest[_]] = mutable.Map.empty
+  def copyTypeMap: mutable.Map[Backend.Exp, Manifest[_]] = typeMap.clone
+  def resetTypeMap: Unit = typeMap.clear
+  def updateTypeMap(e: Backend.Exp, m: Manifest[_]): Unit = typeMap(e) = m
+
+  private val funTable: mutable.ListBuffer[(Backend.Exp, Any)] = mutable.ListBuffer.empty
+  def copyFunTable: mutable.ListBuffer[(Backend.Exp, Any)] = funTable.clone
+  def resetFunTable: Unit = funTable.clear
+  def findFunction(can: Any): Option[(Backend.Exp, Any)] = funTable.find(_._2 == can)
+  def addFunction(f: Backend.Exp, can: Any): Unit = (f, can) +=: funTable
+  def simplifyFunTable(fn1: Backend.Exp, can1: Any): Unit =
+    funTable.transform {
+      case (fn2, can2) => if (can1 == can2) (fn1, can1) else (fn2, can2)
+    }
 
   def emitCommon1(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
                   verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
@@ -37,8 +49,8 @@ object Adapter extends FrontEnd {
   def emitCommon(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
                  verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
                 (m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
-    typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
-    funTable = Nil
+    resetTypeMap
+    resetFunTable
 
     var g: Graph = time("staging") { program(prog) }
 
@@ -60,7 +72,7 @@ object Adapter extends FrontEnd {
       // val btstrm = new java.io.ByteArrayOutputStream((4 << 10) << 10) // 4MB
       // val stream = new java.io.PrintStream(btstrm)
 
-      cg.typeMap = typeMap
+      cg.typeMap = copyTypeMap
       cg.stream = stream
 
       cg.emitAll(g,name)(m1,m2)
@@ -94,7 +106,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Exp[A]
 
   case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
-    Adapter.typeMap(x) = manifest[A]
+    Adapter.updateTypeMap(x, manifest[A])
   }
   def Wrap[A:Manifest](x: lms.core.Backend.Exp): Exp[A] = {
     if (manifest[A] == manifest[Unit]) Const(()).asInstanceOf[Exp[A]]
@@ -107,7 +119,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   case class WrapV[A:Manifest](x: lms.core.Backend.Exp) extends Var[A] {
-    Adapter.typeMap(x) = manifest[A] // could include Var type in manifest
+    Adapter.updateTypeMap(x, manifest[A]) // could include Var type in manifest
   }
   def UnwrapV[T](x: Var[T]) = x match { case WrapV(x) => x }
 
@@ -227,7 +239,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, captures: Backend.Exp*): Backend.Exp = {
     val can = canonicalize(f)
-    Adapter.funTable.find(_._2 == can) match {
+    Adapter.findFunction(can) match {
       case Some((funSym, _)) =>
         funSym
       case _ =>
@@ -242,15 +254,13 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         //    The reason is that in user code, recursive functions have to be written as
         //    lazy val f = fun{...} or def f = fun{...}, in which case the recursive calls
         //    will re-enter the `fun` call.
-        Adapter.funTable = (fn, can)::Adapter.funTable
+        Adapter.addFunction(fn, can)
         val block = Adapter.g.reify(arity, gf)
 
         // Step 3. build the "λ" node with fn1 as the function name
         //    fix the funTable such that it pairs (fn1, can) for non-recursive uses.
         val res = Adapter.g.reflect(fn1,"λ",(block+:captures):_*)(hardSummary(fn))
-        Adapter.funTable = Adapter.funTable.map {
-          case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
-        }
+        Adapter.simplifyFunTable(fn1, can)
         res
     }
   }
@@ -261,11 +271,11 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   val topLevelFunctions = new scala.collection.mutable.HashMap[AnyRef,Backend.Sym]()
   def __topFun(f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, decorator: String = ""): Backend.Exp = {
     val can = canonicalize(f)
-    Adapter.funTable.find(_._2 == can) match {
+    Adapter.findFunction(can) match {
       case Some((funSym, _)) => funSym
       case _ =>
         val fn = Backend.Sym(Adapter.g.fresh)
-        Adapter.funTable = (fn, can)::Adapter.funTable
+        Adapter.addFunction(fn, can)
         val block = Adapter.g.reify(arity, gf)
         val res = Adapter.g.reflect(fn, "λ", block, Backend.Const(0), Backend.Const(decorator))()
         topLevelFunctions.getOrElseUpdate(can, fn)

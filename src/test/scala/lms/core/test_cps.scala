@@ -16,8 +16,8 @@ abstract class CPSDslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with 
     val IR: q.type = q
   }
 
-  Adapter.typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
-  Adapter.funTable = Nil
+  Adapter.resetTypeMap
+  Adapter.resetFunTable
 
   def extra(x: A): Unit = {
     val source = new java.io.ByteArrayOutputStream()
