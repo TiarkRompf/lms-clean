@@ -1184,7 +1184,9 @@ trait DslGen extends ExtendedScalaCodeGen {
 trait DslGenC extends ExtendedCCodeGen {
   val IR: Base
   import IR._
+
   def emitNode(sym: Sym[Any], rhs: Def[Any]): Unit = ???
+
   def emitSource[A : Manifest, B : Manifest](f: Rep[A]=>Rep[B], className: String, stream: java.io.PrintStream): List[(Class[_], Any)] = {
     val statics = Adapter.emitCommon1(className, this, stream)(manifest[A], manifest[B])(x => Unwrap(f(Wrap[A](x))))
     statics.toList
