@@ -49,7 +49,8 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 {
     case Node(s, "tensor-show", List(ts:Backend.Sym), _) => graphCache(ts) match {
       case Node(s, "tensor-new", List(Backend.Const(shape:Seq[Dim]), arr:Backend.Sym), _) =>
         val t = typeMap(arr)
-        Unwrap(print_tensor(shape, arr))
+        val p = print_tensor(shape, arr)
+        Unwrap(p)
       case _ =>
         System.out.println(graphCache(ts))
         ???
@@ -70,7 +71,7 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 {
       }
     case d +: sh =>
       for (i <- ((0 until d): Rep[Range])) {
-        val off: Rep[Dim] = offset + (i: Rep[Int]) * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
+        val off: Rep[Dim] = offset + (i: Rep[Dim]) * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
         print_tensor(sh, arr, off)
       }
   }
