@@ -7,7 +7,7 @@ import lms.core.Backend._
 import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
-import lms.collection.immutable.{SeqOps, CCodeGenSeqOps}
+import lms.collection.immutable.CCodeGenSeqOps
 import scala.io.Source
 
 trait TensorOps1 extends Dsl {
@@ -19,7 +19,8 @@ trait TensorOps1 extends Dsl {
     def apply[N:Numeric:Manifest](arr: Rep[Array[N]], shape: Seq[Dim])(implicit pos: SourceContext): Rep[Tensor[N]] = {
       Wrap[Tensor[N]](Adapter.g.reflect("tensor-new", Backend.Const(shape), Unwrap(arr)))
     }
-    def apply[N:Numeric:Manifest](arr: Rep[Array[N]], shape: Dim*): Rep[Tensor[N]] = apply(arr, shape)
+    // def apply[N:Numeric:Manifest](arr: Rep[Array[N]], shape: Dim*)(implicit pos: SourceContext): Rep[Tensor[N]] =
+    //   apply(arr, shape)
   }
 
   implicit def __liftVarTensor[N:Numeric:Manifest](ts: Var[Tensor[N]]): TensorOpsCls1[N] = new TensorOpsCls1(readVar(ts))
@@ -69,13 +70,9 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 {
           printf("%d ", arr0(offset))
       }
     case d +: sh =>
-      for (i <- (0 until d): Rep[Range]) {
-        val off = offset + i * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
+      for (i <- ((0 until d): Rep[Range])) {
+        val off: Rep[Dim] = offset + i * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
         print_tensor(sh, arr, off)
       }
   }
-}
-
-trait CCodeGenTensorOps1 extends CCodeGenSeqOps {
-
 }
