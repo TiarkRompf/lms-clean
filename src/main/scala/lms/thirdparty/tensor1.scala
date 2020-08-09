@@ -16,7 +16,7 @@ trait TensorOps1 extends Dsl {
 
   object Tensor {
     def apply[N:Numeric:Manifest](arr: Rep[Array[N]], shape: Seq[Dim])(implicit pos: SourceContext): Rep[Tensor[N]] = {
-      Wrap[Tensor[N]](Adapter.g.reflect("tensor-new", Backend.Const(shape), Unwrap(arr)))
+      Wrap[Tensor[N]](Adapter.g.reflect("tensor-new", Backend.Const(shape), Unwrap(arr), Backend.Const(pos)))
     }
     // def apply[N:Numeric:Manifest](arr: Rep[Array[N]], shape: Dim*)(implicit pos: SourceContext): Rep[Tensor[N]] =
     //   apply(arr, shape)
@@ -40,16 +40,16 @@ trait TensorOps1 extends Dsl {
 }
 
 // Now we want to add LMS IR transformation passes here to handle pre-codegen lowering.
-class TensorLowering1 extends AdapterTransformer with TensorOps1 {
+class TensorLowering1 extends AdapterTransformer with TensorOps1 with PrimitiveOps   {
 
   override def transform(n: Node): Backend.Exp = n match {
-    case Node(s, "tensor-new", List(arr:Backend.Sym, shape), _) =>
+    case Node(s, "tensor-new", List(arr:Backend.Sym, shape, _), _) =>
       subst(s) = arr
       ???
     case Node(s, "tensor-show", List(ts:Backend.Sym), _) => graphCache(ts) match {
-      case Node(s, "tensor-new", List(Backend.Const(shape:Seq[Dim]), arr:Backend.Sym), _) =>
+      case Node(s, "tensor-new", List(Backend.Const(shape:Seq[Dim]), arr:Backend.Sym, Backend.Const(sc:SourceContext)), _) =>
         val t = typeMap(arr)
-        val p = print_tensor(shape, arr)
+        val p = print_tensor(shape, arr)(sc)
         Unwrap(p)
       case _ =>
         System.out.println(graphCache(ts))
@@ -58,7 +58,7 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 {
     case _ => super.transform(n)
   }
 
-  def print_tensor(shape: Seq[Dim], arr: Backend.Exp, offset: Rep[Dim] = 0)(implicit pos: lms.macros.SourceContext): Rep[Unit] = shape match {
+  def print_tensor(shape: Seq[Dim], arr: Backend.Exp, offset: Rep[Dim] = unit(0))(implicit pos: SourceContext): Rep[Unit] = shape match {
     case Seq() =>
       val m = typeMap.getOrElse(arr, manifest[Unknown])
       m.typeArguments.head.toString match {
@@ -70,8 +70,8 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 {
           printf("%d ", arr0(offset))
       }
     case d +: sh =>
-      for (i <- ((0 until d): Rep[Range])) {
-        val off: Rep[Dim] = offset + (i: Rep[Dim]) * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
+      for (i <- range_until(unit(0),unit(d))) {
+        val off: Rep[Dim] = offset + (i: Rep[Int]) * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
         print_tensor(sh, arr, off)
       }
   }
