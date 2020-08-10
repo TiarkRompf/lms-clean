@@ -49,7 +49,7 @@ object Adapter extends FrontEnd {
   def emitCommon(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
                  verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
                 (m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
-    reset_state
+    resetState
 
     var g: Graph = time("staging") { program(prog) }
 
