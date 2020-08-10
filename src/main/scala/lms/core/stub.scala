@@ -22,7 +22,7 @@ object Adapter extends FrontEnd {
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var funTable: List[(Backend.Exp, Any)] = _
-  def reset_state = {
+  def resetState = {
     typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
     funTable = Nil
   }
@@ -31,7 +31,7 @@ object Adapter extends FrontEnd {
     genGraphCommon(m1, m2)(g.reify(prog))
   }
   def genGraphCommon(m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
-    reset_state
+    resetState
     var g: Graph = time("staging") { program(prog) }
     g
   }

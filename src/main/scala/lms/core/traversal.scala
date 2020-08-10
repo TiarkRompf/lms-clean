@@ -608,7 +608,7 @@ class AdapterTransformer extends Traverser {
   def transform(graph: Graph): Graph = {
     // We need to save old typeMap and reset the Adapter state
     typeMap = Adapter.typeMap
-    Adapter.reset_state
+    Adapter.resetState
 
     graphCache = graph.globalDefsCache
 

@@ -49,7 +49,7 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 with PrimitiveO
     case Node(s, "tensor-show", List(ts:Backend.Sym), _) => graphCache(ts) match {
       case Node(s, "tensor-new", List(Backend.Const(shape:Seq[Dim]), arr:Backend.Sym, Backend.Const(sc:SourceContext)), _) =>
         val t = typeMap(arr)
-        val p = print_tensor(shape, arr)(sc)
+        val p = printTensor(shape, arr)(sc)
         Unwrap(p)
       case _ =>
         System.out.println(graphCache(ts))
@@ -72,7 +72,7 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 with PrimitiveO
     case d +: sh =>
       for (i <- range_until(unit(0),unit(d))) {
         val off: Rep[Dim] = offset + (i: Rep[Int]) * (if (sh.isEmpty) 1 else sh.foldLeft(1)(_*_))
-        print_tensor(sh, arr, off)
+        printTensor(sh, arr, off)
       }
   }
 }
