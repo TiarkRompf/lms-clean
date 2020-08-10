@@ -58,7 +58,7 @@ class TensorLowering1 extends AdapterTransformer with TensorOps1 with PrimitiveO
     case _ => super.transform(n)
   }
 
-  def print_tensor(shape: Seq[Dim], arr: Backend.Exp, offset: Rep[Dim] = unit(0))(implicit pos: SourceContext): Rep[Unit] = shape match {
+  def printTensor(shape: Seq[Dim], arr: Backend.Exp, offset: Rep[Dim] = unit(0))(implicit pos: SourceContext): Rep[Unit] = shape match {
     case Seq() =>
       val m = typeMap.getOrElse(arr, manifest[Unknown])
       m.typeArguments.head.toString match {
