@@ -263,7 +263,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   val libraryPaths = mutable.HashSet[String]()
   def registerLibraryPath(paths: String*) = libraryPaths ++= paths.toSet
 
-  def composePaths(paths: mutable.HashSet[String], option: String): String = {
+  def joinPaths(paths: Iterable[String], option: String): String = {
     if (paths.isEmpty) ""
     else s"$option ${paths.mkString(s" $option ")}"
   }
