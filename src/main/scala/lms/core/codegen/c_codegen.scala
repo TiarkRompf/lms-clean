@@ -260,6 +260,14 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   val libraryFlags = mutable.HashSet[String]()
   def registerLibrary(nLibraries: String*) = libraryFlags ++= nLibraries.toSet
 
+  val libraryPaths = mutable.HashSet[String]()
+  def registerLibraryPath(paths: String*) = libraryPaths ++= paths.toSet
+
+  def composePaths(paths: mutable.HashSet[String], option: String): String = {
+    if (paths.isEmpty) ""
+    else s"$option ${paths.mkString(s" $option ")}"
+  }
+
   private val registeredFunctions = mutable.HashSet[String]()
   private val functionsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
   private val ongoingFun = new mutable.HashSet[String]()
