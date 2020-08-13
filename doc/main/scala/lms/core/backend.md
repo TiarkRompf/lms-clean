@@ -304,17 +304,17 @@ More details about effect system can be found and Gregory's write up:
 
 Effects can be latent, such as the effects of a function block. The function block may have printing
 statements and variable reads/writes, but they are not happening until they are called in function
-applications. Tracking latent effects can be tricky if we allow first-order functions, where functions
+applications. Tracking latent effects can be tricky if we allow higher-order functions, where functions
 can be returned from other functions and control flows, passed in as parameters, and stored in data
 structures such as arrays, lists, and et al. The current approach in LMS_clean doesn't support
-first-order functions. LMS application using first-order functions in LMS IR will trigger errors in
+higher-order functions. LMS application using higher-order functions in LMS IR will trigger errors in
 Latent Effect analysis.
 
 #### Effects in Data Structures
 
 LMS IR supports `Array`, which is a mutable data structure holding a fixed number of same typed elements
 in consecutive memory. The effects on arrays are at the whole-array granularity (reading and writing to
-an element is treated as reading and writing to the whole array). This is less idea.
+an element is treated as reading and writing to the whole array). This is less ideal.
 
 LMS IR also supports other data strucutures (including `List`, `Tuple`, `Map`, et al). These data
 structures are immutable, pure data structures, thus no effects are needed to use them.
