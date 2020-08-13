@@ -1242,7 +1242,8 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     (new java.io.File(executable)).delete
     import scala.sys.process._
     val includes = codegen.composePaths(codegen.includePaths, "-I")
-    val pb: ProcessBuilder = s"$compilerCommand $sourceFile -o $executable $libraries $includes"
+    val libraryPaths = codegen.composePaths(codegen.libraryPaths, "-L")
+    val pb: ProcessBuilder = s"$compilerCommand $sourceFile -o $executable $libraries $includes $libraryPaths"
     time("gcc") { pb.lines.foreach(Console.println _) }
     (a: A) => (s"$executable $a": ProcessBuilder).lines.foreach(Console.println _)
   }
