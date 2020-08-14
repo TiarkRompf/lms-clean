@@ -1229,7 +1229,7 @@ abstract class DslDriverC[A: Manifest, B: Manifest] extends DslSnippet[A, B] wit
     val statics = codegen.emitSource[A,B](wrapper, "Snippet", new java.io.PrintStream(source))
     (source.toString, statics)
   }
-  var compilerCommand = "cc -std=c99 -O3"
+  val compilerCommand = "cc -std=c99 -O3"
   def libraries = codegen.libraryFlags mkString(" ")
 
   val sourceFile = "/tmp/snippet.c"
@@ -1255,7 +1255,7 @@ abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] w
   override val codegen = new DslGenCPP {
     val IR: q.type = q
   }
-  compilerCommand = "g++ -std=c++17 -O3"
+  override val compilerCommand = "g++ -std=c++17 -O3"
 }
 
 // These empty traits have to be here for backward compatibility :(
