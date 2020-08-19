@@ -532,14 +532,26 @@ abstract class Transformer extends Traverser {
     // println(s"transformed ${n.n}->${subst(n.n)}")
   }
 
+  var graphCache: Map[Sym,Node] = _
+
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
+    graphCache = graph.globalDefsCache
+
+    val oldTypeMap = Adapter.typeMap
+    Adapter.typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
+
     val block = g.reify { e =>
       assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph); transform(graph.block.res) }
+
+    // we need to populate the keys in subst for typeMap
+    for ((k, v) <- subst if v.isInstanceOf[Sym])
+      Adapter.typeMap(v) = oldTypeMap.getOrElse(k, manifest[Unknown])
+
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
 
