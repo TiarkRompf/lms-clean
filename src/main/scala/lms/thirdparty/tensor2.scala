@@ -59,15 +59,12 @@ trait ArrayCPUOps extends Dsl with ArrayOps {
   }
 }
 
-abstract class TensorLowering2 extends Transformer with ArrayCPUOps {
-  // lower Tensor computations to Array computations
-  // FIXME(feiw) very likely this FrontEnd is not needed?
-  val frontEnd: FixedSizeTensorFrontEnd
-  import frontEnd._
-  def init() = {
-    g = new GraphBuilderOpt()
-    Adapter.g = g
-  }
+// lower Tensor computations to Array computations
+abstract class TensorLowering2 extends Transformer with ArrayCPUOps with FixedSizeTensorFrontEnd {
+  // def init() = {
+  //   g = new GraphBuilderOpt()
+  //   Adapter.g = g
+  // }
 
   val tensor2array = new mutable.HashMap[Backend.Sym, Backend.Sym]
 
@@ -102,5 +99,15 @@ abstract class TensorLowering2 extends Transformer with ArrayCPUOps {
       }
 
     case _ => super.transform(n)
+  }
+
+  override def transform(graph: Graph): Graph = {
+    g = new GraphBuilderOpt()
+    Adapter.g = g
+    try {
+      super.transform(graph)
+    } finally {
+      g = null; Adapter.g = null
+    }
   }
 }

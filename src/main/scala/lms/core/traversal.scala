@@ -538,9 +538,13 @@ abstract class Transformer extends Traverser {
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
+
+    // graphCache may be use during transformation to check the Node of a Sym
     graphCache = graph.globalDefsCache
 
+    // Handling typeMap 1. save oldTypeMap first
     val oldTypeMap = Adapter.typeMap
+    // Handling typeMap 2. initialize Adapter.typeMap as fresh, so the transformer might add new typeMap entries
     Adapter.typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
 
     val block = g.reify { e =>
@@ -549,12 +553,12 @@ abstract class Transformer extends Traverser {
       // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph); transform(graph.block.res) }
 
+    // Handling typeMap 3. update new TypeMap with old TypeMap
     // FIXME(feiw): why is the `oldTypeMap.contains(k)` necessary?
     for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k)) {
       Adapter.typeMap(v) = oldTypeMap.getOrElse(k, manifest[Unknown])
     }
 
-    Adapter.g = null
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
 

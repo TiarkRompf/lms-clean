@@ -11,12 +11,12 @@ import lms.core.stub._
 import Backend._
 
 class FixedSizeTensorTest extends TutorialFunSuite {
-  val under = "tensors"
+  val under = "transformer/tensor2"
 
   abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorFrontEnd {
     override def transform(graph: Graph) = {
       graph.show
-      val graph1 = (new TensorLowering2{val frontEnd = new FixedSizeTensorFrontEnd{}; init() }).transform(graph)
+      val graph1 = (new TensorLowering2 {}).transform(graph)
       graph1.show
       graph1
     }
@@ -33,10 +33,10 @@ class FixedSizeTensorTest extends TutorialFunSuite {
         tensor1.show
       }
     }
-    System.out.println(indent(driver.code))
+    check("show", driver.code, "c")
   }
 
-  test("basic") {
+  test("add") {
     val driver = new CompilerCTensor[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
@@ -52,7 +52,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
         tensor3.show
       }
     }
-    System.out.println(indent(driver.code))
+    check("add", driver.code, "c")
   }
 
 //   test("basic1") {
