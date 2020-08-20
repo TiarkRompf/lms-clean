@@ -16,6 +16,7 @@ object Global {
   val sc = new lms.util.ScalaCompile {}
 }
 
+
 object Adapter extends FrontEnd {
 
   override def mkGraphBuilder() = new GraphBuilderOpt

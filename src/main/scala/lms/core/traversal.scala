@@ -561,7 +561,6 @@ abstract class Transformer extends Traverser {
 
 }
 
-
 abstract class CPSTransformer extends Transformer {
 
   val forwardMap = mutable.Map[Sym, Sym]()  // this Map set up connection for lambda-forward node (sTo -> sFrom)
