@@ -19,12 +19,11 @@ generated code. We can combine basic units into `Node`, such as
 Node(Sym(x3), "+", List(Sym(x2), Const(1)), _)
 ```
 the semantics of which is `x3 = x2 + 1`. As you can probably see, the node `op` is just
-a string, which allows eazy extension of various kinds of nodes such as `-`, `print`,
-and et al.
+a string, which allows eazy extension of various kinds of nodes such as `-`, `print`, etc.
 
 Using `Exp` and `Node`, we can construct program of arbitrary sizes, but there is still
 no blocks or scopes in the IR, which is necessary for constructing conditionals, loops,
-functions, and et al. The `case class Block` is exactly for that purpose. However, it
+functions, etc. The `case class Block` is exactly for that purpose. However, it
 might be surprising that the `Block` class doesn't really contain a list of nodes that
 are in the block. Instead, it has `in: List[Sym]` as the inputs of the block, `res: Exp`
 as the output of the block, and then `ein: Sym` and `eff: EffectSummar` for effect-related
@@ -187,7 +186,7 @@ write `Node`.
 
 While data dependencies are captured in the graph structure, the control dependencies have to be
 captured in other means. LMS core handles control dependencies by tracking the effects of nodes and
-blocks (printing, variable read, variable write, et al), and then computed control dependencies based
+blocks (printing, variable read, variable write, etc.), and then computed control dependencies based
 on the effects of all nodes/blocks. Effects of nodes and blockes are
 expressed via accompanying `EffectSummary`. Both dependencies contribute to code scheduling. Here are
 a few simple rules:
@@ -304,19 +303,19 @@ More details about effect system can be found and Gregory's write up:
 
 Effects can be latent, such as the effects of a function block. The function block may have printing
 statements and variable reads/writes, but they are not happening until they are called in function
-applications. Tracking latent effects can be tricky if we allow first-order functions, where functions
+applications. Tracking latent effects can be tricky if we allow higher-order functions, where functions
 can be returned from other functions and control flows, passed in as parameters, and stored in data
-structures such as arrays, lists, and et al. The current approach in LMS_clean doesn't support
-first-order functions. LMS application using first-order functions in LMS IR will trigger errors in
+structures such as arrays, lists, etc. The current approach in LMS_clean doesn't support
+higher-order functions. LMS application using higher-order functions in LMS IR will trigger errors in
 Latent Effect analysis.
 
 #### Effects in Data Structures
 
 LMS IR supports `Array`, which is a mutable data structure holding a fixed number of same typed elements
 in consecutive memory. The effects on arrays are at the whole-array granularity (reading and writing to
-an element is treated as reading and writing to the whole array). This is less idea.
+an element is treated as reading and writing to the whole array). This is less ideal.
 
-LMS IR also supports other data strucutures (including `List`, `Tuple`, `Map`, et al). These data
+LMS IR also supports other data strucutures (including `List`, `Tuple`, `Map`, etc). These data
 structures are immutable, pure data structures, thus no effects are needed to use them.
 
 ### Watch Out (Silent Failures in Effect System)
