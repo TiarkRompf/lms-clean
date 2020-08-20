@@ -22,9 +22,11 @@ object Adapter extends FrontEnd {
   override def mkGraphBuilder() = new GraphBuilderOpt
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
+  var sourceMap: mutable.Map[lms.core.Backend.Exp, SourceContext] = _
   var funTable: List[(Backend.Exp, Any)] = _
   def resetState = {
     typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
+    sourceMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, SourceContext]()
     funTable = Nil
   }
 

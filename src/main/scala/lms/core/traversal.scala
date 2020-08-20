@@ -2,8 +2,10 @@ package lms.core
 
 import scala.collection.mutable
 
-import Backend._
 import lms.core.stub.Adapter
+import lms.macros.SourceContext
+
+import Backend._
 
 abstract class Traverser {
 
@@ -533,7 +535,8 @@ abstract class Transformer extends Traverser {
     // println(s"transformed ${n.n}->${subst(n.n)}")
   }
 
-  var graphCache: Map[Sym,Node] = _
+  var graphCache: Map[Sym, Node] = _
+  var oldSourceMap: mutable.Map[Exp, SourceContext] = _
 
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
@@ -542,10 +545,12 @@ abstract class Transformer extends Traverser {
     // graphCache may be use during transformation to check the Node of a Sym
     graphCache = graph.globalDefsCache
 
-    // Handling typeMap 1. save oldTypeMap first
+    // Handling MetaData 1. save oldTypeMap/SourceMap first
     val oldTypeMap = Adapter.typeMap
-    // Handling typeMap 2. initialize Adapter.typeMap as fresh, so the transformer might add new typeMap entries
+    oldSourceMap = Adapter.sourceMap
+    // Handling MetaData 2. initialize MetaData as fresh, so the transformer might add new metadata entries
     Adapter.typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
+    Adapter.sourceMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, SourceContext]()
 
     val block = g.reify { e =>
       assert(graph.block.in.length == 1)
@@ -553,11 +558,11 @@ abstract class Transformer extends Traverser {
       // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph); transform(graph.block.res) }
 
-    // Handling typeMap 3. update new TypeMap with old TypeMap
-    // FIXME(feiw): why is the `oldTypeMap.contains(k)` necessary?
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k)) {
-      Adapter.typeMap(v) = oldTypeMap.getOrElse(k, manifest[Unknown])
-    }
+    // Handling MetaData 3. update new metadata with old metadata
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k))
+      Adapter.typeMap(v) = oldTypeMap(k)
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldSourceMap.contains(k))
+      Adapter.sourceMap(v) = oldSourceMap(k)
 
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
