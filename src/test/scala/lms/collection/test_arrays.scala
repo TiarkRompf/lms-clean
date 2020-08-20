@@ -7,6 +7,32 @@ import macros.SourceContext
 class ArrayTest extends TutorialFunSuite {
   val under = "backend/"
 
+  test("aliasing_is_not_OK") {
+    val driver = new DslDriverC[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val arr = new Array[Int](10)
+        val arr2 = arr.slice(0, 5)
+        arr2(0) = 5
+        printf("%d %d", arr(0), arr(1))
+      }
+    }
+    check("aliasing_is_not_OK", driver.code, "c")
+  }
+
+  test("borrowing_is_OK") {
+    val driver = new DslDriverC[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val arr = NewArray[Int](10)
+        var arr2 = arr
+        arr2(0) = 5
+        printf("%d %d", arr(0), arr(1))
+      }
+    }
+    check("borrowing_is_OK", driver.code, "c")
+  }
+
   test("free-1") {
     val driver = new DslDriverC[Int,Unit] {
       @virtualize

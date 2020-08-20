@@ -16,7 +16,11 @@ trait ArrayOps { b: Base =>
   def Array[T:Manifest](xs: Rep[T]*): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("Array", xs.map(Unwrap(_)):_*))
   }
-  implicit class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
+
+  implicit def repToArrayOps[A:Manifest](x: Rep[Array[A]]) = new ArrayOps(x)
+  implicit def varToArrayOps[A:Manifest](x: Var[Array[A]]) = new ArrayOps(readVar(x))
+
+  class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = x match {
       case Wrap(_) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
       case EffectView(x, base) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(base)))
