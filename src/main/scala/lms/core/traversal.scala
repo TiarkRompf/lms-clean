@@ -474,6 +474,7 @@ abstract class Transformer extends Traverser {
 
   var g: GraphBuilder = null
 
+  // FIXME(feiw) maybe we should fix typeMap when we add to subst?cd
   val subst = new mutable.HashMap[Sym,Exp]
 
   def transform(s: Exp): Exp = s match {
@@ -548,9 +549,12 @@ abstract class Transformer extends Traverser {
       // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph); transform(graph.block.res) }
 
+    // FIXME(feiw): why is this messing up (overwriting) typeMap
     // we need to populate the keys in subst for typeMap
-    for ((k, v) <- subst if v.isInstanceOf[Sym])
-      Adapter.typeMap(v) = oldTypeMap.getOrElse(k, manifest[Unknown])
+    // for ((k, v) <- subst if v.isInstanceOf[Sym]) {
+    //   Adapter.typeMap(v) = oldTypeMap.getOrElse(k, manifest[Unknown])
+    //   System.out.println(s"$v -> ${oldTypeMap.getOrElse(k, manifest[Unknown])}")
+    // }
 
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }

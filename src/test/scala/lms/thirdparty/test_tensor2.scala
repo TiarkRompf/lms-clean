@@ -16,21 +16,53 @@ class FixedSizeTensorTest extends TutorialFunSuite {
   // first: get a driver :)
   abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorFrontEnd {
     override def transform(graph: Graph) = {
-      (new TensorShow{ val frontEnd = new FixedSizeTensorFrontEnd{}; init() }).transform(graph)
+      val graph1 = (new TensorAdd{ val frontEnd = new FixedSizeTensorFrontEnd{}; init() }).transform(graph)
+      (new TensorShow{ val frontEnd = new FixedSizeTensorFrontEnd{}; init() }).transform(graph1)
     }
   }
 
-  test("basic") {
+  abstract class CompilerCTensor2[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorFrontEnd {
+    override def transform(graph: Graph) = {
+      graph.show
+      val graph1 = (new TensorLowering2{val frontEnd = new FixedSizeTensorFrontEnd{}; init() }).transform(graph)
+      graph1.show
+      graph1
+    }
+  }
+
+  test("show") {
     val driver = new CompilerCTensor[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         // FIXME(feiw) handle this `g` better?
         g = Adapter.g
 
-        val array = Array(1,2,3,4,5)
-        val tensor1 = Tensor(Seq(5), Unwrap(array))
+        val array1 = Array(1,2,3,4,5,6,7,8)
+        val tensor1 = Tensor(Seq(2,2,2), Unwrap(array1))
         printf("%d ", tensor1.shape)
         tensor1.show
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
+  test("basic") {
+    val driver = new CompilerCTensor2[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        // FIXME(feiw) handle this `g` better?
+        g = Adapter.g
+
+        val array1 = Array(1,2,3,4,5,6)
+        val tensor1 = Tensor(Seq(2,3), Unwrap(array1))
+        // printf("%d ", tensor1.shape)
+        // tensor1.show
+
+        val array2 = Array(6,5,4,3,2,1)
+        val tensor2 = Tensor(Seq(2,3), Unwrap(array2))
+        val tensor3 = tensor1 + tensor2
+        printf("%d ", tensor3.shape)
+        tensor3.show
       }
     }
     System.out.println(indent(driver.code))
