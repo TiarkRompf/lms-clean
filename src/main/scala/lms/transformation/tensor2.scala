@@ -1,5 +1,5 @@
 package lms
-package tensors
+package transformation
 
 import scala.annotation.implicitNotFound
 import scala.collection._
@@ -11,7 +11,7 @@ import lms.macros.SourceContext
 
 import Backend._
 
-// FIXME(feiw) I made this a trait because I want to use them with Rep[T]
+// I made this a trait because I want to use them with Rep[T]
 trait FixedSizeTensorFrontEnd extends Base {
 
   type E = Backend.Exp
@@ -48,7 +48,6 @@ trait ArrayCPUOps extends Dsl with ArrayOps {
     val res = NewArray[T](size)
     for (i <- (0 until size): Rep[Range]) {
       res(i) = a(i) + b(i)
-      System.out.println(s"$res = $a + $b")
     }
     res
   }
@@ -61,10 +60,6 @@ trait ArrayCPUOps extends Dsl with ArrayOps {
 
 // lower Tensor computations to Array computations
 abstract class TensorLowering2 extends Transformer with ArrayCPUOps with FixedSizeTensorFrontEnd {
-  // def init() = {
-  //   g = new GraphBuilderOpt()
-  //   Adapter.g = g
-  // }
 
   val tensor2array = new mutable.HashMap[Backend.Sym, Backend.Sym]
 
