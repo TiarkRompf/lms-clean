@@ -549,13 +549,12 @@ abstract class Transformer extends Traverser {
       // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph); transform(graph.block.res) }
 
-    // FIXME(feiw): why is this messing up (overwriting) typeMap
-    // we need to populate the keys in subst for typeMap
-    // for ((k, v) <- subst if v.isInstanceOf[Sym]) {
-    //   Adapter.typeMap(v) = oldTypeMap.getOrElse(k, manifest[Unknown])
-    //   System.out.println(s"$v -> ${oldTypeMap.getOrElse(k, manifest[Unknown])}")
-    // }
+    // FIXME(feiw): why is the `oldTypeMap.contains(k)` necessary?
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k)) {
+      Adapter.typeMap(v) = oldTypeMap.getOrElse(k, manifest[Unknown])
+    }
 
+    Adapter.g = null
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
 
