@@ -556,7 +556,9 @@ abstract class Transformer extends Traverser {
       assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
-      super.apply(graph); transform(graph.block.res) }
+      super.apply(graph)
+      transform(graph.block.res) 
+    }
 
     // Handling MetaData 3. update new metadata with old metadata
     for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k))
