@@ -28,7 +28,7 @@ The logic of this snippet should be clear.
 2. The `body` block is evaluted to `reflect` the nodes and `reify` the blocks into the `GraphBuilder`. Then a `Graph` object is returned containing all nodes, final block, and a hashmap from `Sym` to `Node` (for getting the definition of a `Sym`).
 3. Then the `g` is reset to null.
 
-In the more sofisticated frontend `stub.scala`, we use an `object Adapter` as the graph constructor.
+In the more sophisticated frontend `stub.scala`, we use an `object Adapter` as the graph constructor.
 It overrides the `mkGraphBuilder()` with `GraphBuilderOpt`, which has more optimizations at
 node construction.
 To offer a `Rep[T]` type for each `Backend.Exp`, the `Backend.Exp` are wrapped in a `Wrap[T]` class
@@ -78,4 +78,3 @@ def run(name: String, g: Graph) = {
   }
 }
 ```
-
