@@ -39,7 +39,7 @@ case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
 ```
 And the mapping from `Backend.Exp` to `Manifest[_]` is kept in `Adapter.typeMap`.
 `Adapter.funTable` is another `Adapter` state that maps from frontend functions to their
-canonicanization. Note that after building the LMS IR in `Adapter`, the `typeMap` and `funTable`
+canonicalized forms. Note that after building the LMS IR in `Adapter`, `typeMap` and `funTable`
 are still avaiable (they are not reset to null).
 
 ``` scala
@@ -78,5 +78,4 @@ def run(name: String, g: Graph) = {
   }
 }
 ```
-
 
