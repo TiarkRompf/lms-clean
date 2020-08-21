@@ -550,7 +550,7 @@ abstract class Transformer extends Traverser {
     oldSourceMap = Adapter.sourceMap
     // Handling MetaData 2. initialize MetaData as fresh, so the transformer might add new metadata entries
     Adapter.typeMap = new mutable.HashMap[Backend.Exp, Manifest[_]]()
-    Adapter.sourceMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, SourceContext]()
+    Adapter.sourceMap = new mutable.HashMap[Backend.Exp, SourceContext]()
 
     val block = g.reify { e =>
       assert(graph.block.in.length == 1)
