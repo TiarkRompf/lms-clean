@@ -2,8 +2,10 @@ package lms.core
 
 import scala.collection.mutable
 
-import Backend._
 import lms.core.stub.Adapter
+import lms.macros.SourceContext
+
+import Backend._
 
 abstract class Traverser {
 
@@ -474,6 +476,7 @@ abstract class Transformer extends Traverser {
 
   var g: GraphBuilder = null
 
+  // FIXME(feiw) maybe we should fix typeMap when we add to subst?cd
   val subst = new mutable.HashMap[Sym,Exp]
 
   def transform(s: Exp): Exp = s match {
@@ -532,14 +535,37 @@ abstract class Transformer extends Traverser {
     // println(s"transformed ${n.n}->${subst(n.n)}")
   }
 
+  var graphCache: Map[Sym, Node] = _
+  var oldSourceMap: mutable.Map[Exp, SourceContext] = _
+
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
+
+    // graphCache may be use during transformation to check the Node of a Sym
+    graphCache = graph.globalDefsCache
+
+    // Handling MetaData 1. save oldTypeMap/SourceMap first
+    val oldTypeMap = Adapter.typeMap
+    oldSourceMap = Adapter.sourceMap
+    // Handling MetaData 2. initialize MetaData as fresh, so the transformer might add new metadata entries
+    Adapter.typeMap = new mutable.HashMap[Backend.Exp, Manifest[_]]()
+    Adapter.sourceMap = new mutable.HashMap[Backend.Exp, SourceContext]()
+
     val block = g.reify { e =>
       assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
-      super.apply(graph); transform(graph.block.res) }
+      super.apply(graph)
+      transform(graph.block.res) 
+    }
+
+    // Handling MetaData 3. update new metadata with old metadata
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k))
+      Adapter.typeMap(v) = oldTypeMap(k)
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldSourceMap.contains(k))
+      Adapter.sourceMap(v) = oldSourceMap(k)
+
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
 

@@ -27,7 +27,8 @@ class TensorFrontEnd extends FrontEnd {
     def +(y: Tensor): Tensor = Tensor(g.reflect("tensor_add",x,y.x))
   }
 
-  def Tensor(shape: SEQ)(f: SEQ => INT): Tensor = Tensor(g.reflect("tensor", shape.x, g.reify(xn => f(SEQ(xn)).x)))
+  def Tensor(shape: SEQ)(f: SEQ => INT): Tensor =
+    Tensor(g.reflect("tensor", shape.x, g.reify(xn => f(SEQ(xn)).x)))
   def Tensor(shape: INT*)(f: SEQ => INT): Tensor = Tensor(SEQ(shape:_*))(f)
 
   def zeros(sh: SEQ): Tensor = Tensor(g.reflect("tensor_zeros",sh.x))

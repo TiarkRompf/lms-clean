@@ -22,7 +22,22 @@ object Adapter extends FrontEnd {
   override def mkGraphBuilder() = new GraphBuilderOpt
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
+  var sourceMap: mutable.Map[lms.core.Backend.Exp, SourceContext] = _
   var funTable: List[(Backend.Exp, Any)] = _
+  def resetState = {
+    typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
+    sourceMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, SourceContext]()
+    funTable = Nil
+  }
+
+  def genGraph1(m1: Manifest[_], m2: Manifest[_])(prog: Exp => Exp) = {
+    genGraphCommon(m1, m2)(g.reify(prog))
+  }
+  def genGraphCommon(m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
+    resetState
+    var g: Graph = time("staging") { program(prog) }
+    g
+  }
 
   def emitCommon1(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
                   verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
@@ -37,8 +52,7 @@ object Adapter extends FrontEnd {
   def emitCommon(name: String, cg: ExtendedCodeGen, stream: java.io.PrintStream,
                  verbose: Boolean = false, alt: Boolean = false, eff: Boolean = false)
                 (m1: Manifest[_], m2: Manifest[_])(prog: => Block) = {
-    typeMap = new scala.collection.mutable.HashMap[lms.core.Backend.Exp, Manifest[_]]()
-    funTable = Nil
+    resetState
 
     var g: Graph = time("staging") { program(prog) }
 
@@ -1256,6 +1270,28 @@ abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] w
     val IR: q.type = q
   }
   override val compilerCommand = "g++ -std=c++17 -O3"
+}
+
+abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
+
+  // get original graph
+  val graph = Adapter.genGraph1(manifest[A], manifest[B])(x => Unwrap(wrapper(Wrap[A](x))))
+
+  // run some transformation
+  def transform(graph: Graph): Graph = graph
+
+  // codegen
+  override lazy val (code, statics) = {
+    val source = new java.io.ByteArrayOutputStream()
+    val statics = time("codegen") {
+      val final_g = transform(graph)
+      codegen.typeMap = Adapter.typeMap
+      codegen.stream = new java.io.PrintStream(source)
+      codegen.emitAll(final_g, "Snippet")(manifest[A], manifest[B])
+      codegen.extractAllStatics.toList
+    }
+    (source.toString, statics)
+  }
 }
 
 // These empty traits have to be here for backward compatibility :(
