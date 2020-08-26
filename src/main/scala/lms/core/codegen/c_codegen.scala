@@ -149,9 +149,12 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     }
     withWraper(wraper _)(f)
   }
-  def quoteBlock(b: Block): Unit = ???
-  def quoteBlock(header: String)(f: => Unit): Unit = ()
-  def quoteBlock(b: Block, argType: Boolean = false): Unit = ()
+  def quoteBlock(b: Block): Unit =
+    throw new RuntimeException("Generating nested functions or closures is not supported yet in C codegen")
+  def quoteBlock(header: String)(f: => Unit): Unit =
+    throw new RuntimeException("Generating nested functions or closures is not supported yet in C codegen")
+  def quoteBlock(b: Block, argType: Boolean = false): Unit =
+    throw new RuntimeException("Generating nested functions or closures is not supported yet in C codegen")
 
   // block of statements with result expression
   def quoteBlockPReturn(f: => Unit) = {
