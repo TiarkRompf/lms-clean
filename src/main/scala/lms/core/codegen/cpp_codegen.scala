@@ -114,6 +114,8 @@ trait ExtendedCPPCodeGen extends ExtendedCCodeGen {
     quoteBlockPReturn(traverse(b))
   }
 
+  override def quoteBlock(b: Block): Unit = quoteTypedBlock(b, true, false)
+
   override def shallow(n: Node): Unit = n match {
     case n @ Node(s, "λ", (block: Block)::Nil, _) =>
       quoteTypedBlock(block, false, false, capture = "")
