@@ -8,64 +8,62 @@ import lms.core._
 import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
+import lms.thirdparty.ArrayCPUOps
 
 import Backend._
 
 // I made this a trait because I want to use them with Rep[T]
-trait FixedSizeTensorFrontEnd extends Base {
+trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
 
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
 
-  case class Tensor(x: E) {
+  case class TENSOR(x: E) {
     def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
+    def withEleType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
+    def with_(pos: SourceContext, m: Manifest[_]) = withSource(pos).withEleType(m)
+
+    def p: SourceContext = Adapter.sourceMap.getOrElse(x, ???)
+    def et: Manifest[_] = Adapter.typeMap.getOrElse(x, ???)
 
     def shape: Seq[Int] = x match {
       case Adapter.g.Def(s, Backend.Const(size:Seq[Int])::_) if s.startsWith("tensor") => size
       case a => System.out.println(a); ???
     }
-
-    def eleType: Manifest[_] = x match {
-      case Adapter.g.Def(s, init :+ Backend.Const(m:Manifest[_])) if s.startsWith("tensor") => m
-      case a => System.out.println(a); ???
+    def show(implicit __pos: SourceContext): UNIT = {
+      UNIT(Adapter.g.reflectWrite("show_tensor", x)(Adapter.CTRL))
     }
 
-    def show(implicit __pos: SourceContext): Rep[Unit] = {
-      val sym = Adapter.g.reflectWrite("show_tensor", x)(Adapter.CTRL)
-      Adapter.sourceMap(sym) = __pos
-      Wrap[Unit](sym)
-    }
-
-    def + (y: Tensor)(implicit __pos: SourceContext): Tensor = {
+    def + (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
       assert(shape == y.shape)
-      assert(eleType == y.eleType)
-      Tensor(Adapter.g.reflect("tensor_add", C(shape), x, y.x, C(eleType))).withSource(__pos)
+      assert(et == y.et)
+      TENSOR(Adapter.g.reflect("tensor_add", C(shape), x, y.x)).with_(__pos, et)
     }
-
   }
 
-  def Tensor[T:Numeric:Manifest](shape: Seq[Int], array: E)(implicit __pos: SourceContext): Tensor = {
-    Tensor(Adapter.g.reflect("tensor", C(shape), array, C(manifest[T]))).withSource(__pos)
+  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
+    TENSOR(Adapter.g.reflect("tensor", C(shape), array.x)).with_(__pos, array.et)
   }
-}
 
-trait ArrayCPUOps extends Dsl with ArrayOps {
-  def array_add[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
-    val res = NewArray[T](size)
-    for (i <- (0 until size): Rep[Range]) {
-      res(i) = a(i) + b(i)
+  class Tensor[+T]
+  object Tensor {
+    def apply[T:Numeric:Manifest](shape: Seq[Int], array: Rep[Array[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      Wrap[Tensor[T]](TENSOR(shape, ARRAY(Unwrap(array))).x)
     }
-    res
   }
-  def array_print[T:Manifest](a: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
-    for (i <- (0 until size): Rep[Range]) {
-      printf("%d ", a(i))
+
+  implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
+    def shape: Seq[Int] = TENSOR(Unwrap(x)).shape
+    def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](TENSOR(Unwrap(x)).show.x)
+    def + (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = TENSOR(Unwrap(x)) + TENSOR(Unwrap(y))
+      Wrap[Tensor[T]](t.x)
     }
   }
 }
 
 // lower Tensor computations to Array computations
-abstract class TensorLowering2 extends Transformer with ArrayCPUOps with FixedSizeTensorFrontEnd {
+abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with FixedSizeTensorFrontEnd {
 
   val tensor2array = new mutable.HashMap[Backend.Sym, Backend.Sym]
 
@@ -76,18 +74,12 @@ abstract class TensorLowering2 extends Transformer with ArrayCPUOps with FixedSi
     case Node(s, "tensor", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::_, _) =>
       tensor2array(s) = transform(x).asInstanceOf[Backend.Sym]
       s
-    case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::
-                 Backend.Const(m:Manifest[_])::Nil, _) =>
-      implicit val sc_ :SourceContext = oldSourceMap(s)
-      if (m == manifest[Int]) {
-        val arr1 = Wrap[Array[Int]](tensor2array(x))
-        val arr2 = Wrap[Array[Int]](tensor2array(y))
-        val res = array_add[Int](arr1, arr2, numeral(size))
-        tensor2array(s) = Unwrap(res).asInstanceOf[Backend.Sym]
-        Unwrap(res)
-      } else {
-        ???
-      }
+    case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      implicit val sc_ : SourceContext = oldSourceMap(s)
+      val res = NEW_ARRAY(numeral(size), oldTypeMap(s))
+      tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
+      ARRAY_ADD(ARRAY(tensor2array(x)), ARRAY(tensor2array(y)), res, INT(numeral(size)))
+      res.x
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
       implicit val sc_ = oldSourceMap(s)

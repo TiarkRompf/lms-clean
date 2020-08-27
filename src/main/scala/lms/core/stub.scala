@@ -16,7 +16,7 @@ object Global {
   val sc = new lms.util.ScalaCompile {}
 }
 
-
+// FIXME(feiw) should the MetaData (typeMap and sourceMap) be part of Adapter?
 object Adapter extends FrontEnd {
 
   override def mkGraphBuilder() = new GraphBuilderOpt
@@ -131,6 +131,61 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   implicit def unit[T:Manifest](x: T): Rep[T] = Wrap[T](Backend.Const(x))
+
+
+  class TOP(val x: Backend.Exp) {
+    def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
+    def withType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
+    def with_(pos: SourceContext, m: Manifest[_]) = withSource(pos).withType(m)
+
+    def p: SourceContext = Adapter.sourceMap.getOrElse(x, ???)
+    def t: Manifest[_] = Adapter.typeMap.getOrElse(x, ???)
+  }
+  def TOP(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): TOP =
+    (new TOP(x)).with_(__pos, m)
+
+  case class UNIT(override val x: Backend.Exp)(implicit __pos: SourceContext) extends TOP(x) {
+    with_(__pos).asInstanceOf[UNIT]
+    def withType: UNIT = { Adapter.typeMap(x) = manifest[Unit]; this }
+    def with_(pos: SourceContext): UNIT =
+      withSource(pos).asInstanceOf[UNIT].withType
+  }
+
+  case class BOOL(override val x: Backend.Exp)(implicit __pos: SourceContext) extends TOP(x) {
+    with_(__pos).asInstanceOf[BOOL]
+    def withType: BOOL = { Adapter.typeMap(x) = manifest[Boolean]; this }
+    def with_(pos: SourceContext): BOOL =
+      withSource(pos).asInstanceOf[BOOL].withType
+
+    def unary_! = BOOL(Adapter.g.reflect("!",x))
+  }
+
+  case class VAR(x: Backend.Exp) {
+    def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
+    def withType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
+    def with_(pos: SourceContext, m: Manifest[_]) = withSource(pos).withType(m)
+
+    def et: Manifest[_] = Adapter.typeMap.getOrElse(x, ???)
+
+    def apply(implicit __pos: SourceContext): TOP =
+      TOP(Adapter.g.reflectRead("var_get",x)(x), et)
+    def update(y: TOP)(implicit __pos: SourceContext): UNIT = {
+      assert(et == y.t)
+      UNIT(Adapter.g.reflectWrite("var_set", x, y.x)(x))
+    }
+  }
+  def VAR(x: TOP)(implicit __pos: SourceContext): VAR =
+    VAR(Adapter.g.reflectMutable("var_new", x.x)).with_(__pos, x.t)
+
+
+  def WHILE(c: => BOOL)(b: => Unit): Unit = {
+    val cBlock = Adapter.g.reify(c.x)
+    val bBlock = Adapter.g.reify({ b; Backend.Const(()) } )
+    // compute effect (cBlock bBlock)* cBlock
+    Adapter.g.reflectEffectSummary("W", cBlock,
+      bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock))
+  }
+
 
   // Functions
   def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]) =
@@ -747,6 +802,46 @@ trait LiftPrimitives {
  * on it without using Forge.
  */
 trait PrimitiveOps extends Base with OverloadHack {
+
+  // def INT(x: Backend.Exp) = {
+  //   Adapter.typeMap(x) = manifest[Int]
+  //   new INT(x)
+  // }
+  case class INT(override val x: Backend.Exp)(implicit __pos: SourceContext) extends NUM(x) {
+    with_(__pos, manifest[Int])
+    // def +(y: INT): INT = INT(Adapter.g.reflect("+", x, y.x))
+    // def -(y: INT): INT = INT(Adapter.g.reflect("-", x, y.x))
+    // def *(y: INT): INT = INT(Adapter.g.reflect("*", x, y.x))
+    // def /(y: INT): INT = INT(Adapter.g.reflect("/", x, y.x))
+  }
+  def INT(i: Int)(implicit __pos: SourceContext): INT = INT(Backend.Const(i))
+
+  def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM = {
+    (new NUM(x)).with_(__pos, m).asInstanceOf[NUM]
+  }
+  class NUM(override val x: Backend.Exp) extends TOP(x) {
+    def +(y: NUM)(implicit pos: SourceContext): NUM = {
+      assert(t == y.t)
+      NUM(Adapter.g.reflect("+", x, y.x), t)
+    }
+    def -(y: NUM)(implicit pos: SourceContext): NUM = {
+      assert(t == y.t)
+      NUM(Adapter.g.reflect("-", x, y.x), t)
+    }
+    def *(y: NUM)(implicit pos: SourceContext): NUM = {
+      assert(t == y.t)
+      NUM(Adapter.g.reflect("*", x, y.x), t)
+    }
+    def /(y: NUM)(implicit pos: SourceContext): NUM = {
+      assert(t == y.t)
+      NUM(Adapter.g.reflect("/", x, y.x),t)
+    }
+
+    def <(y: NUM)(implicit pos: SourceContext): BOOL = {
+      assert(t == y.t)
+      BOOL(Adapter.g.reflect("<", x, y.x))
+    }
+  }
 
   /**
    * Primitive conversions

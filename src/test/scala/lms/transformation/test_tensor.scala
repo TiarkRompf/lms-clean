@@ -16,7 +16,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
   abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorFrontEnd {
     override def transform(graph: Graph) = {
       graph.show
-      val graph1 = (new TensorLowering2 {}).transform(graph)
+      val graph1 = (new TensorLoweringCPU {}).transform(graph)
       graph1.show
       graph1
     }
@@ -28,7 +28,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]): Rep[Unit] = {
 
         val array1 = Array(1,2,3,4,5,6,7,8)
-        val tensor1 = Tensor[Int](Seq(2,2,2), Unwrap(array1))
+        val tensor1 = Tensor(Seq(2,2,2), array1)
         printf("%d ", tensor1.shape)
         tensor1.show
       }
@@ -42,10 +42,10 @@ class FixedSizeTensorTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]): Rep[Unit] = {
 
         val array1 = Array(1,2,3,4,5,6)
-        val tensor1 = Tensor[Int](Seq(2,3), Unwrap(array1))
+        val tensor1 = Tensor[Int](Seq(2,3), array1)
 
         val array2 = Array(6,5,4,3,2,1)
-        val tensor2 = Tensor[Int](Seq(2,3), Unwrap(array2))
+        val tensor2 = Tensor(Seq(2,3), array2)
         val tensor3 = tensor1 + tensor2
 
         printf("%d ", tensor3.shape)
