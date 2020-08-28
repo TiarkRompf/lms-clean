@@ -16,7 +16,10 @@ abstract class Traverser {
       // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
     case Node(_, "?", c::(a: Block)::(b: Block)::_, eff) =>
-      eff.hdeps.map((e: Def) => (e,1.0)) + ((c, 1.0)) ++ (a.used ++ b.used).map((e: Def) => (e,0.5)) // XXX why eff.deps? would lose effect-only statements otherwise!
+      (eff.hdeps.map((e: Def) => (e,1.0)) + ((c, 1.0))
+        ++ (a.used intersect b.used).map((e: Def) => (e, 1.0))
+        ++ (a.used diff b.used).map((e: Def) => (e, 0.5))
+        ++ (b.used diff a.used).map((e: Def) => (e, 0.5))) // XXX why eff.deps? would lose effect-only statements otherwise!
     case Node(_, "W", (a: Block)::(b: Block)::_, eff) =>
       eff.hdeps.map((e: Def) => (e,1.0)) ++ (a.used ++ b.used).map(e => (e,100.0)) // XXX why eff.deps?
     case Node(_, "switch", guard::rhs, eff) => // 1 / # blocks instead of 0.5?
