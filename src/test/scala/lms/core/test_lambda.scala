@@ -7,21 +7,7 @@ import lms.macros.SourceContext
 class LambdaTest extends TutorialFunSuite {
   val under = "backend/"
 
-  test("bad_if_freq") {
-    val driver = new DslDriver[Int, Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        var a = arg + 10
-        val a1 = a + 5
-        val a2 = a - 4
-        val s = if (arg > 20) a1 else a2
-        printf("%d", s)
-      }
-    }
-    System.out.println(indent(driver.code))
-  }
-
-  test("lambda_nested_if") {
+  test("lambda_lifted_if") {
     val driver = new DslDriver[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -41,7 +27,7 @@ class LambdaTest extends TutorialFunSuite {
         printf("%d", s)
       }
     }
-    System.out.println(indent(driver.code))
+    check("lambda_lifted_if", driver.code, "scala")
   }
 
   test("lambda_01") {

@@ -10,26 +10,27 @@ import Backend._
 abstract class Traverser {
 
   // freq/block computation
-  def symsFreq(x: Node): Set[(Def,Double)] = x match {
+  def symsFreq(x: Node): Set[(Def,Double,Option[Block])] = x match {
     case Node(f, "λ", Block(in, y, ein, eff)::_, _) =>
-      eff.deps.map((e: Def) => (e,100.0)) + ((y, 100.0))
+      val a: Option[Block] = None
+      eff.deps.map((e: Def) => (e, 100.0, a)) + ((y, 100.0, a))
       // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
     case Node(_, "?", c::(a: Block)::(b: Block)::_, eff) =>
-      (eff.hdeps.map((e: Def) => (e,1.0)) + ((c, 1.0))
-        ++ (a.used intersect b.used).map((e: Def) => (e, 1.0))
-        ++ (a.used diff b.used).map((e: Def) => (e, 0.5))
-        ++ (b.used diff a.used).map((e: Def) => (e, 0.5))) // XXX why eff.deps? would lose effect-only statements otherwise!
+      (eff.hdeps.map((e: Def) => (e, 1.0, None)) + ((c, 1.0, None))
+        ++ (a.used intersect b.used).map((e: Def) => (e, 1.0, None))
+        ++ (a.used diff b.used).map((e: Def) => (e, 0.5, Some(a)))
+        ++ (b.used diff a.used).map((e: Def) => (e, 0.5, Some(b)))) // XXX why eff.deps? would lose effect-only statements otherwise!
     case Node(_, "W", (a: Block)::(b: Block)::_, eff) =>
-      eff.hdeps.map((e: Def) => (e,1.0)) ++ (a.used ++ b.used).map(e => (e,100.0)) // XXX why eff.deps?
+      eff.hdeps.map((e: Def) => (e, 1.0, None)) ++ (a.used ++ b.used).map(e => (e, 100.0, None)) // XXX why eff.deps?
     case Node(_, "switch", guard::rhs, eff) => // 1 / # blocks instead of 0.5?
-      var freqs = Set[(Def,Double)]()
+      var freqs = Set[(Def, Double, Option[Block])]()
       rhs.foreach {
-        case b: Block => freqs ++= b.used.map(e => (e, 0.5))
+        case b: Block => freqs ++= b.used.map(e => (e, 0.5, Some(b)))
         case _ =>
       }
-      freqs + ((guard, 1.0)) ++ eff.hdeps.map((e: Def) => (e,1.0))
-    case _ => hardSyms(x).map((s: Def) => (s,1.0))
+      freqs + ((guard, 1.0, None)) ++ eff.hdeps.map((e: Def) => (e, 1.0, None))
+    case _ => hardSyms(x).map((s: Def) => (s, 1.0, None))
   }
 
 
@@ -128,7 +129,7 @@ abstract class Traverser {
     // nodes that are hard-depended from the seeds.
     // The `reachInner` is seeded by reachable Syms that have low frequency.
     val reach = new mutable.HashSet[Sym]
-    val reachInner = new mutable.HashSet[Sym]
+    val reachInner = new mutable.HashMap[Sym, Block]
     reach ++= y.used
 
     for (d <- g.nodes.reverseIterator) {
@@ -136,15 +137,26 @@ abstract class Traverser {
         if (available(d)) {
           // node will be sched here, don't follow if branches!
           // other statement will be scheduled in an inner block
-          for ((e:Sym,f) <- symsFreq(d))
-            if (f > 0.5) reach += e else reachInner += e
+          for ((e: Sym, f: Double, block: Option[Block]) <- symsFreq(d)) {
+            if (f > 0.5) reach += e
+            else {
+              val Some(b: Block) = block
+              reachInner.update(e, b)
+            }
+          }
         } else {
           // QUESTION(feiw): why we don't split via frequency here?
           reach ++= hardSyms(d)
         }
-      }
-      if (reachInner.contains(d.n)) {
-        reachInner ++= hardSyms(d)
+      } else if (reachInner.contains(d.n)) {
+        val block = reachInner(d.n)
+        for (s <- hardSyms(d)) {
+          if (reachInner.contains(s) && reachInner(s) != block) {
+            reach += s // hoist to reach :)
+          } else {
+            reachInner.update(s, block)
+          }
+        }
       }
     }
 
@@ -223,7 +235,7 @@ abstract class Traverser {
         } else {
           inner1 = n +: inner1
         }
-      } else if (reachInner(n.n)) {
+      } else if (reachInner.contains(n.n)) {
         inner1 = n +: inner1
       }
     }
@@ -560,7 +572,7 @@ abstract class Transformer extends Traverser {
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph)
-      transform(graph.block.res) 
+      transform(graph.block.res)
     }
 
     // Handling MetaData 3. update new metadata with old metadata
