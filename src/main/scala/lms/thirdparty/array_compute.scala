@@ -36,16 +36,39 @@ trait ArrayCPUOps extends Dsl with ArrayOps {
     }
   }
 
-  def array_add[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
-    val res = NewArray[T](size)
+  // This is the typed frontend for adding 2 arrays element-wise (no broadcasting)
+  // We could just do a shallow wrapping of ARRAY_ADD, but if the implementation is super simple,
+  //   we can also just re-implement it.
+  def array_add[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
     for (i <- (0 until size): Rep[Range]) {
       res(i) = a(i) + b(i)
     }
-    res
   }
+
+
+  // This is the typeless frontend for printing all elements of an ARRAY (in flat format)
+  def ARRAY_PRINT(a: ARRAY, size: INT)(implicit __pos: SourceContext) = {
+    // Similarly, we are using the typed front-end of the for loop
+    for (i <- (0 until Wrap[Int](size.x)): Rep[Range]) {
+      val index = INT(Unwrap(i))
+      // here we have to decide which formatting string to use for printing,
+      // and we do so by match-casing the type manifest
+      a.et match {
+        case n if n == manifest[Int] => printf("%d ", Wrap[Int](a(index).x))
+        case n if n == manifest[Float] => printf("%f ", Wrap[Float](a(index).x))
+        case n => System.out.println(s"manifest $n is not supported yet in ARRAY_PRINT")
+      }
+    }
+  }
+
+  // This is the typed frontend for printing all elements of a Rep[Array[T]] (in flat format)
   def array_print[T:Manifest](a: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
     for (i <- (0 until size): Rep[Range]) {
-      printf("%d ", a(i))
+      manifest[T] match {
+        case n if n == manifest[Int] => printf("%d ", a(i))
+        case n if n == manifest[Float] => printf("%f ", a(i))
+        case n => System.out.println(s"manifest $n is not supported yet in ARRAY_PRINT")
+      }
     }
   }
 }

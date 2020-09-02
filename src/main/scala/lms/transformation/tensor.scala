@@ -45,10 +45,14 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
     def p: SourceContext = Adapter.sourceMap.getOrElse(x, ???)
     def et: Manifest[_] = Adapter.typeMap.getOrElse(x, ???)
 
-    def shape: Seq[Int] = x match {
-      case Adapter.g.Def(s, Backend.Const(size:Seq[Int])::_) if s.startsWith("tensor") => size
-      case a => System.out.println(a); ???
+    def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
+    def shape(graphCache: Map[Backend.Sym, Backend.Node]): Seq[Int] = {
+      graphCache.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) if s.startsWith("tensor") => size
+        case a => System.out.println(a); ???
+      }
     }
+
     def show(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectWrite("show_tensor", x)(Adapter.CTRL))
     }
@@ -130,13 +134,19 @@ abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with Fixed
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
       implicit val sc_ = oldSourceMap(s)
-      graphCache.get(x) match {
-        case Some(Node(s, op, Backend.Const(size:Seq[Int])::_, _)) =>
-          val arr = Wrap[Array[Int]](tensor2array(x))
-          array_print[Int](arr, numeral(size))
-          Backend.Const(())
-        case a => System.out.println(a); ???
-      }
+
+      // this unsafe TENSOR construction should be safe because the TENSOR x is already constructed with metadata
+      val tensor = TENSOR(x)
+      // FIXME(feiw) need to provide graphCache for fetching the shape
+      val shape = tensor.shape(graphCache)
+
+      // this unsafe ARRAY construction should be safe because the ARRAY is already constructed with metadata
+      val arr = ARRAY(tensor2array(x))
+
+      // Using typeless frontend for printing
+      ARRAY_PRINT(arr, INT(numeral(shape)))
+
+      Backend.Const(())
 
     case _ => super.transform(n)
   }
