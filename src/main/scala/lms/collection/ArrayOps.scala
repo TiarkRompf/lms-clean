@@ -20,7 +20,7 @@ trait ArrayOps extends Base with PrimitiveOps {
       Adapter.typeMap.getOrElse(x, ???).typeArguments.head
     }
 
-    def apply(i: INT): NUM =
+    def apply(i: INT)(implicit __pos: SourceContext): NUM =
       NUM(Adapter.g.reflectRead("array_get", x, i.x)(x), et)
     def update(i: INT, y: NUM)(implicit __pos: SourceContext): UNIT =
       UNIT(Adapter.g.reflectWrite("array_set", x, i.x, y.x)(x))

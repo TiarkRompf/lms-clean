@@ -11,7 +11,7 @@ void Snippet(int x0) {
   int x2[6] = { 6, 5, 4, 3, 2, 1 };
   int* x3 = (int*)malloc(6 * sizeof(int));
   int x4 = 0;
-  while (x4 < 6) {
+  while (x4 != 6) {
     int x5 = x4;
     x3[x5] = x1[x5] + x2[x5];
     x4 = x4 + 1;

@@ -12,9 +12,28 @@ import lms.thirdparty.ArrayCPUOps
 
 import Backend._
 
-// I made this a trait because I want to use them with Rep[T]
+/**
+ * In this frontend design, we are showing a paradigm of building both the `typeless`
+ * frontend (with all captilized letters: TENSOR), and the `typed` frontend (Tensor).
+ *
+ * Both typeless frontend and typed frontend will wrap `Backend.Exp` with Scala classes
+ * and register the MetaData (including SourceContext and type Manifest).
+ *
+ * In this given design, the typed frontend actually uses the typeless frontend internally.
+ * That is to say, the typed frontend is a shallow wrapper of the typeless frontend.
+ * This is not super necessary but it should avoid duplication of logic in IR construction.
+ *
+ * We are trying to bring up the typeless frontend in other frontend traits as well, because
+ * the typeless frontend is more friendly to IR transformations.
+ * This is similar to how MLIR is typeless and has been easy to run transformations.
+ */
 trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
 
+  /// typeless frontend
+  // Note how the SourceContext and type Manifest are registered.
+  // The `case class TENSOR` is used for `unsafe wrapping` (wrapping Backend.Exp as TENSOR)
+  //      and the methods associated with TENSOR
+  // The `def TENSOR` is used for `safe construction` of TENSOR, which registers metadata.
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
 
@@ -45,18 +64,33 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
     TENSOR(Adapter.g.reflect("tensor", C(shape), array.x)).with_(__pos, array.et)
   }
 
+
+  /// typed frontend
+  // Note how the typed frontend shallowly wrap the typeless frontend.
+  // The `object Tensor` is used to construct a Rep[Tensor[T]]
+  // The `implicit class TensorOps` is used to provide methods of Rep[Tensor[T]]
   class Tensor[+T]
   object Tensor {
     def apply[T:Numeric:Manifest](shape: Seq[Int], array: Rep[Array[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      // Whenever we have something that is Rep[T], it is OK to use `unsafe construction` (CLASS(Unwrap(a)))
+      // to obtain the typeless object because the metadata must have been registered.
+
+      // Then we use the safe construction of TENSOR to build TENSOR object, which is then
+      // shallowly wrapped to Rep[Tensor[T]]
       Wrap[Tensor[T]](TENSOR(shape, ARRAY(Unwrap(array))).x)
     }
   }
 
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
-    def shape: Seq[Int] = TENSOR(Unwrap(x)).shape
-    def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](TENSOR(Unwrap(x)).show.x)
+
+    // first keep a local instance of TENSOR. No need to worry about registering metadata
+    // here because we know that the metadata has ben registered when x: Rep[Tensor[T]] is constructed
+    val self = TENSOR(Unwrap(x))
+
+    def shape: Seq[Int] = self.shape
+    def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
     def + (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = TENSOR(Unwrap(x)) + TENSOR(Unwrap(y))
+      val t = self + TENSOR(Unwrap(y))
       Wrap[Tensor[T]](t.x)
     }
   }
@@ -65,19 +99,32 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
 // lower Tensor computations to Array computations
 abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with FixedSizeTensorFrontEnd {
 
+  // need a global mapping from Tensor to Array
   val tensor2array = new mutable.HashMap[Backend.Sym, Backend.Sym]
 
   def numeral(size: Seq[Int]) = size.foldLeft(1)(_ * _)
 
-  // FIXME(feiw) what do we do about different types? Int Float?
   override def transform(n: Node): Backend.Exp = n match {
     case Node(s, "tensor", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::_, _) =>
       tensor2array(s) = transform(x).asInstanceOf[Backend.Sym]
       s
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      // `oldSourceMap` is the copy of Adapter.sourceMap that maps Backend.Exp to SourceContext
+      // We use it to get the SourceContext of the node `s` and use it for the transformed node.
       implicit val sc_ : SourceContext = oldSourceMap(s)
+
+      // `oldTypeMap` is the copy of Adapter.typeMap that maps Backend.Exp to type Manifest
+      // We use it to get the type Manifest that is used for typeless frontend (such as for NEW_ARRAY)
+
+      // Note that when construction new IR nodes from the old IR nodes, we choose
+      // to use the typeless frontend because typeless frontend doesn't have to revive the type.
+      // It can work with type manifest directly.
       val res = NEW_ARRAY(numeral(size), oldTypeMap(s))
+      // add this new array to the `tensor2array` hashmap
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
+
+      // Again, we use typeless frontend here
+      // We can also use the `unsafe constructor` of `ARRAY` because all arrays metapipe are already registered.
       ARRAY_ADD(ARRAY(tensor2array(x)), ARRAY(tensor2array(y)), res, INT(numeral(size)))
       res.x
 
