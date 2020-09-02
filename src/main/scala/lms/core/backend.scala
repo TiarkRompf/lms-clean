@@ -5,6 +5,10 @@ import scala.collection.{immutable, mutable}
 
 object Backend {
 
+  // A definition is part of the right-hand side of a
+  // node definition.
+  abstract class Def
+
   // TODO: add type info and location info
 
   // Expressions are first-class entities in a program
@@ -30,7 +34,6 @@ object Backend {
     try { Const(pref + i) } finally { nextName(pref) = i + 1 }
   }
 
-
   final def UNSAFE = unstableEffect("UNSAFE")
   val STORE = Const("STORE")
   // A list of effect keys (mutable vars, ...) and
@@ -50,9 +53,7 @@ object Backend {
         (if (hdeps.nonEmpty) hdeps.toSeq.sorted.map(f).mkString(", ") else "_")
       "[" + keyString + ": " + depString + "]"
     }
-    override def toString = if (!isPure) {
-      repr(_.toString)
-    } else ""
+    override def toString = if (!isPure) repr(_.toString) else ""
 
     def isEmpty = isPure
     lazy val isPure = sdeps.isEmpty && hdeps.isEmpty && rkeys.isEmpty && wkeys.isEmpty
@@ -78,6 +79,37 @@ object Backend {
 
   case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary) {
     override def toString = s"$n = ($op ${rhs.mkString(" ")})  $eff"
+
+    val blocks: List[Block] = rhs.collect { case a @ Block(_,_,_,_) => a }
+
+    val boundSyms: Seq[Sym] = blocks.flatMap(_.bound)
+
+    val directSyms: List[Sym] =
+      rhs.flatMap {
+        case s: Sym => List(s)
+        case _ => Nil
+      }
+
+    val valueSyms: List[Sym] =
+      directSyms ++ blocks.flatMap {
+        case Block(ins, res:Sym, ein, _) => res::ein::ins
+        case Block(ins, _, ein, _) => ein::ins
+      }
+
+    val syms: List[Sym] =
+      rhs.flatMap {
+        case s: Sym => List(s)
+        case b: Block => b.deps
+        case _ => Nil
+      } ++ eff.deps
+
+    val hardSyms: Set[Sym] =
+      rhs.foldLeft(Set[Sym]()) {
+        case (agg, s: Sym) => agg + s
+        case (agg, b: Block) => agg ++ b.used
+        case (agg, _) => agg
+      } ++ eff.hdeps
+
   }
 
   /* YYY TODO
@@ -91,55 +123,21 @@ object Backend {
       (guess: typeclass to/from conversion for FrontEnd)
   */
 
-  // A definition is part of the right-hand side of a
-  // node definition.
-  abstract class Def
-
   // inputs, result, effect input, effect output summary
   case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def {
-    def bound = ein::in
-    def used = res match {
+    val bound: List[Sym] = ein::in
+    val used: Set[Sym] = res match {
       case res: Sym => eff.hdeps + res
       case _ => eff.hdeps
     }
-    def deps = used ++ eff.sdeps
+    val deps: Set[Sym] = used ++ eff.sdeps
     // NOTE/TODO: want to mask out purely local effects
     // STORE pure??
-    def isPure = eff.hdeps == Set(ein)
-  }
-
-
-  // where should this go?
-  def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.bound)
-
-  def blocks(x: Node): List[Block] =
-    x.rhs.collect { case a @ Block(_,_,_,_) => a }
-
-  def directSyms(x: Node): List[Sym] =
-    x.rhs.flatMap {
-      case s: Sym => List(s)
-      case _ => Nil
-    }
-
-  def syms(x: Node): List[Sym] = {
-    x.rhs.flatMap {
-      case s: Sym => List(s)
-      case b: Block => b.deps
-      case _ => Nil
-    } ++ x.eff.deps
-  }
-
-  def hardSyms(x: Node): Set[Sym] = {
-    x.rhs.foldLeft(Set[Sym]()) {
-      case (agg, s: Sym) => agg + s
-      case (agg, b: Block) => agg ++ b.used
-      case (agg, _) => agg
-    } ++ x.eff.hdeps
+    val isPure: Boolean = eff.hdeps == Set(ein)
   }
 }
 
 import Backend._
-
 
 class GraphBuilder {
   val globalDefs = new mutable.ArrayBuffer[Node]
@@ -717,7 +715,7 @@ class DeadCodeElim extends Phase {
       live += g.block.res.asInstanceOf[Sym]
 
     for (d <- g.nodes.reverseIterator)
-      if (live(d.n)) live ++= syms(d)
+      if (live(d.n)) live ++= d.syms
 
     g.copy(nodes = g.nodes.filter(d => live(d.n)))
   }
@@ -739,12 +737,6 @@ class DeadCodeElimCG extends Phase {
   // is live. The property of `live` and `reach` can be independent.
   var live: collection.Set[Sym] = _
   var reach: collection.Set[Sym] = _
-
-  def valueSyms(n: Node): List[Sym] =
-    directSyms(n) ++ blocks(n).flatMap {
-      case Block(ins, res:Sym, ein, _) => res::ein::ins
-      case Block(ins, _, ein, _) => ein::ins
-    }
 
   // staticData -- not really a DCE task, but hey
   var statics: collection.Set[Node] = _
@@ -774,8 +766,8 @@ class DeadCodeElimCG extends Phase {
               n.copy(rhs = c::a.copy(res = Const(()))::b.copy(res = Const(()))::t) // remove result deps if dead
             case _ => d
           }
-          live ++= valueSyms(nn)
-          reach ++= hardSyms(nn)
+          live ++= nn.valueSyms
+          reach ++= nn.hardSyms
 
           newNodes = nn::newNodes
         }
@@ -789,10 +781,10 @@ class DeadCodeElimCG extends Phase {
         size = used.size
         for (d <- newNodes.reverseIterator) {
           if (used(d.n)) {
-            used ++= valueSyms(d)
+            used ++= d.valueSyms
           } else if (d.eff.hasSimpleEffect || d.eff.wkeys.exists(used)) {
             used += d.n
-            used ++= valueSyms(d)
+            used ++= d.valueSyms
           }
         }
       }
@@ -830,7 +822,7 @@ class Bound extends Phase {
   val hm = new mutable.HashMap[Sym,Set[Sym]]
 
   def apply(g: Graph): Graph = {
-    val bound = g.nodes.flatMap(boundSyms).toSet ++ g.block.bound
+    val bound = g.nodes.flatMap(_.boundSyms).toSet ++ g.block.bound
 
     // For recursive syms, we don't want to force
     // non-recursive deps into nested scopes
@@ -856,8 +848,8 @@ class Bound extends Phase {
       more = false
 
       for (d <- g.nodes) {
-        val b = boundSyms(d).toSet - d.n
-        val newSyms = syms(d).flatMap(a => hm.getOrElse(a,Set())).toSet -- b
+        val b = d.boundSyms.toSet - d.n
+        val newSyms = d.syms.flatMap(a => hm.getOrElse(a,Set())).toSet -- b
         more ||= (d.op == "λforward" && hm.get(d.n) != Some(newSyms))
         hm(d.n) = newSyms
       }
@@ -889,7 +881,7 @@ class Flow extends Phase {
       List((y,100.0)) ++ eff.deps.map(e => (e,0.001))
     case Node(_, "?", c::Block(ac,ae,ai,af)::Block(bc,be,bi,bf)::_, _) =>
       List((c,1.0),(ae,0.5),(be,0.5)) ++ af.deps.map(e => (e,0.001)) ++ bf.deps.map(e => (e,0.001))
-    case _ => syms(x) map (s => (s,1.0))
+    case _ => x.syms.map(s => (s,1.0))
   }
 
   def apply(g: Graph): Graph = {

@@ -169,7 +169,7 @@ abstract class TensorFusionH extends Transformer {
           // process children, then emit transformed statement
           reach += s
           g.nodes.find(_.n == s).foreach { n =>
-            syms(n).foreach(visit)
+            n.syms.foreach(visit)
             if (hereSyms(n.n))
               traverse(n)
           }
@@ -178,7 +178,7 @@ abstract class TensorFusionH extends Transformer {
           loopsReached = true
           for (s <- loopSyms) {
             g.nodes.find(_.n == s).foreach { n =>
-              syms(n).foreach(visit)
+              n.syms.foreach(visit)
             }
           }
           // emit the fused body ...

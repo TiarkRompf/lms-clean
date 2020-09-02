@@ -380,7 +380,7 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
         case _ => g.nodes.filter(_.n == s).toList
       }
 
-      def dep(n: Node): List[Exp] = syms(n)
+      def dep(n: Node): List[Exp] = n.syms
 
       val scc = GraphUtil.stronglyConnectedComponents[List[Node]](
         find(g.block.res)::g.block.eff.deps.map(find).toList,

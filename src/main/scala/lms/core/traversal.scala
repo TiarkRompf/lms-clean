@@ -30,13 +30,13 @@ abstract class Traverser {
         case _ =>
       }
       freqs + ((guard, 1.0, None)) ++ eff.hdeps.map((e: Def) => (e, 1.0, None))
-    case _ => hardSyms(x).map((s: Def) => (s, 1.0, None))
+    case _ => x.hardSyms.map((s: Def) => (s, 1.0, None))
   }
 
 
-  // This `bound` is used to track the dependent bound variable of each node
-  // See the implementation in src/main/scala/lms/core/backend.scala `class Bound`
-  // It is initialized in the `apply()` function of this class
+  // This `bound` is used to track the dependent bound variable of each node,
+  // see the `class Bound` in src/main/scala/lms/core/backend.scala.
+  // It is initialized in the `apply()` function of this class.
   val bound = new Bound
 
   // This `path` is used to track the available bound variables at the current block
@@ -108,34 +108,30 @@ abstract class Traverser {
    * The function takes another function `f` as curried parameter, which is applied with
    * the new path, new inner, new outer, and the block.
    */
-  def scheduleBlock_[T](y: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
+  def scheduleBlock_[T](block: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
+    // When entering a block, we get more bound variables
+    // (from the block and possibly supplemented via `extra`)
+    val path1 = block.bound ++ extra.toList ++ path
 
-    // when entering a block, we get more bound variables (from the block and possibly supplimented
-    // via `extra)
-    val path1 = y.bound ++ extra.toList ++ path
+    // a node is available if all bound vars the node depends on are in the scope
+    def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
 
-    // a node is available if all bound vars
-    // it depends on are in scope
-    def available(d: Node) =
-      bound.hm(d.n) -- path1 - d.n == Set()
-
-    // find out which nodes are reachable on a
-    // warm path (not only via if/else branches)
-    val g = new Graph(inner, y, null)
+    // find out which nodes are reachable on a warm path (not only via if/else branches)
+    val g = new Graph(inner, block, null)
 
     // Step 1: compute `reach` and `reachInner`
-    // These are nodes that are reachable from for the current block and for an inner block
-    // We start from `y.used`, where `y` is the current block as seeds, and back track all
-    // nodes that are hard-depended from the seeds.
-    // The `reachInner` is seeded by reachable Syms that have low frequency.
+    //   These are nodes that are reachable from for the current block and for an inner block
+    //   We start from `block.used`, where `block` is the current block as roots, and backtrack
+    //   all nodes that are hard-depended from the roots.
+    //   The `reachInner` uses reachable Syms that have low frequency as roots.
     val reach = new mutable.HashSet[Sym]
     val reachInner = new mutable.HashMap[Sym, Block]
-    reach ++= y.used
+    reach ++= block.used
 
     for (d <- g.nodes.reverseIterator) {
-      if (reach contains d.n) {
+      if (reach.contains(d.n)) {
         if (available(d)) {
-          // node will be sched here, don't follow if branches!
+          // node will be scheduled here, don't follow if branches!
           // other statement will be scheduled in an inner block
           for ((e: Sym, f: Double, block: Option[Block]) <- symsFreq(d)) {
             if (f > 0.5) reach += e
@@ -146,90 +142,90 @@ abstract class Traverser {
           }
         } else {
           // QUESTION(feiw): why we don't split via frequency here?
-          reach ++= hardSyms(d)
+          reach ++= d.hardSyms
         }
       } else if (reachInner.contains(d.n)) {
         val block = reachInner(d.n)
-        for (s <- hardSyms(d)) {
+        for (s <- d.hardSyms) {
           if (reachInner.contains(s) && reachInner(s) != block) {
             reach += s // hoist to reach :)
           } else {
             reachInner.update(s, block)
           }
         }
+      } else {
+        // Not reachable by any means
       }
     }
 
-    /*
-    NOTES ON RECURSIVE SCHEDULES
+    /**
+     *  NOTES ON RECURSIVE SCHEDULES
+     *
+     *  E.g. from tutorials/AutomataTest:
+     *     x2 = fwd; x23 = DFAState(x2); x2' = (λ ...); x23
+     *
+     *  PROBLEM: Since we iterate over g.nodes in reverse order, the lambda (x2')
+     *  is initially not reachable (only the fwd node x2)!
+     *
+     *  Ideally we would directly want to build something like
+     *     x23 = fwd; x2 = (λ ...) ; x23 = DFAState(x2)
+     *  but this seems hard to achieve in general.
+     *
+     *  We fixed it so far by using a different symbol inside and outside the
+     *  function, so now we get:
+     *     x2 = fwd; x23 = DFAState(x2); x2' = (λ ...) ; x33 = DFAState(x2')
+     *
+     *  This is less ideal in terms of CSE, but at least we get a correct
+     *  schedule.
+     *
+     *  We could improve this by using a proper call to SCC instead of just
+     *  iterating over g.nodes in reverse order. The performance implications
+     *  aren't clear, so we decided to postpone this.
+     *
+     *  Code would look like this:
+     *
+     *  def find(s: Sym) = g.nodes.reverse.find(_.n == s).toList
+     *  def succ(s: Sym) = {
+     *    find(s).flatMap { d =>
+     *    if (available(d)) symsFreq(d) collect { case (e:Sym,f) if f > 0.5 => e }
+     *    else symsFreq(d) collect { case (e:Sym,f) => e }
+     *  }}
+     *
+     *  val nodes1 = lms.util.GraphUtil.stronglyConnectedComponents(g.block.used, succ)
+     *
+     *  nodes1.foreach(println)
+     *
+     *  def tb(x: Boolean) = if (x) 1 else 0
+     *  for (n <- inner) {
+     *    println(s"// ${tb(available(n))} ${tb(reach(n.n))} $n ${symsFreq(n)}")
+     *  }
+     */
 
-    // E.g. from tutorials/AutomataTest:
-    //    x2 = fwd; x23 = DFAState(x2); x2' = (λ ...); x23
+    // Should a node `d` be scheduled here? It must be:
+    //   (1) available -- not dependent on other bound vars.
+    //   (2) used at least as often as the block result.
 
-    // PROBLEM: Since we iterate over g.nodes in reverse order, the lambda (x2')
-    // is initially not reachable (only the fwd node x2)!
-
-    // Ideally we would directly want to build something like
-    //    x23 = fwd; x2 = (λ ...) ; x23 = DFAState(x2)
-    // but this seems hard to achieve in general.
-
-    // We fixed it so far by using a different symbol inside and outside the
-    // function, so now we get:
-    //    x2 = fwd; x23 = DFAState(x2); x2' = (λ ...) ; x33 = DFAState(x2')
-
-    // This is less ideal in terms of CSE, but at least we get a correct
-    // schedule.
-
-    // We could improve this by using a proper call to SCC instead of just
-    // iterating over g.nodes in reverse order. The performance implications
-    // aren't clear, so we decided to postpone this.
-
-    // Code would look like this:
-
-    def find(s: Sym) = g.nodes.reverse.find(_.n == s).toList
-    def succ(s: Sym) = {
-      find(s).flatMap { d =>
-      if (available(d)) symsFreq(d) collect { case (e:Sym,f) if f > 0.5 => e }
-      else symsFreq(d) collect { case (e:Sym,f) => e }
-    }}
-
-    val nodes1 = lms.util.GraphUtil.stronglyConnectedComponents(g.block.used, succ)
-
-    // nodes1.foreach(println)
-
-    // def tb(x: Boolean) = if (x) 1 else 0
-    // for (n <- inner) {
-    //   println(s"// ${tb(available(n))} ${tb(reach(n.n))} $n ${symsFreq(n)}")
-    // }
-    */
-
-
-    // Should node d be scheduled here? It must be:
-    // (1) available: not dependent on other bound vars
-    // (2) used at least as often as the block result
-
-    def scheduleHere(d: Node) =
-      available(d) && reach(d.n)
+    def scheduleHere(d: Node) = available(d) && reach(d.n)
 
     // Step 2: with the computed `reach` and `reachInner`, we can split the nodes
-    // to `outer1` (for current block) and `inner1` (for inner blocks)
-    // The logic is simply: `outer1` has nodes that are reachable and available.
+    //   to `outer1` (for current block) and `inner1` (for inner blocks).
+    //   The logic is simply: `outer1` has nodes that are reachable and available.
     var outer1 = Seq[Node]()
     var inner1 = Seq[Node]()
 
-    // Extra reachable statement from soft dependencies
-    // It is important to track softDeps too because if we don't, the soft-dependent
+    // Extra reachable statements from soft dependencies.
+    // It is important to track softDeps too, because if we don't, the soft-dependent
     //   nodes might go to `inner1` and be scheduled after the node that soft-depends on it.
     // If a node is only soft-depended by other nodes, we make sure that we can remove it
     //   by DCE pass before traversal passes. (see DeadCodeElimCG class in codegen.scala)
-    // the test "extraThroughSoft_is_necessary" show cases the importance of `extraThroughSoft`.
+    // The test "extraThroughSoft_is_necessary" show cases the importance of `extraThroughSoft`.
     val extraThroughSoft = new mutable.HashSet[Sym]
     for (n <- inner.reverseIterator) {
       if (reach(n.n) || extraThroughSoft(n.n)) {
         if (available(n)) {
           outer1 = n +: outer1
           if (!reach(n.n)) // if added through soft deps, hards needs to be added as well
-            extraThroughSoft ++= syms(n)
+            extraThroughSoft ++= n.syms
           else
             extraThroughSoft ++= n.eff.sdeps
         } else {
@@ -251,7 +247,7 @@ abstract class Traverser {
     // for (n <- inner1)
     //   System.out.println(s"\t$n")
 
-    f(path1, inner1, outer1, y)
+    f(path1, inner1, outer1, block)
   }
 
   def traverse(ns: Seq[Node], res: Block): Unit = {
@@ -262,19 +258,19 @@ abstract class Traverser {
     scheduleBlock(b, extra:_*)(traverse)
   }
 
-  def getFreeVarBlock(y: Block, extra: Sym*): Set[Sym] = scheduleBlock(y, extra:_*) { (ns: Seq[Node], res: Block) =>
-    val used = new mutable.HashSet[Sym]
-    val bound = new mutable.HashSet[Sym]
-    used ++= y.used
-    bound ++= path
-    for (n <- ns ++ inner) {
-      used ++= syms(n)
-      bound += n.n
-      bound ++= boundSyms(n)
+  def getFreeVarBlock(y: Block, extra: Sym*): Set[Sym] =
+    scheduleBlock(y, extra:_*) { (ns: Seq[Node], res: Block) =>
+      val used = new mutable.HashSet[Sym]
+      val bound = new mutable.HashSet[Sym]
+      used ++= y.used
+      bound ++= path
+      for (n <- ns ++ inner) {
+        used ++= n.syms
+        bound += n.n
+        bound ++= n.boundSyms
+      }
+        (used diff bound).toSet
     }
-    (used diff bound).toSet
-  }
-
 
   def traverse(n: Node): Unit = n match {
     case n @ Node(f, "λ", (y:Block)::_, _) =>
@@ -292,7 +288,6 @@ abstract class Traverser {
       traverse(g.block)
     }
   }
-
 }
 
 /**
@@ -327,7 +322,7 @@ abstract class CPSTraverser extends Traverser {
     case n @ Node(f, "λ", (y:Block)::_, _) =>
       traverse(y, f)(v => k)
     case n @ Node(f, op, es, _) =>
-      traverse(blocks(n))(k)
+      traverse(n.blocks)(k)
   }
 
   def apply(g: Graph)(k: Int): Unit = {
@@ -386,14 +381,14 @@ class CompactTraverser extends Traverser {
     if (y.res.isInstanceOf[Sym]) hm(y.res.asInstanceOf[Sym]) = 1
     for (n <- ns) {
       df(n.n) = n
-      for (s <- directSyms(n) if df.contains(s) || n.op == "λforward") // do not count refs through blocks or effects
+      for (s <- n.directSyms if df.contains(s) || n.op == "λforward") // do not count refs through blocks or effects
         hm(s) = hm.getOrElse(s,0) + 1                                  // NOTE: λforward is to deal with recursive defs
-      for (s <- syms(n) if df.contains(s))
+      for (s <- n.syms if df.contains(s))
         succ(s) = n.n::succ.getOrElse(s,Nil)
-      blocks(n).foreach(hmi ++= _.used) // block results count as inner
+      n.blocks.foreach(hmi ++= _.used) // block results count as inner
     }                                   // syms(n) -- directSyms(n)
 
-    for (n <- inner) hmi ++= hardSyms(n)
+    for (n <- inner) hmi ++= n.hardSyms
 
     // NOTE: Recursive lambdas cannot be inlined. To ensure this
     // behavior, we count λforward as additional ref to the lambda
@@ -422,7 +417,7 @@ class CompactTraverser extends Traverser {
 
     def processNodeHere(n: Node): Unit = {
       seen += n.n
-      for (s <- directSyms(n).reverse) {
+      for (s <- n.directSyms.reverse) {
         checkInline(s)
       }
     }
