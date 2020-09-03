@@ -183,7 +183,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
 
   // Functions
-  def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]) =
+  def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Backend.Exp => Backend.Exp =
     (x1: Backend.Exp) => Unwrap(f(Wrap[A](x1)))
   def unwrapFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A],Rep[B]) => Rep[C]) =
     (x1: Backend.Exp, x2: Backend.Exp) => Unwrap(f(Wrap[A](x1), Wrap[B](x2)))
