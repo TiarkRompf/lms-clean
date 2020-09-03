@@ -13,12 +13,10 @@ trait ArrayOps extends Base with PrimitiveOps {
   case class ARRAY(x: Backend.Exp) {
     def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
     def withEleType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
-    def with_(pos: SourceContext, m: Manifest[_]) = withSource(pos).withEleType(m)
+    def withSrcType(pos: SourceContext, m: Manifest[_]) = withSource(pos).withEleType(m)
 
-    def p: SourceContext = Adapter.sourceMap.getOrElse(x, ???)
-    def et: Manifest[_] = {
-      Adapter.typeMap.getOrElse(x, ???).typeArguments.head
-    }
+    def p: SourceContext = Adapter.sourceMap(x)
+    def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
 
     def apply(i: INT)(implicit __pos: SourceContext): NUM =
       NUM(Adapter.g.reflectRead("array_get", x, i.x)(x), et)
@@ -27,7 +25,7 @@ trait ArrayOps extends Base with PrimitiveOps {
 
   }
   def NEW_ARRAY(x: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
-    ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(x))).with_(__pos, m)
+    ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(x))).withSrcType(__pos, m)
   }
 
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {

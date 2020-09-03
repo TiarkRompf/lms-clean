@@ -134,39 +134,34 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
 
   class TOP(val x: Backend.Exp) {
-    def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
-    def withType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
-    def with_(pos: SourceContext, m: Manifest[_]) = withSource(pos).withType(m)
+    def withSource(pos: SourceContext): this.type = { Adapter.sourceMap(x) = pos; this }
+    def withType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
+    def withSrcType(pos: SourceContext, m: Manifest[_]): this.type = withSource(pos).withType(m)
 
-    def p: SourceContext = Adapter.sourceMap.getOrElse(x, ???)
-    def t: Manifest[_] = Adapter.typeMap.getOrElse(x, ???)
+    def p: SourceContext = Adapter.sourceMap(x)
+    def t: Manifest[_] = Adapter.typeMap(x)
+    def equals(that: this.type) = x == that.x
   }
   def TOP(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): TOP =
-    (new TOP(x)).with_(__pos, m)
+    (new TOP(x)).withSrcType(__pos, m)
 
-  case class UNIT(override val x: Backend.Exp)(implicit __pos: SourceContext) extends TOP(x) {
-    with_(__pos).asInstanceOf[UNIT]
-    def withType: UNIT = { Adapter.typeMap(x) = manifest[Unit]; this }
-    def with_(pos: SourceContext): UNIT =
-      withSource(pos).asInstanceOf[UNIT].withType
+
+  class UNIT(override val x: Backend.Exp) extends TOP(x) {
+    Adapter.typeMap(x) = manifest[Unit]
   }
+  def UNIT(x: Backend.Exp)(implicit __pos: SourceContext): UNIT = (new UNIT(x)).withSource(__pos)
 
-  case class BOOL(override val x: Backend.Exp)(implicit __pos: SourceContext) extends TOP(x) {
-    with_(__pos).asInstanceOf[BOOL]
-    def withType: BOOL = { Adapter.typeMap(x) = manifest[Boolean]; this }
-    def with_(pos: SourceContext): BOOL =
-      withSource(pos).asInstanceOf[BOOL].withType
 
+  class BOOL(override val x: Backend.Exp) extends TOP(x) {
+    Adapter.typeMap(x) = manifest[Boolean]
     def unary_! = BOOL(Adapter.g.reflect("!",x))
   }
+  def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
 
-  case class VAR(x: Backend.Exp) {
-    def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
-    def withType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
-    def with_(pos: SourceContext, m: Manifest[_]) = withSource(pos).withType(m)
+  class VAR(override val x: Backend.Exp) extends TOP(x) {
+    def et: Manifest[_] = Adapter.typeMap(x)
 
-    def et: Manifest[_] = Adapter.typeMap.getOrElse(x, ???)
-
+    // FIXME(feiw) the return type (TOP) might be too generic/relaxed
     def apply(implicit __pos: SourceContext): TOP =
       TOP(Adapter.g.reflectRead("var_get",x)(x), et)
     def update(y: TOP)(implicit __pos: SourceContext): UNIT = {
@@ -175,7 +170,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
     }
   }
   def VAR(x: TOP)(implicit __pos: SourceContext): VAR =
-    VAR(Adapter.g.reflectMutable("var_new", x.x)).with_(__pos, x.t)
+    (new VAR(Adapter.g.reflectMutable("var_new", x.x))).withSrcType(__pos, x.t)
 
 
   def WHILE(c: => BOOL)(b: => Unit): Unit = {
@@ -808,7 +803,7 @@ trait PrimitiveOps extends Base with OverloadHack {
   //   new INT(x)
   // }
   case class INT(override val x: Backend.Exp)(implicit __pos: SourceContext) extends NUM(x) {
-    with_(__pos, manifest[Int])
+    withSrcType(__pos, manifest[Int])
     // def +(y: INT): INT = INT(Adapter.g.reflect("+", x, y.x))
     // def -(y: INT): INT = INT(Adapter.g.reflect("-", x, y.x))
     // def *(y: INT): INT = INT(Adapter.g.reflect("*", x, y.x))
@@ -817,7 +812,7 @@ trait PrimitiveOps extends Base with OverloadHack {
   def INT(i: Int)(implicit __pos: SourceContext): INT = INT(Backend.Const(i))
 
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM = {
-    (new NUM(x)).with_(__pos, m).asInstanceOf[NUM]
+    (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
   }
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {

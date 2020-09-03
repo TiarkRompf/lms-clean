@@ -40,10 +40,10 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
   case class TENSOR(x: E) {
     def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
     def withEleType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
-    def with_(pos: SourceContext, m: Manifest[_]) = withSource(pos).withEleType(m)
+    def withSrcType(pos: SourceContext, m: Manifest[_]) = withSource(pos).withEleType(m)
 
-    def p: SourceContext = Adapter.sourceMap.getOrElse(x, ???)
-    def et: Manifest[_] = Adapter.typeMap.getOrElse(x, ???)
+    def p: SourceContext = Adapter.sourceMap(x)
+    def et: Manifest[_] = Adapter.typeMap(x)
 
     def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
     def shape(graphCache: Map[Backend.Sym, Backend.Node]): Seq[Int] = {
@@ -60,12 +60,12 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
     def + (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
       assert(shape == y.shape)
       assert(et == y.et)
-      TENSOR(Adapter.g.reflect("tensor_add", C(shape), x, y.x)).with_(__pos, et)
+      TENSOR(Adapter.g.reflect("tensor_add", C(shape), x, y.x)).withSrcType(__pos, et)
     }
   }
 
   def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
-    TENSOR(Adapter.g.reflect("tensor", C(shape), array.x)).with_(__pos, array.et)
+    TENSOR(Adapter.g.reflect("tensor", C(shape), array.x)).withSrcType(__pos, array.et)
   }
 
 
