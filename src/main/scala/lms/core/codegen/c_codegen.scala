@@ -569,7 +569,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   }
 
   // FIXME Too ugly!!!!
-  var graphCache: Map[Sym,Node] = _
+  var graphCache: collection.Map[Sym,Node] = _
   def isWritableSym(w: Sym): Boolean = graphCache.get(w) match {
     case Some(Node(_, "var_new", _, _)) => true // ok
     case _ => false

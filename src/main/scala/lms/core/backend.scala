@@ -4,7 +4,6 @@ package lms.core
 import scala.collection.{immutable, mutable}
 
 object Backend {
-
   // A definition is part of the right-hand side of a
   // node definition.
   abstract class Def
@@ -78,17 +77,13 @@ object Backend {
   // arguments, as well as an effect summary.
 
   case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary) {
-    override def toString = s"$n = ($op ${rhs.mkString(" ")})  $eff"
+    override def toString = s"$n = ($op ${rhs.mkString(" ")}) $eff"
 
     val blocks: List[Block] = rhs.collect { case a @ Block(_,_,_,_) => a }
 
     val boundSyms: Seq[Sym] = blocks.flatMap(_.bound)
 
-    val directSyms: List[Sym] =
-      rhs.flatMap {
-        case s: Sym => List(s)
-        case _ => Nil
-      }
+    val directSyms: List[Sym] = rhs.filter(_.isInstanceOf[Sym]).asInstanceOf[List[Sym]]
 
     val valueSyms: List[Sym] =
       directSyms ++ blocks.flatMap {
@@ -139,23 +134,31 @@ object Backend {
 
 import Backend._
 
-class GraphBuilder {
-  val globalDefs = new mutable.ArrayBuffer[Node]
-  val globalDefsCache = new mutable.HashMap[Sym,Node]
-  val globalDefsReverseCache = new mutable.HashMap[(String,Seq[Def]),Node]
+trait GraphLookup {
+  val globalDefsCache: collection.Map[Sym, Node]
 
-  var nSyms = 0
-  def fresh = try nSyms finally nSyms += 1
+  def findDefinition(s: Exp): Option[Node] = s match {
+    case s: Sym => globalDefsCache.get(s)
+    case _ => None
+  }
 
   object Def {
-    def unapply(xs: Def): Option[(String,List[Def])] = xs match {
+    def unapply(xs: Def): Option[(String, List[Def])] = xs match {
       case s @ Sym(n) =>
         findDefinition(s).map(n => (n.op,n.rhs))
       case _ => None
     }
   }
+}
 
-  def findDefinition(s: Exp): Option[Node] = s match { case s: Sym => globalDefsCache.get(s) case _ => None }
+class GraphBuilder extends GraphLookup {
+  val globalDefs = new mutable.ArrayBuffer[Node]
+  val globalDefsCache = new mutable.HashMap[Sym, Node]
+  val globalDefsReverseCache = new mutable.HashMap[(String, Seq[Def]), Node]
+
+  var nSyms = 0
+  def fresh = try nSyms finally nSyms += 1
+
   def findDefinition(op: String, as: Seq[Def]): Option[Node] = globalDefsReverseCache.get((op,as))
 
   def rewrite(s: String, as: List[Def]): Option[Exp] = None
@@ -183,7 +186,6 @@ class GraphBuilder {
 
   def reflectUnsafe(s: String, as: Def*) = reflectEffect(s, as:_*)(UNSAFE)()
 
-
   def latest(e1: Exp) = if (curLocalDefs(e1)) e1.asInstanceOf[Sym] else curBlock
   def getLastWrite(x: Exp) = curEffects.get(x) match {
     case Some((lw, _)) => lw
@@ -203,7 +205,7 @@ class GraphBuilder {
     } finally { reflectHere = saveReflectHere }
   }
 
-  def isCurrentValue(src: Exp, value: Sym) = !curEffects.get(src).filter({ case (_, lrs) => lrs contains value }).isEmpty
+  def isCurrentValue(src: Exp, value: Sym) = !curEffects.get(src).filter({ case (_, lrs) => lrs.contains(value) }).isEmpty
   // This is the main function for reflect with explicit read/write effects
   def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
     // simple pre-construction optimization
@@ -422,7 +424,7 @@ class GraphBuilder {
 
   def getInnerNodes(b: Block): List[Node] = {
     val bound = new Bound
-    bound(Graph(globalDefs.toList,b, globalDefsCache.toMap))
+    bound(Graph(globalDefs.toList, b, globalDefsCache))
     val ins = b.ein::b.in
     globalDefs.toList.filter(n => ins.exists(bound.hm.getOrElse(n.n,Set())))
   }
@@ -505,13 +507,13 @@ class GraphBuilderOpt extends GraphBuilder {
 
   // fine grained dependency computation for array
   override def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Set[Sym], Set[Sym]) =
-  findDefinition(latest(lw)) match {
-    case Some(Node(_, "array_set", as2, deps)) if (s == "array_set" && as.init == as2.init) =>
-      // If latest(lw) is setting the same array at the same index, we do not add hard dependence but soft dependence
-      // In addition, we need to inherite the soft and hard deps of latest(lw)
-      (deps.sdeps + latest(lw), deps.hdeps)
-    case _ => super.gatherEffectDepsWrite(s, as, lw, lr)
-  }
+    findDefinition(latest(lw)) match {
+      case Some(Node(_, "array_set", as2, deps)) if (s == "array_set" && as.init == as2.init) =>
+        // If latest(lw) is setting the same array at the same index, we do not add hard dependence but soft dependence
+        // In addition, we need to inherite the soft and hard deps of latest(lw)
+        (deps.sdeps + latest(lw), deps.hdeps)
+      case _ => super.gatherEffectDepsWrite(s, as, lw, lr)
+    }
 
   // graph pre-node-construction optimization
   override def rewrite(s: String, as: List[Def]): Option[Exp] = (s,as) match {
@@ -688,8 +690,8 @@ class GraphBuilderOpt extends GraphBuilder {
   }
 }
 
-case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: immutable.Map[Sym,Node]) {
-  // contract: nodes is sorted topologically
+case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: collection.Map[Sym, Node]) extends GraphLookup {
+  // contract: nodes are sorted topologically
   def show: Unit = {
     System.out.println("=================")
     for (node <- nodes)
@@ -699,16 +701,12 @@ case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: im
   }
 }
 
-
-abstract class Phase extends (Graph => Graph) {
-
-}
+abstract class Phase extends (Graph => Graph) { }
 
 // Compute liveness information and discard
 // nodes not used in computing the result
 class DeadCodeElim extends Phase {
   def apply(g: Graph): Graph = {
-
     val live = new mutable.HashSet[Sym]
 
     if (g.block.res.isInstanceOf[Sym])
@@ -742,7 +740,6 @@ class DeadCodeElimCG extends Phase {
   var statics: collection.Set[Node] = _
 
   def apply(g: Graph): Graph = utils.time("DeadCodeElimCG") {
-
     live = new mutable.HashSet[Sym]
     reach = new mutable.HashSet[Sym]
     statics = new mutable.HashSet[Node]
@@ -804,10 +801,11 @@ class DeadCodeElimCG extends Phase {
         else
           d
       }
-      val newBlock = if (fixDeps)
-        g.block.copy(eff = g.block.eff.filter(used))
-      else
-        g.block
+      val newBlock =
+        if (fixDeps)
+          g.block.copy(eff = g.block.eff.filter(used))
+        else
+          g.block
 
       Graph(newNodes, newBlock, newGlobalDefsCache)
     }

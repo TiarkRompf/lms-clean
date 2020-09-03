@@ -10,29 +10,37 @@ import Backend._
 abstract class Traverser {
 
   // freq/block computation
-  def symsFreq(x: Node): Set[(Def,Double,Option[Block])] = x match {
+  def symsFreq(g: Graph, x: Node): Set[(Def, Double)] = x match {
     case Node(f, "λ", Block(in, y, ein, eff)::_, _) =>
       val a: Option[Block] = None
-      eff.deps.map((e: Def) => (e, 100.0, a)) + ((y, 100.0, a))
+      eff.deps.map((e: Def) => (e, 100.0)) + ((y, 100.0))
       // case Node(_, "?", c::Block(ac,ae,af)::Block(bc,be,bf)::Nil, _) =>
       // List((c,1.0)) ++ (ae::be::af ++ bf).map(e => (e,0.5))
     case Node(_, "?", c::(a: Block)::(b: Block)::_, eff) =>
-      (eff.hdeps.map((e: Def) => (e, 1.0, None)) + ((c, 1.0, None))
-        ++ (a.used intersect b.used).map((e: Def) => (e, 1.0, None))
-        ++ (a.used diff b.used).map((e: Def) => (e, 0.5, Some(a)))
-        ++ (b.used diff a.used).map((e: Def) => (e, 0.5, Some(b)))) // XXX why eff.deps? would lose effect-only statements otherwise!
+      println("---")
+      for (x <- a.used) {
+        println(x)
+        println(g.globalDefsCache)
+        x match { case g.Def(op, defs) => println(op) }
+      }
+      println("---")
+      // XXX why eff.deps? would lose effect-only statements otherwise!
+      (eff.hdeps.map((e: Def) => (e, 1.0)) + ((c, 1.0))
+        ++ (a.used intersect b.used).map((e: Def) => (e, 1.0))
+        ++ (a.used diff b.used).map((e: Def) => (e, 0.5))
+        ++ (b.used diff a.used).map((e: Def) => (e, 0.5)))
     case Node(_, "W", (a: Block)::(b: Block)::_, eff) =>
-      eff.hdeps.map((e: Def) => (e, 1.0, None)) ++ (a.used ++ b.used).map(e => (e, 100.0, None)) // XXX why eff.deps?
+      // XXX why eff.deps?
+      eff.hdeps.map((e: Def) => (e, 1.0)) ++ (a.used ++ b.used).map(e => (e, 100.0))
     case Node(_, "switch", guard::rhs, eff) => // 1 / # blocks instead of 0.5?
-      var freqs = Set[(Def, Double, Option[Block])]()
+      var freqs = Set[(Def, Double)]()
       rhs.foreach {
-        case b: Block => freqs ++= b.used.map(e => (e, 0.5, Some(b)))
+        case b: Block => freqs ++= b.used.map(e => (e, 0.5))
         case _ =>
       }
-      freqs + ((guard, 1.0, None)) ++ eff.hdeps.map((e: Def) => (e, 1.0, None))
-    case _ => x.hardSyms.map((s: Def) => (s, 1.0, None))
+      freqs + ((guard, 1.0)) ++ eff.hdeps.map((e: Def) => (e, 1.0))
+    case _ => x.hardSyms.map((s: Def) => (s, 1.0))
   }
-
 
   // This `bound` is used to track the dependent bound variable of each node,
   // see the `class Bound` in src/main/scala/lms/core/backend.scala.
@@ -90,10 +98,10 @@ abstract class Traverser {
   // This `scheduleBlock` function wraps on the `scheduleBlock_` function, while
   // applying the logic of setting new path (`path1`) and new inner (`inner1`) environment,
   // and traversing nodes for the current block: `traverse(outer1, y)`
-  def scheduleBlock[T](y: Block, extra: Sym*)(traverse: (Seq[Node], Block) => T): T =
-    scheduleBlock_(y, extra: _*) { (path1, inner1, outer1, y) =>
+  def scheduleBlock[T](block: Block, extra: Sym*)(traverse: (Seq[Node], Block) => T): T =
+    scheduleBlock_(block, extra: _*) { (path1, inner1, outer1, y) =>
       withScope(path1, inner1) {
-        traverse(outer1, y)
+        traverse(outer1, block)
       }
     }
 
@@ -117,7 +125,7 @@ abstract class Traverser {
     def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
 
     // find out which nodes are reachable on a warm path (not only via if/else branches)
-    val g = new Graph(inner, block, null)
+    val g = new Graph(inner, block, inner.map((n: Node) => (n.n, n)).toMap)
 
     // Step 1: compute `reach` and `reachInner`
     //   These are nodes that are reachable from for the current block and for an inner block
@@ -125,34 +133,24 @@ abstract class Traverser {
     //   all nodes that are hard-depended from the roots.
     //   The `reachInner` uses reachable Syms that have low frequency as roots.
     val reach = new mutable.HashSet[Sym]
-    val reachInner = new mutable.HashMap[Sym, Block]
+    val reachInner = new mutable.HashSet[Sym]
     reach ++= block.used
 
     for (d <- g.nodes.reverseIterator) {
       if (reach.contains(d.n)) {
+        println(d)
         if (available(d)) {
           // node will be scheduled here, don't follow if branches!
           // other statement will be scheduled in an inner block
-          for ((e: Sym, f: Double, block: Option[Block]) <- symsFreq(d)) {
-            if (f > 0.5) reach += e
-            else {
-              val Some(b: Block) = block
-              reachInner.update(e, b)
-            }
-          }
+          println(d)
+          for ((e:Sym, f) <- symsFreq(g, d))
+            if (f > 0.5) reach += e else reachInner += e
         } else {
           // QUESTION(feiw): why we don't split via frequency here?
           reach ++= d.hardSyms
         }
       } else if (reachInner.contains(d.n)) {
-        val block = reachInner(d.n)
-        for (s <- d.hardSyms) {
-          if (reachInner.contains(s) && reachInner(s) != block) {
-            reach += s // hoist to reach :)
-          } else {
-            reachInner.update(s, block)
-          }
-        }
+        reachInner ++= d.hardSyms
       } else {
         // Not reachable by any means
       }
@@ -409,7 +407,6 @@ class CompactTraverser extends Traverser {
       else None }
     // (shouldInline is protected by withScope)
 
-
     // ----- backward pass -----
 
     // for nodes that should be inlined, disable if dependencies interfere
@@ -481,9 +478,7 @@ class CompactTraverser extends Traverser {
   }
 }
 
-
 abstract class Transformer extends Traverser {
-
   var g: GraphBuilder = null
 
   // FIXME(feiw) maybe we should fix typeMap when we add to subst?cd
@@ -545,7 +540,7 @@ abstract class Transformer extends Traverser {
     // println(s"transformed ${n.n}->${subst(n.n)}")
   }
 
-  var graphCache: Map[Sym, Node] = _
+  var graphCache: collection.Map[Sym, Node] = _
   var oldSourceMap: mutable.Map[Exp, SourceContext] = _
 
   def transform(graph: Graph): Graph = {
@@ -578,11 +573,9 @@ abstract class Transformer extends Traverser {
 
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
-
 }
 
 abstract class CPSTransformer extends Transformer {
-
   val forwardMap = mutable.Map[Sym, Sym]()  // this Map set up connection for lambda-forward node (sTo -> sFrom)
   val forwardCPSSet = mutable.Set[Exp]()    // this Set collect sFrom, whose sTo has CPS effect
   val contSet = mutable.Set.empty[Exp]      // this Set collect all continuation captured by shift1 (so that their application doesn't take more continuations)

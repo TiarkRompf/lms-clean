@@ -29,7 +29,8 @@ class LambdaTest extends TutorialFunSuite {
     }
     check("lambda_lifted_if", driver.code, "scala")
   }
-
+  
+  /*
   test("lambda_01") {
     val driver = new DslDriver[Int,Unit] {
       @virtualize
@@ -479,4 +480,5 @@ class LambdaTest extends TutorialFunSuite {
     }
     check("be_careful_with_lazy", driver.code, "scala")
   }
+  */
 }
