@@ -154,7 +154,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   class BOOL(override val x: Backend.Exp) extends TOP(x) {
     Adapter.typeMap(x) = manifest[Boolean]
-    def unary_! = BOOL(Adapter.g.reflect("!",x))
+    def unary_!(implicit __pos: SourceContext) = BOOL(Adapter.g.reflect("!",x))
   }
   def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
 
@@ -798,22 +798,7 @@ trait LiftPrimitives {
  */
 trait PrimitiveOps extends Base with OverloadHack {
 
-  // def INT(x: Backend.Exp) = {
-  //   Adapter.typeMap(x) = manifest[Int]
-  //   new INT(x)
-  // }
-  case class INT(override val x: Backend.Exp)(implicit __pos: SourceContext) extends NUM(x) {
-    withSrcType(__pos, manifest[Int])
-    // def +(y: INT): INT = INT(Adapter.g.reflect("+", x, y.x))
-    // def -(y: INT): INT = INT(Adapter.g.reflect("-", x, y.x))
-    // def *(y: INT): INT = INT(Adapter.g.reflect("*", x, y.x))
-    // def /(y: INT): INT = INT(Adapter.g.reflect("/", x, y.x))
-  }
-  def INT(i: Int)(implicit __pos: SourceContext): INT = INT(Backend.Const(i))
 
-  def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM = {
-    (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
-  }
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
       assert(t == y.t)
@@ -837,6 +822,17 @@ trait PrimitiveOps extends Base with OverloadHack {
       BOOL(Adapter.g.reflect("<", x, y.x))
     }
   }
+  def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM = {
+    (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
+  }
+
+
+  class INT(override val x: Backend.Exp) extends NUM(x) {
+    this.withType(manifest[Int])
+  }
+  def INT(x: Backend.Exp)(implicit __pos: SourceContext): INT = (new INT(x)).withSource(__pos)
+  def INT(i: Int)(implicit __pos: SourceContext): INT = (new INT(Backend.Const(i))).withSource(__pos)
+
 
   /**
    * Primitive conversions
