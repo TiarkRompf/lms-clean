@@ -10,12 +10,7 @@ import lms.macros.SourceContext
 
 trait ArrayOps extends Base with PrimitiveOps {
 
-  case class ARRAY(x: Backend.Exp) {
-    def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
-    def withEleType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
-    def withSrcType(pos: SourceContext, m: Manifest[_]) = withSource(pos).withEleType(m)
-
-    def p: SourceContext = Adapter.sourceMap(x)
+  class ARRAY(override val x: Backend.Exp) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
 
     def apply(i: INT)(implicit __pos: SourceContext): NUM =
@@ -24,9 +19,9 @@ trait ArrayOps extends Base with PrimitiveOps {
       UNIT(Adapter.g.reflectWrite("array_set", x, i.x, y.x)(x))
 
   }
-  def NEW_ARRAY(x: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
-    ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(x))).withSrcType(__pos, m)
-  }
+  def ARRAY(size: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
+    (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m)
+
 
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))

@@ -81,7 +81,7 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
 
       // Then we use the safe construction of TENSOR to build TENSOR object, which is then
       // shallowly wrapped to Rep[Tensor[T]]
-      Wrap[Tensor[T]](TENSOR(shape, ARRAY(Unwrap(array))).x)
+      Wrap[Tensor[T]](TENSOR(shape, new ARRAY(Unwrap(array))).x)
     }
   }
 
@@ -123,13 +123,13 @@ abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with Fixed
       // Note that when construction new IR nodes from the old IR nodes, we choose
       // to use the typeless frontend because typeless frontend doesn't have to revive the type.
       // It can work with type manifest directly.
-      val res = NEW_ARRAY(numeral(size), oldTypeMap(s))
+      val res = ARRAY(numeral(size), oldTypeMap(s))
       // add this new array to the `tensor2array` hashmap
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
       // Again, we use typeless frontend here
       // We can also use the `unsafe constructor` of `ARRAY` because all arrays metapipe are already registered.
-      ARRAY_ADD(ARRAY(tensor2array(x)), ARRAY(tensor2array(y)), res, INT(numeral(size)))
+      ARRAY_ADD(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(numeral(size)))
       res.x
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
@@ -141,7 +141,7 @@ abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with Fixed
       val shape = tensor.shape(graphCache)
 
       // this unsafe ARRAY construction should be safe because the ARRAY is already constructed with metadata
-      val arr = ARRAY(tensor2array(x))
+      val arr = new ARRAY(tensor2array(x))
 
       // Using typeless frontend for printing
       ARRAY_PRINT(arr, INT(numeral(shape)))
