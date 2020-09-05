@@ -157,10 +157,7 @@ trait ScalaCodeGen_List extends ExtendedScalaCodeGen {
     case _ => super.traverse(n)
   }
 
-  //TODO: what should be added here?
-  override def symsFreq(n: Node): Set[(Def, Double)] = n match {
-    case _ => super.symsFreq(n)
-  }
+  //TODO: what should be added for symsFreq?
 }
 
 // A List codegen using the immer library

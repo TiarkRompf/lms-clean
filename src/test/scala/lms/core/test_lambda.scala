@@ -7,6 +7,30 @@ import lms.macros.SourceContext
 class LambdaTest extends TutorialFunSuite {
   val under = "backend/"
 
+  test("lambda_lifted_if") {
+    val driver = new DslDriver[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        def then_br(ss: Rep[Int]): Rep[Int] = {
+          ss + 10
+        }
+        def else_br(ss: Rep[Int]): Rep[Int] = {
+          ss * 2
+        }
+        val rep_then_br: Rep[Int => Int] = fun(then_br)
+        val rep_else_br: Rep[Int => Int] = fun(else_br)
+        val s = if (arg > 10) {
+           rep_then_br(arg) - rep_else_br(arg)
+        } else {
+           rep_then_br(arg) + rep_else_br(arg)
+        }
+        printf("%d", s)
+      }
+    }
+    check("lambda_lifted_if", driver.code, "scala")
+  }
+  
+  /*
   test("lambda_01") {
     val driver = new DslDriver[Int,Unit] {
       @virtualize
@@ -456,4 +480,5 @@ class LambdaTest extends TutorialFunSuite {
     }
     check("be_careful_with_lazy", driver.code, "scala")
   }
+  */
 }
