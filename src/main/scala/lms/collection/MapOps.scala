@@ -130,49 +130,37 @@ trait ScalaCodeGen_Map extends ExtendedScalaCodeGen {
     case Node(s, "map-new", Const(mK: Manifest[_])::Const(mV: Manifest[_])::kvs, _) =>
       val kty = remap(mK)
       val vty = remap(mV)
-      emit("Map[")
-      emit(kty); emit(", "); emit(vty)
-      emit("](")
+      emit(s"Map[$kty, $vty](")
       kvs.zipWithIndex.map { case (kv, i) =>
         shallow(kv)
         if (i != kvs.length-1) emit(", ")
       }
       emit(")")
-    case Node(s, "map-apply", List(m, k), _) =>
-      shallow(m); emit("("); shallow(k); emit(")")
-    case Node(s, "map-contains", List(m, k), _) =>
-      shallow(m); emit(".contains("); shallow(k); emit(")")
-    case Node(s, "map-get", List(m, k), _) =>
-      shallow(m); emit(".get("); shallow(k); emit(")")
-    case Node(s, "map-getOrElse", List(m, k, d), _) =>
-      shallow(m); emit(".getOrElse("); shallow(k); emit(", "); shallow(d); emit(")")
-    case Node(s, "map-size", List(m), _) =>
-      shallow(m); emit(".size");
-    case Node(s, "map-+", List(m, kv), _) =>
-      shallow(m); emit(" + ("); shallow(kv); emit(")")
-    case Node(s, "map-++", List(m1, m2), _) =>
-      shallow(m1); emit(" ++ "); shallow(m2)
-    case Node(s, "map-keySet", List(m), _) =>
-      shallow(m); emit(".keySet");
-    case Node(s, "map-isEmpty", List(m), _) =>
-      shallow(m); emit(".isEmpty");
+    case Node(s, "map-apply", List(m, k), _) => es"$m($k)"
+    case Node(s, "map-contains", List(m, k), _) => es"$m.contains($k)"
+    case Node(s, "map-get", List(m, k), _) => es"$m.get($k)"
+    case Node(s, "map-getOrElse", List(m, k, d), _) => es"$m.getOrElse($k, $d)"
+    case Node(s, "map-size", List(m), _) => es"$m.size"
+    case Node(s, "map-+", List(m, kv), _) => es"$m + ($kv)"
+    case Node(s, "map-++", List(m1, m2), _) => es"$m1 ++ $m2"
+    case Node(s, "map-keySet", List(m), _) => es"$m.keySet"
+    case Node(s, "map-isEmpty", List(m), _) => es"$m.isEmpty"
     case Node(s, "map-foldLeft", List(m, z, b: Block, _), _) =>
       val p = PTuple(List(PVar(b.in(0)), PTuple(List(PVar(b.in(1)), PVar(b.in(2))))))
-      shallow(m); emit(".foldLeft(")
-      shallow(z); emit(") ")
+      es"$m.foldLeft($z) "
       quoteCaseBlock(b, p) //Note: quoteBlock will emit `{` and `}`
     case Node(s, "map-foreach", List(m, b: Block), _) =>
       val p = PTuple(b.in.map(PVar(_)))
-      shallow(m); emit(".foreach "); quoteCaseBlock(b, p)
+      es"$m.foreach "; quoteCaseBlock(b, p)
     case Node(s, "map-filter", List(m, b: Block), _) =>
       val p = PTuple(b.in.map(PVar(_)))
-      shallow(m); emit(".filter "); quoteCaseBlock(b, p)
+      es"$m.filter "; quoteCaseBlock(b, p)
     case Node(s, "map-map", List(m, b: Block), _) =>
       val p = PTuple(b.in.map(PVar(_)))
-      shallow(m); emit(".map "); quoteCaseBlock(b, p)
+      es"$m.map "; quoteCaseBlock(b, p)
     case Node(s, "map-mapmap", List(m, b: Block), _) =>
       val p = PTuple(b.in.map(PVar(_)))
-      shallow(m); emit(".map "); quoteCaseBlock(b, p)
+      es"$m.map "; quoteCaseBlock(b, p)
     case _ => super.shallow(n)
   }
 }

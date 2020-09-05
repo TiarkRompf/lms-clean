@@ -142,10 +142,36 @@ abstract class CompactCodeGen extends CompactTraverser {
       super.traverseCompact(ns, y)
     }
   }
+
   // the `emit` and `emitln` are basic codegen units.
   // the actual desitination of them are determined by children classes.
   def emit(s: String): Unit
   def emitln(s: String = ""): Unit
+
+  implicit class EmitHelper(val sc: StringContext) {
+    /** `es` for `emit-and-shallow`, which turns an interpolated string
+      * such as `es"The quick brown $fox jumps over the lazy $dog"`
+      * into `emit("The quick brown "); shallow(fox); emit(" jumps over the lazy "); shallow(dog)`.
+      */
+    def es(args: Any*): Unit = {
+      val strings = sc.parts.iterator
+      val expressions = args.iterator
+      emit(strings.next)
+      while(strings.hasNext) {
+        expressions.next match {
+          case (x: Def) => shallow(x)
+          case (n: Node) => shallow(n)
+          case (s: String) => emit(s)
+          case (i: Int) => emit(i.toString)
+        }
+        emit(strings.next)
+      }
+    }
+    def esln(args: Any*): Unit = {
+      es(args:_*)
+      emitln()
+    }
+  }
 
   /**
    * `quote` family of methods are used to emit a codegen unit (a variable, constant, or block)
@@ -161,7 +187,9 @@ abstract class CompactCodeGen extends CompactTraverser {
   def quote(s: Def): String = s match {
     case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
     case Sym(n) => s.toString
-    case Const(s: String) => "\""+s.replace("\"", "\\\"").replace("\n","\\n").replace("\t","\\t")+"\"" // TODO: more escapes?
+    case Const(s: String) =>
+      // TODO: more escapes?
+      "\""+s.replace("\"", "\\\"").replace("\n","\\n").replace("\t","\\t")+"\""
     case Const(x: Char) if x == '\n' => "'\\n'"
     case Const(x: Char) if x == '\t' => "'\\t'"
     case Const(x: Char) if x == 0    => "'\\0'"
@@ -238,7 +266,7 @@ abstract class CompactCodeGen extends CompactTraverser {
         emitln(quoteEff(y.eff))
         emit("}")
       } else {
-        if (y.res != Const(())) { emit(" else "); shallow(y.res) }
+        if (y.res != Const(())) { es" else ${y.res}" }
         emit(quoteEff(y.eff))
       }
     }
@@ -256,7 +284,7 @@ abstract class CompactCodeGen extends CompactTraverser {
   }
 
   def shallowP(n: Def, prec: Int = 20): Unit = n match {
-    case InlineSym(n) if precedence(n) < prec => emit("("); shallow(n); emit(")")
+    case InlineSym(n) if precedence(n) < prec => es"($n)"
     case _ => shallow(n)
   }
 
@@ -274,7 +302,7 @@ abstract class CompactCodeGen extends CompactTraverser {
       shallow(x)
 
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
-      emit("if ("); shallow(c); emit(") ")
+      es"if ($c) "
       quoteBlockP(traverse(a))
       emit(" else ")
       quoteBlockP(traverse(b))

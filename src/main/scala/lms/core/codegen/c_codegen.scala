@@ -161,9 +161,8 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     def wraper(numStms: Int, l: Option[Node], y: Block)(f: => Unit) = {
       emitln("{")
       f
-      if (y.res != Const(())) {
-        emit("return "); shallow(y.res); emit(";")
-      }
+      if (y.res != Const(()))
+        es"return ${y.res};"
       emitln(quoteEff(y.eff))
       emit("}")
     }
@@ -332,16 +331,16 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   def emitValDef(n: Node): Unit = {
     if (dce.live(n.n))
       emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = ")
-    shallow(n); emitln(";")
+    esln"$n;"
   }
 
   def emitVarDef(n: Node): Unit = {
     // emit(s"var ${quote(s)} = $rhs; // ${dce.reach(s)} ${dce.live(s)} ")
     // TODO: enable dce for vars ... but currently getting unused expression warnings ...
     // if (dce.live(s))
-      emit(s"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = "); shallow(n.rhs.head); emitln(";")
+    esln"${remap(typeMap.getOrElse(n.n, manifest[Unknown]))} ${quote(n.n)} = ${n.rhs.head};"
     // else
-      // emit(s"$rhs;")
+    // emit(s"$rhs;")
   }
 
   override def shallow(n: Node): Unit = n match {
@@ -351,7 +350,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case Node(s, op, List(a), _) if math.contains(op) =>
       registerHeader("<math.h>")
       registerLibrary("-lm")
-      emit(s"$op("); shallow(a); emit(")")
+      es"$op($a)"
     case Node(s, "cast", a::_, _) =>
       // NOTE: removing upcast can lead to errors because if inlining:
       // int32_t x = ...
@@ -362,9 +361,9 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       val tpe = typeMap.getOrElse(s, manifest[Unknown])
       emit(s"(${remap(tpe)})"); shallowP(a, precedence("cast"))
     case Node(s,"String.charAt",List(a,i),_) =>
-      shallowP(a); emit("["); shallow(i); emit("]")
+      shallowP(a); es"[$i]"
     case Node(s,"array_get",List(a,i),_) =>
-      shallowP(a); emit("["); shallow(i); emit("]")
+      shallowP(a); es"[$i]"
     // case Node(s,"var_get",List(a),_) =>
       // quote(a)+s"/*${quote(s)}*/"
 
@@ -384,7 +383,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case n @ Node(s,"generate-comment",List(Const(x: String)),_) => ???
 
     case n @ Node(s,"P",List(x),_) =>
-      emit("""printf("%s\n", """); shallow(x); emit(")");
+      es"""printf("%s\n", $x)"""
     case n @ Node(s, "λ", (block: Block)::Const(0)::Nil, _) =>
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
@@ -404,22 +403,22 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       emit(s"($tpe*)malloc("); shallowP(x, precedence("*")); emit(s" * sizeof($tpe))")
     case n @ Node(s, "mmap" ,List(len, fd), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"($tpe*)mmap(0, "); shallow(len); emit(", PROT_READ, MAP_FILE | MAP_SHARED, "); shallow(fd); emit(", 0)")
+      es"($tpe*)mmap(0, $len, PROT_READ, MAP_FILE | MAP_SHARED, $fd, 0)"
     case n @ Node(s, "NewArray" ,List(x, Const(0)), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"($tpe*)calloc("); shallow(x); emit(s", sizeof($tpe))")
+      es"($tpe*)calloc($x, sizeof($tpe))"
     case n @ Node(s,"array_new",List(x),_) =>
       emit(s"(int*)malloc("); shallowP(x, precedence("*")); emit(s" * sizeof(int))")
     case n @ Node(s,"array_slice",List(x, idx, _), _) =>
       shallowP(x, precedence("+")); emit(" + "); shallowP(idx, precedence("+") + 1)
     case n @ Node(s,"array_length",List(x), _) => ???
     case n @ Node(s,"array_sort",List(arr, len, arr2, comp),_) => // FIXME: not arr duplicated?
-      emit("qsort("); shallow(arr); emit(" ,"); shallow(len); emit(", sizeof(*"); shallow(arr2); emit("), (__compar_fn_t)"); shallow(comp); emit(")")
+      es"qsort($arr, $len, sizeof(*$arr2), (__compar_fn_t)$comp)"
     case n @ Node(s,"array_free", List(arr), _) =>
-      emit("free("); shallow(arr); emit(")")
+      es"free($arr)"
     case n @ Node(s,"array_resize", List(arr, nsize), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"($tpe*)realloc("); shallow(arr); emit(", "); shallowP(nsize, precedence("*")); emit(s" * sizeof($tpe))")
+      es"($tpe*)realloc($arr, "; shallowP(nsize, precedence("*")); emit(s" * sizeof($tpe))")
     case n @ Node(s, "array-of-char-to-string", List(x:Sym), _) =>
       shallow(x) // FIXME(feiw): this is currently wrong: should have array copy
     case n @ Node(s,op,args,_) if nameMap contains op =>
@@ -439,16 +438,19 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       registerHeader("<string.h>")
       (op.substring(7), args) match {
         case ("slice", List(lhs, idx, _)) => shallowP(lhs, precedence("+")); emit(" + "); shallowP(idx, precedence("+") + 1)
-        case ("equalsTo", List(lhs, rhs)) => emit("strcmp("); shallow(lhs); emit(", "); shallow(rhs); emit(" == 0");
-        case ("toDouble", List(rhs)) => emit("atof("); shallow(rhs); emit(")")
-        case ("toInt", List(rhs)) => emit("atoi("); shallow(rhs); emit(")")
-        case ("length", List(rhs)) => emit("strlen("); shallow(rhs); emit(")")
+        case ("equalsTo", List(lhs, rhs)) => es"strcmp($lhs, $rhs) == 0"
+        case ("toDouble", List(rhs)) => es"atof($rhs)"
+        case ("toInt", List(rhs)) => es"atoi($rhs)"
+        case ("length", List(rhs)) => es"strlen($rhs)"
         case (a, _) => System.out.println(s"TODO: $a - ${args.length}"); ???
       }
     case n @ Node(s,op,args,_) if op.contains('.') && !op.contains(' ') => // method call
       val (recv::args1) = args
       if (args1.length > 0) {
-        shallowP(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1)); emit("("); shallow(args1.head); args1.tail.foreach { emit(", "); shallow(_) }; emit(")")
+        shallowP(recv)
+        es".${op.drop(op.lastIndexOf('.') + 1)}(${args1.head}"
+        args1.tail.foreach { x => es", $x" }
+        emit(")")
       } else {
         shallowP(recv); emit("."); emit(op.drop(op.lastIndexOf('.') + 1))
       }
@@ -463,13 +465,16 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
       emitln(s"$tpe ${quote(s)} = { 0 };") // FIXME: uninitialized? or add it as argument?
     case n @ Node(s,"var_set",List(x,y),_) =>
-      emit(s"${quote(x)} = "); shallow(y); emitln(";")
+      esln"${quote(x)} = $y;"
     case n @ Node(s, "reffield_set", List(ptr, Const(field: String), v), _) =>
-      shallowP(ptr, precedence("reffield_get")); emit("->"); emit(field); emit(" = "); shallow(v); emitln(";")
+      shallowP(ptr, precedence("reffield_get"))
+      esln"->$field = $v;"
     // static array
     case n @ Node(s, "Array" , xs,_) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit(s"$tpe ${quote(s)}[${xs.length}] = { "); shallow(xs.head); xs.tail.foreach(x => {emit(", "); shallow(x)}); emitln(" };")
+      es"$tpe ${quote(s)}[${xs.length}] = { ${xs.head}"
+      xs.tail.foreach(x => es", $x")
+      emitln(" };")
 
     case n @ Node(s, "NewArray", List(x, Const(v)), _) if v != 0 =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
@@ -489,13 +494,14 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => ??? // no-op
 
     case n @ Node(s,"array_set",List(x,i,y),_) =>
-      shallowP(x); emit("["); shallow(i); emit("] = "); shallow(y); emitln(";")
+      shallowP(x); esln"[$i] = $y;"
 
     case n @ Node(s, "array_copyTo", List(src, dst, start, len), _) =>
-      emit("memcpy("); shallowP(dst, precedence("+")); emit(" + "); shallowP(start, precedence("+") + 1); emit(", "); shallow(src); emit(", "); shallow(len); emitln(");")
+      emit("memcpy("); shallowP(dst, precedence("+")); emit(" + "); shallowP(start, precedence("+") + 1)
+      esln", $src, $len);"
 
     case n @ Node(s,"?",c::(a:Block)::(b:Block)::_,_) if !dce.live(s) =>
-      emit(s"if ("); shallow(c); emit(") ")
+      es"if ($c) "
       quoteBlock(traverse(a))
       quoteElseBlock(traverse(b))
       emitln()
@@ -510,7 +516,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case n @ Node(_, "switch", (guard: Exp)::default::others, _) =>
       val tp = typeBlockRes(guard)
       assert(tp == manifest[Long] || tp == manifest[Int] || tp == manifest[Short] || tp == manifest[Char])
-      emit("switch ("); shallow(guard); emitln(") {");
+      esln"switch ($guard) {"
       others.grouped(2).foreach {
         case Seq(Const(cases: Seq[Const]), block: Block) =>
           cases.foreach(x => emitln(s"case ${quote(x)}:;")) // extra ; used to avoid error on case 2: int x = 1; ....
@@ -562,9 +568,8 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       emitln(s"gettimeofday(&${quote(s)}_t, NULL);")
       emitln(s"long ${quote(s)} = ${quote(s)}_t.tv_sec * 1000000L + ${quote(s)}_t.tv_usec;");
     case n @ Node(s, "exit", List(x) ,_) =>
-      emit("fflush(stdout); fflush(stderr); exit("); shallow(x); emitln(");")
+      esln"fflush(stdout); fflush(stderr); exit($x);"
     case _ =>
-      // emit(s"val ${quote(s)} = " + shallow(n))
       emitValDef(n)
   }
 

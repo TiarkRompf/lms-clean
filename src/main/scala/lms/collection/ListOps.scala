@@ -122,54 +122,33 @@ trait ScalaCodeGen_List extends ExtendedScalaCodeGen {
   override def shallow(n: Node): Unit = n match {
     case Node(s, "list-new", Const(mA: Manifest[_])::xs, _) =>
       val ty = remap(mA)
-      emit("List[")
-      emit(ty)
-      emit("](")
+      es"List[$ty]("
       xs.zipWithIndex.map { case (x, i) =>
         shallow(x)
         if (i != xs.length-1) emit(", ")
       }
       emit(")")
-    case Node(s, "list-apply", List(xs, i), _) =>
-      shallow(xs); emit("("); shallow(i); emit(")")
-    case Node(s, "list-head", List(xs), _) =>
-      shallow(xs); emit(".head")
-    case Node(s, "list-tail", List(xs), _) =>
-      shallow(xs); emit(".tail")
-    case Node(s, "list-size", List(xs), _) =>
-      shallow(xs); emit(".size")
-    case Node(s, "list-isEmpty", List(xs), _) =>
-      shallow(xs); emit(".isEmpty")
-    case Node(s, "list-take", List(xs, i), _) =>
-      shallow(xs); emit(".take("); shallow(i); emit(")")
-    case Node(s, "list-prepend", List(xs, x), _) =>
-      shallow(x); emit(" :: "); shallow(xs)
-    case Node(s, "list-concat", List(xs, ys), _) =>
-      shallow(xs); emit(" ++ "); shallow(ys)
-    case Node(s, "list-mkString", List(xs, Const("")), _) =>
-      shallow(xs); emit(".mkString")
-    case Node(s, "list-mkString", List(xs, sep), _) =>
-      shallow(xs); emit(".mkString("); shallow(sep); emit(")")
-    case Node(s, "list-toArray", List(xs), _) =>
-      shallow(xs); emit(".toArray")
-    case Node(s, "list-toSeq", List(xs), _) =>
-      shallow(xs); emit(".toSeq")
-    case Node(s, "list-map", List(xs, b), _) =>
-      shallow(xs); emit(".map("); shallow(b); emit(")")
-    case Node(s, "list-flatMap", xs::(b: Block)::rest, _) =>
-      shallow(xs); emit(".flatMap("); shallow(b); emit(")")
+    case Node(s, "list-apply", List(xs, i), _) => es"$xs($i)"
+    case Node(s, "list-head", List(xs), _) => es"$xs.head"
+    case Node(s, "list-tail", List(xs), _) => es"$xs.tail"
+    case Node(s, "list-size", List(xs), _) => es"$xs.size"
+    case Node(s, "list-isEmpty", List(xs), _) => es"$xs.isEmpty"
+    case Node(s, "list-take", List(xs, i), _) => es"$xs.take($i)"
+    case Node(s, "list-prepend", List(xs, x), _) => es"$x :: $xs"
+    case Node(s, "list-concat", List(xs, ys), _) => es"$xs ++ $ys"
+    case Node(s, "list-mkString", List(xs, Const("")), _) => es"$xs.mkString"
+    case Node(s, "list-mkString", List(xs, sep), _) => es"$xs.mkString($sep)"
+    case Node(s, "list-toArray", List(xs), _) => es"$xs.toArray"
+    case Node(s, "list-toSeq", List(xs), _) => es"$xs.toSeq"
+    case Node(s, "list-map", List(xs, b), _) => es"$xs.map($b)"
+    case Node(s, "list-flatMap", xs::(b: Block)::rest, _) => es"$xs.flatMap($b)"
     case Node(s, "list-foldLeft", List(xs, z, b), _) =>
-      shallow(xs); emit(".foldLeft("); shallow(z); emit(")("); shallow(b, false); emit(")")
-    case Node(s, "list-zip", List(xs, ys), _) =>
-      shallow(xs); emit(".zip("); shallow(ys); emit(")")
-    case Node(s, "list-filter", List(xs, b), _) =>
-      shallow(xs); emit(".filter("); shallow(b); emit(")")
-    case Node(s, "list-sortBy", List(xs, b), _) =>
-      shallow(xs); emit(".sortBy("); shallow(b); emit(")")
-    case Node(s, "list-containsSlice", List(xs, ys), _) =>
-      shallow(xs); emit(".containsSlice("); shallow(ys); emit(")")
-    case Node(s, "list-intersect", List(xs, ys), _) =>
-      shallow(xs); emit(".intersect("); shallow(ys); emit(")")
+      es"$xs.foldLeft($z)("; shallow(b, false); emit(")")
+    case Node(s, "list-zip", List(xs, ys), _) => es"$xs.zip($ys)"
+    case Node(s, "list-filter", List(xs, b), _) => es"$xs.filter($b)"
+    case Node(s, "list-sortBy", List(xs, b), _) => es"$xs.sortBy($b)"
+    case Node(s, "list-containsSlice", List(xs, ys), _) => es"$xs.containsSlice($ys)"
+    case Node(s, "list-intersect", List(xs, ys), _) => es"$xs.intersect($ys)"
     case _ => super.shallow(n)
   }
 
@@ -210,59 +189,33 @@ trait CppCodeGen_List extends ExtendedCPPCodeGen {
 
   override def shallow(n: Node): Unit = n match {
     case Node(s, "list-new", Const(mA: Manifest[_])::xs, _) =>
-      emit("immer::flex_vector<")
-      emit(remap(mA))
-      emit(">")
-      emit("{")
+      emit(s"immer::flex_vector<${remap(mA)}>{")
       xs.zipWithIndex.map { case (x, i) =>
         shallow(x)
         if (i != xs.length-1) emit(", ")
       }
       emit("}")
-    case Node(s, "list-apply", List(xs, i), _) =>
-      shallow(xs); emit(".at("); shallow(i); emit(")")
-    case Node(s, "list-head", List(xs), _) =>
-      shallow(xs); emit(".front()")
-    case Node(s, "list-tail", List(xs), _) =>
-      shallow(xs); emit(".drop(1)")
-    case Node(s, "list-size", List(xs), _) =>
-      shallow(xs); emit(".size()")
-    case Node(s, "list-isEmpty", List(xs), _) =>
-      shallow(xs); emit(".size() == 0")
-    case Node(s, "list-take", List(xs, i), _) =>
-      shallow(xs); emit(".take("); shallow(i); emit(")")
-    case Node(s, "list-prepend", List(xs, x), _) =>
-      shallow(x); emit(".push_front("); shallow(xs); emit(")")
-    case Node(s, "list-concat", List(xs, ys), _) =>
-      shallow(xs); emit(" + "); shallow(ys)
+    case Node(s, "list-apply", List(xs, i), _) => es"$xs.at($i)"
+    case Node(s, "list-head", List(xs), _) => es"$xs.front()"
+    case Node(s, "list-tail", List(xs), _) => es"$xs.drop(1)"
+    case Node(s, "list-size", List(xs), _) => es"$xs.size()"
+    case Node(s, "list-isEmpty", List(xs), _) => es"$xs.size() == 0"
+    case Node(s, "list-take", List(xs, i), _) => es"$xs.take($i)"
+    case Node(s, "list-prepend", List(xs, x), _) => es"$x.push_front($xs)"
+    case Node(s, "list-concat", List(xs, ys), _) => es"$xs + $ys"
     case Node(s, "list-map", List(xs, b: Block), _) =>
       val retType = remap(typeBlockRes(b.res))
-      emit(s"ImmerContrib::vmap<$retType>(")
-      shallow(xs)
-      emit(", ")
-      shallow(b)
-      emit(")")
+      es"ImmerContrib::vmap<$retType>($xs, $b)"
     case Node(s, "list-flatMap", xs::(b: Block)::Const(mA: Manifest[_])::rest, _) =>
       // Note: b.res must return a List type, as required by flatMap
       val retType = remap(typeBlockRes(b.res).typeArguments(0))
-      emit(s"ImmerContrib::flatMap<$retType>(")
-      shallow(xs)
-      emit(", ")
-      shallow(b)
-      emit(")")
+      es"ImmerContrib::flatMap<$retType>($xs, $b)"
     case Node(s, "list-foldLeft", List(xs, z, b), _) =>
-      emit("ImmerContrib::foldLeft(")
-      shallow(xs); emit(", ")
-      shallow(z); emit(", ")
-      shallow(b); emit(")")
+      es"ImmerContrib::foldLeft($xs, $z, $b)"
     case Node(s, "list-zip", List(xs, ys), _) =>
-      emit("ImmerContrib::zip(")
-      shallow(xs); emit(", ")
-      shallow(ys); emit(")")
+      es"ImmerContrib::zip($xs, $ys)"
     case Node(s, "list-filter", List(xs, b), _) =>
-      emit("ImmerContrib::filter(")
-      shallow(xs); emit(", ")
-      shallow(b); emit(")")
+      es"ImmerContrib::filter($xs, $b)"
     // Unsupported operation for immer backend
     case Node(s, "list-mkString", List(xs, sep), _) =>
       ???
