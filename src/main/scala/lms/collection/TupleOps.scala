@@ -126,26 +126,15 @@ trait ScalaCodeGen_Tuple extends ExtendedScalaCodeGen {
 
   override def shallow(n: Node): Unit = n match {
     // Tuple2
-    case Node(s, "tuple2-new", List(fst, snd), _) =>
-      emit("("); shallow(fst); emit(", "); shallow(snd); emit(")")
-    case Node(s, "tuple2-1", List(t), _) =>
-      shallow(t); emit("._1")
-    case Node(s, "tuple2-2", List(t), _) =>
-      shallow(t); emit("._2")
-    case Node(s, "tuple2-swap", List(t), _) =>
-      shallow(t); emit(".swap")
+    case Node(s, "tuple2-new", List(fst, snd), _) => es"($fst, $snd)"
+    case Node(s, "tuple2-1", List(t), _) => es"$t._1"
+    case Node(s, "tuple2-2", List(t), _) => es"$t._2"
+    case Node(s, "tuple2-swap", List(t), _) => es"$t.swap"
     // Tuple3
-    case Node(s, "tuple3-new", List(fst, snd, trd), _) =>
-      emit("(")
-      shallow(fst); emit(", ")
-      shallow(snd); emit(", ")
-      shallow(trd); emit(")")
-    case Node(s, "tuple3-1", List(t), _) =>
-      shallow(t); emit("._1")
-    case Node(s, "tuple3-2", List(t), _) =>
-      shallow(t); emit("._2")
-    case Node(s, "tuple3-3", List(t), _) =>
-      shallow(t); emit("._3")
+    case Node(s, "tuple3-new", List(fst, snd, trd), _) => es"($fst, $snd, $trd)"
+    case Node(s, "tuple3-1", List(t), _) => es"$t._1"
+    case Node(s, "tuple3-2", List(t), _) => es"$t._2"
+    case Node(s, "tuple3-3", List(t), _) => es"$t._3"
     case _ => super.shallow(n)
   }
 }
@@ -193,29 +182,15 @@ trait CppCodeGen_Tuple extends ExtendedCPPCodeGen {
 
   override def shallow(n: Node): Unit = n match {
     // Tuple2
-    case Node(s, "tuple2-new", List(fst, snd), _) =>
-      emit("{")
-      shallow(fst); emit(", "); shallow(snd)
-      emit("}")
-    case Node(s, "tuple2-1", List(t), _) =>
-      emit("std::get<0>("); shallow(t); emit(")")
-    case Node(s, "tuple2-2", List(t), _) =>
-      emit("std::get<1>("); shallow(t); emit(")")
-    case Node(s, "tuple2-swap", List(t), _) =>
-      emit("Pair::swap("); shallow(t); emit(")")
+    case Node(s, "tuple2-new", List(fst, snd), _) => es"{$fst, $snd}"
+    case Node(s, "tuple2-1", List(t), _) => es"std::get<0>($t)"
+    case Node(s, "tuple2-2", List(t), _) => es"std::get<1>($t)"
+    case Node(s, "tuple2-swap", List(t), _) => es"Pair::swap($t)"
     // Tuple3
-    case Node(s, "tuple3-new", List(fst, snd, trd), _) =>
-      emit("{")
-      shallow(fst); emit(", ")
-      shallow(snd); emit(", ")
-      shallow(trd); 
-      emit("}")
-    case Node(s, "tuple3-1", List(t), _) =>
-      emit("std::get<0>("); shallow(t); emit(")")
-    case Node(s, "tuple3-2", List(t), _) =>
-      emit("std::get<1>("); shallow(t); emit(")")
-    case Node(s, "tuple3-3", List(t), _) =>
-      emit("std::get<2>("); shallow(t); emit(")")
+    case Node(s, "tuple3-new", List(fst, snd, trd), _) => es"{$fst, $snd, $trd}"
+    case Node(s, "tuple3-1", List(t), _) => es"std::get<0>($t)"
+    case Node(s, "tuple3-2", List(t), _) => es"std::get<1>($t)"
+    case Node(s, "tuple3-3", List(t), _) => es"std::get<2>($t)"
     case _ => super.shallow(n)
   }
 }
