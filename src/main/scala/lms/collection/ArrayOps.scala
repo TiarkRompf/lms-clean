@@ -8,7 +8,20 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
 
-trait ArrayOps { b: Base =>
+trait ArrayOps extends Base with PrimitiveOps {
+
+  class ARRAY(override val x: Backend.Exp) extends TOP(x) {
+    def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
+
+    def apply(i: INT)(implicit __pos: SourceContext): NUM =
+      NUM(Adapter.g.reflectRead("array_get", x, i.x)(x), et)
+    def update(i: INT, y: NUM)(implicit __pos: SourceContext): UNIT =
+      UNIT(Adapter.g.reflectWrite("array_set", x, i.x, y.x)(x))
+
+  }
+  def ARRAY(size: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
+    (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m)
+
 
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))

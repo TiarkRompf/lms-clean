@@ -532,11 +532,17 @@ abstract class Transformer extends Traverser {
 
   override def traverse(n: Node): Unit = {
     subst(n.n) = transform(n)
-    // println(s"transformed ${n.n}->${subst(n.n)}")
+    if (subst(n.n).isInstanceOf[Sym] && oldTypeMap.contains(n.n)) {
+      Adapter.typeMap(subst(n.n)) = oldTypeMap(n.n)
+    }
+    if (subst(n.n).isInstanceOf[Sym] && oldSourceMap.contains(n.n)) {
+      Adapter.sourceMap(subst(n.n)) = oldSourceMap(n.n)
+    }
   }
 
   var graphCache: Map[Sym, Node] = _
   var oldSourceMap: mutable.Map[Exp, SourceContext] = _
+  var oldTypeMap: mutable.Map[Exp, Manifest[_]] = _
 
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
@@ -546,7 +552,7 @@ abstract class Transformer extends Traverser {
     graphCache = graph.globalDefsCache
 
     // Handling MetaData 1. save oldTypeMap/SourceMap first
-    val oldTypeMap = Adapter.typeMap
+    oldTypeMap = Adapter.typeMap
     oldSourceMap = Adapter.sourceMap
     // Handling MetaData 2. initialize MetaData as fresh, so the transformer might add new metadata entries
     Adapter.typeMap = new mutable.HashMap[Backend.Exp, Manifest[_]]()
@@ -557,13 +563,14 @@ abstract class Transformer extends Traverser {
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
       super.apply(graph)
-      transform(graph.block.res) 
+      transform(graph.block.res)
     }
 
     // Handling MetaData 3. update new metadata with old metadata
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k))
+    // (FIXME(feiw) maybe redundant) (not sure why all the checks are necessary)
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k) && !Adapter.typeMap.contains(v))
       Adapter.typeMap(v) = oldTypeMap(k)
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldSourceMap.contains(k))
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldSourceMap.contains(k) && !Adapter.sourceMap.contains(v))
       Adapter.sourceMap(v) = oldSourceMap(k)
 
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)

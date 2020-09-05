@@ -596,7 +596,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     val ng = init(g)
     val efs = "" //quoteEff(g.block.ein)
     val stt = dce.statics.toList.map(quoteStatic).mkString(", ")
-    prepareHeaders 
+    prepareHeaders
     emitln("""
     |/*****************************************
     |Emitting C Generated Code

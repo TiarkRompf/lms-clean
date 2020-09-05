@@ -16,7 +16,7 @@ object Global {
   val sc = new lms.util.ScalaCompile {}
 }
 
-
+// FIXME(feiw) should the MetaData (typeMap and sourceMap) be part of Adapter?
 object Adapter extends FrontEnd {
 
   override def mkGraphBuilder() = new GraphBuilderOpt
@@ -132,8 +132,58 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   implicit def unit[T:Manifest](x: T): Rep[T] = Wrap[T](Backend.Const(x))
 
+
+  class TOP(val x: Backend.Exp) {
+    def withSource(pos: SourceContext): this.type = { Adapter.sourceMap(x) = pos; this }
+    def withType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
+    def withSrcType(pos: SourceContext, m: Manifest[_]): this.type = withSource(pos).withType(m)
+
+    def p: SourceContext = Adapter.sourceMap(x)
+    def t: Manifest[_] = Adapter.typeMap(x)
+    def equals(that: this.type) = x == that.x
+  }
+  def TOP(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): TOP =
+    (new TOP(x)).withSrcType(__pos, m)
+
+
+  class UNIT(override val x: Backend.Exp) extends TOP(x) {
+    Adapter.typeMap(x) = manifest[Unit]
+  }
+  def UNIT(x: Backend.Exp)(implicit __pos: SourceContext): UNIT = (new UNIT(x)).withSource(__pos)
+
+
+  class BOOL(override val x: Backend.Exp) extends TOP(x) {
+    Adapter.typeMap(x) = manifest[Boolean]
+    def unary_!(implicit __pos: SourceContext) = BOOL(Adapter.g.reflect("!",x))
+  }
+  def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
+
+  class VAR(override val x: Backend.Exp) extends TOP(x) {
+    def et: Manifest[_] = Adapter.typeMap(x)
+
+    // FIXME(feiw) the return type (TOP) might be too generic/relaxed
+    def apply(implicit __pos: SourceContext): TOP =
+      TOP(Adapter.g.reflectRead("var_get",x)(x), et)
+    def update(y: TOP)(implicit __pos: SourceContext): UNIT = {
+      assert(et == y.t)
+      UNIT(Adapter.g.reflectWrite("var_set", x, y.x)(x))
+    }
+  }
+  def VAR(x: TOP)(implicit __pos: SourceContext): VAR =
+    (new VAR(Adapter.g.reflectMutable("var_new", x.x))).withSrcType(__pos, x.t)
+
+
+  def WHILE(c: => BOOL)(b: => Unit): Unit = {
+    val cBlock = Adapter.g.reify(c.x)
+    val bBlock = Adapter.g.reify({ b; Backend.Const(()) } )
+    // compute effect (cBlock bBlock)* cBlock
+    Adapter.g.reflectEffectSummary("W", cBlock,
+      bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock))
+  }
+
+
   // Functions
-  def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]) =
+  def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Backend.Exp => Backend.Exp =
     (x1: Backend.Exp) => Unwrap(f(Wrap[A](x1)))
   def unwrapFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A],Rep[B]) => Rep[C]) =
     (x1: Backend.Exp, x2: Backend.Exp) => Unwrap(f(Wrap[A](x1), Wrap[B](x2)))
@@ -747,6 +797,42 @@ trait LiftPrimitives {
  * on it without using Forge.
  */
 trait PrimitiveOps extends Base with OverloadHack {
+
+
+  class NUM(override val x: Backend.Exp) extends TOP(x) {
+    def +(y: NUM)(implicit pos: SourceContext): NUM = {
+      assert(t == y.t)
+      NUM(Adapter.g.reflect("+", x, y.x), t)
+    }
+    def -(y: NUM)(implicit pos: SourceContext): NUM = {
+      assert(t == y.t)
+      NUM(Adapter.g.reflect("-", x, y.x), t)
+    }
+    def *(y: NUM)(implicit pos: SourceContext): NUM = {
+      assert(t == y.t)
+      NUM(Adapter.g.reflect("*", x, y.x), t)
+    }
+    def /(y: NUM)(implicit pos: SourceContext): NUM = {
+      assert(t == y.t)
+      NUM(Adapter.g.reflect("/", x, y.x),t)
+    }
+
+    def <(y: NUM)(implicit pos: SourceContext): BOOL = {
+      assert(t == y.t)
+      BOOL(Adapter.g.reflect("<", x, y.x))
+    }
+  }
+  def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM = {
+    (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
+  }
+
+
+  class INT(override val x: Backend.Exp) extends NUM(x) {
+    this.withType(manifest[Int])
+  }
+  def INT(x: Backend.Exp)(implicit __pos: SourceContext): INT = (new INT(x)).withSource(__pos)
+  def INT(i: Int)(implicit __pos: SourceContext): INT = (new INT(Backend.Const(i))).withSource(__pos)
+
 
   /**
    * Primitive conversions
