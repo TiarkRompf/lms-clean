@@ -8,8 +8,9 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
 import lms.thirdparty.{CLibs, SizeTOps, CBLASOps}
+import lms.collection.mutable.ArrayOps
 
-trait CBLASOps extends Base with CLibs with SizeTOps {
+trait CBLASOps extends Base with CLibs with SizeTOps with ArrayOps {
 
   abstract class CBLAS_LAYOUT
   def rowMajor = cmacro[CBLAS_LAYOUT]("CblasRowMajor")
@@ -32,6 +33,14 @@ trait CBLASOps extends Base with CLibs with SizeTOps {
       Unwrap(A), Unwrap(lda), Unwrap(X), Unwrap(incX), Unwrap(beta), Unwrap(Y),
       Unwrap(incY))(Seq(0, 1, 5, 7), Seq(10), Set[Int]())
 
+  def CBLAS_SGEMV(layout: Rep[CBLAS_LAYOUT], transA: Rep[CBLAS_TRANSPOSE], m: INT, n: INT,
+      alpha: FLOAT, a: ARRAY, lda: INT, x: ARRAY, incX: INT, beta: FLOAT, y: ARRAY, incY: INT) = {
+    // this function only works for float arrays I think
+    assert(a.et == manifest[Float] && x.et == manifest[Float] && y.et == manifest[Float])
+    libFunction[Unit]("cblas_sgemv", Unwrap(layout), Unwrap(transA), m.x, n.x, alpha.x,
+      a.x, lda.x, x.x, incX.x, beta.x, y.x, incY.x)(Seq(0, 1, 5, 7), Seq(10), Set[Int]())
+  }
+
   /*
     void cblas_sgemm(const CBLAS_LAYOUT layout, const CBLAS_TRANSPOSE TransA,
                 const CBLAS_TRANSPOSE TransB, const int M, const int N,
@@ -45,5 +54,14 @@ trait CBLASOps extends Base with CLibs with SizeTOps {
     libFunction[Unit]("cblas_sgemm", Unwrap(layout), Unwrap(transA), Unwrap(transB), Unwrap(m), Unwrap(n),
       Unwrap(k), Unwrap(alpha), Unwrap(A), Unwrap(lda), Unwrap(B), Unwrap(ldb), Unwrap(beta), Unwrap(C),
       Unwrap(ldc))(Seq(0, 1, 2, 7, 9), Seq(12), Set[Int]())
+
+  def CBLAS_SGEMM(layout: Rep[CBLAS_LAYOUT], transA: Rep[CBLAS_TRANSPOSE], transB: Rep[CBLAS_TRANSPOSE],
+      m: INT, n: INT, k: INT, alpha: FLOAT, a: ARRAY, lda: INT, b: ARRAY, ldb: INT, beta: FLOAT, c: ARRAY,
+      ldc: INT) = {
+    // this function only works for float arrays I think
+    assert(a.et == manifest[Float] && b.et == manifest[Float] && c.et == manifest[Float])
+    libFunction[Unit]("cblas_sgemm", Unwrap(layout), Unwrap(transA), Unwrap(transB), m.x, n.x, k.x,
+      alpha.x, a.x, lda.x, b.x, ldb.x, beta.x, c.x, ldc.x)(Seq(0, 1, 2, 7, 9), Seq(12), Set[Int]())
+  }
 
 }

@@ -8,6 +8,7 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
 import lms.collection.mutable.ArrayOps
+import lms.thirdparty.CBLASOps
 
 /**
  * This frontend is used for Tensor Computations by CPU (naive implementation)
@@ -20,7 +21,7 @@ import lms.collection.mutable.ArrayOps
  * Likely the typed frontend will just be a shallow wrapper of the typeless frontend, so
  *     that we have no code duplication.
  */
-trait ArrayCPUOps extends Dsl with ArrayOps {
+trait ArrayCPUOps extends Dsl with ArrayOps with CBLASOps {
 
   // This is the typeless frontend for adding 2 arrays element-wise (no broadcasting)
   def ARRAY_ADD(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit _pos: SourceContext) = {
@@ -45,6 +46,82 @@ trait ArrayCPUOps extends Dsl with ArrayOps {
     }
   }
 
+  def ARRAY_MINUS(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit _pos: SourceContext) = {
+    for (i <- (0 until Wrap[Int](size.x)): Rep[Range]) {
+      val index = INT(Unwrap(i))
+      res(index) = a(index) - b(index)
+      ()
+    }
+  }
+
+  def array_minus[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+    for (i <- (0 until size): Rep[Range]) {
+      res(i) = a(i) - b(i)
+    }
+  }
+
+  def ARRAY_MULT(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit _pos: SourceContext) = {
+    for (i <- (0 until Wrap[Int](size.x)): Rep[Range]) {
+      val index = INT(Unwrap(i))
+      res(index) = a(index) * b(index)
+      ()
+    }
+  }
+
+  def array_mult[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+    for (i <- (0 until size): Rep[Range]) {
+      res(i) = a(i) * b(i)
+    }
+  }
+
+  def ARRAY_DIV(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit _pos: SourceContext) = {
+    for (i <- (0 until Wrap[Int](size.x)): Rep[Range]) {
+      val index = INT(Unwrap(i))
+      res(index) = a(index) / b(index)
+      ()
+    }
+  }
+
+  def array_div[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+    for (i <- (0 until size): Rep[Range]) {
+      res(i) = a(i) / b(i)
+    }
+  }
+
+  def ARRAY_VVDOT(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
+    // FIXME(feiw) do we need to initialize res with 0?
+    for (i <- (0 until Wrap[Int](size.x)): Rep[Range]) {
+      val index = INT(Unwrap(i))
+      res(0) = res(0) + a(index) * b(index)
+      ()
+    }
+  }
+
+  def array_vvdot[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+    // FIXME(feiw) do we need to initialize res with 0
+    for (i <- (0 until size): Rep[Range]) {
+      res(0) = res(0) + a(i) * b(i)
+    }
+  }
+
+  def ARRAY_MVDOT(a: ARRAY, b: ARRAY, res: ARRAY, a0: INT, a1: INT)(implicit __pos: SourceContext) = {
+    CBLAS_SGEMV(rowMajor, noTrans, a0, a1, FLOAT(1.0f), a, a1, b, 1, 0.0f, res, 1)
+  }
+
+  def array_mvdot[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], a0: Int, a1: Int)(implicit __pos: SourceContext) = {
+    // FIMXE(feiw) type error :(
+    // cblas_sgemv(rowMajor, noTrans, a0, a1, 1.0f, a, a1, b, 1, 0.0f, res, 1)
+    ???
+  }
+
+  def ARRAY_MMDOT(a: ARRAY, b: ARRAY, res: ARRAY, a0: INT, a1: INT, b1: INT)(implicit __pos: SourceContext) = {
+    CBLAS_SGEMM(rowMajor, noTrans, noTrans, a0, b1, a1, 1.0f, a, a1, b, b1, 0.0f, res, b1)
+  }
+  def array_mmdot[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], a0: Rep[Int], a1: Rep[Int], b1: Rep[Int])(implicit __pos: SourceContext) = {
+    // FIMXE(feiw) type error :(
+    // cblas_sgemm(rowMajor, noTrans, noTrans, a0, b1, a1, 1, a, a1, b, b1, 0, res, b1)
+    ???
+  }
 
   // This is the typeless frontend for printing all elements of an ARRAY (in flat format)
   def ARRAY_PRINT(a: ARRAY, size: INT)(implicit __pos: SourceContext) = {

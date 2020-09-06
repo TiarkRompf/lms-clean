@@ -831,7 +831,13 @@ trait PrimitiveOps extends Base with OverloadHack {
     this.withType(manifest[Int])
   }
   def INT(x: Backend.Exp)(implicit __pos: SourceContext): INT = (new INT(x)).withSource(__pos)
-  def INT(i: Int)(implicit __pos: SourceContext): INT = (new INT(Backend.Const(i))).withSource(__pos)
+  implicit def INT(i: Int)(implicit __pos: SourceContext): INT = (new INT(Backend.Const(i))).withSource(__pos)
+
+  class FLOAT(override val x: Backend.Exp) extends NUM(x) {
+    this.withType(manifest[Float])
+  }
+  def FLOAT(x: Backend.Exp)(implicit __pos: SourceContext): FLOAT = (new FLOAT(x)).withSource(__pos)
+  implicit def FLOAT(i: Float)(implicit __pos: SourceContext): FLOAT = (new FLOAT(Backend.Const(i))).withSource(__pos)
 
 
   /**

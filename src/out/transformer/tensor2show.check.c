@@ -1,6 +1,7 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
+#include <cblas.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>

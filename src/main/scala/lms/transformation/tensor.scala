@@ -37,12 +37,11 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
 
-  case class TENSOR(x: E) {
-    def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
-    def withEleType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
-    def withSrcType(pos: SourceContext, m: Manifest[_]) = withSource(pos).withEleType(m)
+  class TENSOR(override val x: Backend.Exp) extends TOP(x) {
+    def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
+    override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
+      withSource(pos).withEleType(m)
 
-    def p: SourceContext = Adapter.sourceMap(x)
     def et: Manifest[_] = Adapter.typeMap(x)
 
     def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
@@ -60,12 +59,47 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
     def + (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
       assert(shape == y.shape)
       assert(et == y.et)
-      TENSOR(Adapter.g.reflect("tensor_add", C(shape), x, y.x)).withSrcType(__pos, et)
+      (new TENSOR(Adapter.g.reflect("tensor_add", C(shape), x, y.x))).withSrcType(__pos, et)
+    }
+
+    def - (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      assert(shape == y.shape)
+      assert(et == y.et)
+      (new TENSOR(Adapter.g.reflect("tensor_minus", C(shape), x, y.x))).withSrcType(__pos, et)
+    }
+
+    def * (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      assert(shape == y.shape)
+      assert(et == y.et)
+      (new TENSOR(Adapter.g.reflect("tensor_mult", C(shape), x, y.x))).withSrcType(__pos, et)
+    }
+
+    def / (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      assert(shape == y.shape)
+      assert(et == y.et)
+      (new TENSOR(Adapter.g.reflect("tensor_div", C(shape), x, y.x))).withSrcType(__pos, et)
+    }
+
+    def dot(y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      val res_shape = if (shape.size == 1 && y.shape.size == 1) {
+        assert(shape == y.shape) // vector-vector-dot
+        Seq(1)
+      } else if (shape.size == 2 && y.shape.size == 1) {
+        assert(shape(1) == y.shape(0)) // matrix-vector-dot
+        Seq(shape(0))
+      } else if (shape.size == 2 && y.shape.size == 2) {
+        assert(shape(1) == y.shape(0)) // matrix-matrix-dot
+        Seq(shape(0), y.shape(1))
+      } else {
+        assert(false)
+      }
+      assert(et == y.et)
+      (new TENSOR(Adapter.g.reflect("tensor_dot", C(res_shape), x, y.x))).withSrcType(__pos, et)
     }
   }
 
   def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
-    TENSOR(Adapter.g.reflect("tensor", C(shape), array.x)).withSrcType(__pos, array.et)
+    (new TENSOR(Adapter.g.reflect("tensor", C(shape), array.x))).withSrcType(__pos, array.et)
   }
 
 
@@ -89,76 +123,30 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
 
     // first keep a local instance of TENSOR. No need to worry about registering metadata
     // here because we know that the metadata has ben registered when x: Rep[Tensor[T]] is constructed
-    val self = TENSOR(Unwrap(x))
+    val self = new TENSOR(Unwrap(x))
 
     def shape: Seq[Int] = self.shape
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
     def + (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self + TENSOR(Unwrap(y))
+      val t = self + (new TENSOR(Unwrap(y)))
       Wrap[Tensor[T]](t.x)
     }
-  }
-}
+    def - (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self - (new TENSOR(Unwrap(y)))
+      Wrap[Tensor[T]](t.x)
+    }
+    def * (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self * (new TENSOR(Unwrap(y)))
+      Wrap[Tensor[T]](t.x)
+    }
+    def / (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self / (new TENSOR(Unwrap(y)))
+      Wrap[Tensor[T]](t.x)
+    }
 
-// lower Tensor computations to Array computations
-abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with FixedSizeTensorFrontEnd {
-
-  // need a global mapping from Tensor to Array
-  val tensor2array = new mutable.HashMap[Backend.Sym, Backend.Sym]
-
-  def numeral(size: Seq[Int]) = size.foldLeft(1)(_ * _)
-
-  override def transform(n: Node): Backend.Exp = n match {
-    case Node(s, "tensor", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::_, _) =>
-      tensor2array(s) = transform(x).asInstanceOf[Backend.Sym]
-      s
-    case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      // `oldSourceMap` is the copy of Adapter.sourceMap that maps Backend.Exp to SourceContext
-      // We use it to get the SourceContext of the node `s` and use it for the transformed node.
-      implicit val sc_ : SourceContext = oldSourceMap(s)
-
-      // `oldTypeMap` is the copy of Adapter.typeMap that maps Backend.Exp to type Manifest
-      // We use it to get the type Manifest that is used for typeless frontend (such as for NEW_ARRAY)
-
-      // Note that when construction new IR nodes from the old IR nodes, we choose
-      // to use the typeless frontend because typeless frontend doesn't have to revive the type.
-      // It can work with type manifest directly.
-      val res = ARRAY(numeral(size), oldTypeMap(s))
-      // add this new array to the `tensor2array` hashmap
-      tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
-
-      // Again, we use typeless frontend here
-      // We can also use the `unsafe constructor` of `ARRAY` because all arrays metapipe are already registered.
-      ARRAY_ADD(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(numeral(size)))
-      res.x
-
-    case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
-      implicit val sc_ = oldSourceMap(s)
-
-      // this unsafe TENSOR construction should be safe because the TENSOR x is already constructed with metadata
-      val tensor = TENSOR(x)
-      // FIXME(feiw) need to provide graphCache for fetching the shape
-      val shape = tensor.shape(graphCache)
-
-      // this unsafe ARRAY construction should be safe because the ARRAY is already constructed with metadata
-      val arr = new ARRAY(tensor2array(x))
-
-      // Using typeless frontend for printing
-      ARRAY_PRINT(arr, INT(numeral(shape)))
-
-      Backend.Const(())
-
-    case _ => super.transform(n)
-  }
-
-  override def transform(graph: Graph): Graph = {
-    assert (g == null)
-    g = new GraphBuilderOpt()
-    Adapter.g = g
-    try {
-      super.transform(graph)
-    } finally {
-      g = null; Adapter.g = null
+    def dot(y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self dot (new TENSOR(Unwrap(y)))
+      Wrap[Tensor[T]](t.x)
     }
   }
 }
