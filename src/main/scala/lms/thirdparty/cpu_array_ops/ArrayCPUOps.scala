@@ -1,4 +1,4 @@
-package lms.thirdparty
+package lms.thirdparty.array_computation
 
 import lms.core._
 import lms.util._

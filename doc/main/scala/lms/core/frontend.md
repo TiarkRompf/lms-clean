@@ -37,8 +37,8 @@ class FrontEnd {
     // It builds a lambda node with the `f' reified into the block,
     // then it returns a scala function that can be applied to create APP construct
     def FUN(f: INT => INT): INT => INT = {
-      val fn = INT(g.reflect("lambda", g.reify {xn: Exp => f(INT(xn)).x} ) )
-      (x: INT) => APP(fn.x, x)
+      val fn = g.reflect("lambda", g.reify {xn: Exp => f(INT(xn)).x})
+      (x: INT) => APP(fn, x)
     }
 }
 ```

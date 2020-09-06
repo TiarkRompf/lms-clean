@@ -1,5 +1,5 @@
 package lms
-package transformation
+package transformation.tensor
 
 import scala.annotation.implicitNotFound
 import lms.core.virtualize

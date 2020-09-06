@@ -224,6 +224,18 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
 
   // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
+  def CUDA_FILL(implicit __pos: SourceContext) = (a: ARRAY, v: NUM, size: INT) => {
+    assert(v.t == a.et)
+    val f = Adapter.g.reflect("lambda", Adapter.g.reify { (aa: Backend.Exp, vv: Backend.Exp, ss: Backend.Exp) =>
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- tid.until(Wrap[Int](size.x), stride): Rep[Range]) {
+        a(INT(Unwrap(i))) = v; ()
+      }
+      Backend.Const(())
+    })
+    UNIT(Adapter.g.reflect("@", f, a.x, v.x, size.x))
+  }
 
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
