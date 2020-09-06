@@ -89,8 +89,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
         tensor6.show
       }
     }
-    System.out.println(indent(driver.code))
-    driver.eval(0)
+    check("eleBinary", driver.code, "c")
   }
 
   test("dot") {
@@ -112,8 +111,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
         mm.show
       }
     }
-    System.out.println(indent(driver.code))
-    driver.eval(0)
+    check("dot", driver.code, "c")
   }
 
 }
