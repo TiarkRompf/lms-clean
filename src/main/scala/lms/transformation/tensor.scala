@@ -67,8 +67,9 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
   def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
     TENSOR(Adapter.g.reflect("tensor", C(shape), array.x)).withSrcType(__pos, array.et)
   }
+}
 
-
+trait FixedSizeTensorOps extends FixedSizeTensorFrontEnd {
   /// typed frontend
   // Note how the typed frontend shallowly wrap the typeless frontend.
   // The `object Tensor` is used to construct a Rep[Tensor[T]]
@@ -101,7 +102,7 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
 }
 
 // lower Tensor computations to Array computations
-abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with FixedSizeTensorFrontEnd {
+abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with FixedSizeTensorOps {
 
   // need a global mapping from Tensor to Array
   val tensor2array = new mutable.HashMap[Backend.Sym, Backend.Sym]

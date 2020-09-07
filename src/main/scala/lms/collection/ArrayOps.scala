@@ -8,7 +8,7 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
 
-trait ArrayOps extends Base with PrimitiveOps {
+trait ArrayOps extends PrimitiveOps {
 
   class ARRAY(override val x: Backend.Exp) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head

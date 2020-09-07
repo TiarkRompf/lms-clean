@@ -13,7 +13,7 @@ import Backend._
 class FixedSizeTensorTest extends TutorialFunSuite {
   val under = "transformer/tensor2"
 
-  abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorFrontEnd {
+  abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorOps {
     override def transform(graph: Graph) = {
       graph.show
       val graph1 = (new TensorLoweringCPU {}).transform(graph)
