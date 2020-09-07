@@ -798,7 +798,7 @@ trait LiftPrimitives {
 }
 
 
-object PrimitiveTypeLess extends Base {
+object PrimitiveTypeLess {
   import BaseTypeLess._
 
   class NUM(override val x: Backend.Exp) extends TOP(x) {
