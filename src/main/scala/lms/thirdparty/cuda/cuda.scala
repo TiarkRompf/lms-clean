@@ -223,20 +223,35 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
 
-  // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
-  def CUDA_FILL(implicit __pos: SourceContext) = (a: ARRAY, v: NUM, size: INT) => {
-    assert(v.t == a.et)
-    val f = Adapter.g.reflect("lambda", Adapter.g.reify { (aa: Backend.Exp, vv: Backend.Exp, ss: Backend.Exp) =>
-      val stride = gridDimX * blockDimX
-      val tid = threadIdxX + blockIdxX * blockDimX
-      for (i <- tid.until(Wrap[Int](size.x), stride): Rep[Range]) {
-        a(INT(Unwrap(i))) = v; ()
+  def CUDA_KERNEL3(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
+      val kernel = Adapter.g.reflect("λ", Adapter.g.reify { (x1, x2, x3) => f(List(x1, x2, x3)) },
+        Backend.Const(0), Backend.Const("__global__"))
+      (a: TOP, b: TOP, c: TOP, dim1: Rep[Dim3], dim2: Rep[Dim3]) => {
+        // type checking
+        Seq(a, b, c).zip(ms).foreach {
+          case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man)
+        }
+        UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, Unwrap(dim1), Unwrap(dim2)))
       }
-      Backend.Const(())
-    })
-    UNIT(Adapter.g.reflect("@", f, a.x, v.x, size.x))
   }
 
+  def CUDA_FILL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
+      // type cast
+      val array = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val value = (new NUM(xn(1))).withSrcType(__pos, m)
+      val size  = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(tid, Wrap[Int](size.x), stride)) {
+        array(INT(Unwrap(i))) = value; ()
+      }
+      Backend.Const(())
+    }, m.arrayManifest, m, manifest[Int])
+
+
+  // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
       val stride = gridDimX * blockDimX
