@@ -89,7 +89,7 @@ object Adapter extends FrontEnd {
 /**
  * BaseTypeless trait
  */
-trait BaseTypeLess {
+object BaseTypeLess {
 
   class TOP(val x: Backend.Exp) {
     def withSource(pos: SourceContext): this.type = { Adapter.sourceMap(x) = pos; this }
@@ -151,7 +151,7 @@ trait BaseTypeLess {
  * 6. other extentions are at later part of this file or can be extended by DSL writer
  *    including UtilOps, RangeOps, Equal, OrderingOps, PrimitiveOps, LiftPrimitiveOps, et al.
  */
-trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompare with BaseTypeLess {
+trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompare {
   type Rep[+T] = Exp[T];
 
   abstract class Exp[+T]
@@ -798,7 +798,8 @@ trait LiftPrimitives {
 }
 
 
-trait PrimitiveTypeLess extends Base {
+object PrimitiveTypeLess extends Base {
+  import BaseTypeLess._
 
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
@@ -840,7 +841,7 @@ trait PrimitiveTypeLess extends Base {
  * Forge-generated file. We need a static version since Delite (and other projects) depend
  * on it without using Forge.
  */
-trait PrimitiveOps extends PrimitiveTypeLess with OverloadHack {
+trait PrimitiveOps extends Base with OverloadHack {
 
   /**
    * Primitive conversions

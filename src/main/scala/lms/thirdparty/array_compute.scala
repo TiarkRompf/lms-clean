@@ -7,7 +7,7 @@ import lms.core.Backend._
 import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
-import lms.collection.mutable.ArrayOps
+import lms.collection.mutable.{ArrayOps, ArrayTypeLess}
 
 /**
  * This frontend is used for Tensor Computations by CPU (naive implementation)
@@ -20,7 +20,10 @@ import lms.collection.mutable.ArrayOps
  * Likely the typed frontend will just be a shallow wrapper of the typeless frontend, so
  *     that we have no code duplication.
  */
-trait ArrayCPUOps extends Dsl with ArrayOps {
+object ArrayCPUTypeLess extends Dsl with ArrayOps {
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
+  import ArrayTypeLess._
 
   // This is the typeless frontend for adding 2 arrays element-wise (no broadcasting)
   def ARRAY_ADD(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit _pos: SourceContext) = {
@@ -36,16 +39,6 @@ trait ArrayCPUOps extends Dsl with ArrayOps {
     }
   }
 
-  // This is the typed frontend for adding 2 arrays element-wise (no broadcasting)
-  // We could just do a shallow wrapping of ARRAY_ADD, but if the implementation is super simple,
-  //   we can also just re-implement it.
-  def array_add[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
-    for (i <- (0 until size): Rep[Range]) {
-      res(i) = a(i) + b(i)
-    }
-  }
-
-
   // This is the typeless frontend for printing all elements of an ARRAY (in flat format)
   def ARRAY_PRINT(a: ARRAY, size: INT)(implicit __pos: SourceContext) = {
     // Similarly, we are using the typed front-end of the for loop
@@ -58,6 +51,19 @@ trait ArrayCPUOps extends Dsl with ArrayOps {
         case n if n == manifest[Float] => printf("%f ", Wrap[Float](a(index).x))
         case n => System.out.println(s"manifest $n is not supported yet in ARRAY_PRINT")
       }
+    }
+  }
+}
+
+
+trait ArrayCPUOps extends Dsl with ArrayOps {
+
+  // This is the typed frontend for adding 2 arrays element-wise (no broadcasting)
+  // We could just do a shallow wrapping of ARRAY_ADD, but if the implementation is super simple,
+  //   we can also just re-implement it.
+  def array_add[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+    for (i <- (0 until size): Rep[Range]) {
+      res(i) = a(i) + b(i)
     }
   }
 

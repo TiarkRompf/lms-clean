@@ -8,7 +8,10 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
 
-trait ArrayOps extends PrimitiveOps {
+object ArrayTypeLess {
+
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
 
   class ARRAY(override val x: Backend.Exp) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
@@ -22,6 +25,10 @@ trait ArrayOps extends PrimitiveOps {
   def ARRAY(size: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
     (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m)
 
+}
+
+
+trait ArrayOps extends PrimitiveOps {
 
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
