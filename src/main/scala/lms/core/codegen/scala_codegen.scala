@@ -243,13 +243,11 @@ class CompactScalaCodeGen extends CompactCodeGen {
   }
 }
 
-
 trait Pattern
 case class PVar(x: Sym) extends Pattern
 case class PTuple(xs: List[Pattern]) extends Pattern
 
 class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
-
   var lastNL = false
   override def emit(s: String): Unit = { stream.print(s); lastNL = false }
   override def emitln(s: String = "") = if (s != "" || !lastNL) { stream.println(s); lastNL = true }
@@ -297,7 +295,6 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
   // process and print block results
   override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
-
     // Are there any forward nodes? if yes, declare all variables before
     // assigning initial values to avoid "forward reference extends
     // over definition" errors. Exception: lambdas emitted as defs.
@@ -377,6 +374,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       shallowP(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
       emit(s"if ("); shallow(c); emit(") ")
+      // es"if ($c) "
       quoteBlockP(traverse(a))
       quoteElseBlock(traverse(b))
     case n @ Node(f,"W",List(c:Block,b:Block),_) =>
@@ -393,6 +391,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"array_free", List(arr), _) => ()
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      // es"new Array[$tpe]($x)"
       emit("new Array["); emit(tpe); emit("]("); shallow(x); emit(")")
     case n @ Node(s,"@",x::y,_) => {
       def emitArgs(y: List[Def]): Unit = y match {
@@ -474,7 +473,6 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       val types = args.map { a => remap(typeMap.getOrElse(a, manifest[Unknown])) }
       val retType = remap(typeMap.getOrElse(y.res, manifest[Unit]))
       val eff = quoteEff(y.ein)
-
       val argsStr = (args zip types).map { case (x, a) => s"${quote(x)}: $a" }.mkString(", ")
       emit(s"def ${quote(f)}($argsStr): $retType$eff = ")
       quoteBlockP(traverse(y,f))

@@ -129,19 +129,19 @@ trait ExtendedCodeGen {
   def emitAll(g: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit
 }
 
-
 abstract class CompactCodeGen extends CompactTraverser {
-
   // In code gen of recursive function (with x2 = lambda_forward(x3)), it is tempting to replace
   // all uses of x2 with x3, so that we don't explicitly have the lambda_forward symbol as forward declaration.
   // This is however, potentially wrong for mutual recursive functions in some case (check the DFA tutorial tests)
 
   // process and print block results
-  override def traverseCompact(ns: Seq[Node], y: Block): Unit = {
-    wraper(numStms, lastNode, y) {
-      super.traverseCompact(ns, y)
+  override def traverseCompact(ns: Seq[Node], block: Block): Unit = {
+    scheduleCache(block) = ns
+    wraper(numStms, lastNode, block) {
+      super.traverseCompact(ns, block)
     }
   }
+
   // the `emit` and `emitln` are basic codegen units.
   // the actual desitination of them are determined by children classes.
   def emit(s: String): Unit
@@ -158,6 +158,7 @@ abstract class CompactCodeGen extends CompactTraverser {
   // rename variables (say from x6 to x4).
   val rename = new mutable.HashMap[Sym,String]
   var doRename = true
+
   def quote(s: Def): String = s match {
     case s @ Sym(n) if doRename => rename.getOrElseUpdate(s, s"x${rename.size}")
     case Sym(n) => s.toString

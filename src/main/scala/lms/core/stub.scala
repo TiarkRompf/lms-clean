@@ -261,7 +261,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
         // Step 3. build the "λ" node with fn1 as the function name
         //    fix the funTable such that it pairs (fn1, can) for non-recursive uses.
-        val res = Adapter.g.reflect(fn1,"λ",(block+:captures):_*)(hardSummary(fn))
+        val res = Adapter.g.reflect(fn1, "λ", (block+:captures):_*)(hardSummary(fn))
         Adapter.funTable = Adapter.funTable.map {
           case (fn2, can2) => if (can == can2) (fn1, can) else (fn2, can2)
         }

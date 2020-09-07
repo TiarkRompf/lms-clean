@@ -450,7 +450,7 @@ class GraphBuilder extends GraphLookup {
   def reify(f: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => f(xs(0), xs(1), xs(2)))
   def reify(f: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => f(xs(0), xs(1), xs(2), xs(3)))
 
-  case class BlockEffect(var map: Map[Exp,(Sym, List[Sym])], prev: BlockEffect) {
+  case class BlockEffect(var map: Map[Exp, (Sym, List[Sym])], prev: BlockEffect) {
     def get(key: Exp): Option[(Sym, List[Sym])] = if (prev != null) map.get(key) orElse prev.get(key) else map.get(key)
     def getOrElse(key: Exp, default: (Sym, List[Sym])) = get(key).getOrElse(default)
     def +=(kv: (Exp, (Sym, List[Sym]))) = map += kv
@@ -481,7 +481,7 @@ class GraphBuilder extends GraphLookup {
     }
   }
 
-  def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block = withBlockScopedEnv(here){
+  def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block = withBlockScopedEnv(here) {
     val args = (0 until arity).toList.map(_ => Sym(fresh))
     val res = f(args)
     // remove local definitions from visible effect keys
@@ -816,8 +816,7 @@ class DeadCodeElimCG extends Phase {
 // Compute bound structure information
 // (i.e., which bound variables a node depends on)
 class Bound extends Phase {
-
-  val hm = new mutable.HashMap[Sym,Set[Sym]]
+  val hm = new mutable.HashMap[Sym, Set[Sym]]
 
   def apply(g: Graph): Graph = {
     val bound = g.nodes.flatMap(_.boundSyms).toSet ++ g.block.bound
@@ -852,14 +851,9 @@ class Bound extends Phase {
         hm(d.n) = newSyms
       }
     }
-
-    //hm.foreach(println)
-
     g
   }
-
 }
-
 
 // Compute frequency information (i.e., how
 // many times a node's result is going to
