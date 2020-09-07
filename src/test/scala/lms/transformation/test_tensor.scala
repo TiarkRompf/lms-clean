@@ -14,7 +14,7 @@ import Backend._
 class FixedSizeTensorTest extends TutorialFunSuite {
   val under = "transformer/tensor2"
 
-  abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorFrontEnd { q =>
+  abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorOps { q =>
 
     override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCBLASOps {
       val IR: q.type = q

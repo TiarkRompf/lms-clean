@@ -136,10 +136,16 @@ object Backend {
       case (agg, _) => agg
     } ++ x.eff.hdeps
   }
+
+  case class BlockEffect(var map: Map[Exp,(Sym, List[Sym])], prev: BlockEffect) {
+    def get(key: Exp): Option[(Sym, List[Sym])] = if (prev != null) map.get(key) orElse prev.get(key) else map.get(key)
+    def getOrElse(key: Exp, default: (Sym, List[Sym])) = get(key).getOrElse(default)
+    def +=(kv: (Exp, (Sym, List[Sym]))) = map += kv
+  }
+
 }
 
 import Backend._
-
 
 class GraphBuilder {
   val globalDefs = new mutable.ArrayBuffer[Node]
@@ -450,12 +456,6 @@ class GraphBuilder {
   def reify(f: (Exp, Exp, Exp) => Exp): Block = reify(3, xs => f(xs(0), xs(1), xs(2)))
   def reify(f: (Exp, Exp, Exp, Exp) => Exp): Block = reify(4, xs => f(xs(0), xs(1), xs(2), xs(3)))
 
-  case class BlockEffect(var map: Map[Exp,(Sym, List[Sym])], prev: BlockEffect) {
-    def get(key: Exp): Option[(Sym, List[Sym])] = if (prev != null) map.get(key) orElse prev.get(key) else map.get(key)
-    def getOrElse(key: Exp, default: (Sym, List[Sym])) = get(key).getOrElse(default)
-    def +=(kv: (Exp, (Sym, List[Sym]))) = map += kv
-  }
-
   def withBlockScopedEnv(here: Boolean)(closure: => Block): Block = {
     val save = curBlock
     val saveEffects = curEffects
@@ -494,7 +494,7 @@ class GraphBuilder {
     //  - while tests
     //  - closure test
     var hard = writes.map(curEffects.map(_)._1)
-    if (curEffects.map contains res) // if res is a local mutable (e.g. Array)
+    if (curEffects.map.contains(res)) // if res is a local mutable (e.g. Array)
       hard += curEffects.map(res)._1
     if (hard.isEmpty)
       hard = Set(curBlock)

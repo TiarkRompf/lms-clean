@@ -26,7 +26,10 @@ import Backend._
  * the typeless frontend is more friendly to IR transformations.
  * This is similar to how MLIR is typeless and has been easy to run transformations.
  */
-trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
+object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
+  import ArrayTypeLess._
 
   /// typeless frontend
   // Note how the SourceContext and type Manifest are registered.
@@ -35,6 +38,9 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
   // The `def TENSOR` is used for `safe construction` of TENSOR, which registers metadata.
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
+
+  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR =
+    (new TENSOR(Adapter.g.reflect("tensor", C(shape), array.x))).withSrcType(__pos, array.et)
 
   class TENSOR(override val x: Backend.Exp) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = {
@@ -103,10 +109,12 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
       (new TENSOR(Adapter.g.reflect("tensor_dot", C(res_shape), x, y.x))).withSrcType(__pos, et)
     }
   }
+}
 
-  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR =
-    (new TENSOR(Adapter.g.reflect("tensor", C(shape), array.x))).withSrcType(__pos, array.et)
 
+trait FixedSizeTensorOps extends Base with PrimitiveOps with ArrayOps {
+  import ArrayTypeLess._
+  import FixedSizeTensorTypeLess._
 
   /// typed frontend
   // Note how the typed frontend shallowly wrap the typeless frontend.

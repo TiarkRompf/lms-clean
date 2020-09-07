@@ -7,12 +7,18 @@ import lms.core._
 import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
-import lms.thirdparty.array_computation.ArrayCPUOps
+import lms.thirdparty.array_computation.{ArrayCPUTypeLess, ArrayCPUOps}
 
 import Backend._
 
 // lower Tensor computations to Array computations
-abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with FixedSizeTensorFrontEnd {
+abstract class TensorLoweringCPU extends Transformer {
+
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
+  import ArrayTypeLess._
+  import ArrayCPUTypeLess._
+  import FixedSizeTensorTypeLess._
 
   // need a global mapping from Tensor to Array
   val tensor2array = new mutable.HashMap[Backend.Sym, Backend.Sym]

@@ -192,10 +192,10 @@ class CompactScalaCodeGen extends CompactCodeGen {
       emit(s"scala.math.$op("); shallowP(x); emit(")")
 
     case n @ Node(s,"array_get",List(x,i),_) =>
-      shallow(x); emit("("); shallow(i); emit(")")
+      es"$x($i)"
 
     case n @ Node(s,"P",List(x),_) =>
-      emit("println("); shallow(x); emit(")")
+      es"println($x)"
 
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) =>
       quoteBlock {
@@ -219,22 +219,22 @@ class CompactScalaCodeGen extends CompactCodeGen {
       emit(s"def ${quote(f)}(${quote(x)}: Int): Int${quoteEff(y.ein)} = "); quoteBlockP(traverse(y,f)); emitln("")
     // XXX: should not need these below!
     case n @ Node(s,"P",_,_) => // Unit result
-      shallow(n); emitln("")
+      esln"$n"
     case n @ Node(s,"W",_,_) => // Unit result
-      shallow(n); emitln("")
+      esln"$n"
     case n @ Node(s,"var_new",List(x),_) =>
-      emit(s"var ${quote(s)} = "); shallow(x); emitln("")
+      esln"var ${quote(s)} = $x"
     case n @ Node(s,"var_set",List(x,y),_) =>
-      emit(s"${quote(x)} = "); shallow(y); emitln("")
+      esln"${quote(x)} = $y"
     case n @ Node(s,"array_new",List(x),_) =>
-      emit(s"val ${quote(s)} = new Array[Int]("); shallow(x); emitln(")")
+      esln"val ${quote(s)} = new Array[Int]($x)"
     case n @ Node(s,"array_set",List(x,i,y),_) =>
-      shallow(x); emit("("); shallow(i); emit(") = "); shallow(y); emitln("")
+      esln"$x($i) = $y"
     case _ => emitValDef(n)
   }
 
   def emitValDef(n: Node): Unit = {
-    emit(s"val ${quote(n.n)} = "); shallow(n); emitln("")
+    esln"val ${quote(n.n)} = $n"
   }
 
   override def apply(g: Graph) = {
@@ -242,7 +242,6 @@ class CompactScalaCodeGen extends CompactCodeGen {
     emitln()
   }
 }
-
 
 trait Pattern
 case class PVar(x: Sym) extends Pattern
@@ -376,7 +375,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"?",List(c, a: Block, b: Block),_) if a.isPure && a.res == Const(true) =>
       shallowP(c, precedence("||")); emit(" || "); quoteBlockP(precedence("||") + 1)(traverse(b))
     case n @ Node(f,"?",c::(a:Block)::(b:Block)::_,_) =>
-      emit(s"if ("); shallow(c); emit(") ")
+      es"if ($c) "
       quoteBlockP(traverse(a))
       quoteElseBlock(traverse(b))
     case n @ Node(f,"W",List(c:Block,b:Block),_) =>
@@ -387,13 +386,13 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"var_get",List(x),_) =>
       shallow(x)
     case n @ Node(s,"array_get",List(x,i),_) =>
-      shallowP(x); emit("("); shallow(i); emit(")")
+      shallowP(x); es"($i)"
     case n @ Node(s,"array_length",List(x), _) =>
-      shallow(x); emit(".length")
+      es"$x.length"
     case n @ Node(s,"array_free", List(arr), _) => ()
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit("new Array["); emit(tpe); emit("]("); shallow(x); emit(")")
+      es"new Array[$tpe]($x)"
     case n @ Node(s,"@",x::y,_) => {
       def emitArgs(y: List[Def]): Unit = y match {
         case t::Nil => shallow(t)
@@ -402,7 +401,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
       shallowP(x); emit("("); emitArgs(y); emit(")")
     }
     case n @ Node(s,"P",List(x),_) =>
-      emit("println"); emit("("); shallow(x); emit(")")
+      es"println($x)"
     case n @ Node(s,"comment",Const(str: String)::Const(verbose: Boolean)::(b:Block)::_,_) => ??? // Comment shouldn't be inlined
       emitln("//# " + str)
       if (verbose) {
@@ -468,7 +467,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "exit", List(x), _) =>
-      emit("System.exit("); shallow(x); emitln(")")
+      es"System.exit($x)"
     case n @ Node(f, "λ", (y: Block)::_, _) =>
       val args = y.in
       val types = args.map { a => remap(typeMap.getOrElse(a, manifest[Unknown])) }
@@ -513,16 +512,17 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
     case n @ Node(s,"var_new",List(x),_) =>
       /*if (dce.live(s))*/
       if (!recursive) {
-        emit(s"var ${quote(s)} = "); shallow(x); emitln()
+        esln"var ${quote(s)} = $x"
       } else {
-        emit(s"${quote(s)} = "); shallow(x); emitln()
+        esln"${quote(s)} = $x"
       }
     case n @ Node(s,"var_set",List(x,y),_) =>
-      emit(s"${quote(x)} = "); shallow(y); emitln()
+      esln"${quote(x)} = $y"
     case n @ Node(s,"array_new",List(x),_) =>
-      /*if (dce.live(s))*/ emit(s"val ${quote(s)} = new Array[Int]("); shallow(x); emit(")"); emitln()
+      /*if (dce.live(s))*/
+      esln"val ${quote(s)} = new Array[Int]($x)"
     case n @ Node(s,"array_set",List(x,i,y),_) =>
-      shallow(x); emit("("); shallow(i); emit(") = "); shallow(y); emitln()
+      esln"$x($i) = $y"
 
     case n @ Node(s,"var_get",_,_) if !dce.live(s) => ??? // no-op
     case n @ Node(s,"array_get",_,_) if !dce.live(s) => ??? // no-op

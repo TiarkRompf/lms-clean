@@ -85,6 +85,62 @@ object Adapter extends FrontEnd {
   }
 }
 
+
+/**
+ * BaseTypeless trait
+ */
+object BaseTypeLess {
+
+  class TOP(val x: Backend.Exp) {
+    def withSource(pos: SourceContext): this.type = { Adapter.sourceMap(x) = pos; this }
+    def withType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
+    def withSrcType(pos: SourceContext, m: Manifest[_]): this.type = withSource(pos).withType(m)
+
+    def p: SourceContext = Adapter.sourceMap(x)
+    def t: Manifest[_] = Adapter.typeMap(x)
+    def equals(that: this.type) = x == that.x
+  }
+  def TOP(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): TOP =
+    (new TOP(x)).withSrcType(__pos, m)
+
+
+  class UNIT(override val x: Backend.Exp) extends TOP(x) {
+    Adapter.typeMap(x) = manifest[Unit]
+  }
+  def UNIT(x: Backend.Exp)(implicit __pos: SourceContext): UNIT = (new UNIT(x)).withSource(__pos)
+
+
+  class BOOL(override val x: Backend.Exp) extends TOP(x) {
+    Adapter.typeMap(x) = manifest[Boolean]
+    def unary_!(implicit __pos: SourceContext) = BOOL(Adapter.g.reflect("!",x))
+  }
+  def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
+
+
+  class VAR(override val x: Backend.Exp) extends TOP(x) {
+    def et: Manifest[_] = Adapter.typeMap(x)
+
+    // FIXME(feiw) the return type (TOP) might be too generic/relaxed
+    def apply(implicit __pos: SourceContext): TOP =
+      TOP(Adapter.g.reflectRead("var_get",x)(x), et)
+    def update(y: TOP)(implicit __pos: SourceContext): UNIT = {
+      assert(et == y.t)
+      UNIT(Adapter.g.reflectWrite("var_set", x, y.x)(x))
+    }
+  }
+  def VAR(x: TOP)(implicit __pos: SourceContext): VAR =
+    (new VAR(Adapter.g.reflectMutable("var_new", x.x))).withSrcType(__pos, x.t)
+
+
+  def WHILE(c: => BOOL)(b: => Unit): Unit = {
+    val cBlock = Adapter.g.reify(c.x)
+    val bBlock = Adapter.g.reify({ b; Backend.Const(()) } )
+    // compute effect (cBlock bBlock)* cBlock
+    Adapter.g.reflectEffectSummary("W", cBlock,
+      bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock))
+  }
+}
+
 /**
  * Base trait:
  * 1. definition of iconic Rep[T] and Var[T]
@@ -131,56 +187,6 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   }
 
   implicit def unit[T:Manifest](x: T): Rep[T] = Wrap[T](Backend.Const(x))
-
-
-  class TOP(val x: Backend.Exp) {
-    def withSource(pos: SourceContext): this.type = { Adapter.sourceMap(x) = pos; this }
-    def withType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
-    def withSrcType(pos: SourceContext, m: Manifest[_]): this.type = withSource(pos).withType(m)
-
-    def p: SourceContext = Adapter.sourceMap(x)
-    def t: Manifest[_] = Adapter.typeMap(x)
-    def equals(that: this.type) = x == that.x
-  }
-  def TOP(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): TOP =
-    (new TOP(x)).withSrcType(__pos, m)
-
-
-  class UNIT(override val x: Backend.Exp) extends TOP(x) {
-    Adapter.typeMap(x) = manifest[Unit]
-  }
-  def UNIT(x: Backend.Exp)(implicit __pos: SourceContext): UNIT = (new UNIT(x)).withSource(__pos)
-
-
-  class BOOL(override val x: Backend.Exp) extends TOP(x) {
-    Adapter.typeMap(x) = manifest[Boolean]
-    def unary_!(implicit __pos: SourceContext) = BOOL(Adapter.g.reflect("!",x))
-  }
-  def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
-
-  class VAR(override val x: Backend.Exp) extends TOP(x) {
-    def et: Manifest[_] = Adapter.typeMap(x)
-
-    // FIXME(feiw) the return type (TOP) might be too generic/relaxed
-    def apply(implicit __pos: SourceContext): TOP =
-      TOP(Adapter.g.reflectRead("var_get",x)(x), et)
-    def update(y: TOP)(implicit __pos: SourceContext): UNIT = {
-      assert(et == y.t)
-      UNIT(Adapter.g.reflectWrite("var_set", x, y.x)(x))
-    }
-  }
-  def VAR(x: TOP)(implicit __pos: SourceContext): VAR =
-    (new VAR(Adapter.g.reflectMutable("var_new", x.x))).withSrcType(__pos, x.t)
-
-
-  def WHILE(c: => BOOL)(b: => Unit): Unit = {
-    val cBlock = Adapter.g.reify(c.x)
-    val bBlock = Adapter.g.reify({ b; Backend.Const(()) } )
-    // compute effect (cBlock bBlock)* cBlock
-    Adapter.g.reflectEffectSummary("W", cBlock,
-      bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock))
-  }
-
 
   // Functions
   def unwrapFun[A:Manifest,B:Manifest](f: Rep[A] => Rep[B]): Backend.Exp => Backend.Exp =
@@ -791,13 +797,9 @@ trait LiftPrimitives {
   implicit def chainFloatToRepDouble[A:Manifest](x: A)(implicit c: A => Rep[Float], __pos: SourceContext): Rep[Double] = repFloatToRepDouble(c(x))
 }
 
-/**
- * This file is extremely boilerplate. In fact, most of the code here is copied from a
- * Forge-generated file. We need a static version since Delite (and other projects) depend
- * on it without using Forge.
- */
-trait PrimitiveOps extends Base with OverloadHack {
 
+object PrimitiveTypeLess {
+  import BaseTypeLess._
 
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
@@ -839,7 +841,14 @@ trait PrimitiveOps extends Base with OverloadHack {
   }
   def FLOAT(x: Backend.Exp)(implicit __pos: SourceContext): FLOAT = (new FLOAT(x)).withSource(__pos)
   implicit def FLOAT(i: Float)(implicit __pos: SourceContext): FLOAT = (new FLOAT(Backend.Const(i))).withSource(__pos)
+}
 
+/**
+ * This file is extremely boilerplate. In fact, most of the code here is copied from a
+ * Forge-generated file. We need a static version since Delite (and other projects) depend
+ * on it without using Forge.
+ */
+trait PrimitiveOps extends Base with OverloadHack {
 
   /**
    * Primitive conversions
