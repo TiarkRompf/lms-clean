@@ -37,11 +37,17 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
   def C(a: Any) = Backend.Const(a)
 
   class TENSOR(override val x: Backend.Exp) extends TOP(x) {
-    def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
+    def withEleType(m: Manifest[_]): this.type = {
+      System.out.println(s"TENSOR: saving $x with et $m to typeMap ${Adapter.typeMap}")
+      Adapter.typeMap(x) = m; this
+    }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
 
-    def et: Manifest[_] = Adapter.typeMap(x)
+    def et: Manifest[_] = {
+      System.out.println(s"TENSOR: fetching $x with et ${Adapter.typeMap(x)} from typeMap ${Adapter.typeMap}")
+      Adapter.typeMap(x)
+    }
 
     def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
     def shape(graphCache: Map[Backend.Sym, Backend.Node]): Seq[Int] = {
@@ -90,16 +96,16 @@ trait FixedSizeTensorFrontEnd extends Base with PrimitiveOps with ArrayOps {
         assert(shape(1) == y.shape(0)) // matrix-matrix-dot
         Seq(shape(0), y.shape(1))
       } else {
-        assert(false)
+        assert(false, "Higher than 2D is not yet supported in dot function")
       }
       assert(et == y.et)
+      System.out.println(s"dot function: create tensor_dot with et: $et")
       (new TENSOR(Adapter.g.reflect("tensor_dot", C(res_shape), x, y.x))).withSrcType(__pos, et)
     }
   }
 
-  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
+  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR =
     (new TENSOR(Adapter.g.reflect("tensor", C(shape), array.x))).withSrcType(__pos, array.et)
-  }
 
 
   /// typed frontend

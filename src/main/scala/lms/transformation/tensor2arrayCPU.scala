@@ -76,6 +76,7 @@ abstract class TensorLoweringCPU extends Transformer with ArrayCPUOps with Fixed
 
       // match case on the type (input shapes) of the dot
       if (shape_x.size == 1 && shape_y.size == 1) {
+          System.out.println(s"VVDot: result array with element type ${oldTypeMap(s)}")
           val res = ARRAY(1, oldTypeMap(s))
           tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
           ARRAY_VVDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(shape_x(0)))

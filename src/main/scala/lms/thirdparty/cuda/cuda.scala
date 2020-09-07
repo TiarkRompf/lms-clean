@@ -13,7 +13,7 @@ import lms.collection.mutable.{ArrayOps, StackArrayOps}
 trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */
   // 1. support bindings to manual cuda kernels
-  // 2. support bindings to cublas library ???
+  // 2. support bindings to cublas library (TODO)
   // 3. support generating cuda kernels (TODO)
 
   abstract class CudaErrorT
@@ -29,6 +29,14 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaCall(cudaMalloc(addr, SizeT(count * sizeOf[T])))
     addr
   }
+
+  // a typeless interface for CUDA_MALLOC
+  def CUDA_MALLOC(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
+    val addr = ARRAY(0, m)
+    cudaCall(libFunction[CudaErrorT]("cudaMalloc", addr.x, count.x)(Seq(1), Seq(0), Set(0)))
+    addr
+  }
+
 
   // cudaError_t cudaFree ( void* devPtr )
   def cudaFree[T:Manifest](devPtr: Rep[Array[T]]) =
@@ -224,15 +232,26 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
 
   def CUDA_KERNEL3(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
-      val kernel = Adapter.g.reflect("λ", Adapter.g.reify { (x1, x2, x3) => f(List(x1, x2, x3)) },
-        Backend.Const(0), Backend.Const("__global__"))
-      (a: TOP, b: TOP, c: TOP, dim1: Rep[Dim3], dim2: Rep[Dim3]) => {
-        // type checking
-        Seq(a, b, c).zip(ms).foreach {
-          case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man)
-        }
-        UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, Unwrap(dim1), Unwrap(dim2)))
+    val kernel = Adapter.g.reflect("λ", Adapter.g.reify { (x1, x2, x3) => f(List(x1, x2, x3)) },
+      Backend.Const(0), Backend.Const("__global__"))
+    (a: TOP, b: TOP, c: TOP, dim1: Rep[Dim3], dim2: Rep[Dim3]) => {
+      // type checking
+      Seq(a, b, c).zip(ms).foreach {
+        case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man)
       }
+      UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, Unwrap(dim1), Unwrap(dim2)))
+    }
+  }
+  def CUDA_KERNEL4(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
+    val kernel = Adapter.g.reflect("λ", Adapter.g.reify { (x1, x2, x3, x4) => f(List(x1, x2, x3, x4)) },
+      Backend.Const(0), Backend.Const("__global__"))
+    (a: TOP, b: TOP, c: TOP, d: TOP, dim1: Rep[Dim3], dim2: Rep[Dim3]) => {
+      // type checking
+      Seq(a, b, c, d).zip(ms).foreach {
+        case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man)
+      }
+      UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, d.x, Unwrap(dim1), Unwrap(dim2)))
+    }
   }
 
   def CUDA_FILL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
@@ -342,6 +361,27 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       }
     }
 
+
+  def CUDA_ARRAY_ADD(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
+    val kernel = CUDA_ARRAY_ADD_KERNEL(a.et)
+    kernel(a, b, res, size, dim3(gridSize), dim3(blockSize))
+  }
+  def CUDA_ARRAY_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
+    // type cast
+    val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+    val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+    val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+    val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+
+    // actual computation
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- range_until_step(tid, Wrap[Int](size.x), stride)) {
+      val index = INT(Unwrap(i))
+      res(index) = a(index) + b(index); ()
+    }
+    Backend.Const(())
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {

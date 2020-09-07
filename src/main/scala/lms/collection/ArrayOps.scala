@@ -9,19 +9,7 @@ import lms.core.utils.time
 import lms.macros.SourceContext
 
 
-// FIXME(feiw): is it proper to put this trait here?
-trait Devices {
-  object Device extends Enumeration {
-    type Device = Value
-    val CPU = Value("CPU") // ID = 0
-    val GPU = Value("GPU") // ID = 1
-  }
-  import Device._
-}
-
-trait ArrayOps extends Base with PrimitiveOps with Devices {
-
-  import Device._
+trait ArrayOps extends Base with PrimitiveOps {
 
   class ARRAY(override val x: Backend.Exp) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
@@ -33,9 +21,7 @@ trait ArrayOps extends Base with PrimitiveOps with Devices {
 
   }
   def ARRAY(size: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
-    (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m)
-  def ARRAY(size: Int, m: Manifest[_], d: Device)(implicit __pos: SourceContext): ARRAY =
-    (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size), Backend.Const(d)))).withSrcType(__pos, m)
+    (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m.arrayManifest)
 
 
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {

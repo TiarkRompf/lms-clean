@@ -7,7 +7,7 @@ import macros.SourceContext
 
 import lms.core._
 import lms.core.stub._
-import lms.thirdparty._
+import lms.thirdparty.{CCodeGenLibs, CCodeGenCBLASOps}
 
 import Backend._
 
@@ -16,15 +16,8 @@ class FixedSizeTensorTest extends TutorialFunSuite {
 
   abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorFrontEnd { q =>
 
-    override val codegen = new DslGenC with thirdparty.CCodeGenLibs {
+    override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCBLASOps {
       val IR: q.type = q
-      override def emitAll(ng: Graph, name: String)(m1:Manifest[_],m2:Manifest[_]): Unit = {
-
-        registerHeader("/opt/OpenBLAS/include", "<cblas.h>")
-        registerLibrary("-lopenblas")
-
-        super.emitAll(ng, name)(m1, m2)
-      }
     }
 
     override def transform(graph: Graph) = {

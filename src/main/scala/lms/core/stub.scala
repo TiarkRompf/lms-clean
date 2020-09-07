@@ -801,7 +801,7 @@ trait PrimitiveOps extends Base with OverloadHack {
 
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM + method")
       NUM(Adapter.g.reflect("+", x, y.x), t)
     }
     def -(y: NUM)(implicit pos: SourceContext): NUM = {
@@ -823,6 +823,7 @@ trait PrimitiveOps extends Base with OverloadHack {
     }
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM = {
+    System.out.println(s"NUM $x is of type $m")
     (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
   }
 

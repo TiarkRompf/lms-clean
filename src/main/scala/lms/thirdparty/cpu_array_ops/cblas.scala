@@ -65,3 +65,8 @@ trait CBLASOps extends Base with CLibs with SizeTOps with ArrayOps {
   }
 
 }
+
+trait CCodeGenCBLASOps extends CCodeGenLibs {
+  registerHeader("/opt/OpenBLAS/include", "<cblas.h>")
+  registerLibrary("-lopenblas")
+}
