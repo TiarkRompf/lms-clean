@@ -27,24 +27,26 @@ object CUDATypeLess extends Dsl with StackArrayOps with SizeTOps with CLibs with
   // a typeless interface for CUDA_MALLOC
   def CUDA_MALLOC(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
     val addr = ARRAY(0, m)
-    CUDA_CALL(Unwrap(libFunction[Int]("cudaMalloc", addr.x, count.x)(Seq(1), Seq(0), Set(0))))
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, count.x)(Seq(1), Seq(0), Set(0))))
     addr
   }
 
   // a typeless interface for CUDA_FREE
   def CUDA_FREE(devPtr: ARRAY) =
-    CUDA_CALL(Unwrap(libFunction[Int]("cudaFree", devPtr.x)(Seq(0), Seq(0), Set[Int]())))
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaFree", devPtr.x)(Seq(0), Seq(0), Set[Int]())))
 
   // FIXME(feiw) hacky Macro type (used to be `abstract class CudaMemcpyKind`)
-  def HOST2HOST(implicit __pos: SourceContext): INT = INT(CMACRO("cudaMemcpyHostToHost", manifest[Int]))
-  def HOST2DEVICE(implicit __pos: SourceContext): INT = INT(CMACRO("cudaMemcpyHostToDevice", manifest[Int]))
-  def DEVICE2HOST(implicit __pos: SourceContext): INT = INT(CMACRO("cudaMemcpyDeviceToHost", manifest[Int]))
-  def DEVICE2DEVICE(implicit __pos: SourceContext): INT = INT(CMACRO("cudaMemcpyDeviceToDevice", manifest[Int]))
+  class CUDA_MEMCPY_KIND(override val x: Backend.Exp) extends TOP(x)
+  def CUDA_MEMCPY_KIND(x: TOP): CUDA_MEMCPY_KIND = new CUDA_MEMCPY_KIND(x.x)
+  def HOST2HOST(implicit __pos: SourceContext): CUDA_MEMCPY_KIND = CUDA_MEMCPY_KIND(CMACRO("cudaMemcpyHostToHost", manifest[Any]))
+  def HOST2DEVICE(implicit __pos: SourceContext): CUDA_MEMCPY_KIND = CUDA_MEMCPY_KIND(CMACRO("cudaMemcpyHostToDevice", manifest[Any]))
+  def DEVICE2HOST(implicit __pos: SourceContext): CUDA_MEMCPY_KIND = CUDA_MEMCPY_KIND(CMACRO("cudaMemcpyDeviceToHost", manifest[Any]))
+  def DEVICE2DEVICE(implicit __pos: SourceContext): CUDA_MEMCPY_KIND = CUDA_MEMCPY_KIND(CMACRO("cudaMemcpyDeviceToDevice", manifest[Any]))
   // Direction of the transfer is inferred from the pointer values. Requires unified virtual addressing
-  def CPYDefault(implicit __pos: SourceContext): INT = INT(CMACRO("cudaMemcpyDefault", manifest[Int]))
+  def CPYDefault(implicit __pos: SourceContext): CUDA_MEMCPY_KIND = CUDA_MEMCPY_KIND(CMACRO("cudaMemcpyDefault", manifest[Any]))
 
   // ​cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
-  def CUDA_MEMCOPY(dst: ARRAY, src: ARRAY, count: INT, kind: INT, m: Manifest[_])(implicit __pos: SourceContext) = {
+  def CUDA_MEMCOPY(dst: ARRAY, src: ARRAY, count: INT, kind: CUDA_MEMCPY_KIND, m: Manifest[_])(implicit __pos: SourceContext) = {
     val data_size: INT = m match {
       case a if a == manifest[Char] => 1
       case a if a == manifest[Int] => 4
@@ -52,7 +54,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with SizeTOps with CLibs with
       case a if a == manifest[Double] => 8
       case a => System.out.println(a); ???
     }
-    CUDA_CALL(Unwrap(libFunction[Int]("cudaMemcpy", dst.x, src.x, (count * data_size).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, (count * data_size).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
   }
 
   class DIM3(override val x: Backend.Exp) extends TOP(x)

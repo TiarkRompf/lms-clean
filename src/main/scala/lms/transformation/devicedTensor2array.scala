@@ -30,25 +30,24 @@ abstract class DevicedTensorLowering extends Transformer with CudaOps {
 
   override def transform(n: Node): Backend.Exp = n match {
 
-    // FIXME(feiw) why the matching fails when I put `Backend.Const(d:Device)`???
-    case Node(s, "tensor", Backend.Const(size:Seq[Int])::Backend.Const(d)::(x:Backend.Sym)::_, _) =>
+    case Node(s, "tensor", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::(x:Backend.Sym)::_, _) =>
       assert(d.isInstanceOf[CPU], "tensor initialization must be from CPU")
       t2a(s) = transform(x).asInstanceOf[Backend.Sym]
       Adapter.typeMap(transform(x)) = oldTypeMap(x)
       s
 
-    case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::Backend.Const(d)::
-        (x:Backend.Sym)::(y:Backend.Sym)::_, _) if d.isInstanceOf[Device] =>
+    case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = oldSourceMap(s)
 
       val x_device = (new TENSOR(x)).device(graphCache)
       val y_device = (new TENSOR(y)).device(graphCache)
       assert(x_device == d && y_device == d)
 
-      val res = ARRAYD(numeral(size), oldTypeMap(s), d.asInstanceOf[Device]) // declare an array on device d
+      val res = ARRAYD(numeral(size), oldTypeMap(s), d) // declare an array on device d
       t2a(s) = res.x.asInstanceOf[Backend.Sym]
 
-      d.asInstanceOf[Device] match {
+      d match {
         case CPU(_) => ARRAY_ADD(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)) // calling the CPU version
         case GPU(_) => CUDA_ARRAY_ADD(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)); () // calling the GPU version
       }

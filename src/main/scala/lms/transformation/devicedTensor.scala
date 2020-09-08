@@ -28,7 +28,6 @@ trait Devices {
  *               tensors can be printed only from CPU.
  */
 object FixedSizeTensorDeviceTypeLess extends Devices {
-// trait FixedSizeTensorDeviceFrontEnd extends Base with PrimitiveOps with ArrayOps with CudaOps {
   import BaseTypeLess._
   import ArrayTypeLess._
   import CUDATypeLess._
@@ -67,7 +66,7 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
     def device: Device = device(Adapter.g.globalDefsCache)
     def device(graphCache: Map[Backend.Sym, Backend.Node]): Device = {
       graphCache.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, a::Backend.Const(d)::_, _)) if s.startsWith("tensor") && d.isInstanceOf[Device] => d.asInstanceOf[Device]
+        case Some(Node(_, s, a::Backend.Const(d:Device)::_, _)) if s.startsWith("tensor") => d
         case a => System.out.println(a); ???
       }
     }
