@@ -11,63 +11,53 @@ import lms.core.stub._
 
 trait CPPOps { b: Base =>
 
-  abstract class Capture
-  case class CapAll(s: String) extends Capture
-  case class CopyOne[T: Manifest](s: Rep[T]) extends Capture
-  case class RefOne[T: Manifest](s: Rep[T]) extends Capture
-
-  class Captures (val caps: Seq[Capture])
+  class Captures (val caps: Seq[lms.core.Backend.Exp])
   object Captures {
-    def apply(s: String) = new Captures(Seq(CapAll(s)))
-    def CopyExcept[T: Manifest](s: Rep[T]*) = new Captures(Seq(CapAll("=")) ++ s.map(RefOne(_)))
-    def RefExcept[T: Manifest](s: Rep[T]*) = new Captures(Seq(CapAll("&")) ++ s.map(CopyOne(_)))
+    def apply(s: String) = new Captures(Seq(lms.core.Backend.Const(s)))
+    def CopyExcept[T: Manifest](s: Rep[T]*) = new Captures(Seq(lms.core.Backend.Const("=")) ++ s.map(Unwrap(_)))
+    def RefExcept[T: Manifest](s: Rep[T]*) = new Captures(Seq(lms.core.Backend.Const("&")) ++ s.map(Unwrap(_)))
   }
   implicit def liftCapture(s:String) = Captures(s)
-  private def unwrap(c: Capture) = c match {
-    case CapAll(s: String) => lms.core.Backend.Const(s)
-    case CopyOne(s: Rep[_]) => Unwrap(s)
-    case RefOne(s: Rep[_]) => Unwrap(s)
-  }
 
   def fun[A:Manifest,B:Manifest](capture: Captures, f: Rep[A] => Rep[B]): Rep[A => B] =
-    Wrap[A=>B](__fun(f, 1, xn => Unwrap(f(Wrap[A](xn(0)))), capture.caps.map(unwrap): _*))
+    Wrap[A=>B](__fun(f, 1, xn => Unwrap(f(Wrap[A](xn(0)))), capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest](capture: Captures, f: (Rep[A], Rep[B]) => Rep[C]): Rep[(A, B) => C] =
-    Wrap[(A,B)=>C](__fun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), capture.caps.map(unwrap): _*))
+    Wrap[(A,B)=>C](__fun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](capture: Captures, f: (Rep[A], Rep[B], Rep[C]) => Rep[D]): Rep[(A, B, C) => D] =
-    Wrap[(A,B,C)=>D](__fun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), capture.caps.map(unwrap): _*))
+    Wrap[(A,B,C)=>D](__fun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](capture: Captures, f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]): Rep[(A, B, C, D) => E] =
-    Wrap[(A,B,C,D)=>E](__fun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), capture.caps.map(unwrap): _*))
+    Wrap[(A,B,C,D)=>E](__fun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](capture: Captures, f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]):
     Rep[(A, B, C, D, E) => F] =
-    Wrap[(A,B,C,D,E)=>F](__fun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)))), capture.caps.map(unwrap): _*))
+    Wrap[(A,B,C,D,E)=>F](__fun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)))), capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest]
     (capture: Captures, f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]): Rep[(A, B, C, D, E, F) => G] =
-    Wrap[(A,B,C,D,E,F)=>G](__fun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), capture.caps.map(unwrap): _*))
+    Wrap[(A,B,C,D,E,F)=>G](__fun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest]
     (capture: Captures, f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G]) => Rep[H]): Rep[(A, B, C, D, E, F, G) => H] =
     Wrap[(A,B,C,D,E,F,G)=>H](__fun(f, 7, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)))),
-                                   capture.caps.map(unwrap): _*))
+                                   capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest]
     (capture: Captures, f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]): Rep[(A, B, C, D, E, F, G, H) => I] =
     Wrap[(A,B,C,D,E,F,G,H)=>I](__fun(f, 8, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)))),
-                                   capture.caps.map(unwrap): _*))
+                                   capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest]
     (capture: Captures, f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I]) => Rep[J]): Rep[(A, B, C, D, E, F, G, H, I) => J] =
     Wrap[(A,B,C,D,E,F,G,H,I)=>J](__fun(f, 9, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)))),
-                                   capture.caps.map(unwrap): _*))
+                                   capture.caps: _*))
 
   def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest]
     (capture: Captures, f:(Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J]) => Rep[K]): Rep[(A, B, C, D, E, F, G, H, I, J) => K] =
     Wrap[(A,B,C,D,E,F,G,H,I,J)=>K](__fun(f, 9, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9)))),
-                                   capture.caps.map(unwrap): _*))
+                                   capture.caps: _*))
 }
 
 trait ExtendedCPPCodeGen extends ExtendedCCodeGen {
