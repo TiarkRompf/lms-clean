@@ -28,6 +28,7 @@ abstract class TensorLoweringCPU extends Transformer {
   override def transform(n: Node): Backend.Exp = n match {
     case Node(s, "tensor", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::_, _) =>
       tensor2array(s) = transform(x).asInstanceOf[Backend.Sym]
+      Adapter.typeMap(transform(x)) = oldTypeMap(x)
       s
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       // `oldSourceMap` is the copy of Adapter.sourceMap that maps Backend.Exp to SourceContext

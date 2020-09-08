@@ -7,15 +7,21 @@ import lms.core._
 import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
-import lms.thirdparty.array_computation.ArrayCPUOps
-import lms.thirdparty.CudaOps
+import lms.thirdparty.array_computation.ArrayCPUTypeLess
+import lms.thirdparty.{CudaOps, CUDATypeLess}
 
 import Backend._
 
 
 // lower Tensor computations to Array computations
 // respect device allocation (simple distinction of GPU and CPU)
-abstract class DevicedTensorLowering extends Transformer with FixedSizeTensorDeviceFrontEnd with ArrayCPUOps with CudaOps {
+abstract class DevicedTensorLowering extends Transformer with CudaOps {
+
+  import PrimitiveTypeLess._
+  import ArrayTypeLess._
+  import ArrayCPUTypeLess._
+  import FixedSizeTensorDeviceTypeLess._
+  import CUDATypeLess._
 
   // need a global mapping from Tensor to Array
   val t2a = new mutable.HashMap[Backend.Sym, Backend.Sym]
@@ -28,6 +34,7 @@ abstract class DevicedTensorLowering extends Transformer with FixedSizeTensorDev
     case Node(s, "tensor", Backend.Const(size:Seq[Int])::Backend.Const(d)::(x:Backend.Sym)::_, _) =>
       assert(d.isInstanceOf[CPU], "tensor initialization must be from CPU")
       t2a(s) = transform(x).asInstanceOf[Backend.Sym]
+      Adapter.typeMap(transform(x)) = oldTypeMap(x)
       s
 
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::Backend.Const(d)::
@@ -38,7 +45,7 @@ abstract class DevicedTensorLowering extends Transformer with FixedSizeTensorDev
       val y_device = (new TENSOR(y)).device(graphCache)
       assert(x_device == d && y_device == d)
 
-      val res = ARRAY(numeral(size), oldTypeMap(s), d.asInstanceOf[Device]) // declare an array on device d
+      val res = ARRAYD(numeral(size), oldTypeMap(s), d.asInstanceOf[Device]) // declare an array on device d
       t2a(s) = res.x.asInstanceOf[Backend.Sym]
 
       d.asInstanceOf[Device] match {

@@ -8,10 +8,15 @@ import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.array_computation.ArrayCPUOps
-import lms.thirdparty.CudaOps
+import lms.thirdparty.{CudaOps, CUDATypeLess}
 
 import Backend._
 
+trait Devices {
+  class Device
+  case class CPU(x: Int) extends Device
+  case class GPU(x: Int) extends Device
+}
 
 /**
  * In this frondend design, we are building Tensor IR with fixed shape and device.
@@ -22,24 +27,27 @@ import Backend._
  *    such that: tensors are moved to GPU or CPU based on the request from tensor computation
  *               tensors can be printed only from CPU.
  */
-
-trait FixedSizeTensorDeviceFrontEnd extends Base with PrimitiveOps with ArrayOps with CudaOps {
+object FixedSizeTensorDeviceTypeLess extends Devices {
+// trait FixedSizeTensorDeviceFrontEnd extends Base with PrimitiveOps with ArrayOps with CudaOps {
+  import BaseTypeLess._
+  import ArrayTypeLess._
+  import CUDATypeLess._
 
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
 
-  class Device
-  case class CPU(x: Int) extends Device
-  case class GPU(x: Int) extends Device
-
-  /// ARRAY Frontend
-  // FIXME(should it be here?)
-  def ARRAY(size: Int, m: Manifest[_], d: Device = CPU(0))(implicit __pos: SourceContext): ARRAY = d match {
+  /// ARRAY Frontend // FIXME(should it be here?)
+  def ARRAYD(size: Int, m: Manifest[_], d: Device)(implicit __pos: SourceContext): ARRAY = d match {
     case CPU(_) => (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m.arrayManifest)
     case GPU(_) => CUDA_MALLOC(size, m)
   }
 
+
   /// typeless frontend
+  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflect("tensor", C(shape), C(CPU(0)), array.x))).withSrcType(__pos, array.et)
+  }
+
   class TENSOR(override val x: Backend.Exp) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
@@ -115,11 +123,13 @@ trait FixedSizeTensorDeviceFrontEnd extends Base with PrimitiveOps with ArrayOps
       (new TENSOR(Adapter.g.reflect("tensor_dot", C(res_shape), C(device), x, y.x))).withSrcType(__pos, et)
     }
   }
+}
 
-  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflect("tensor", C(shape), C(CPU(0)), array.x))).withSrcType(__pos, array.et)
-  }
 
+trait FixedSizeTensorDeviceOps extends Dsl with ArrayOps with CudaOps {
+
+  import ArrayTypeLess._
+  import FixedSizeTensorDeviceTypeLess._
 
   /// Typed Frontend
   class Tensor[+T]

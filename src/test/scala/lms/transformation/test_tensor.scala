@@ -32,11 +32,9 @@ class FixedSizeTensorTest extends TutorialFunSuite {
     val driver = new CompilerCTensor[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-
-        val array1 = Array(1,2,3,4,5,6,7,8)
-        val tensor1 = Tensor(Seq(2,2,2), array1)
-        printf("%d ", tensor1.shape)
-        tensor1.show
+        val tensor = Tensor(Seq(2,2,2), Array(1,2,3,4,5,6,7,8))
+        printf("%d ", tensor.shape)
+        tensor.show
       }
     }
     check("show", driver.code, "c")
@@ -46,14 +44,9 @@ class FixedSizeTensorTest extends TutorialFunSuite {
     val driver = new CompilerCTensor[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-
-        val array1 = Array(1,2,3,4,5,6)
-        val tensor1 = Tensor[Int](Seq(2,3), array1)
-
-        val array2 = Array(6,5,4,3,2,1)
-        val tensor2 = Tensor(Seq(2,3), array2)
+        val tensor1 = Tensor[Int](Seq(2,3), Array(1,2,3,4,5,6))
+        val tensor2 = Tensor(Seq(2,3), Array(6,5,4,3,2,1))
         val tensor3 = tensor1 + tensor2
-
         printf("%d ", tensor3.shape)
         tensor3.show
       }

@@ -5,6 +5,7 @@ import lms.core.stub._
 import lms.core.virtualize
 import macros.SourceContext
 import lms.collection._
+import lms.collection.mutable.ArrayTypeLess
 
 
 class CudaTest extends TutorialFunSuite {
@@ -92,20 +93,26 @@ class CudaTest extends TutorialFunSuite {
 
   test("fill_gen_kernel2") {
     val driver = new DslDriverCCuda[Int, Unit] {
+      import BaseTypeLess._
+      import PrimitiveTypeLess._
+      import ArrayTypeLess._
+      import CUDATypeLess._
+
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val cuda_arr = cudaMalloc2[Float](5)
+        val cuda_arr = CUDA_MALLOC(5, manifest[Float])
         val cudaFillFloat = CUDA_FILL(manifest[Float])
-        val array = new ARRAY(Unwrap(cuda_arr))
-        cudaFillFloat(array, 3.0f, 5, dim3(gridSize), dim3(blockSize))
+        cudaFillFloat(cuda_arr, 3.0f, 5, DIM3(gridSize), DIM3(blockSize))
 
-        val arr = NewArray[Float](5)
-        cudaCall(cudaMemcpyOfT(arr, cuda_arr, 5, device2host))
-        printf("%d %d", arr(2), arr(3))
-        cudaCall(cudaFree(cuda_arr))
+        val arr = ARRAY(5, manifest[Float])
+        CUDA_MEMCOPY(arr, cuda_arr, 5, DEVICE2HOST, manifest[Float])
+        printf("%f %f", Wrap[Float](arr(2).x), Wrap[Float](arr(3).x))
+        CUDA_FREE(cuda_arr)
+        unit(())
       }
     }
-    check("cuda_global_fill", driver.code, "cu")
+    // check("cuda_global_fill", driver.code, "cu")
+    System.out.println(indent(driver.code))
   }
 
   test("cap_gen_kernel") {

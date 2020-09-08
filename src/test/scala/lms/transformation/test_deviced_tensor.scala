@@ -15,7 +15,7 @@ import Backend._
 class FixedSizeDevicedTensorTest extends TutorialFunSuite {
   val under = "transformer/deviced_tensor"
 
-  abstract class CompilerCDevicedTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorDeviceFrontEnd { q =>
+  abstract class CompilerCDevicedTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorDeviceOps { q =>
 
     override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCBLASOps with CCodeGenCudaOps {
       val IR: q.type = q
@@ -31,6 +31,8 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
 
   test("show") {
     val driver = new CompilerCDevicedTensor[Int, Unit] {
+      import FixedSizeTensorDeviceTypeLess._
+
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val tensor1 = Tensor(Seq(2,3), Array[Float](1,2,3,4,5,6))
@@ -44,6 +46,8 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
 
   test("add") {
     val driver = new CompilerCDevicedTensor[Int, Unit] {
+      import FixedSizeTensorDeviceTypeLess._
+
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val tensor1 = Tensor(Seq(2,3), Array[Float](1,2,3,4,5,6))

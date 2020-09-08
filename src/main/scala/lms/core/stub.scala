@@ -164,7 +164,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Exp[A]
 
   case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
-    Adapter.typeMap(x) = manifest[A]
+    Adapter.typeMap.getOrElseUpdate(x, manifest[A])
   }
   def Wrap[A:Manifest](x: lms.core.Backend.Exp): Exp[A] = {
     if (manifest[A] == manifest[Unit]) Const(()).asInstanceOf[Exp[A]]
@@ -835,6 +835,7 @@ object PrimitiveTypeLess {
   }
   def INT(x: Backend.Exp)(implicit __pos: SourceContext): INT = (new INT(x)).withSource(__pos)
   implicit def INT(i: Int)(implicit __pos: SourceContext): INT = (new INT(Backend.Const(i))).withSource(__pos)
+  def INT(x: TOP): INT = (new INT(x.x))
 
   class FLOAT(override val x: Backend.Exp) extends NUM(x) {
     this.withType(manifest[Float])

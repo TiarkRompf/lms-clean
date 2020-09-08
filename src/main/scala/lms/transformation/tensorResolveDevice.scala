@@ -11,7 +11,7 @@ import lms.thirdparty.array_computation.ArrayCPUOps
 
 import Backend._
 
-abstract class TensorResolvingDevice extends Transformer with FixedSizeTensorDeviceFrontEnd {
+abstract class TensorResolvingDevice extends Transformer {
 
   // LATER: let's first have a IR that manually resolve device
 

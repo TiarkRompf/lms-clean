@@ -530,15 +530,7 @@ abstract class Transformer extends Traverser {
         g.reflect(op,args:_*)
   }
 
-  override def traverse(n: Node): Unit = {
-    subst(n.n) = transform(n)
-    if (subst(n.n).isInstanceOf[Sym] && oldTypeMap.contains(n.n)) {
-      Adapter.typeMap(subst(n.n)) = oldTypeMap(n.n)
-    }
-    if (subst(n.n).isInstanceOf[Sym] && oldSourceMap.contains(n.n)) {
-      Adapter.sourceMap(subst(n.n)) = oldSourceMap(n.n)
-    }
-  }
+  override def traverse(n: Node): Unit = { subst(n.n) = transform(n) }
 
   var graphCache: Map[Sym, Node] = _
   var oldSourceMap: mutable.Map[Exp, SourceContext] = _

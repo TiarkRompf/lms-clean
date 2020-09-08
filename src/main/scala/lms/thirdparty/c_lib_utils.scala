@@ -12,6 +12,16 @@ import lms.collection.mutable.ArrayOps
 import lms.collection._
 
 
+object CLibTypeLess {
+  import BaseTypeLess._
+
+  // FIMXE(feiw) this CMACRO needs explicit cast to return non-TOP
+  def CMACRO(s: String, m: Manifest[_])(implicit __pos: SourceContext): TOP = {
+    TOP(Adapter.g.reflectUnsafe("macro", lms.core.Backend.Const(s)), m)
+  }
+}
+
+
 trait CMacro { b: Base =>
   def cmacro[T:Manifest](m:String): Rep[T] = {
     Wrap[T](Adapter.g.reflectUnsafe("macro", lms.core.Backend.Const(m)))

@@ -8,9 +8,14 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
 import lms.thirdparty.{CLibs, SizeTOps, CBLASOps}
-import lms.collection.mutable.ArrayOps
+import lms.collection.mutable.{ArrayOps, ArrayTypeLess}
+
 
 trait CBLASOps extends Base with CLibs with SizeTOps with ArrayOps {
+
+  // FIXME(feiw) separate the typeless frontend from the typed frontend?
+  import PrimitiveTypeLess._
+  import ArrayTypeLess._
 
   abstract class CBLAS_LAYOUT
   def rowMajor = cmacro[CBLAS_LAYOUT]("CblasRowMajor")
