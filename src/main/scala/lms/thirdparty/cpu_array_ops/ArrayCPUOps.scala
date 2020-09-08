@@ -8,7 +8,7 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
 import lms.collection.mutable.{ArrayOps, ArrayTypeLess}
-import lms.thirdparty.CBLASOps
+import lms.thirdparty.{CBLASOps, CBLASTypeLess}
 
 /**
  * This frontend is used for Tensor Computations by CPU (naive implementation)
@@ -21,10 +21,11 @@ import lms.thirdparty.CBLASOps
  * Likely the typed frontend will just be a shallow wrapper of the typeless frontend, so
  *     that we have no code duplication.
  */
-object ArrayCPUTypeLess extends Dsl with ArrayOps with CBLASOps {
+object ArrayCPUTypeLess extends Dsl with ArrayOps {
   import BaseTypeLess._
   import PrimitiveTypeLess._
   import ArrayTypeLess._
+  import CBLASTypeLess._
 
   // This is the typeless frontend for adding 2 arrays element-wise (no broadcasting)
   def ARRAY_ADD(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit _pos: SourceContext) = {
@@ -74,11 +75,11 @@ object ArrayCPUTypeLess extends Dsl with ArrayOps with CBLASOps {
   }
 
   def ARRAY_MVDOT(a: ARRAY, b: ARRAY, res: ARRAY, a0: INT, a1: INT)(implicit __pos: SourceContext) = {
-    CBLAS_SGEMV(rowMajor, noTrans, a0, a1, FLOAT(1.0f), a, a1, b, 1, 0.0f, res, 1)
+    CBLAS_SGEMV(ROW_MAJOR, NO_TRANS, a0, a1, FLOAT(1.0f), a, a1, b, 1, 0.0f, res, 1)
   }
 
   def ARRAY_MMDOT(a: ARRAY, b: ARRAY, res: ARRAY, a0: INT, a1: INT, b1: INT)(implicit __pos: SourceContext) = {
-    CBLAS_SGEMM(rowMajor, noTrans, noTrans, a0, b1, a1, 1.0f, a, a1, b, b1, 0.0f, res, b1)
+    CBLAS_SGEMM(ROW_MAJOR, NO_TRANS, NO_TRANS, a0, b1, a1, 1.0f, a, a1, b, b1, 0.0f, res, b1)
   }
 
   // This is the typeless frontend for printing all elements of an ARRAY (in flat format)

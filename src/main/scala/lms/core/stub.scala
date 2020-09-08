@@ -807,27 +807,25 @@ object PrimitiveTypeLess {
       NUM(Adapter.g.reflect("+", x, y.x), t)
     }
     def -(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM - method")
       NUM(Adapter.g.reflect("-", x, y.x), t)
     }
     def *(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM * method")
       NUM(Adapter.g.reflect("*", x, y.x), t)
     }
     def /(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM / method")
       NUM(Adapter.g.reflect("/", x, y.x),t)
     }
 
     def <(y: NUM)(implicit pos: SourceContext): BOOL = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM < method")
       BOOL(Adapter.g.reflect("<", x, y.x))
     }
   }
-  def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM = {
-    System.out.println(s"NUM $x is of type $m")
+  def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =
     (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
-  }
 
 
   class INT(override val x: Backend.Exp) extends NUM(x) {
