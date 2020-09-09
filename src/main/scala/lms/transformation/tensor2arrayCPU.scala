@@ -28,7 +28,7 @@ abstract class TensorLoweringCPU extends Transformer {
   override def transform(n: Node): Backend.Exp = n match {
     case Node(s, "tensor", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::_, _) =>
       tensor2array(s) = transform(x).asInstanceOf[Backend.Sym]
-      Adapter.typeMap(transform(x)) = oldTypeMap(x)
+      Adapter.typeMap(transform(x)) = Adapter.oldTypeMap(x)
       s
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       // `oldSourceMap` is the copy of Adapter.sourceMap that maps Backend.Exp to SourceContext
@@ -41,7 +41,7 @@ abstract class TensorLoweringCPU extends Transformer {
       // Note that when construction new IR nodes from the old IR nodes, we choose
       // to use the typeless frontend because typeless frontend doesn't have to revive the type.
       // It can work with type manifest directly.
-      val res = ARRAY(numeral(size), oldTypeMap(s))
+      val res = ARRAY(numeral(size), Adapter.oldTypeMap(s))
       // add this new array to the `tensor2array` hashmap
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
@@ -52,7 +52,7 @@ abstract class TensorLoweringCPU extends Transformer {
 
     case Node(s, "tensor_minus", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = oldSourceMap(s)
-      val res = ARRAY(numeral(size), oldTypeMap(s))
+      val res = ARRAY(numeral(size), Adapter.oldTypeMap(s))
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
       ARRAY_MINUS(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(numeral(size)))
@@ -60,7 +60,7 @@ abstract class TensorLoweringCPU extends Transformer {
 
     case Node(s, "tensor_mult", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = oldSourceMap(s)
-      val res = ARRAY(numeral(size), oldTypeMap(s))
+      val res = ARRAY(numeral(size), Adapter.oldTypeMap(s))
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
       ARRAY_MULT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(numeral(size)))
@@ -68,7 +68,7 @@ abstract class TensorLoweringCPU extends Transformer {
 
     case Node(s, "tensor_div", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = oldSourceMap(s)
-      val res = ARRAY(numeral(size), oldTypeMap(s))
+      val res = ARRAY(numeral(size), Adapter.oldTypeMap(s))
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
       ARRAY_DIV(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(numeral(size)))
@@ -83,18 +83,17 @@ abstract class TensorLoweringCPU extends Transformer {
 
       // match case on the type (input shapes) of the dot
       if (shape_x.size == 1 && shape_y.size == 1) {
-          System.out.println(s"VVDot: result array with element type ${oldTypeMap(s)}")
-          val res = ARRAY(1, oldTypeMap(s))
+          val res = ARRAY(1, Adapter.oldTypeMap(s))
           tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
           ARRAY_VVDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(shape_x(0)))
           res.x
       } else if (shape_x.size == 2 && shape_y.size == 1) {
-          val res = ARRAY(shape_x(0), oldTypeMap(s))
+          val res = ARRAY(shape_x(0), Adapter.oldTypeMap(s))
           tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
           ARRAY_MVDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(shape_x(0)), INT(shape_x(1)))
           res.x
       } else if (shape_x.size == 2 && shape_y.size == 2) {
-          val res = ARRAY(shape_x(0) * shape_y(1), oldTypeMap(s))
+          val res = ARRAY(shape_x(0) * shape_y(1), Adapter.oldTypeMap(s))
           tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
           ARRAY_MMDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(shape_x(0)), INT(shape_x(1)), INT(shape_y(1)))
           res.x

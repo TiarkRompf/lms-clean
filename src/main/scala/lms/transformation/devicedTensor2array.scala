@@ -15,7 +15,7 @@ import Backend._
 
 // lower Tensor computations to Array computations
 // respect device allocation (simple distinction of GPU and CPU)
-abstract class DevicedTensorLowering extends Transformer with CudaOps {
+abstract class DevicedTensorLowering extends Transformer {
 
   import PrimitiveTypeLess._
   import ArrayTypeLess._
@@ -31,10 +31,27 @@ abstract class DevicedTensorLowering extends Transformer with CudaOps {
   override def transform(n: Node): Backend.Exp = n match {
 
     case Node(s, "tensor", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::(x:Backend.Sym)::_, _) =>
-      assert(d.isInstanceOf[CPU], "tensor initialization must be from CPU")
       t2a(s) = transform(x).asInstanceOf[Backend.Sym]
-      Adapter.typeMap(transform(x)) = oldTypeMap(x)
+      Adapter.typeMap(transform(x)) = Adapter.oldTypeMap(x)
       s
+
+    case Node(s, "tensor_sendrecv", Backend.Const(size:Seq[Int])::Backend.Const(td:Device)::Backend.Const(d:Device)::(x:Backend.Sym)::_, _) =>
+      implicit val sc_ : SourceContext = oldSourceMap(s)
+      val m = Adapter.oldTypeMap(s)
+      val count = numeral(size)
+
+      val res = ARRAYD(count, Adapter.oldTypeMap(s), td) // declare an array on device td
+      t2a(s) = res.x.asInstanceOf[Backend.Sym]
+
+      val kind = (d, td) match {
+        case (CPU(_), CPU(_)) => HOST2HOST
+        case (CPU(_), GPU(_)) => HOST2DEVICE
+        case (GPU(_), CPU(_)) => DEVICE2HOST
+        case (GPU(_), GPU(_)) => DEVICE2DEVICE
+      }
+      CUDA_MEMCOPY(res, new ARRAY(t2a(x)), count, kind, m)
+
+      res.x
 
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
         (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
@@ -44,7 +61,7 @@ abstract class DevicedTensorLowering extends Transformer with CudaOps {
       val y_device = (new TENSOR(y)).device(graphCache)
       assert(x_device == d && y_device == d)
 
-      val res = ARRAYD(numeral(size), oldTypeMap(s), d) // declare an array on device d
+      val res = ARRAYD(numeral(size), Adapter.oldTypeMap(s), d) // declare an array on device d
       t2a(s) = res.x.asInstanceOf[Backend.Sym]
 
       d match {
@@ -57,10 +74,9 @@ abstract class DevicedTensorLowering extends Transformer with CudaOps {
       implicit val sc_ = oldSourceMap(s)
 
       val shape = (new TENSOR(x)).shape(graphCache)
-    //   val device = (new TENSOR(x)).device(graphCache)
-    //   assert(device == CPU, "show_tensor must be on CPU")
+      val device = (new TENSOR(x)).device(graphCache)
+      assert(device.isInstanceOf[CPU], "show_tensor must be on CPU")
 
-      System.out.println(t2a)
       val arr = new ARRAY(t2a(x))
 
       ARRAY_PRINT(arr, INT(numeral(shape)))

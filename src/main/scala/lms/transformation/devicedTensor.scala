@@ -29,6 +29,7 @@ trait Devices {
  */
 object FixedSizeTensorDeviceTypeLess extends Devices {
   import BaseTypeLess._
+  import PrimitiveTypeLess._
   import ArrayTypeLess._
   import CUDATypeLess._
 
@@ -36,15 +37,15 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
   def C(a: Any) = Backend.Const(a)
 
   /// ARRAY Frontend // FIXME(should it be here?)
-  def ARRAYD(size: Int, m: Manifest[_], d: Device)(implicit __pos: SourceContext): ARRAY = d match {
-    case CPU(_) => (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m.arrayManifest)
+  def ARRAYD(size: INT, m: Manifest[_], d: Device)(implicit __pos: SourceContext): ARRAY = d match {
+    case CPU(_) => (new ARRAY(Adapter.g.reflectMutable("NewArray", size.x))).withSrcType(__pos, m.arrayManifest)
     case GPU(_) => CUDA_MALLOC(size, m)
   }
 
 
   /// typeless frontend
-  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflect("tensor", C(shape), C(CPU(0)), array.x))).withSrcType(__pos, array.et)
+  def TENSOR(shape: Seq[Int], array: ARRAY, device: Device = CPU(0))(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), C(device), array.x)(array.x))).withSrcType(__pos, array.et)
   }
 
   class TENSOR(override val x: Backend.Exp) extends TOP(x) {
@@ -52,7 +53,7 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
 
-    def et: Manifest[_] = Adapter.typeMap(x)
+    def et: Manifest[_] = Adapter.typeMap.applyOrElse(x, Adapter.oldTypeMap)
 
     // Convention: every `tensor_*` IR has `shape` as the first Def and the `device` as the second Def
     def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
@@ -73,12 +74,13 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
 
     def to(target_device: Device)(implicit __pos: SourceContext): TENSOR = {
       if (device == target_device) this
-      else (new TENSOR(Adapter.g.reflect("tensor_sendrecv", C(shape), C(target_device), C(device), x))).withSrcType(__pos, et)
+      else (new TENSOR(Adapter.g.reflect("tensor_sendrecv", C(shape), C(target_device), C(device),
+          x))).withSrcType(__pos, et)
     }
 
 
     def show(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectWrite("show_tensor", x)(Adapter.CTRL))
+      UNIT(Adapter.g.reflectEffect("show_tensor", x)()(Adapter.CTRL))
     }
 
     def + (y: TENSOR)(implicit device: Device, __pos: SourceContext): TENSOR = {
@@ -127,14 +129,19 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
 
 trait FixedSizeTensorDeviceOps extends Dsl with ArrayOps with CudaOps {
 
+  import PrimitiveTypeLess._
   import ArrayTypeLess._
   import FixedSizeTensorDeviceTypeLess._
+
+  def NewArray[T:Manifest](x: Rep[Int], device: Device)(implicit __pos: SourceContext): Rep[Array[T]] = {
+    Wrap[Array[T]](ARRAYD(new INT(Unwrap(x)), manifest[T], device).x)
+  }
 
   /// Typed Frontend
   class Tensor[+T]
   object Tensor {
-    def apply[T:Numeric:Manifest](shape: Seq[Int], array: Rep[Array[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      Wrap[Tensor[T]](TENSOR(shape, new ARRAY(Unwrap(array))).x)
+    def apply[T:Numeric:Manifest](shape: Seq[Int], array: Rep[Array[T]], device: Device = CPU(0))(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      Wrap[Tensor[T]](TENSOR(shape, new ARRAY(Unwrap(array)), device).x)
     }
   }
 

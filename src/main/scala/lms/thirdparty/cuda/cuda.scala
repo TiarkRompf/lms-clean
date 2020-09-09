@@ -20,14 +20,22 @@ object CUDATypeLess extends Dsl with StackArrayOps with SizeTOps with CLibs with
   import CLibTypeLess._
 
 
+  def data_size(m: Manifest[_]): Int = m match {
+    case a if a == manifest[Char] => 1
+    case a if a == manifest[Int] => 4
+    case a if a == manifest[Float] => 4
+    case a if a == manifest[Double] => 8
+    case a => System.out.println(a); ???
+  }
+
   // FIXME(feiw) hacky temp status type (used to be CudaErrorT)
   def CUDA_CALL(status: Backend.Exp) =
-    libFunction[Unit]("CUDA_CALL", Unwrap(status))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+    libFunction[Unit]("CUDA_CALL", status)(Seq[Int](0), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   // a typeless interface for CUDA_MALLOC
   def CUDA_MALLOC(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
     val addr = ARRAY(0, m)
-    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, count.x)(Seq(1), Seq(0), Set(0))))
+    CUDA_CALL(Unwrap(libFunction[Int]("cudaMalloc", addr.x, (count * data_size(m)).x)(Seq(1), Seq(0), Set(0))))
     addr
   }
 
@@ -46,16 +54,8 @@ object CUDATypeLess extends Dsl with StackArrayOps with SizeTOps with CLibs with
   def CPYDefault(implicit __pos: SourceContext): CUDA_MEMCPY_KIND = CUDA_MEMCPY_KIND(CMACRO("cudaMemcpyDefault", manifest[Any]))
 
   // ​cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
-  def CUDA_MEMCOPY(dst: ARRAY, src: ARRAY, count: INT, kind: CUDA_MEMCPY_KIND, m: Manifest[_])(implicit __pos: SourceContext) = {
-    val data_size: INT = m match {
-      case a if a == manifest[Char] => 1
-      case a if a == manifest[Int] => 4
-      case a if a == manifest[Float] => 4
-      case a if a == manifest[Double] => 8
-      case a => System.out.println(a); ???
-    }
-    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, (count * data_size).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
-  }
+  def CUDA_MEMCOPY(dst: ARRAY, src: ARRAY, count: INT, kind: CUDA_MEMCPY_KIND, m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, (count * data_size(m)).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
 
   class DIM3(override val x: Backend.Exp) extends TOP(x)
   def DIM3(a: Int, b: Int = 1, c: Int = 1)(implicit __pos: SourceContext): DIM3 =

@@ -23,9 +23,10 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
 
     override def transform(graph: Graph) = {
       graph.show
-      val graph1 = (new DevicedTensorLowering {}).transform(graph)
+      val graph1 = (new TensorResolvingDevice {}).transform(graph)
       graph1.show
-      graph1
+      val graph2 = (new DevicedTensorLowering {}).transform(graph1)
+      graph2
     }
   }
 
@@ -35,10 +36,11 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-        val tensor1 = Tensor(Seq(2,3), Array[Float](1,2,3,4,5,6))
-        val tensor2 = Tensor(Seq(2,3), Array[Float](6,5,4,3,2,1))
+        val array = NewArray[Float](6, GPU(0))
+        // FIXME(feiw) slightly not ideal since GPU(0) is given to both array and Tensor
+        val tensor1 = Tensor(Seq(2,3), array, GPU(0))
+        // val tensor2 = tensor1.to(CPU(0))
         tensor1.show
-        tensor2.show
       }
     }
     System.out.println(indent(driver.code))

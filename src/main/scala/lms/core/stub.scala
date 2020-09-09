@@ -21,6 +21,8 @@ object Adapter extends FrontEnd {
 
   override def mkGraphBuilder() = new GraphBuilderOpt
 
+  var oldTypeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
+
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var sourceMap: mutable.Map[lms.core.Backend.Exp, SourceContext] = _
   var funTable: List[(Backend.Exp, Any)] = _

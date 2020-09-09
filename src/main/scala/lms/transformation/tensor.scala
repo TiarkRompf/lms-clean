@@ -40,7 +40,7 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
   def C(a: Any) = Backend.Const(a)
 
   def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR =
-    (new TENSOR(Adapter.g.reflect("tensor", C(shape), array.x))).withSrcType(__pos, array.et)
+    (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), array.x)(array.x))).withSrcType(__pos, array.et)
 
   class TENSOR(override val x: Backend.Exp) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }

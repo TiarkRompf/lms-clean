@@ -40,6 +40,21 @@ class FixedSizeTensorTest extends TutorialFunSuite {
     check("show", driver.code, "c")
   }
 
+  test("tensor_construction_effect") {
+    val driver = new CompilerCTensor[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val array = NewArray[Int](6)
+        for (i <- (0 until 6): Rep[Range]) {
+          array(i) = i
+        }
+        val tensor = Tensor(Seq(2,3), array)
+        tensor.show
+      }
+    }
+    check("tensor_construction_effect", driver.code, "c")
+  }
+
   test("add") {
     val driver = new CompilerCTensor[Int, Unit] {
       @virtualize
