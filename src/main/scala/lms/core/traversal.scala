@@ -533,8 +533,6 @@ abstract class Transformer extends Traverser {
   override def traverse(n: Node): Unit = { subst(n.n) = transform(n) }
 
   var graphCache: Map[Sym, Node] = _
-  var oldSourceMap: mutable.Map[Exp, SourceContext] = _
-  // var oldTypeMap: mutable.Map[Exp, Manifest[_]] = _
 
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
@@ -545,7 +543,7 @@ abstract class Transformer extends Traverser {
 
     // Handling MetaData 1. save oldTypeMap/SourceMap first
     Adapter.oldTypeMap = Adapter.typeMap
-    oldSourceMap = Adapter.sourceMap
+    Adapter.oldSourceMap = Adapter.sourceMap
     // Handling MetaData 2. initialize MetaData as fresh, so the transformer might add new metadata entries
     Adapter.typeMap = new mutable.HashMap[Backend.Exp, Manifest[_]]()
     Adapter.sourceMap = new mutable.HashMap[Backend.Exp, SourceContext]()
@@ -562,8 +560,8 @@ abstract class Transformer extends Traverser {
     // (FIXME(feiw) maybe redundant) (not sure why all the checks are necessary)
     for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap.contains(k) && !Adapter.typeMap.contains(v))
       Adapter.typeMap(v) = Adapter.oldTypeMap(k)
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldSourceMap.contains(k) && !Adapter.sourceMap.contains(v))
-      Adapter.sourceMap(v) = oldSourceMap(k)
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap.contains(k) && !Adapter.sourceMap.contains(v))
+      Adapter.sourceMap(v) = Adapter.oldSourceMap(k)
 
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }

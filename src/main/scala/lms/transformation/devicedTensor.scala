@@ -45,15 +45,37 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
 
   /// typeless frontend
   def TENSOR(shape: Seq[Int], array: ARRAY, device: Device = CPU(0))(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), C(device), array.x)(array.x))).withSrcType(__pos, array.et)
+    (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), C(device), array.x)(array.x), old = false)).withSrcType(__pos, array.et)
   }
 
-  class TENSOR(override val x: Backend.Exp) extends TOP(x) {
+
+  /**
+   * NOTE: sometimes in the typeless frontend, we want to add methods that fetch info from the metadata.
+   *     The metadata could be the `typeMap`, the `sourceMap`, or the `GraphDefsCache`.
+   *  `GraphDefsCache` may not be an *bona fide* metadata, but it is similar to the other metadata because
+   *     it is also a HashMap from Sym to other infor.
+   *  If we don't do any transformation, the way to fetch the metadata is to simply fetch from the metadata Maps.
+   *  However, when we do transformation, we will have 2 sets of metadata (one for the original graph, one for the new graph).
+   *  That creates a problem for these methods:
+   *       `def et` `def shape` `def device`, which depend on metadata maps, because we are not sure which metadata
+   *       hashmap to use.
+   *  One Solution is to always check both sets of Metadata HashMaps. It works only if the `Sym`s of 2 graphs
+   *    are never the same. We can make it work if we force the `fresh` method to use a global state (never reuse a Sym id
+   *    even across graphs).
+   *  Another Solution (as implemented now) is to add a FLAG to the `class TENSOR` to indicate which set of Metadata should it use.
+   *    The FLAG is called `old`, which, if true, indicates that the `def et` (and other functions) should use the old set of Metadata.
+   *    How do we set the value of `old`? We use this convention.
+   *    1. We only use the `unsafe` constructor (new TENSOR(x)) in transformer for the old graph. So the `class TENSOR` has
+   *       the `old` FLAG default to true.
+   *    2. We always use the `safe` constructor (def TENSOR(..)) in non-transformer cases. It sets `old` to false.
+   *    3. We add another `safe` constructor (def tensor(a: Rep[Tensor[T]])) in typed constructor that always sets `old` to false.
+   */
+  class TENSOR(override val x: Backend.Exp, val old: Boolean = true) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
 
-    def et: Manifest[_] = Adapter.typeMap.applyOrElse(x, Adapter.oldTypeMap)
+    def et: Manifest[_] = if (old) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
     // Convention: every `tensor_*` IR has `shape` as the first Def and the `device` as the second Def
     def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
@@ -145,8 +167,10 @@ trait FixedSizeTensorDeviceOps extends Dsl with ArrayOps with CudaOps {
     }
   }
 
+  def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x), old = false)
+
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
-    val self = new TENSOR(Unwrap(x))
+    val self = tensor(x)
 
     def shape: Seq[Int] = self.shape
     def device: Device = self.device
@@ -156,24 +180,24 @@ trait FixedSizeTensorDeviceOps extends Dsl with ArrayOps with CudaOps {
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
 
     def + (y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self + (new TENSOR(Unwrap(y)))
+      val t = self + tensor(y)
       Wrap[Tensor[T]](t.x)
     }
     def - (y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self - (new TENSOR(Unwrap(y)))
+      val t = self - tensor(y)
       Wrap[Tensor[T]](t.x)
     }
     def * (y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self * (new TENSOR(Unwrap(y)))
+      val t = self * tensor(y)
       Wrap[Tensor[T]](t.x)
     }
     def / (y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self / (new TENSOR(Unwrap(y)))
+      val t = self / tensor(y)
       Wrap[Tensor[T]](t.x)
     }
 
     def dot(y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self dot (new TENSOR(Unwrap(y)))
+      val t = self dot tensor(y)
       Wrap[Tensor[T]](t.x)
     }
   }

@@ -23,18 +23,15 @@ abstract class TensorResolvingDevice extends Transformer {
 
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
         (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      implicit val sc_ : SourceContext = oldSourceMap(s)
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       implicit val dd_ : Device = d
 
       val res_tensor = (new TENSOR(x)).to(d) + (new TENSOR(y).to(d))
       res_tensor.x
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
-      implicit val sc_ = oldSourceMap(s)
+      implicit val sc_ = Adapter.oldSourceMap(s)
 
-      // FIXME(feiw): x is a Sym in the old graph, so we cannot use `Adapter.typeMap`
-      // to get the type of x. However, the .to function is using the .et method of TENSOR
-      // and it uses `Adapter.typeMap`.
       (new TENSOR(x)).to(CPU(0)).show
       Backend.Const(())
 

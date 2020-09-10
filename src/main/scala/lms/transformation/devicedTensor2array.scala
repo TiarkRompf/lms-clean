@@ -36,7 +36,7 @@ abstract class DevicedTensorLowering extends Transformer {
       s
 
     case Node(s, "tensor_sendrecv", Backend.Const(size:Seq[Int])::Backend.Const(td:Device)::Backend.Const(d:Device)::(x:Backend.Sym)::_, _) =>
-      implicit val sc_ : SourceContext = oldSourceMap(s)
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       val m = Adapter.oldTypeMap(s)
       val count = numeral(size)
 
@@ -55,7 +55,7 @@ abstract class DevicedTensorLowering extends Transformer {
 
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
         (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      implicit val sc_ : SourceContext = oldSourceMap(s)
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
 
       val x_device = (new TENSOR(x)).device(graphCache)
       val y_device = (new TENSOR(y)).device(graphCache)
@@ -71,7 +71,7 @@ abstract class DevicedTensorLowering extends Transformer {
       res.x
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
-      implicit val sc_ = oldSourceMap(s)
+      implicit val sc_ = Adapter.oldSourceMap(s)
 
       val shape = (new TENSOR(x)).shape(graphCache)
       val device = (new TENSOR(x)).device(graphCache)

@@ -33,7 +33,7 @@ abstract class TensorLoweringCPU extends Transformer {
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       // `oldSourceMap` is the copy of Adapter.sourceMap that maps Backend.Exp to SourceContext
       // We use it to get the SourceContext of the node `s` and use it for the transformed node.
-      implicit val sc_ : SourceContext = oldSourceMap(s)
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
 
       // `oldTypeMap` is the copy of Adapter.typeMap that maps Backend.Exp to type Manifest
       // We use it to get the type Manifest that is used for typeless frontend (such as for NEW_ARRAY)
@@ -51,7 +51,7 @@ abstract class TensorLoweringCPU extends Transformer {
       res.x
 
     case Node(s, "tensor_minus", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      implicit val sc_ : SourceContext = oldSourceMap(s)
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       val res = ARRAY(numeral(size), Adapter.oldTypeMap(s))
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
@@ -59,7 +59,7 @@ abstract class TensorLoweringCPU extends Transformer {
       res.x
 
     case Node(s, "tensor_mult", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      implicit val sc_ : SourceContext = oldSourceMap(s)
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       val res = ARRAY(numeral(size), Adapter.oldTypeMap(s))
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
@@ -67,7 +67,7 @@ abstract class TensorLoweringCPU extends Transformer {
       res.x
 
     case Node(s, "tensor_div", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      implicit val sc_ : SourceContext = oldSourceMap(s)
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       val res = ARRAY(numeral(size), Adapter.oldTypeMap(s))
       tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
@@ -75,7 +75,7 @@ abstract class TensorLoweringCPU extends Transformer {
       res.x
 
     case Node(s, "tensor_dot", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      implicit val sc_ : SourceContext = oldSourceMap(s)
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
 
       // when digging the shape of original TENSOR, need to pass the `graphCache` argument
       val shape_x = (new TENSOR(x)).shape(graphCache)
@@ -103,7 +103,7 @@ abstract class TensorLoweringCPU extends Transformer {
 
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
-      implicit val sc_ = oldSourceMap(s)
+      implicit val sc_ = Adapter.oldSourceMap(s)
 
       // when digging the shape of original TENSOR, need to pass the `graphCache` argument
       val shape = (new TENSOR(x)).shape(graphCache)

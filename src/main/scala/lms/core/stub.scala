@@ -21,7 +21,10 @@ object Adapter extends FrontEnd {
 
   override def mkGraphBuilder() = new GraphBuilderOpt
 
+  // We are using these "global" data structures to hold "old" graph metadata in transformation
   var oldTypeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
+  var oldSourceMap: mutable.Map[lms.core.Backend.Exp, lms.macros.SourceContext] = _
+  var oldDefsCache: mutable.Map[lms.core.Backend.Sym, lms.core.Backend.Node] = _
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var sourceMap: mutable.Map[lms.core.Backend.Exp, SourceContext] = _
