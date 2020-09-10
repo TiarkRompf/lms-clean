@@ -77,9 +77,8 @@ abstract class TensorLoweringCPU extends Transformer {
     case Node(s, "tensor_dot", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
 
-      // when digging the shape of original TENSOR, need to pass the `graphCache` argument
-      val shape_x = (new TENSOR(x)).shape(graphCache)
-      val shape_y = (new TENSOR(y)).shape(graphCache)
+      val shape_x = (new TENSOR(x)).shape
+      val shape_y = (new TENSOR(y)).shape
 
       // match case on the type (input shapes) of the dot
       if (shape_x.size == 1 && shape_y.size == 1) {
@@ -105,8 +104,7 @@ abstract class TensorLoweringCPU extends Transformer {
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
       implicit val sc_ = Adapter.oldSourceMap(s)
 
-      // when digging the shape of original TENSOR, need to pass the `graphCache` argument
-      val shape = (new TENSOR(x)).shape(graphCache)
+      val shape = (new TENSOR(x)).shape
 
       // this unsafe ARRAY construction should be safe because the ARRAY is already constructed with metadata
       val arr = new ARRAY(tensor2array(x))

@@ -78,17 +78,17 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
     def et: Manifest[_] = if (old) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
     // Convention: every `tensor_*` IR has `shape` as the first Def and the `device` as the second Def
-    def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
-    def shape(graphCache: Map[Backend.Sym, Backend.Node]): Seq[Int] = {
-      graphCache.get(x.asInstanceOf[Backend.Sym]) match {
+    def shape: Seq[Int] = {
+      val gc = if (old) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) if s.startsWith("tensor") => size
         case a => System.out.println(a); ???
       }
     }
 
-    def device: Device = device(Adapter.g.globalDefsCache)
-    def device(graphCache: Map[Backend.Sym, Backend.Node]): Device = {
-      graphCache.get(x.asInstanceOf[Backend.Sym]) match {
+    def device: Device = {
+      val gc = if (old) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, a::Backend.Const(d:Device)::_, _)) if s.startsWith("tensor") => d
         case a => System.out.println(a); ???
       }
@@ -96,8 +96,8 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
 
     def to(target_device: Device)(implicit __pos: SourceContext): TENSOR = {
       if (device == target_device) this
-      else (new TENSOR(Adapter.g.reflect("tensor_sendrecv", C(shape), C(target_device), C(device),
-          x))).withSrcType(__pos, et)
+      else (new TENSOR(Adapter.g.reflect("tensor_sendrecv", C(shape), C(target_device),
+        C(device), x))).withSrcType(__pos, et)
     }
 
 

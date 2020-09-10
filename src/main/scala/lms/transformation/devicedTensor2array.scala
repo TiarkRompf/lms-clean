@@ -57,8 +57,8 @@ abstract class DevicedTensorLowering extends Transformer {
         (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
 
-      val x_device = (new TENSOR(x)).device(graphCache)
-      val y_device = (new TENSOR(y)).device(graphCache)
+      val x_device = (new TENSOR(x)).device
+      val y_device = (new TENSOR(y)).device
       assert(x_device == d && y_device == d)
 
       val res = ARRAYD(numeral(size), Adapter.oldTypeMap(s), d) // declare an array on device d
@@ -73,8 +73,8 @@ abstract class DevicedTensorLowering extends Transformer {
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
       implicit val sc_ = Adapter.oldSourceMap(s)
 
-      val shape = (new TENSOR(x)).shape(graphCache)
-      val device = (new TENSOR(x)).device(graphCache)
+      val shape = (new TENSOR(x)).shape
+      val device = (new TENSOR(x)).device
       assert(device.isInstanceOf[CPU], "show_tensor must be on CPU")
 
       val arr = new ARRAY(t2a(x))

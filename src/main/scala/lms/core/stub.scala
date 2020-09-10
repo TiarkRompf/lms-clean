@@ -24,7 +24,7 @@ object Adapter extends FrontEnd {
   // We are using these "global" data structures to hold "old" graph metadata in transformation
   var oldTypeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var oldSourceMap: mutable.Map[lms.core.Backend.Exp, lms.macros.SourceContext] = _
-  var oldDefsCache: mutable.Map[lms.core.Backend.Sym, lms.core.Backend.Node] = _
+  var oldDefsCache: immutable.Map[lms.core.Backend.Sym, lms.core.Backend.Node] = _
 
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var sourceMap: mutable.Map[lms.core.Backend.Exp, SourceContext] = _

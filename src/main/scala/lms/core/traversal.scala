@@ -532,14 +532,11 @@ abstract class Transformer extends Traverser {
 
   override def traverse(n: Node): Unit = { subst(n.n) = transform(n) }
 
-  var graphCache: Map[Sym, Node] = _
-
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
 
-    // graphCache may be use during transformation to check the Node of a Sym
-    graphCache = graph.globalDefsCache
+    Adapter.oldDefsCache = graph.globalDefsCache
 
     // Handling MetaData 1. save oldTypeMap/SourceMap first
     Adapter.oldTypeMap = Adapter.typeMap

@@ -42,19 +42,16 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
   def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR =
     (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), array.x)(array.x))).withSrcType(__pos, array.et)
 
-  class TENSOR(override val x: Backend.Exp) extends TOP(x) {
+  class TENSOR(override val x: Backend.Exp, val old: Boolean = true) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
 
-    def et: Manifest[_] = {
-      System.out.println(s"TENSOR: fetching $x with et ${Adapter.typeMap(x)} from typeMap ${Adapter.typeMap}")
-      Adapter.typeMap(x)
-    }
+    def et: Manifest[_] = if (old) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
-    def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
-    def shape(graphCache: Map[Backend.Sym, Backend.Node]): Seq[Int] = {
-      graphCache.get(x.asInstanceOf[Backend.Sym]) match {
+    def shape: Seq[Int] = {
+      val gc = if (old) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) if s.startsWith("tensor") => size
         case a => System.out.println(a); ???
       }
@@ -129,33 +126,35 @@ trait FixedSizeTensorOps extends Base with PrimitiveOps with ArrayOps {
     }
   }
 
+  def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x), old = false)
+
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
 
     // first keep a local instance of TENSOR. No need to worry about registering metadata
     // here because we know that the metadata has ben registered when x: Rep[Tensor[T]] is constructed
-    val self = new TENSOR(Unwrap(x))
+    val self = tensor(x)
 
     def shape: Seq[Int] = self.shape
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
     def + (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self + (new TENSOR(Unwrap(y)))
+      val t = self + tensor(y)
       Wrap[Tensor[T]](t.x)
     }
     def - (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self - (new TENSOR(Unwrap(y)))
+      val t = self - tensor(y)
       Wrap[Tensor[T]](t.x)
     }
     def * (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self * (new TENSOR(Unwrap(y)))
+      val t = self * tensor(y)
       Wrap[Tensor[T]](t.x)
     }
     def / (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self / (new TENSOR(Unwrap(y)))
+      val t = self / tensor(y)
       Wrap[Tensor[T]](t.x)
     }
 
     def dot(y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self dot (new TENSOR(Unwrap(y)))
+      val t = self dot tensor(y)
       Wrap[Tensor[T]](t.x)
     }
   }
