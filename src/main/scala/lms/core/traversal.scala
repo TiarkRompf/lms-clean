@@ -536,11 +536,11 @@ abstract class Transformer extends Traverser {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
 
-    Adapter.oldDefsCache = graph.globalDefsCache
-
     // Handling MetaData 1. save oldTypeMap/SourceMap first
+    Adapter.oldDefsCache = graph.globalDefsCache
     Adapter.oldTypeMap = Adapter.typeMap
     Adapter.oldSourceMap = Adapter.sourceMap
+
     // Handling MetaData 2. initialize MetaData as fresh, so the transformer might add new metadata entries
     Adapter.typeMap = new mutable.HashMap[Backend.Exp, Manifest[_]]()
     Adapter.sourceMap = new mutable.HashMap[Backend.Exp, SourceContext]()
@@ -554,11 +554,11 @@ abstract class Transformer extends Traverser {
     }
 
     // Handling MetaData 3. update new metadata with old metadata
-    // (FIXME(feiw) maybe redundant) (not sure why all the checks are necessary)
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap.contains(k) && !Adapter.typeMap.contains(v))
-      Adapter.typeMap(v) = Adapter.oldTypeMap(k)
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap.contains(k) && !Adapter.sourceMap.contains(v))
-      Adapter.sourceMap(v) = Adapter.oldSourceMap(k)
+    // (FIXME(feiw) this is not redundant but I want to know why
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap.contains(k))
+      Adapter.typeMap.getOrElseUpdate(v, Adapter.oldTypeMap(k))
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap.contains(k))
+      Adapter.sourceMap.getOrElseUpdate(v, Adapter.oldSourceMap(k))
 
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }

@@ -99,7 +99,6 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
         assert(false, "Higher than 2D is not yet supported in dot function")
       }
       assert(et == y.et)
-      System.out.println(s"dot function: create tensor_dot with et: $et")
       (new TENSOR(Adapter.g.reflect("tensor_dot", C(res_shape), x, y.x))).withSrcType(__pos, et)
     }
   }

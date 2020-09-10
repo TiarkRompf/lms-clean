@@ -1,4 +1,4 @@
-package lms.thirdparty
+package lms.thirdparty.array_computation
 
 import lms.core._
 import lms.util._
@@ -9,24 +9,16 @@ import lms.core.utils.time
 import lms.macros.SourceContext
 import lms.collection.mutable.{ArrayOps, ArrayTypeLess, StackArrayOps}
 import lms.transformation.tensor.FixedSizeTensorDeviceTypeLess
+import lms.thirdparty.{CLibs, CCodeGenLibs, CLibTypeLess, SizeTOps, SIZE_TTypeLess, CCodeGenSizeTOps}
 
 
-object CUDATypeLess extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaFunction {
-
+object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction {
   import BaseTypeLess._
   import PrimitiveTypeLess._
   import ArrayTypeLess._
   import FixedSizeTensorDeviceTypeLess._
   import CLibTypeLess._
-
-
-  def data_size(m: Manifest[_]): Int = m match {
-    case a if a == manifest[Char] => 1
-    case a if a == manifest[Int] => 4
-    case a if a == manifest[Float] => 4
-    case a if a == manifest[Double] => 8
-    case a => System.out.println(a); ???
-  }
+  import SIZE_TTypeLess._
 
   // FIXME(feiw) hacky temp status type (used to be CudaErrorT)
   def CUDA_CALL(status: Backend.Exp) =
@@ -35,7 +27,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with SizeTOps with CLibs with
   // a typeless interface for CUDA_MALLOC
   def CUDA_MALLOC(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
     val addr = ARRAY(0, m)
-    CUDA_CALL(Unwrap(libFunction[Int]("cudaMalloc", addr.x, (count * data_size(m)).x)(Seq(1), Seq(0), Set(0))))
+    CUDA_CALL(Unwrap(libFunction[Int]("cudaMalloc", addr.x, SIZE_T(count * sizeOf(m)).x)(Seq(1), Seq(0), Set(0))))
     addr
   }
 
@@ -55,7 +47,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with SizeTOps with CLibs with
 
   // ​cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
   def CUDA_MEMCOPY(dst: ARRAY, src: ARRAY, count: INT, kind: CUDA_MEMCPY_KIND, m: Manifest[_])(implicit __pos: SourceContext) =
-    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, (count * data_size(m)).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, SIZE_T(count * sizeOf(m)).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
 
   class DIM3(override val x: Backend.Exp) extends TOP(x)
   def DIM3(a: Int, b: Int = 1, c: Int = 1)(implicit __pos: SourceContext): DIM3 =

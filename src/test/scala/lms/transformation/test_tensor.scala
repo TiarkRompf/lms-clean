@@ -7,7 +7,8 @@ import macros.SourceContext
 
 import lms.core._
 import lms.core.stub._
-import lms.thirdparty.{CCodeGenLibs, CCodeGenCBLASOps}
+import lms.thirdparty.{CCodeGenLibs}
+import lms.thirdparty.array_computation.{CCodeGenCBLASOps}
 
 import Backend._
 

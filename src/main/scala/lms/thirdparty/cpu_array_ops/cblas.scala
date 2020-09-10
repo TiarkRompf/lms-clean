@@ -1,4 +1,4 @@
-package lms.thirdparty
+package lms.thirdparty.array_computation
 
 import lms.core._
 import lms.util._
@@ -7,7 +7,7 @@ import lms.core.Backend._
 import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
-import lms.thirdparty.{CLibs, SizeTOps, CBLASOps}
+import lms.thirdparty.{CLibs, SizeTOps, CLibTypeLess, CCodeGenLibs}
 import lms.collection.mutable.{ArrayOps, ArrayTypeLess}
 
 

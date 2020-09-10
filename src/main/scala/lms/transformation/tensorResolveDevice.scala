@@ -7,8 +7,7 @@ import lms.core._
 import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
-import lms.thirdparty.array_computation.ArrayCPUOps
-import lms.thirdparty.CUDATypeLess
+import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess}
 
 import Backend._
 

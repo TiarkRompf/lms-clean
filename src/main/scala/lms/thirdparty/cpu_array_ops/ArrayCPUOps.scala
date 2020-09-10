@@ -8,7 +8,7 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
 import lms.collection.mutable.{ArrayOps, ArrayTypeLess}
-import lms.thirdparty.{CBLASOps, CBLASTypeLess}
+import lms.thirdparty.array_computation.CBLASTypeLess
 
 /**
  * This frontend is used for Tensor Computations by CPU (naive implementation)
