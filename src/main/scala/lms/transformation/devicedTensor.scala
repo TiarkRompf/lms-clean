@@ -69,12 +69,14 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
    *    2. We always use the `safe` constructor (def TENSOR(..)) in non-transformer cases. It sets `old` to false.
    *    3. We add another `safe` constructor (def tensor(a: Rep[Tensor[T]])) in typed constructor that always sets `old` to false.
    */
-  class TENSOR(override val x: Backend.Exp, val old: Boolean = true) extends TOP(x) {
+  class TENSOR(override val x: Backend.Exp, val old: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
 
-    def et: Manifest[_] = if (old) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
+    def et: Manifest[_] = {
+      if (old) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
+    }
 
     // Convention: every `tensor_*` IR has `shape` as the first Def and the `device` as the second Def
     def shape: Seq[Int] = {
@@ -96,7 +98,7 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
     def to(target_device: Device)(implicit __pos: SourceContext): TENSOR = {
       if (device == target_device) this
       else (new TENSOR(Adapter.g.reflect("tensor_sendrecv", C(shape), C(target_device),
-        C(device), x))).withSrcType(__pos, et)
+        C(device), x), old = false)).withSrcType(__pos, et)
     }
 
 

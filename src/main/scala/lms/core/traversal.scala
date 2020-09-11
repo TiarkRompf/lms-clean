@@ -509,7 +509,7 @@ abstract class Transformer extends Traverser {
     case Node(s, "λ", (b @ Block(in, y, ein, eff))::_, _) =>
       // need to deal with recursive binding!
       val s1 = Sym(g.fresh)
-      subst(s) = s1
+      subst(s) = s1 // FIXME(feiw) is this redundant with line 534
       g.reflect(s1, "λ", transform(b))()
     case Node(s,op,rs,es) =>
       // effect dependencies in target graph are managed by
@@ -530,7 +530,16 @@ abstract class Transformer extends Traverser {
         g.reflect(op,args:_*)
   }
 
-  override def traverse(n: Node): Unit = { subst(n.n) = transform(n) }
+  override def traverse(n: Node): Unit = {
+    subst(n.n) = transform(n)
+    // Also pass the metadata to the new exp
+    // We use `getOrElseUpdate` because the handling of each node might
+    // have already filled a proper value, which we don't want to override
+    if (Adapter.oldTypeMap.contains(n.n))
+      Adapter.typeMap.getOrElseUpdate(subst(n.n), Adapter.oldTypeMap(n.n))
+    if (Adapter.oldSourceMap.contains(n.n))
+      Adapter.sourceMap.getOrElseUpdate(subst(n.n), Adapter.oldSourceMap(n.n))
+  }
 
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either

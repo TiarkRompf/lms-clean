@@ -25,13 +25,14 @@ abstract class TensorResolvingDevice extends Transformer {
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       implicit val dd_ : Device = d
 
-      val res_tensor = (new TENSOR(x)).to(d) + (new TENSOR(y).to(d))
+      val res_tensor = (new TENSOR(transform(x))).to(d) + (new TENSOR(transform(y))).to(d)
+
       res_tensor.x
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
       implicit val sc_ = Adapter.oldSourceMap(s)
 
-      (new TENSOR(x)).to(CPU(0)).show
+      (new TENSOR(transform(x))).to(CPU(0)).show
       Backend.Const(())
 
     case _ => super.transform(n)

@@ -40,11 +40,10 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
         val array = NewArray[Float](6, GPU(0))
         // FIXME(feiw) slightly not ideal since GPU(0) is given to both array and Tensor
         val tensor1 = Tensor(Seq(2,3), array, GPU(0))
-        // val tensor2 = tensor1.to(CPU(0))
         tensor1.show
       }
     }
-    System.out.println(indent(driver.code))
+    check("show", driver.code, "cu")
   }
 
   test("add") {
@@ -55,7 +54,7 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val tensor1 = Tensor(Seq(2,3), Array[Float](1,2,3,4,5,6))
         val tensor2 = Tensor(Seq(2,3), Array[Float](6,5,4,3,2,1))
-        implicit val device = CPU(0)
+        implicit val device = GPU(0)
         val tensor3 = tensor1 + tensor2
         tensor3.show
       }
