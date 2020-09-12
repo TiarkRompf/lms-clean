@@ -127,14 +127,23 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case _ => 20
   }
 
-  def emitFunction(name: String, body: Block, decorator: String = "") = {
+  def emitFunctionSignature(name: String, body: Block, decorator: String = "",
+                            argNames: Boolean = true, ending: String = " ") = {
     val res = body.res
     val args = body.in
     val ret = if (decorator == "") s"${remap(typeBlockRes(res))} "
               else s"$decorator ${remap(typeBlockRes(res))} "
-    val params = "(" + args.map(s => s"${remap(typeMap.getOrElse(s, manifest[Unknown]))} ${quote(s)}").mkString(", ") + ") "
-    val sig = ret + name + params
+    val params = "(" + args.map { s =>
+      val ty = remap(typeMap.getOrElse(s, manifest[Unknown]))
+      val name = quote(s)
+      if (argNames) ty + " " + name else ty
+    }.mkString(", ") + ")"
+    val sig = ret + name + params + ending
     emit(sig)
+  }
+
+  def emitFunction(name: String, body: Block, decorator: String = "") = {
+    emitFunctionSignature(name, body, decorator)
     quoteBlockPReturn(traverse(body))
     emitln()
   }
@@ -273,17 +282,35 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   private val registeredFunctions = mutable.HashSet[String]()
   private val functionsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
   private val ongoingFun = new mutable.HashSet[String]()
-  def registerTopLevelFunction(id: String, streamId: String = "general")(f: => Unit) = if (!registeredFunctions(id)) {
-    if (ongoingFun(streamId)) ???
-    ongoingFun += streamId
-    registeredFunctions += id
-    withStream(functionsStreams.getOrElseUpdate(streamId, {
+  def registerTopLevelFunction(id: String, streamId: String = "general")(f: => Unit) =
+    if (!registeredFunctions(id)) {
+      if (ongoingFun(streamId)) ???
+      ongoingFun += streamId
+      registeredFunctions += id
+      withStream(functionsStreams.getOrElseUpdate(streamId, {
+        val functionsStream = new ByteArrayOutputStream()
+        val functionsWriter = new PrintStream(functionsStream)
+        (functionsWriter, functionsStream)
+      })._1)(f)
+      ongoingFun -= streamId
+    }
+  private val functionDeclsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
+  def registerTopLevelFunctionDecl(id: String, streamId: String = "general")(f: => Unit) = {
+    withStream(functionDeclsStreams.getOrElseUpdate(streamId, {
       val functionsStream = new ByteArrayOutputStream()
       val functionsWriter = new PrintStream(functionsStream)
       (functionsWriter, functionsStream)
     })._1)(f)
-    ongoingFun -= streamId
   }
+
+  def emitFunctionDecls(out: PrintStream): Unit =
+    if (functionDeclsStreams.size > 0){
+      out.println("\n/************* Function Declarations **************/")
+      for ((_, functionsStream) <- functionDeclsStreams.values.toSeq) {
+        functionsStream.writeTo(out)
+      }
+    }
+
   def emitFunctions(out: PrintStream): Unit =
     if (functionsStreams.size > 0){
       out.println("\n/************* Functions **************/")
@@ -385,11 +412,17 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case n @ Node(s,"P",List(x),_) =>
       es"""printf("%s\n", $x)"""
     case n @ Node(s, "λ", (block: Block)::Const(0)::Nil, _) =>
+      registerTopLevelFunctionDecl(quote(s)) {
+        emitFunctionSignature(quote(s), block, argNames = false, ending = ";\n")
+      }
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
       }
       emit(quote(s))
     case n @ Node(s, "λ", (block: Block)::Const(0)::Const(decorator: String)::Nil, _) =>
+      registerTopLevelFunctionDecl(quote(s)) {
+        emitFunctionSignature(quote(s), block, argNames = false, ending = ";\n")
+      }
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block, decorator)
       }
@@ -555,10 +588,16 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       // XXX: this is most likely not enough in the general case
       rename(s) = quote(y)
     case n @ Node(s, "λ", (block: Block)::Const(0)::Nil, _) => // FIXME: check free var?
+      registerTopLevelFunctionDecl(quote(s)) {
+        emitFunctionSignature(quote(s), block, argNames = false, ending = ";\n")
+      }
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
       }
     case n @ Node(s, "λ", (block: Block)::Const(0)::Const(decorator: String)::Nil, _) =>
+      registerTopLevelFunctionDecl(quote(s)) {
+        emitFunctionSignature(quote(s), block, argNames = false, ending = ";\n")
+      }
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block, decorator)
       }
