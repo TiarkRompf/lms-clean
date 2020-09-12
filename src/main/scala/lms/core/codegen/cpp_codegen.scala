@@ -84,7 +84,7 @@ trait ExtendedCPPCodeGen extends ExtendedCCodeGen {
     val eff = quoteEff(b.ein)
     val args = argMod match {
       case Some(mods) =>
-        assert(mods.length == b.in.length, s"argMod should have same length as block inputs ${mods.length} ${b.in.length}")
+        assert(mods.length == b.in.length, s"argMod length (${mods.length}) should equal to the block argument length (${b.in.length})")
         b.in.zipWithIndex.map{
           case (s, i) =>
             val mod = mods(i)
