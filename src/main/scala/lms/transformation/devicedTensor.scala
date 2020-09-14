@@ -170,6 +170,13 @@ trait FixedSizeTensorDeviceOps extends Dsl with ArrayOps with CudaOps {
     }
   }
 
+  def atGPU[T:Numeric:Manifest](clo: Device => Rep[Tensor[T]]): Rep[Tensor[T]] = {
+      clo(GPU(0)) // clo is supposed to run with an implicit Device argument
+  }
+  def atGPU[T:Numeric:Manifest](clo: Device => Seq[Rep[Tensor[T]]]): Seq[Rep[Tensor[T]]] = {
+      clo(GPU(0)) // clo is supposed to run with an implicit Device argument
+  }
+
   def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x), old = false)
 
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
