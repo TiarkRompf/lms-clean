@@ -509,7 +509,7 @@ abstract class Transformer extends Traverser {
     case Node(s, "λ", (b @ Block(in, y, ein, eff))::_, _) =>
       // need to deal with recursive binding!
       val s1 = Sym(g.fresh)
-      subst(s) = s1 // FIXME(feiw) is this redundant with line 534
+      subst(s) = s1
       g.reflect(s1, "λ", transform(b))()
     case Node(s,op,rs,es) =>
       // effect dependencies in target graph are managed by
