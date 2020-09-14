@@ -8,7 +8,7 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.{SourceContext, RefinedManifest}
 import lms.collection.mutable.{ArrayOps, ArrayTypeLess}
-import lms.thirdparty.array_computation.CBLASTypeLess
+import lms.thirdparty.array_computation.{CBLASTypeLess, CBLASOps}
 
 /**
  * This frontend is used for Tensor Computations by CPU (naive implementation)
@@ -99,7 +99,7 @@ object ArrayCPUTypeLess extends Dsl with ArrayOps {
 }
 
 
-trait ArrayCPUOps extends Dsl with ArrayOps {
+trait ArrayCPUOps extends Dsl with ArrayOps with CBLASOps {
 
   // This is the typed frontend for adding 2 arrays element-wise (no broadcasting)
   // We could just do a shallow wrapping of ARRAY_ADD, but if the implementation is super simple,
@@ -135,16 +135,14 @@ trait ArrayCPUOps extends Dsl with ArrayOps {
     }
   }
 
-  def array_mvdot[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], a0: Int, a1: Int)(implicit __pos: SourceContext) = {
-    // FIMXE(feiw) type error :(
-    // cblas_sgemv(rowMajor, noTrans, a0, a1, 1.0f, a, a1, b, 1, 0.0f, res, 1)
-    ???
+  // FIXME(feiw) this cblas_sgemv only works for float*??
+  def array_mvdot(a: Rep[Array[Float]], b: Rep[Array[Float]], res: Rep[Array[Float]], a0: Int, a1: Int)(implicit __pos: SourceContext) = {
+    cblas_sgemv(rowMajor, noTrans, a0, a1, 1.0f, a, a1, b, 1, 0.0f, res, 1)
   }
 
-  def array_mmdot[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], a0: Rep[Int], a1: Rep[Int], b1: Rep[Int])(implicit __pos: SourceContext) = {
-    // FIMXE(feiw) type error :(
-    // cblas_sgemm(rowMajor, noTrans, noTrans, a0, b1, a1, 1, a, a1, b, b1, 0, res, b1)
-    ???
+  // FIXME(feiw) this cblas_sgemm only works for float*??
+  def array_mmdot(a: Rep[Array[Float]], b: Rep[Array[Float]], res: Rep[Array[Float]], a0: Rep[Int], a1: Rep[Int], b1: Rep[Int])(implicit __pos: SourceContext) = {
+    cblas_sgemm(rowMajor, noTrans, noTrans, a0, b1, a1, 1, a, a1, b, b1, 0, res, b1)
   }
 
   // This is the typed frontend for printing all elements of a Rep[Array[T]] (in flat format)

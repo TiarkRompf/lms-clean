@@ -563,7 +563,7 @@ abstract class Transformer extends Traverser {
     }
 
     // Handling MetaData 3. update new metadata with old metadata
-    // (FIXME(feiw) this is not redundant but I want to know why
+    // this is not redundant because of the block arguments (function definitions)
     for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap.contains(k))
       Adapter.typeMap.getOrElseUpdate(v, Adapter.oldTypeMap(k))
     for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap.contains(k))

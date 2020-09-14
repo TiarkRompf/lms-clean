@@ -83,7 +83,7 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
         tensor6.show
       }
     }
-    System.out.println(indent(driver.code))
+    check("binary", driver.code, "cu")
   }
 
 }
