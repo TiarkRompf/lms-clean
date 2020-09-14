@@ -95,6 +95,8 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
       }
     }
 
+    def device_shape: (Device, Seq[Int]) = (device, shape)
+
     def to(target_device: Device)(implicit __pos: SourceContext): TENSOR = {
       if (device == target_device) this
       else (new TENSOR(Adapter.g.reflect("tensor_sendrecv", C(shape), C(target_device),

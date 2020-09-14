@@ -26,7 +26,41 @@ abstract class TensorResolvingDevice extends Transformer {
       implicit val dd_ : Device = d
 
       val res_tensor = (new TENSOR(transform(x))).to(d) + (new TENSOR(transform(y))).to(d)
+      res_tensor.x
 
+    case Node(s, "tensor_minus", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+      implicit val dd_ : Device = d
+
+      val res_tensor = (new TENSOR(transform(x))).to(d) - (new TENSOR(transform(y))).to(d)
+      res_tensor.x
+
+    case Node(s, "tensor_mult", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+      implicit val dd_ : Device = d
+
+      val res_tensor = (new TENSOR(transform(x))).to(d) * (new TENSOR(transform(y))).to(d)
+      res_tensor.x
+
+    case Node(s, "tensor_div", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+      implicit val dd_ : Device = d
+
+      val res_tensor = (new TENSOR(transform(x))).to(d) / (new TENSOR(transform(y))).to(d)
+      res_tensor.x
+
+    case Node(s, "tensor_dot", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+      implicit val dd_ : Device = d
+
+      val res_tensor = (new TENSOR(transform(x))).to(d) dot (new TENSOR(transform(y))).to(d)
       res_tensor.x
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>

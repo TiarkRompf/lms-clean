@@ -19,6 +19,11 @@ object CLibTypeLess {
   def CMACRO(s: String, m: Manifest[_])(implicit __pos: SourceContext): TOP = {
     TOP(Adapter.g.reflectUnsafe("macro", lms.core.Backend.Const(s)), m)
   }
+
+  // FIMXE(feiw) this NEW_STRUCT needs explicit cast to return non-TOP
+  def NEW_STRUCT(m: Manifest[_])(implicit __pos: SourceContext): TOP = {
+    TOP(Adapter.g.reflectUnsafe("lib-struct", Backend.Const(m)), m)
+  }
 }
 
 

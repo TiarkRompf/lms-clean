@@ -77,29 +77,24 @@ abstract class TensorLoweringCPU extends Transformer {
     case Node(s, "tensor_dot", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
 
-      val shape_x = (new TENSOR(x)).shape
-      val shape_y = (new TENSOR(y)).shape
+      val x_shape = (new TENSOR(transform(x))).shape
+      val y_shape = (new TENSOR(transform(y))).shape
+
+      val res = ARRAY(numeral(size), Adapter.oldTypeMap(s))
+      tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
 
       // match case on the type (input shapes) of the dot
-      if (shape_x.size == 1 && shape_y.size == 1) {
-          val res = ARRAY(1, Adapter.oldTypeMap(s))
-          tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
-          ARRAY_VVDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(shape_x(0)))
-          res.x
-      } else if (shape_x.size == 2 && shape_y.size == 1) {
-          val res = ARRAY(shape_x(0), Adapter.oldTypeMap(s))
-          tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
-          ARRAY_MVDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(shape_x(0)), INT(shape_x(1)))
-          res.x
-      } else if (shape_x.size == 2 && shape_y.size == 2) {
-          val res = ARRAY(shape_x(0) * shape_y(1), Adapter.oldTypeMap(s))
-          tensor2array(s) = res.x.asInstanceOf[Backend.Sym]
-          ARRAY_MMDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(shape_x(0)), INT(shape_x(1)), INT(shape_y(1)))
-          res.x
+      if (x_shape.size == 1 && y_shape.size == 1) {
+          ARRAY_VVDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(x_shape(0)))
+      } else if (x_shape.size == 2 && y_shape.size == 1) {
+          ARRAY_MVDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(x_shape(0)), INT(x_shape(1)))
+      } else if (x_shape.size == 2 && y_shape.size == 2) {
+          ARRAY_MMDOT(new ARRAY(tensor2array(x)), new ARRAY(tensor2array(y)), res, INT(x_shape(0)), INT(x_shape(1)), INT(y_shape(1)))
       } else {
           throw new Exception("dot for higher than 2D is not yet supported")
       }
 
+      res.x
 
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
       implicit val sc_ = Adapter.oldSourceMap(s)

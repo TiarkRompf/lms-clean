@@ -27,7 +27,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   // a typeless interface for CUDA_MALLOC
   def CUDA_MALLOC(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
     val addr = ARRAY(0, m)
-    CUDA_CALL(Unwrap(libFunction[Int]("cudaMalloc", addr.x, SIZE_T(count * sizeOf(m)).x)(Seq(1), Seq(0), Set(0))))
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, SIZE_T(count * sizeOf(m)).x)(Seq(1), Seq(0), Set(0))))
     addr
   }
 
@@ -129,6 +129,70 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     }
     Backend.Const(())
   }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  def CUDA_ARRAY_MINUS(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
+    val kernel = CUDA_ARRAY_MINUS_KERNEL(a.et)
+    kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
+  }
+  def CUDA_ARRAY_MINUS_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
+    // type cast
+    val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+    val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+    val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+    val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+
+    // actual computation
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+      val index = INT(Unwrap(i))
+      res(index) = a(index) - b(index); ()
+    }
+    Backend.Const(())
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  def CUDA_ARRAY_MULT(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
+    val kernel = CUDA_ARRAY_MULT_KERNEL(a.et)
+    kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
+  }
+  def CUDA_ARRAY_MULT_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
+    // type cast
+    val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+    val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+    val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+    val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+
+    // actual computation
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+      val index = INT(Unwrap(i))
+      res(index) = a(index) * b(index); ()
+    }
+    Backend.Const(())
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  def CUDA_ARRAY_DIV(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
+    val kernel = CUDA_ARRAY_DIV_KERNEL(a.et)
+    kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
+  }
+  def CUDA_ARRAY_DIV_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
+    // type cast
+    val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+    val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+    val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+    val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+
+    // actual computation
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+      val index = INT(Unwrap(i))
+      res(index) = a(index) / b(index); ()
+    }
+    Backend.Const(())
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
 }
 
 trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaFunction {

@@ -54,9 +54,35 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val tensor1 = Tensor(Seq(2,3), Array[Float](1,2,3,4,5,6))
         val tensor2 = Tensor(Seq(2,3), Array[Float](6,5,4,3,2,1))
-        implicit val device = GPU(0)
-        val tensor3 = tensor1 + tensor2
+        val tensor3 = {
+          implicit val device = GPU(0)
+          tensor1 + tensor2
+        }
         tensor3.show
+      }
+    }
+    check("add", driver.code, "cu")
+  }
+
+  test("binary") {
+    val driver = new CompilerCDevicedTensor[Int, Unit] {
+      import FixedSizeTensorDeviceTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val tensor1 = Tensor(Seq(2,3), Array[Float](1,2,3,4,5,6))
+        val tensor2 = Tensor(Seq(2,3), Array[Float](6,5,4,3,2,1))
+        val (tensor3, tensor4, tensor5, tensor6) = {
+          implicit val device = GPU(0)
+          (tensor1 + tensor2,
+          tensor1 - tensor2,
+          tensor1 * tensor2,
+          tensor1 / tensor2)
+        }
+        tensor3.show
+        tensor4.show
+        tensor5.show
+        tensor6.show
       }
     }
     System.out.println(indent(driver.code))

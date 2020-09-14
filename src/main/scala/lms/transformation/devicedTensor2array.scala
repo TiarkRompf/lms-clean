@@ -7,7 +7,7 @@ import lms.core._
 import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
-import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess}
+import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess, CUBLASTypeLess}
 
 import Backend._
 
@@ -21,6 +21,7 @@ abstract class DevicedTensorLowering extends Transformer {
   import ArrayCPUTypeLess._
   import FixedSizeTensorDeviceTypeLess._
   import CUDATypeLess._
+  import CUBLASTypeLess._
 
   // need a global mapping from Tensor to Array
   val t2a = new mutable.HashMap[Backend.Sym, Backend.Sym]
@@ -66,6 +67,99 @@ abstract class DevicedTensorLowering extends Transformer {
       d match {
         case CPU(_) => ARRAY_ADD(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)) // calling the CPU version
         case GPU(_) => CUDA_ARRAY_ADD(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)); () // calling the GPU version
+      }
+      res.x
+
+    case Node(s, "tensor_minus", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+
+      val x_device = (new TENSOR(x, old = true)).device
+      val y_device = (new TENSOR(y, old = true)).device
+      assert(x_device == d && y_device == d)
+
+      val res = ARRAYD(numeral(size), Adapter.oldTypeMap(s), d) // declare an array on device d
+      t2a(s) = res.x.asInstanceOf[Backend.Sym]
+
+      d match {
+        case CPU(_) => ARRAY_MINUS(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)) // calling the CPU version
+        case GPU(_) => CUDA_ARRAY_MINUS(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)); () // calling the GPU version
+      }
+      res.x
+
+    case Node(s, "tensor_mult", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+
+      val x_device = (new TENSOR(x, old = true)).device
+      val y_device = (new TENSOR(y, old = true)).device
+      assert(x_device == d && y_device == d)
+
+      val res = ARRAYD(numeral(size), Adapter.oldTypeMap(s), d) // declare an array on device d
+      t2a(s) = res.x.asInstanceOf[Backend.Sym]
+
+      d match {
+        case CPU(_) => ARRAY_MULT(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)) // calling the CPU version
+        case GPU(_) => CUDA_ARRAY_MULT(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)); () // calling the GPU version
+      }
+      res.x
+
+    case Node(s, "tensor_div", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+
+      val x_device = (new TENSOR(x, old = true)).device
+      val y_device = (new TENSOR(y, old = true)).device
+      assert(x_device == d && y_device == d)
+
+      val res = ARRAYD(numeral(size), Adapter.oldTypeMap(s), d) // declare an array on device d
+      t2a(s) = res.x.asInstanceOf[Backend.Sym]
+
+      d match {
+        case CPU(_) => ARRAY_DIV(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)) // calling the CPU version
+        case GPU(_) => CUDA_ARRAY_DIV(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, numeral(size)); () // calling the GPU version
+      }
+      res.x
+
+    case Node(s, "tensor_dot", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+        (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+
+      // FIXME(feiw) something can be fixed here
+      val (x_device, x_shape) = (new TENSOR(transform(x))).device_shape
+      val (y_device, y_shape) = (new TENSOR(transform(y))).device_shape
+      assert(x_device == d && y_device == d)
+
+      val res = ARRAYD(numeral(size), Adapter.oldTypeMap(s), d) // declare an array on device d
+      t2a(s) = res.x.asInstanceOf[Backend.Sym]
+
+      d match {
+        case CPU(_) => if (x_shape.size == 1 && y_shape.size == 1) {
+          ARRAY_VVDOT(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, INT(x_shape(0)))
+        } else if (x_shape.size == 2 && y_shape.size == 1) {
+          ARRAY_MVDOT(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, INT(x_shape(0)), INT(x_shape(1)))
+        } else if (x_shape.size == 2 && y_shape.size == 2) {
+          ARRAY_MMDOT(new ARRAY(t2a(x)), new ARRAY(t2a(y)), res, INT(x_shape(0)), INT(x_shape(1)), INT(y_shape(1)))
+        } else {
+          throw new Exception("dot for higher than 2D is not yet supported")
+        }
+
+        case GPU(_) => if (x_shape.size == 1 && y_shape.size == 1) {
+          // FIXME(feiw) maybe this res must be on CPU because otherwise it segfault?
+          CUBLAS_SDOT(CUBLAS_HANDLE, INT(x_shape(0)), new ARRAY(t2a(x)), 1, new ARRAY(t2a(y)), 1, res)
+        } else if (x_shape.size == 2 && y_shape.size == 1) {
+          val m = INT(x_shape(0))
+          val n = INT(x_shape(1))
+          CUBLAS_SGEMV(CUBLAS_HANDLE, CUBLAS_OP_T, n, m, ONE, new ARRAY(t2a(x)), n, new ARRAY(t2a(y)), 1, ZERO, res, 1)
+        } else if (x_shape.size == 2 && y_shape.size == 2) {
+          val m = INT(x_shape(0))
+          val n = INT(y_shape(1))
+          val k = INT(x_shape(1))
+          CUBLAS_SGEMM(CUBLAS_HANDLE, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, ONE, new ARRAY(t2a(y)), n, new ARRAY(t2a(x)),
+            k, ZERO, res, n)
+        } else {
+          throw new Exception("dot for higher than 2D is not yet supported")
+        }
       }
       res.x
 
