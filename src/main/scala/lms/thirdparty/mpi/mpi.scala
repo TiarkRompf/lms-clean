@@ -64,6 +64,10 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
 }
 
 trait CCodeGenMPI extends ExtendedCCodeGen {
+
+  // NOTE: this type map from `mStr.endsWith("$DataStructure1")` to `DataStructure1`
+  //       is necessary only if we may use this type without a struct instance,
+  //       such as in function parameters.
   override def remap(m: Manifest[_]) = {
     val mStr = m.toString
     if (mStr.endsWith("$DataStructure1")) "DataStructure1"
