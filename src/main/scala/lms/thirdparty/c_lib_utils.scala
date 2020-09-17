@@ -27,8 +27,8 @@ trait CCodeGenCMacro extends ExtendedCCodeGen {
 }
 
 trait LibStruct { b : Base =>
-  def newStruct[T: Manifest]: Rep[T] = {
-    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", Backend.Const(manifest[T])))
+  def newStruct[T: Manifest](typeName: String): Rep[T] = {
+    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", Backend.Const(typeName)))
   }
 
   // T: type of struct . U: type of field
@@ -50,13 +50,11 @@ trait CCodeGenLibStruct extends ExtendedCCodeGen {
   }
 
   override def traverse(n: Node): Unit = n match {
-    case Node(s, "lib-struct", List(Const(m: Manifest[_])), _) =>
-      emit(s"${remap(m)} ")
-      shallow(s)
-      emitln(";")
+    case Node(s, "lib-struct", List(Const(m: String)), _) =>
+      esln"$m $s;"
     // allow "lib-struct" to take parameters
-    case Node(s, "lib-struct", Const(m: Manifest[_])::args, _) =>
-      emit(s"${remap(m)} "); shallow(s);
+    case Node(s, "lib-struct", Const(m: String)::args, _) =>
+      emit(s"$m "); shallow(s);
       emit("("); shallow(args.head);
       args.tail.foreach(a => {emit(", "); shallow(a)})
       emitln(");")
