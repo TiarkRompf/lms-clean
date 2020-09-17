@@ -51,9 +51,7 @@ trait CCodeGenLibStruct extends ExtendedCCodeGen {
 
   override def traverse(n: Node): Unit = n match {
     case Node(s, "lib-struct", List(Const(m: String)), _) =>
-      emit(s"$m ")
-      shallow(s)
-      emitln(";")
+      esln"$m $s;"
     // allow "lib-struct" to take parameters
     case Node(s, "lib-struct", Const(m: String)::args, _) =>
       emit(s"$m "); shallow(s);
