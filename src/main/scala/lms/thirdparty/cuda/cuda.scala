@@ -16,7 +16,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // 2. support bindings to cublas library ???
   // 3. support generating cuda kernels (TODO)
 
-  abstract class CudaErrorT
+  class CudaErrorT
   // Using a manual function in header file to handle CudaErrorT
   def cudaCall(status: Rep[CudaErrorT]) =
     libFunction[Unit]("CUDA_CALL", Unwrap(status))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
@@ -34,7 +34,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaFree[T:Manifest](devPtr: Rep[Array[T]]) =
     libFunction[CudaErrorT]("cudaFree", Unwrap(devPtr))(Seq(0), Seq(0), Set[Int]())
 
-  abstract class CudaMemcpyKind
+  class CudaMemcpyKind
   def host2host = cmacro[CudaMemcpyKind]("cudaMemcpyHostToHost")
   def host2device = cmacro[CudaMemcpyKind]("cudaMemcpyHostToDevice")
   def device2host = cmacro[CudaMemcpyKind]("cudaMemcpyDeviceToHost")
@@ -47,6 +47,31 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     libFunction[CudaErrorT]("cudaMemcpy", Unwrap(dst), Unwrap(src), Unwrap(size), Unwrap(kind))(Seq(1,2,3), Seq(0), Set[Int]())
   def cudaMemcpyOfT[T:Manifest](dst: Rep[Array[T]], src: Rep[Array[T]], count: Rep[Int], kind: Rep[CudaMemcpyKind])(implicit __pos: SourceContext) =
     cudaMemcpy(dst, src, SizeT(count * sizeOf[T]), kind)
+
+  // cudaSetDevice(int)
+  def cudaSetDevice(device: Rep[Int]) =
+    libFunction[CudaErrorT]("cudaSetDevice", Unwrap(device))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+
+  class cudaStreamT
+  def cudaStream: Rep[cudaStreamT] = cmacro[cudaStreamT]("cudaStreamT")
+
+  def cudaStreamDefault: Rep[Int] = cmacro[Int]("cudaStreamDefault")
+  def cudaStreamNonBlocking: Rep[Int] = cmacro[Int]("cudaStreamNonBlocking")
+
+  // __host__ ​ __device__ ​cudaError_t cudaStreamCreateWithFlags ( cudaStream_t* pStream, unsigned int  flags )
+  def cudaStreamCreateWithFlags(stream: Rep[cudaStreamT], flag: Rep[Int]) =
+    libFunction[CudaErrorT]("cudaStreamCreateWithFlags", Unwrap(stream), Unwrap(flag))(Seq(0), Seq(0), Set(0))
+
+  // __host__ ​cudaError_t cudaStreamSynchronize ( cudaStream_t stream ) // Waits for stream tasks to complete.
+  def cudaStreamSynchronize(stream: Rep[cudaStreamT]) =
+    libFunction[CudaErrorT]("cudaStreamSynchronize", Unwrap(stream))(Seq(0), Seq(0), Set[Int]())
+
+
+  // cudaGetDeviceCount(&deviceCount)
+  def cudaGetDeviceCount(count: Var[Int]) =
+    libFunction[CudaErrorT]("cudaGetDeviceCount", UnwrapV(count))(Seq(), Seq(0), Set(0))
+
+
 
   // CUDA Kernel Basics:
 
