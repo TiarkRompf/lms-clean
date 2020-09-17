@@ -28,7 +28,7 @@ trait CCodeGenCMacro extends ExtendedCCodeGen {
 
 trait LibStruct { b : Base =>
   def newStruct[T: Manifest](typeName: String): Rep[T] = {
-    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", Backend.Const(type_name)))
+    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", Backend.Const(typeName)))
   }
 
   // T: type of struct . U: type of field
