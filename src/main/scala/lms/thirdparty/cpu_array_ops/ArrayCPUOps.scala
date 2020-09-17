@@ -66,7 +66,6 @@ object ArrayCPUTypeLess extends Dsl with ArrayOps {
   }
 
   def ARRAY_VVDOT(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
-    // FIXME(feiw) do we need to initialize res with 0?
     for (i <- (0 until Wrap[Int](size.x)): Rep[Range]) {
       val index = INT(Unwrap(i))
       res(0) = res(0) + a(index) * b(index)
@@ -104,31 +103,31 @@ trait ArrayCPUOps extends Dsl with ArrayOps with CBLASOps {
   // This is the typed frontend for adding 2 arrays element-wise (no broadcasting)
   // We could just do a shallow wrapping of ARRAY_ADD, but if the implementation is super simple,
   //   we can also just re-implement it.
-  def array_add[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+  def array_add[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Rep[Int])(implicit __pos: SourceContext) = {
     for (i <- (0 until size): Rep[Range]) {
       res(i) = a(i) + b(i)
     }
   }
 
-  def array_minus[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+  def array_minus[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Rep[Int])(implicit __pos: SourceContext) = {
     for (i <- (0 until size): Rep[Range]) {
       res(i) = a(i) - b(i)
     }
   }
 
-  def array_mult[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+  def array_mult[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Rep[Int])(implicit __pos: SourceContext) = {
     for (i <- (0 until size): Rep[Range]) {
       res(i) = a(i) * b(i)
     }
   }
 
-  def array_div[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+  def array_div[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Rep[Int])(implicit __pos: SourceContext) = {
     for (i <- (0 until size): Rep[Range]) {
       res(i) = a(i) / b(i)
     }
   }
 
-  def array_vvdot[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+  def array_vvdot[T:Numeric:Manifest](a: Rep[Array[T]], b: Rep[Array[T]], res: Rep[Array[T]], size: Rep[Int])(implicit __pos: SourceContext) = {
     // FIXME(feiw) do we need to initialize res with 0
     for (i <- (0 until size): Rep[Range]) {
       res(0) = res(0) + a(i) * b(i)
@@ -136,7 +135,7 @@ trait ArrayCPUOps extends Dsl with ArrayOps with CBLASOps {
   }
 
   // FIXME(feiw) this cblas_sgemv only works for float*??
-  def array_mvdot(a: Rep[Array[Float]], b: Rep[Array[Float]], res: Rep[Array[Float]], a0: Int, a1: Int)(implicit __pos: SourceContext) = {
+  def array_mvdot(a: Rep[Array[Float]], b: Rep[Array[Float]], res: Rep[Array[Float]], a0: Rep[Int], a1: Rep[Int])(implicit __pos: SourceContext) = {
     cblas_sgemv(rowMajor, noTrans, a0, a1, 1.0f, a, a1, b, 1, 0.0f, res, 1)
   }
 
@@ -146,7 +145,7 @@ trait ArrayCPUOps extends Dsl with ArrayOps with CBLASOps {
   }
 
   // This is the typed frontend for printing all elements of a Rep[Array[T]] (in flat format)
-  def array_print[T:Manifest](a: Rep[Array[T]], size: Int)(implicit __pos: SourceContext) = {
+  def array_print[T:Manifest](a: Rep[Array[T]], size: Rep[Int])(implicit __pos: SourceContext) = {
     for (i <- (0 until size): Rep[Range]) {
       manifest[T] match {
         case n if n == manifest[Int] => printf("%d ", a(i))

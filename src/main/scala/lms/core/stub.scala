@@ -808,24 +808,24 @@ object PrimitiveTypeLess {
 
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM + method")
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("+", x, y.x), t)
     }
     def -(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM - method")
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("-", x, y.x), t)
     }
     def *(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM * method")
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("*", x, y.x), t)
     }
     def /(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM / method")
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("/", x, y.x),t)
     }
 
     def <(y: NUM)(implicit pos: SourceContext): BOOL = {
-      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t} in NUM < method")
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       BOOL(Adapter.g.reflect("<", x, y.x))
     }
   }

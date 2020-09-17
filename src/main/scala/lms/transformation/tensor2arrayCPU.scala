@@ -81,8 +81,8 @@ abstract class TensorLoweringCPU extends Transformer {
       val m = Adapter.oldTypeMap(s)
       val count = numeral(size)
 
-      val x_shape = (new TENSOR(x, old = true)).shape
-      val y_shape = (new TENSOR(y, old = true)).shape
+      val x_shape = (new TENSOR(x, useOldMetadata = true)).shape
+      val y_shape = (new TENSOR(y, useOldMetadata = true)).shape
 
       val res = ARRAY(count, m)
 
@@ -102,7 +102,7 @@ abstract class TensorLoweringCPU extends Transformer {
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
       implicit val sc_ = Adapter.oldSourceMap(s)
 
-      val shape = (new TENSOR(x, old = true)).shape
+      val shape = (new TENSOR(x, useOldMetadata = true)).shape
 
       // this unsafe ARRAY construction should be safe because the ARRAY is already constructed with metadata
       // Using typeless frontend for printing

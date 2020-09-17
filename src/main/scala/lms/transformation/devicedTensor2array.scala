@@ -54,8 +54,8 @@ abstract class DevicedTensorLowering extends Transformer {
       val count = numeral(size)
 
       // device check (maybe add type check as well?)
-      val x_device = (new TENSOR(x, old = true)).device
-      val y_device = (new TENSOR(y, old = true)).device
+      val x_device = (new TENSOR(x, useOldMetadata = true)).device
+      val y_device = (new TENSOR(y, useOldMetadata = true)).device
       assert(x_device == d && y_device == d)
 
       // declare an array on device d
@@ -74,8 +74,8 @@ abstract class DevicedTensorLowering extends Transformer {
       val count = numeral(size)
 
       // device check (maybe add type check as well?)
-      val x_device = (new TENSOR(x, old = true)).device
-      val y_device = (new TENSOR(y, old = true)).device
+      val x_device = (new TENSOR(x, useOldMetadata = true)).device
+      val y_device = (new TENSOR(y, useOldMetadata = true)).device
       assert(x_device == d && y_device == d)
 
       // declare an array on device d
@@ -94,8 +94,8 @@ abstract class DevicedTensorLowering extends Transformer {
       val count = numeral(size)
 
       // device check (maybe add type check as well?)
-      val x_device = (new TENSOR(x, old = true)).device
-      val y_device = (new TENSOR(y, old = true)).device
+      val x_device = (new TENSOR(x, useOldMetadata = true)).device
+      val y_device = (new TENSOR(y, useOldMetadata = true)).device
       assert(x_device == d && y_device == d)
 
       // declare an array on device d
@@ -114,8 +114,8 @@ abstract class DevicedTensorLowering extends Transformer {
       val count = numeral(size)
 
       // device check (maybe add type check as well?)
-      val x_device = (new TENSOR(x, old = true)).device
-      val y_device = (new TENSOR(y, old = true)).device
+      val x_device = (new TENSOR(x, useOldMetadata = true)).device
+      val y_device = (new TENSOR(y, useOldMetadata = true)).device
       assert(x_device == d && y_device == d)
 
       // declare an array on device d
@@ -134,8 +134,8 @@ abstract class DevicedTensorLowering extends Transformer {
       val count = numeral(size)
 
       // device check (maybe add type check as well?)
-      val (x_device, x_shape) = (new TENSOR(x, old = true)).device_shape
-      val (y_device, y_shape) = (new TENSOR(y, old = true)).device_shape
+      val (x_device, x_shape) = (new TENSOR(x, useOldMetadata = true)).device_shape
+      val (y_device, y_shape) = (new TENSOR(y, useOldMetadata = true)).device_shape
       assert(x_device == d && y_device == d)
 
       // declare an array on device d
@@ -174,7 +174,7 @@ abstract class DevicedTensorLowering extends Transformer {
     case Node(s, "show_tensor", (x: Backend.Sym)::Nil, _) =>
       implicit val sc_ = Adapter.oldSourceMap(s)
 
-      val (device, shape) = (new TENSOR(x, old = true)).device_shape
+      val (device, shape) = (new TENSOR(x, useOldMetadata = true)).device_shape
       assert(device.isInstanceOf[CPU], "show_tensor must be on CPU")
 
       ARRAY_PRINT(new ARRAY(transform(x)), INT(numeral(shape)))

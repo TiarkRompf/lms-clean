@@ -44,7 +44,7 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
 
   /// typeless frontend
   def TENSOR(shape: Seq[Int], array: ARRAY, device: Device = CPU(0))(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), C(device), array.x)(array.x), old = false)).withSrcType(__pos, array.et)
+    (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), C(device), array.x)(array.x))).withSrcType(__pos, array.et)
   }
 
 
@@ -69,18 +69,18 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
    *    2. We always use the `safe` constructor (def TENSOR(..)) in non-transformer cases. It sets `old` to false.
    *    3. We add another `safe` constructor (def tensor(a: Rep[Tensor[T]])) in typed constructor that always sets `old` to false.
    */
-  class TENSOR(override val x: Backend.Exp, val old: Boolean = false) extends TOP(x) {
+  class TENSOR(override val x: Backend.Exp, val useOldMetadata: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
 
     def et: Manifest[_] = {
-      if (old) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
+      if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
     }
 
     // Convention: every `tensor_*` IR has `shape` as the first Def and the `device` as the second Def
     def shape: Seq[Int] = {
-      val gc = if (old) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) if s.startsWith("tensor") => size
         case a => System.out.println(a); ???
@@ -88,7 +88,7 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
     }
 
     def device: Device = {
-      val gc = if (old) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, a::Backend.Const(d:Device)::_, _)) if s.startsWith("tensor") => d
         case a => System.out.println(a); ???
@@ -100,7 +100,7 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
     def to(target_device: Device)(implicit __pos: SourceContext): TENSOR = {
       if (device == target_device) this
       else (new TENSOR(Adapter.g.reflect("tensor_sendrecv", C(shape), C(target_device),
-        C(device), x), old = false)).withSrcType(__pos, et)
+        C(device), x))).withSrcType(__pos, et)
     }
 
 
@@ -177,7 +177,7 @@ trait FixedSizeTensorDeviceOps extends Dsl with ArrayOps with CudaOps {
       clo(GPU(0)) // clo is supposed to run with an implicit Device argument
   }
 
-  def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x), old = false)
+  def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))
 
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)

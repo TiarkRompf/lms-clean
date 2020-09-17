@@ -30,7 +30,7 @@ object CBLASTypeLess extends Dsl with CLibs {
   def CBLAS_SGEMV(layout: CBLAS_LAYOUT, transA: CBLAS_TRANSPOSE, m: INT, n: INT,
       alpha: FLOAT, a: ARRAY, lda: INT, x: ARRAY, incX: INT, beta: FLOAT, y: ARRAY, incY: INT) = {
     // this function only works for float arrays I think
-    assert(a.et == manifest[Float] && x.et == manifest[Float] && y.et == manifest[Float])
+    require(a.et == manifest[Float] && x.et == manifest[Float] && y.et == manifest[Float])
     libFunction[Unit]("cblas_sgemv", layout.x, transA.x, m.x, n.x, alpha.x,
       a.x, lda.x, x.x, incX.x, beta.x, y.x, incY.x)(Seq(0, 1, 5, 7), Seq(10), Set[Int]())
   }
@@ -39,7 +39,7 @@ object CBLASTypeLess extends Dsl with CLibs {
       m: INT, n: INT, k: INT, alpha: FLOAT, a: ARRAY, lda: INT, b: ARRAY, ldb: INT, beta: FLOAT,
       c: ARRAY, ldc: INT) = {
     // this function only works for float arrays I think
-    assert(a.et == manifest[Float] && b.et == manifest[Float] && c.et == manifest[Float])
+    require(a.et == manifest[Float] && b.et == manifest[Float] && c.et == manifest[Float])
     libFunction[Unit]("cblas_sgemm", layout.x, transA.x, transB.x, m.x, n.x, k.x,
       alpha.x, a.x, lda.x, b.x, ldb.x, beta.x, c.x, ldc.x)(Seq(0, 1, 2, 7, 9), Seq(12), Set[Int]())
   }
