@@ -172,7 +172,7 @@ class CPPLambdaTest extends TutorialFunSuite {
         var y = 1
         val f = fun("&", { (n: Rep[Int]) =>
           x = 1
-          fun (Capture.RefExcept(n), { (m: Rep[Int]) =>
+          fun (Captures.RefExcept(n), { (m: Rep[Int]) =>
             y = 2
             m + n
           })
@@ -196,9 +196,9 @@ class CPPLambdaTest extends TutorialFunSuite {
         var z = 2
         val f = fun("&", { (n: Rep[Int]) =>
           x = 1
-          fun(Capture.RefExcept(n), { (m: Rep[Int]) =>
+          fun(Captures.RefExcept(n), { (m: Rep[Int]) =>
             y = 2
-            fun(Capture.RefExcept(n, m), { (x: Rep[Int]) =>
+            fun(Captures.RefExcept(n, m), { (x: Rep[Int]) =>
               z = 3
               n + m + x
             })
