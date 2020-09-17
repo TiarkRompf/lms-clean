@@ -118,7 +118,7 @@ trait CuBLASOps extends Base with CLibs with CudaFunction with StackArrayOps wit
     libFunction[Unit]("CUBLAS_CALL", Unwrap(status))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   abstract class CublasHandleT
-  lazy val cublasHandle = newStruct[CublasHandleT]
+  lazy val cublasHandle = newStruct[CublasHandleT]("cublasHandle_t")
   def cublasCreate(handle: Rep[CublasHandleT]) =
     libFunction[CublasStatusT]("cublasCreate", Unwrap(handle))(Seq[Int](), Seq(0), Set(0))
   def cublasDestroy(handle: Rep[CublasHandleT]) =
