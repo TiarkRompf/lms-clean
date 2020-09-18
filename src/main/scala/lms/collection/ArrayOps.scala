@@ -8,10 +8,13 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
 
-object ArrayTypeLess {
 
+object ArrayTypeLess {
   import BaseTypeLess._
   import PrimitiveTypeLess._
+
+  def ARRAY(size: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
+    (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m.arrayManifest)
 
   class ARRAY(override val x: Backend.Exp) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
@@ -20,11 +23,7 @@ object ArrayTypeLess {
       NUM(Adapter.g.reflectRead("array_get", x, i.x)(x), et)
     def update(i: INT, y: NUM)(implicit __pos: SourceContext): UNIT =
       UNIT(Adapter.g.reflectWrite("array_set", x, i.x, y.x)(x))
-
   }
-  def ARRAY(size: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
-    (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m)
-
 }
 
 

@@ -8,12 +8,17 @@ Emitting C Generated Code
 #include <stdbool.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  int x1[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
-  printf("%d ", {2, 2, 2});
+  int* x1 = (int*)malloc(6 * sizeof(int));
   int x2 = 0;
-  while (x2 != 8) {
-    printf("%d ", x1[x2]);
+  while (x2 != 6) {
+    int x3 = x2;
+    x1[x3] = x3;
     x2 = x2 + 1;
+  }
+  int x4 = 0;
+  while (x4 != 6) {
+    printf("%d ", x1[x4]);
+    x4 = x4 + 1;
   }
 }
 /*****************************************

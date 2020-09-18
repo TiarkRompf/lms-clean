@@ -1,19 +1,23 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
+#include <string.h>
 #include <cblas.h>
 #include <stdlib.h>
+#include <cuda_header.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  int x1[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
-  printf("%d ", {2, 2, 2});
-  int x2 = 0;
-  while (x2 != 8) {
-    printf("%d ", x1[x2]);
-    x2 = x2 + 1;
+  float* x1 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x1, (size_t)(6 * sizeof(int))));
+  float* x2 = (float*)malloc(6 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(6 * sizeof(int)), cudaMemcpyDeviceToHost));
+  int x3 = 0;
+  while (x3 != 6) {
+    printf("%f ", x2[x3]);
+    x3 = x3 + 1;
   }
 }
 /*****************************************

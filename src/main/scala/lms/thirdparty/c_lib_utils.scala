@@ -12,6 +12,21 @@ import lms.collection.mutable.ArrayOps
 import lms.collection._
 
 
+object CLibTypeLess {
+  import BaseTypeLess._
+
+  // FIMXE(feiw) this CMACRO needs explicit cast to return non-TOP
+  def CMACRO(s: String, m: Manifest[_])(implicit __pos: SourceContext): TOP = {
+    TOP(Adapter.g.reflectUnsafe("macro", lms.core.Backend.Const(s)), m)
+  }
+
+  // FIMXE(feiw) this NEW_STRUCT needs explicit cast to return non-TOP
+  def NEW_STRUCT(m: Manifest[_])(implicit __pos: SourceContext): TOP = {
+    TOP(Adapter.g.reflectUnsafe("lib-struct", Backend.Const(m)), m)
+  }
+}
+
+
 trait CMacro { b: Base =>
   def cmacro[T:Manifest](m:String): Rep[T] = {
     Wrap[T](Adapter.g.reflectUnsafe("macro", lms.core.Backend.Const(m)))
@@ -27,8 +42,8 @@ trait CCodeGenCMacro extends ExtendedCCodeGen {
 }
 
 trait LibStruct { b : Base =>
-  def newStruct[T: Manifest](type_name: String): Rep[T] = {
-    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", Backend.Const(type_name)))
+  def newStruct[T: Manifest](typeName: String): Rep[T] = {
+    Wrap[T](Adapter.g.reflectUnsafe("lib-struct", Backend.Const(typeName)))
   }
 
   // T: type of struct . U: type of field
@@ -51,9 +66,7 @@ trait CCodeGenLibStruct extends ExtendedCCodeGen {
 
   override def traverse(n: Node): Unit = n match {
     case Node(s, "lib-struct", List(Const(m: String)), _) =>
-      emit(s"$m ")
-      shallow(s)
-      emitln(";")
+      esln"$m $s;"
     // allow "lib-struct" to take parameters
     case Node(s, "lib-struct", Const(m: String)::args, _) =>
       emit(s"$m "); shallow(s);
