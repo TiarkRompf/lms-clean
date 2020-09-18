@@ -8,6 +8,24 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
 
+object SIZE_TTypeLess {
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
+
+  def sizeOf(m: Manifest[_])(implicit __pos: SourceContext): INT = INT(Adapter.g.reflectUnsafe("sizeof", Backend.Const(m)))
+
+  case class SizeT(x: Int) { override def toString() = x.toString }
+
+  class SIZE_T(override val x: Backend.Exp) extends TOP(x) {
+    this.withType(manifest[SizeT])
+  }
+  def SIZE_T(x: Backend.Exp)(implicit __pos: SourceContext): SIZE_T = (new SIZE_T(x)).withSource(__pos)
+  def SIZE_T(x: NUM)(implicit __pos: SourceContext): SIZE_T = {
+    assert (x.t == manifest[Int])
+    SIZE_T(Adapter.g.reflectUnsafe("cast", x.x, Backend.Const("SizeT")))
+  }
+}
+
 trait SizeTOps extends Base with PrimitiveOps with CLibs {
 
   // NOTE(feiw) as a short-cut for constant int :)

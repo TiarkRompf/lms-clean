@@ -21,6 +21,11 @@ object Adapter extends FrontEnd {
 
   override def mkGraphBuilder() = new GraphBuilderOpt
 
+  // We are using these "global" data structures to hold "old" graph metadata in transformation
+  var oldTypeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
+  var oldSourceMap: mutable.Map[lms.core.Backend.Exp, lms.macros.SourceContext] = _
+  var oldDefsCache: immutable.Map[lms.core.Backend.Sym, lms.core.Backend.Node] = _
+
   var typeMap: mutable.Map[lms.core.Backend.Exp, Manifest[_]] = _
   var sourceMap: mutable.Map[lms.core.Backend.Exp, SourceContext] = _
   var funTable: List[(Backend.Exp, Any)] = _
@@ -164,7 +169,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Exp[A]
 
   case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
-    Adapter.typeMap(x) = manifest[A]
+    Adapter.typeMap.getOrElseUpdate(x, manifest[A])
   }
   def Wrap[A:Manifest](x: lms.core.Backend.Exp): Exp[A] = {
     if (manifest[A] == manifest[Unit]) Const(()).asInstanceOf[Exp[A]]
@@ -803,37 +808,43 @@ object PrimitiveTypeLess {
 
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("+", x, y.x), t)
     }
     def -(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("-", x, y.x), t)
     }
     def *(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("*", x, y.x), t)
     }
     def /(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("/", x, y.x),t)
     }
 
     def <(y: NUM)(implicit pos: SourceContext): BOOL = {
-      assert(t == y.t)
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       BOOL(Adapter.g.reflect("<", x, y.x))
     }
   }
-  def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM = {
+  def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =
     (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
-  }
 
 
   class INT(override val x: Backend.Exp) extends NUM(x) {
     this.withType(manifest[Int])
   }
   def INT(x: Backend.Exp)(implicit __pos: SourceContext): INT = (new INT(x)).withSource(__pos)
-  def INT(i: Int)(implicit __pos: SourceContext): INT = (new INT(Backend.Const(i))).withSource(__pos)
+  implicit def INT(i: Int)(implicit __pos: SourceContext): INT = (new INT(Backend.Const(i))).withSource(__pos)
+  def INT(x: TOP): INT = (new INT(x.x))
+
+  class FLOAT(override val x: Backend.Exp) extends NUM(x) {
+    this.withType(manifest[Float])
+  }
+  def FLOAT(x: Backend.Exp)(implicit __pos: SourceContext): FLOAT = (new FLOAT(x)).withSource(__pos)
+  implicit def FLOAT(i: Float)(implicit __pos: SourceContext): FLOAT = (new FLOAT(Backend.Const(i))).withSource(__pos)
 }
 
 /**

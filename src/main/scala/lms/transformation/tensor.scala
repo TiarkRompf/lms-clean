@@ -1,5 +1,4 @@
-package lms
-package transformation
+package lms.transformation.tensor
 
 import scala.annotation.implicitNotFound
 import scala.collection._
@@ -8,7 +7,7 @@ import lms.core._
 import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
-import lms.thirdparty.ArrayCPUOps
+import lms.thirdparty.array_computation.ArrayCPUOps
 
 import Backend._
 
@@ -40,17 +39,19 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
 
-  case class TENSOR(x: E) {
-    def withSource(pos: SourceContext) = { Adapter.sourceMap(x) = pos; this }
-    def withEleType(m: Manifest[_]) = { Adapter.typeMap(x) = m; this }
-    def withSrcType(pos: SourceContext, m: Manifest[_]) = withSource(pos).withEleType(m)
+  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR =
+    (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), array.x)(array.x))).withSrcType(__pos, array.et)
 
-    def p: SourceContext = Adapter.sourceMap(x)
-    def et: Manifest[_] = Adapter.typeMap(x)
+  class TENSOR(override val x: Backend.Exp, val useOldMetadata: Boolean = false) extends TOP(x) {
+    def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
+    override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
+      withSource(pos).withEleType(m)
 
-    def shape: Seq[Int] = shape(Adapter.g.globalDefsCache)
-    def shape(graphCache: Map[Backend.Sym, Backend.Node]): Seq[Int] = {
-      graphCache.get(x.asInstanceOf[Backend.Sym]) match {
+    def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
+
+    def shape: Seq[Int] = {
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) if s.startsWith("tensor") => size
         case a => System.out.println(a); ???
       }
@@ -63,14 +64,46 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
     def + (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
       assert(shape == y.shape)
       assert(et == y.et)
-      TENSOR(Adapter.g.reflect("tensor_add", C(shape), x, y.x)).withSrcType(__pos, et)
+      (new TENSOR(Adapter.g.reflect("tensor_add", C(shape), x, y.x))).withSrcType(__pos, et)
+    }
+
+    def - (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      assert(shape == y.shape)
+      assert(et == y.et)
+      (new TENSOR(Adapter.g.reflect("tensor_minus", C(shape), x, y.x))).withSrcType(__pos, et)
+    }
+
+    def * (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      assert(shape == y.shape)
+      assert(et == y.et)
+      (new TENSOR(Adapter.g.reflect("tensor_mult", C(shape), x, y.x))).withSrcType(__pos, et)
+    }
+
+    def / (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      assert(shape == y.shape)
+      assert(et == y.et)
+      (new TENSOR(Adapter.g.reflect("tensor_div", C(shape), x, y.x))).withSrcType(__pos, et)
+    }
+
+    def dot(y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      val res_shape = if (shape.size == 1 && y.shape.size == 1) {
+        assert(shape == y.shape) // vector-vector-dot
+        Seq(1)
+      } else if (shape.size == 2 && y.shape.size == 1) {
+        assert(shape(1) == y.shape(0)) // matrix-vector-dot
+        Seq(shape(0))
+      } else if (shape.size == 2 && y.shape.size == 2) {
+        assert(shape(1) == y.shape(0)) // matrix-matrix-dot
+        Seq(shape(0), y.shape(1))
+      } else {
+        assert(false, "Higher than 2D is not yet supported in dot function")
+      }
+      assert(et == y.et)
+      (new TENSOR(Adapter.g.reflect("tensor_dot", C(res_shape), x, y.x))).withSrcType(__pos, et)
     }
   }
-
-  def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
-    TENSOR(Adapter.g.reflect("tensor", C(shape), array.x)).withSrcType(__pos, array.et)
-  }
 }
+
 
 trait FixedSizeTensorOps extends Base with PrimitiveOps with ArrayOps {
   import ArrayTypeLess._
@@ -92,18 +125,36 @@ trait FixedSizeTensorOps extends Base with PrimitiveOps with ArrayOps {
     }
   }
 
+  def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))
+
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
 
     // first keep a local instance of TENSOR. No need to worry about registering metadata
     // here because we know that the metadata has ben registered when x: Rep[Tensor[T]] is constructed
-    val self = TENSOR(Unwrap(x))
+    val self = tensor(x)
 
     def shape: Seq[Int] = self.shape
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
     def + (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self + TENSOR(Unwrap(y))
+      val t = self + tensor(y)
+      Wrap[Tensor[T]](t.x)
+    }
+    def - (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self - tensor(y)
+      Wrap[Tensor[T]](t.x)
+    }
+    def * (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self * tensor(y)
+      Wrap[Tensor[T]](t.x)
+    }
+    def / (y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self / tensor(y)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def dot(y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self dot tensor(y)
       Wrap[Tensor[T]](t.x)
     }
   }
 }
-

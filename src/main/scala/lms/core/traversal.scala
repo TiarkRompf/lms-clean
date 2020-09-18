@@ -532,28 +532,24 @@ abstract class Transformer extends Traverser {
 
   override def traverse(n: Node): Unit = {
     subst(n.n) = transform(n)
-    if (subst(n.n).isInstanceOf[Sym] && oldTypeMap.contains(n.n)) {
-      Adapter.typeMap(subst(n.n)) = oldTypeMap(n.n)
-    }
-    if (subst(n.n).isInstanceOf[Sym] && oldSourceMap.contains(n.n)) {
-      Adapter.sourceMap(subst(n.n)) = oldSourceMap(n.n)
-    }
+    // Also pass the metadata to the new exp
+    // We use `getOrElseUpdate` because the handling of each node might
+    // have already filled a proper value, which we don't want to override
+    if (Adapter.oldTypeMap.contains(n.n))
+      Adapter.typeMap.getOrElseUpdate(subst(n.n), Adapter.oldTypeMap(n.n))
+    if (Adapter.oldSourceMap.contains(n.n))
+      Adapter.sourceMap.getOrElseUpdate(subst(n.n), Adapter.oldSourceMap(n.n))
   }
-
-  var graphCache: Map[Sym, Node] = _
-  var oldSourceMap: mutable.Map[Exp, SourceContext] = _
-  var oldTypeMap: mutable.Map[Exp, Manifest[_]] = _
 
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
 
-    // graphCache may be use during transformation to check the Node of a Sym
-    graphCache = graph.globalDefsCache
-
     // Handling MetaData 1. save oldTypeMap/SourceMap first
-    oldTypeMap = Adapter.typeMap
-    oldSourceMap = Adapter.sourceMap
+    Adapter.oldDefsCache = graph.globalDefsCache
+    Adapter.oldTypeMap = Adapter.typeMap
+    Adapter.oldSourceMap = Adapter.sourceMap
+
     // Handling MetaData 2. initialize MetaData as fresh, so the transformer might add new metadata entries
     Adapter.typeMap = new mutable.HashMap[Backend.Exp, Manifest[_]]()
     Adapter.sourceMap = new mutable.HashMap[Backend.Exp, SourceContext]()
@@ -567,11 +563,11 @@ abstract class Transformer extends Traverser {
     }
 
     // Handling MetaData 3. update new metadata with old metadata
-    // (FIXME(feiw) maybe redundant) (not sure why all the checks are necessary)
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldTypeMap.contains(k) && !Adapter.typeMap.contains(v))
-      Adapter.typeMap(v) = oldTypeMap(k)
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && oldSourceMap.contains(k) && !Adapter.sourceMap.contains(v))
-      Adapter.sourceMap(v) = oldSourceMap(k)
+    // this is not redundant because of the block arguments (function definitions)
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap.contains(k))
+      Adapter.typeMap.getOrElseUpdate(v, Adapter.oldTypeMap(k))
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap.contains(k))
+      Adapter.sourceMap.getOrElseUpdate(v, Adapter.oldSourceMap(k))
 
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }

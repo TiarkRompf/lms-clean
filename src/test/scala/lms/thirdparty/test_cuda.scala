@@ -1,10 +1,11 @@
 package lms
-package thirdparty
+package thirdparty.array_computation
 
 import lms.core.stub._
 import lms.core.virtualize
-import macros.SourceContext
+import lms.macros.SourceContext
 import lms.collection._
+import lms.collection.mutable.ArrayTypeLess
 
 
 class CudaTest extends TutorialFunSuite {
@@ -78,13 +79,36 @@ class CudaTest extends TutorialFunSuite {
         // use the CudaFill function in cuda.scala
 
         // now let's use the fill function
-        val cuda_arr = cudaMalloc2[Int](5)
-        val cudaFillInt = cudaFill[Int]
+        val cuda_arr = cudaMalloc2[Float](5)
+        val cudaFillInt = cudaFill[Float]
         cudaFillInt(cuda_arr, 3, 5, dim3(gridSize), dim3(blockSize))
-        val arr = NewArray[Int](5)
+        val arr = NewArray[Float](5)
         cudaCall(cudaMemcpyOfT(arr, cuda_arr, 5, device2host))
-        printf("%d %d", arr(2), arr(3))
+        printf("%f %f", arr(2), arr(3))
         cudaCall(cudaFree(cuda_arr))
+      }
+    }
+    check("cuda_global_fill", driver.code, "cu")
+  }
+
+  test("fill_gen_kernel2") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      import BaseTypeLess._
+      import PrimitiveTypeLess._
+      import ArrayTypeLess._
+      import CUDATypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val cuda_arr = CUDA_MALLOC(5, manifest[Float])
+        val cudaFillFloat = CUDA_FILL(manifest[Float])
+        cudaFillFloat(cuda_arr, 3.0f, 5, DIM3(gridSize), DIM3(blockSize))
+
+        val arr = ARRAY(5, manifest[Float])
+        CUDA_MEMCOPY(arr, cuda_arr, 5, DEVICE2HOST, manifest[Float])
+        printf("%f %f", Wrap[Float](arr(2).x), Wrap[Float](arr(3).x))
+        CUDA_FREE(cuda_arr)
+        unit(())
       }
     }
     check("cuda_global_fill", driver.code, "cu")
