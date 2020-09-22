@@ -1321,9 +1321,9 @@ abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
 }
 
 // Basic DslDriver for Scala CodeGen
-abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslExp { q =>
+abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslExp { self =>
   val codegen = new DslGen {
-    val IR: q.type = q
+    val IR: self.type = self
   }
   lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
