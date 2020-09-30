@@ -37,7 +37,7 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
   }
 
   def mpi_barrier(world: Rep[MPIComm]): Rep[Unit] =
-    libFunction[Unit]("MPI_Barrier", Unwrap(world))(Seq(0), Seq[Int](), Set[Int](0), Adapter.CTRL)
+    libFunction[Unit]("MPI_Barrier", Unwrap(world))(Seq(0), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   class MPIDataType
   def mpi_datatype_null: Rep[MPIDataType] = cmacro[MPIDataType]("MPI_DATATYPE_NULL")

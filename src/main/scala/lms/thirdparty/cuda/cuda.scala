@@ -238,7 +238,8 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     libFunction[CudaErrorT]("cudaSetDevice", Unwrap(device))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   class cudaStreamT
-  def cudaStream: Rep[cudaStreamT] = cmacro[cudaStreamT]("cudaStreamT")
+  // def cudaStream: Rep[cudaStreamT] = cmacro[cudaStreamT]("cudaStreamT")
+  def cudaStream: Rep[cudaStreamT] = newStruct[cudaStreamT]("cudaStreamT")
 
   def cudaStreamDefault: Rep[Int] = cmacro[Int]("cudaStreamDefault")
   def cudaStreamNonBlocking: Rep[Int] = cmacro[Int]("cudaStreamNonBlocking")
@@ -256,6 +257,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaGetDeviceCount(count: Var[Int]) =
     libFunction[CudaErrorT]("cudaGetDeviceCount", UnwrapV(count))(Seq(), Seq(0), Set(0))
 
+  // cudaError_t cudaMemset( void* devPtr, int value, size_t count )
+  def cudaMemset[T:Manifest](devPtr: Rep[Array[T]], value: Rep[Int], count: Rep[SizeT]) =
+    libFunction[CudaErrorT]("cudaMemset", Unwrap(devPtr), Unwrap(value), Unwrap(count))(Seq(1,2), Seq(0), Set(0))
 
 
   // CUDA Kernel Basics:

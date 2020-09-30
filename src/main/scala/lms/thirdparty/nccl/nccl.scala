@@ -29,17 +29,17 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
     UnwrapV(version))(Seq[Int](),Seq(0),Set[Int](0))
 
   // ncclResult_t ncclGetUniqueId(ncclUniqueId* uniqueId)
-  def ncclGetUniqueId(id: Var[ncclUniqueId]): Rep[ncclResultT] =
-    libFunction[ncclResultT]("ncclGetUniqueId", UnwrapV(id))(Seq(0), Seq(0), Set(0))
+  def ncclGetUniqueId(id: Rep[ncclUniqueId]): Rep[ncclResultT] =
+    libFunction[ncclResultT]("ncclGetUniqueId", Unwrap(id))(Seq(0), Seq(0), Set(0))
 
   // ncclResult_t ncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank)
-  def ncclCommInitRank(comm: Var[ncclCommT], nranks: Rep[Int], commId: Rep[ncclUniqueId], rank: Rep[Int]) =
-    libFunction[ncclResultT]("ncclCommInitRank", UnwrapV(comm), Unwrap(nranks), Unwrap(commId),
+  def ncclCommInitRank(comm: Rep[ncclCommT], nranks: Rep[Int], commId: Rep[ncclUniqueId], rank: Rep[Int]) =
+    libFunction[ncclResultT]("ncclCommInitRank", Unwrap(comm), Unwrap(nranks), Unwrap(commId),
       Unwrap(rank))(Seq(0,2), Seq(0), Set(0))
 
   // ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist)
-  def ncclCommInitAll(comm: Var[ncclCommT], ndev: Rep[Int], devlist: Rep[Array[Int]]) =
-    libFunction[ncclResultT]("ncclCommInitAll", UnwrapV(comm), Unwrap(ndev),
+  def ncclCommInitAll(comm: Rep[ncclCommT], ndev: Rep[Int], devlist: Rep[Array[Int]]) =
+    libFunction[ncclResultT]("ncclCommInitAll", Unwrap(comm), Unwrap(ndev),
       Unwrap(devlist))(Seq(0,2), Seq(0), Set(0))
 
   def ncclUniqueIdBytes: Rep[Int] = cmacro[Int]("NCCL_UNIQUE_ID_BYTES")
