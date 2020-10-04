@@ -378,6 +378,8 @@ class GraphBuilder {
         val ((rk, wk), (prk, pwk), _) = getFunctionLatentEffect(out)
         val ((rk2, wk2), (prk2, pwk2), _) = getFunctionLatentEffect(out2)
         ((rk ++ rk2, wk ++ wk2), (prk ++ prk2, pwk ++ pwk2), None) // FIXME(feiw)
+      case Some(Node(_, "module", (b:Block)::_, _)) =>
+        getEffKeysWithParam(b)
       case Some(e) =>
         ??? // FIXME what about @, ?, array_apply => conservative write on all args?
       // Cleary the current solution is not complete and needs to be extended for more constructs or re-do in a different manner:

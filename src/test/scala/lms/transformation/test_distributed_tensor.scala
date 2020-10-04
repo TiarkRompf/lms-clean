@@ -56,6 +56,25 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     check("AD", driver.code, "cu")
   }
 
+  test("AD") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        implicit val anno = NAnno
+        val model = module { () =>
+          val tensor_input = Tensor.input[Float](Seq(3, 3))
+          val tensor_weight = Tensor.weight[Float](Seq(3, 3))
+          tensor_input * tensor_weight
+        }
+        model()
+        printf("compile")
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
   test("show") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._

@@ -34,7 +34,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     ns.foreach(n => n match {
       case Node(s, op, _, _) if op.startsWith("tensor") =>
         val tensor_type = (new TENSOR(s, useOldMetadata = true)).tensor_type
-        all_dims ++= tensor_type.s.map(_.d)
+        all_dims ++= tensor_type.shape.map(_.dim)
       case _ => ()
     })
     dim_names = new USets[Dim](all_dims.toList)
@@ -43,19 +43,19 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     //         to have the same size)
     ns.foreach(n => n match {
       case Node(s, op, tt::anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _)
-          if (op == "tensor_add" || op == "tensor_minus" || op == "tensor_mul" || op == "tensor_div") =>
+          if (op == "tensor_add" || op == "tensor_minus" || op == "tensor_mult" || op == "tensor_div") =>
         val x_type = (new TENSOR(x, useOldMetadata=true)).tensor_type
         val y_type = (new TENSOR(y, useOldMetadata=true)).tensor_type
-        (x_type.s zip y_type.s) foreach { case (a:Size, b:Size) =>
-          dim_names.merge(a.d, b.d)
+        (x_type.shape zip y_type.shape) foreach { case (a:Size, b:Size) =>
+          dim_names.merge(a.dim, b.dim)
         }
       case Node(s, "tensor_dot", tt::anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
         val x_type = (new TENSOR(x, useOldMetadata=true)).tensor_type
         val y_type = (new TENSOR(y, useOldMetadata=true)).tensor_type
-        (x_type.s.size, y_type.s.size) match {
-          case (1,1) => dim_names.merge(x_type.s.head.d, y_type.s.head.d)
-          case (2,1) => dim_names.merge(x_type.s.last.d, y_type.s.head.d)
-          case (2,2) => dim_names.merge(x_type.s.last.d, y_type.s.head.d)
+        (x_type.shape.size, y_type.shape.size) match {
+          case (1,1) => dim_names.merge(x_type.shape.head.dim, y_type.shape.head.dim)
+          case (2,1) => dim_names.merge(x_type.shape.last.dim, y_type.shape.head.dim)
+          case (2,2) => dim_names.merge(x_type.shape.last.dim, y_type.shape.head.dim)
           case _ => ???
         }
       case Node(s, op, _, _) if (op == "tensor_input" || op == "tensor_weight") => ()
@@ -66,10 +66,10 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     ns.foreach(traverse)
   }
 
-  def update_dim_name(tt: TensorType) = TensorType(tt.s.map{case Size(d, s) =>
-        Size(dim_names.union_map(d), s)}, tt.d, tt.et)
-  def update_dim_name(anno: Anno) = anno match {
-    case SAnno(d: Dim, devices) => SAnno(dim_names.union_map(d), devices)
+  def update_dim_name(tt: TensorType): TensorType = TensorType(tt.shape.map{case Size(d, s) =>
+        Size(dim_names.union_map(d), s)}, tt.et, update_dim_name(tt.anno))
+  def update_dim_name(anno: Anno): Anno = anno match {
+    case SAnno(dim: Dim, devices, _) => SAnno(dim_names.union_map(dim), devices)
     case a => a
   }
 

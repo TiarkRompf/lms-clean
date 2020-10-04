@@ -22,18 +22,18 @@ import Backend._
  */
 object FixedSizeDistributedTensorTypeLess {
 
+  type E = Backend.Exp
+  def C(a: Any) = Backend.Const(a)
+
   import BaseTypeLess._
   import PrimitiveTypeLess._
   import ArrayTypeLess._
   import CUDATypeLess._
 
   abstract class Device
+  object UnKnownD extends Device
   case class CPU(x: Int) extends Device
   case class GPU(x: Int) extends Device
-  object UnKnownD extends Device
-
-  type E = Backend.Exp
-  def C(a: Any) = Backend.Const(a)
 
   var dim_name: Int = 0;
   def next_dim_name: Int = {
@@ -42,30 +42,22 @@ object FixedSizeDistributedTensorTypeLess {
   }
 
   case class Dim(x: Int) // named dimension
-  def dim = Dim(next_dim_name)
-  case class Size(d: Dim, s: Int) // dim and length
-  case class TensorType(s: Seq[Size], d: Device, et: Manifest[_]) // tensor type
-
-  abstract class Anno
-  object NAnno extends Anno
-  case class SAnno(d: Dim, devices: Seq[Device]) extends Anno // spatial splitting annotation
-  case class KAnno(p: Int) extends Anno // stacked pipelines
-  case class QAnno(p: Int) extends Anno // queued pipelines
-
-  def build_inputs(shape: Seq[Int], et: Manifest[_], index: Int, devices: Seq[Device]) = {
-    val tt = TensorType(shape.map(s => Size(dim, s)), UnKnownD, et) // FIXME(feiw) remove UnKnowD
-    val anno = SAnno(tt.s(index).d, devices)
-    (tt, anno)
+  def dim = Dim(next_dim_name) // fresh dim
+  case class Size(dim: Dim, size: Int) // dim and length
+  case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno) { // tensor type
+    def namedDim(x: Int) = shape(x).dim
   }
+
+  abstract class Anno extends Serializable // Annotation class
+  object NAnno extends Anno // Null Annotation
+  case class SAnno(dim: Dim, devices: Seq[Device], stable: Boolean = true) extends Anno // spatial splitting annotation
+  case class KAnno(pipeline: Int) extends Anno // stacked pipelines
+  case class QAnno(pipeline: Int) extends Anno // queued pipelines
 
   def INPUT(shape: Seq[Int], et: Manifest[_], index: Int, devices: Seq[Device])(implicit __pos: SourceContext): TENSOR = {
-    val (tt, anno) = build_inputs(shape, et, index, devices)
-    INPUT(tt, anno)
-  }
-
-  // deprecate
-  def INPUT(shape: Seq[Int], et: Manifest[_], anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-    INPUT(TensorType(shape.map(s => Size(dim, s)), UnKnownD, et), anno)
+    val tensorType = TensorType(shape.map(s => Size(dim, s)), et) // this is using default NAnno
+    val anno = SAnno(tensorType.namedDim(index), devices)
+    INPUT(tensorType, anno)
   }
 
   def INPUT(tt: TensorType, anno: Anno)(implicit __pos: SourceContext): TENSOR = {
@@ -73,17 +65,21 @@ object FixedSizeDistributedTensorTypeLess {
   }
 
   def WEIGHT(shape: Seq[Int], et: Manifest[_], index: Int, devices: Seq[Device])(implicit __pos: SourceContext): TENSOR = {
-    val (tt, anno) = build_inputs(shape, et, index, devices)
-    WEIGHT(tt, anno)
-  }
-
-  // deprecate
-  def WEIGHT(shape: Seq[Int], et: Manifest[_], anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-    WEIGHT(TensorType(shape.map(s => Size(dim, s)), UnKnownD, et), anno)
+    val tensorType = TensorType(shape.map(s => Size(dim, s)), et) // this is using default NAnno
+    val anno = SAnno(tensorType.namedDim(index), devices)
+    WEIGHT(tensorType, anno)
   }
 
   def WEIGHT(tt: TensorType, anno: Anno)(implicit __pos: SourceContext): TENSOR = {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_weight", C(tt), C(anno)))).withSrcType(__pos, tt.et)
+  }
+
+  def ONES(tt: TensorType, anno: Anno)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_ones", C(tt), C(anno)))).withSrcType(__pos, tt.et)
+  }
+
+  def ZEROS(tt: TensorType, anno: Anno)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(tt), C(anno)))).withSrcType(__pos, tt.et)
   }
 
   class TENSOR(override val x: Backend.Exp, val useOldMetadata: Boolean = false) extends TOP(x) {
@@ -91,9 +87,7 @@ object FixedSizeDistributedTensorTypeLess {
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
 
-    def et: Manifest[_] = {
-      if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
-    }
+    def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
     def tensor_type: TensorType = {
       val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
@@ -111,9 +105,7 @@ object FixedSizeDistributedTensorTypeLess {
       }
     }
 
-    def shape_size: Seq[Int] = tensor_type.s.map(_.s)
-    def device: Device = tensor_type.d
-    def device_shape: (Device, Seq[Int]) = (device, shape_size)
+    def shape_size: Seq[Int] = tensor_type.shape.map(_.size)
 
     // def to(target_device: Device)(implicit __pos: SourceContext): TENSOR = {
     //   if (device == target_device) this
@@ -122,13 +114,21 @@ object FixedSizeDistributedTensorTypeLess {
     // }
 
     def show(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("show_tensor", x)()(Adapter.CTRL))
+      UNIT(Adapter.g.reflectEffect("show_tensor", x)(x)(Adapter.CTRL))
+    }
+
+    def += (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): UNIT = {
+      UNIT(Adapter.g.reflectEffect("accum_tensor", x, y.x)(x, y.x)(x))
+    }
+
+    def optimize(grad: TENSOR, momentum: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): UNIT = {
+      UNIT(Adapter.g.reflectEffect("optimize_tensor", x, grad.x, momentum.x)(x, grad.x, momentum.x)(x))
     }
 
     def elemWiseNoBroadCasting(y: TENSOR, anno: Anno, __pos: SourceContext)(op: String): TENSOR = {
       assert(shape_size == y.shape_size)
       assert(et == y.et)
-      (new TENSOR(Adapter.g.reflect(op, C(tensor_type), C(anno), x, y.x))).withSrcType(__pos, et)
+      (new TENSOR(Adapter.g.reflectRead(op, C(tensor_type), C(anno), x, y.x)(x, y.x))).withSrcType(__pos, et)
     }
 
     def + (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
@@ -147,79 +147,118 @@ object FixedSizeDistributedTensorTypeLess {
       val res_tt = (shape_size.size, y.shape_size.size) match {
         case (1,1) => // vector-vector-dot
           assert(shape_size == y.shape_size)
-          TensorType(Seq(Size(Dim(next_dim_name), 1)), UnKnownD, et)
+          TensorType(Seq(Size(Dim(next_dim_name), 1)), et)
         case (2,1) => // matrix-vector-dot
           assert(shape_size(1) == y.shape_size(0))
-          TensorType(tensor_type.s.take(1), device, et)
+          TensorType(tensor_type.shape.take(1), et)
         case (2,2) => // matrix-matrix-dot
           assert(shape_size(1) == y.shape_size(0))
-          TensorType(Seq(tensor_type.s(0), y.tensor_type.s(1)), device, et)
+          TensorType(Seq(tensor_type.shape(0), y.tensor_type.shape(1)), et)
         case _ => throw new Exception("not yet supporting high dimension dot")
       }
       assert(et == y.et)
-      (new TENSOR(Adapter.g.reflect("tensor_dot", C(res_tt), C(anno), x, y.x))).withSrcType(__pos, et)
+      (new TENSOR(Adapter.g.reflectRead("tensor_dot", C(res_tt), C(anno), x, y.x)(x, y.x))).withSrcType(__pos, et)
     }
+  }
+
+  // FIXME(feiw) the return type fo MODULE is strange
+  def MODULE(f: () => TENSOR): () => UNIT = {
+    val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f().x))(Adapter.CTRL)
+    () => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(()))(Adapter.CTRL))
   }
 }
 
 
-// trait FixedSizeTensorDeviceOps extends Dsl with ArrayOps with CudaOps {
+trait FixedSizeDistributedTensorOps extends Dsl {
 
-//   import PrimitiveTypeLess._
-//   import ArrayTypeLess._
-//   import FixedSizeTensorDeviceTypeLess._
+  import PrimitiveTypeLess._
+  import FixedSizeDistributedTensorTypeLess._
 
-//   def NewArray[T:Manifest](x: Rep[Int], device: Device)(implicit __pos: SourceContext): Rep[Array[T]] = {
-//     Wrap[Array[T]](ARRAYD(new INT(Unwrap(x)), manifest[T], device).x)
-//   }
+  def module[T](f: () => Rep[Tensor[T]]) = {
+    MODULE(() => new TENSOR(Unwrap(f())))
+  }
 
-//   /// Typed Frontend
-//   class Tensor[+T]
-//   object Tensor {
-//     def apply[T:Numeric:Manifest](shape: Seq[Int], array: Rep[Array[T]], device: Device = CPU(0))(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-//       Wrap[Tensor[T]](TENSOR(shape, new ARRAY(Unwrap(array)), device).x)
-//     }
-//   }
+  /// Typed Frontend
+  class Tensor[+T]
+  object Tensor {
+    def input[T:Manifest](shape: Seq[Int], index: Int, devices: Seq[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = INPUT(shape, manifest[T], index, devices)
+      Wrap[Tensor[T]](tensor.x)
+    }
 
-//   def atGPU[T:Numeric:Manifest](clo: Device => Rep[Tensor[T]]): Rep[Tensor[T]] = {
-//       clo(GPU(0)) // clo is supposed to run with an implicit Device argument
-//   }
-//   def atGPU[T:Numeric:Manifest](clo: Device => Seq[Rep[Tensor[T]]]): Seq[Rep[Tensor[T]]] = {
-//       clo(GPU(0)) // clo is supposed to run with an implicit Device argument
-//   }
+    def input[T:Manifest](shape: Seq[Int])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = INPUT(TensorType(shape.map(s => Size(dim, s)), manifest[T]), anno)
+      Wrap[Tensor[T]](tensor.x)
+    }
 
-//   def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))
+    def input[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = INPUT(tensor_type, anno)
+      Wrap[Tensor[T]](tensor.x)
+    }
 
-//   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
-//     val self = tensor(x)
+    def weight[T:Manifest](shape: Seq[Int], index: Int, devices: Seq[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = WEIGHT(shape, manifest[T], index, devices)
+      Wrap[Tensor[T]](tensor.x)
+    }
 
-//     def shape: Seq[Int] = self.shape
-//     def device: Device = self.device
-//     def to(target_device: Device)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-//       Wrap[Tensor[T]](self.to(target_device).x)
-//     }
-//     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
+    def weight[T:Manifest](shape: Seq[Int])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = WEIGHT(TensorType(shape.map(s => Size(dim, s)), manifest[T]), anno)
+      Wrap[Tensor[T]](tensor.x)
+    }
 
-//     def + (y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-//       val t = self + tensor(y)
-//       Wrap[Tensor[T]](t.x)
-//     }
-//     def - (y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-//       val t = self - tensor(y)
-//       Wrap[Tensor[T]](t.x)
-//     }
-//     def * (y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-//       val t = self * tensor(y)
-//       Wrap[Tensor[T]](t.x)
-//     }
-//     def / (y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-//       val t = self / tensor(y)
-//       Wrap[Tensor[T]](t.x)
-//     }
+    def ones[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = ONES(tensor_type, anno)
+      Wrap[Tensor[T]](tensor.x)
+    }
 
-//     def dot(y: Rep[Tensor[T]])(implicit device: Device, __pos: SourceContext): Rep[Tensor[T]] = {
-//       val t = self dot tensor(y)
-//       Wrap[Tensor[T]](t.x)
-//     }
-//   }
-// }
+    def zeros[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = ZEROS(tensor_type, anno)
+      Wrap[Tensor[T]](tensor.x)
+    }
+  }
+
+  def tensor_type[T:Numeric:Manifest](shape: Seq[Int]): TensorType =
+    TensorType(shape.map(s => Size(dim, s)), manifest[T])
+
+  def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))
+
+  implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
+    val self = tensor(x)
+
+    def shape: Seq[Int] = self.shape_size
+    def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
+
+    // def + (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.+(y, anno)
+    def + (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self + (tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    // def - (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.-(y, anno)
+    def - (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self - (tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    // def * (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.*(y, anno)
+    def * (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self * (tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    // def / (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this./(y, anno)
+    def / (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self / (tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def dot(y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self dot (tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+    // def dot(y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    //   val t = self dot (tensor(y), anno)
+    //   Wrap[Tensor[T]](t.x)
+    // }
+  }
+}
