@@ -21,23 +21,24 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
   class CNull
   def cNull: Rep[CNull] = cmacro[CNull]("NULL")
 
+  def MPI_CHECK(return_value: Rep[Int]) = libFunction[Unit]("MPICHECK", Unwrap(return_value))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+
   // this is how we deal with library functions (may need pointers)
-  def mpi_init() = libFunction[Unit]("MPI_INIT", Unwrap(cNull), Unwrap(cNull))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
-  def mpi_finalize() = libFunction[Unit]("MPI_FINALIZE")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+  def mpi_init() = libFunction[Int]("MPI_Init", Unwrap(cNull), Unwrap(cNull))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
-  def mpi_comm_size(world: Rep[MPIComm], size: Var[Int]): Rep[Unit] = {
-    libFunction[Unit]("MPI_COMM_SIZE", Unwrap(world), UnwrapV(size))(Seq[Int](), Seq(1), Set(1))
-  }
-  def mpi_comm_rank(world: Rep[MPIComm], rank: Var[Int]): Rep[Unit] = {
-    libFunction[Unit]("MPI_COMM_RANK", Unwrap(world), UnwrapV(rank))(Seq[Int](), Seq(1), Set(1))
-  }
+  def mpi_finalize() = libFunction[Int]("MPI_Finalize")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
-  def mpi_get_processor_name(name: Rep[Array[Char]], len: Var[Int]): Rep[Unit] = {
-    libFunction[Unit]("MPI_Get_processor_name", Unwrap(name), UnwrapV(len))(Seq[Int](), Seq(0, 1), Set(1))
-  }
+  def mpi_comm_size(world: Rep[MPIComm], size: Var[Int]) =
+    libFunction[Int]("MPI_Comm_size", Unwrap(world), UnwrapV(size))(Seq[Int](), Seq(1), Set(1))
 
-  def mpi_barrier(world: Rep[MPIComm]): Rep[Unit] =
-    libFunction[Unit]("MPI_Barrier", Unwrap(world))(Seq(0), Seq[Int](), Set[Int](), Adapter.CTRL)
+  def mpi_comm_rank(world: Rep[MPIComm], rank: Var[Int]) =
+    libFunction[Int]("MPI_Comm_rank", Unwrap(world), UnwrapV(rank))(Seq[Int](), Seq(1), Set(1))
+
+  def mpi_get_processor_name(name: Rep[Array[Char]], len: Var[Int]) =
+    libFunction[Int]("MPI_Get_processor_name", Unwrap(name), UnwrapV(len))(Seq[Int](), Seq(0, 1), Set(1))
+
+  def mpi_barrier(world: Rep[MPIComm]) =
+    libFunction[Int]("MPI_Barrier", Unwrap(world))(Seq(0), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   class MPIDataType
   def mpi_datatype_null: Rep[MPIDataType] = cmacro[MPIDataType]("MPI_DATATYPE_NULL")
@@ -157,7 +158,6 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
       Unwrap(comm))(Seq(1,3,4,5), Seq(1), Set(1))
 
 
-
   // this is how we bind to library structs with field read access
   class DataStructure1
   // 1. define an implicit value for c-type registration (internally it is a CustomManifest)
@@ -186,6 +186,8 @@ trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
 }
 
 trait CCodeGenMPI extends ExtendedCCodeGen {
+
+  registerHeader("<mpi_header.h>")
 
   // NOTE: this type map from `mStr.endsWith("$DataStructure1")` to `DataStructure1`
   //       is necessary only if we may use this type without a struct instance,

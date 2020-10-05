@@ -10,13 +10,17 @@ import lms.thirdparty.array_computation.{CUDATypeLess, CCodeGenCudaOps, CudaOps}
 
 
 class NCCLTest extends TutorialFunSuite {
-  val under = "thirdparty/"
+  val under = "thirdparty/nccl/"
 
-  abstract class DslDriverCNCCL[A: Manifest, B: Manifest] extends DslDriverC[A,B] with NCCLOps with CudaOps with SizeTOps{ q =>
-    override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCudaOps with CCodeGenSizeTOps {
+  abstract class DslDriverCNCCL[A: Manifest, B: Manifest] extends DslDriverC[A,B] with NCCLOps with CudaOps with SizeTOps with MPIOps { q =>
+    override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCudaOps with CCodeGenSizeTOps with CCodeGenMPI {
       val IR: q.type = q
+
+      registerHeader("<nccl_header.h>")
+      registerHeader("<nccl.h>")
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"
+
 
     val curPath = System.getProperty("user.dir")
     override val sourceFile = s"$curPath/snippet.cu"
@@ -29,11 +33,11 @@ class NCCLTest extends TutorialFunSuite {
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        
+
         val comms = ncclComm
         val devs = Array(0)
         ncclCheck(ncclCommInitAll(comms, 1, devs))
-        
+
         val s = cudaStream
         // the same as cudaStreamCreate(s)
         cudaStreamCreateWithFlags(s, cudaStreamDefault)
@@ -90,20 +94,14 @@ class NCCLTest extends TutorialFunSuite {
         printf("Success \n")
       }
     }
-    System.out.println(indent(driver.code))
+    check("single-process-single-device", driver.code, "cu")
   }
 
-  // use MPI and NCCL together
-  abstract class DslDriverCNCCLMPI[A: Manifest, B: Manifest] extends DslDriverCNCCL[A,B] with MPIOps { q =>
-    override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCudaOps with CCodeGenSizeTOps with CCodeGenMPI {
-      val IR: q.type = q
-    }
-  }
 
   test("one-device-per-process") {
     // https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/examples.html
     // example 2
-    val driver = new DslDriverCNCCLMPI[Int, Unit] {
+    val driver = new DslDriverCNCCL[Int, Unit] {
 
       @virtualize
       def snippet(arg:Rep[Int]) = {
@@ -113,9 +111,9 @@ class NCCLTest extends TutorialFunSuite {
         val localRank = 0
 
         // initializing MPI
-        mpi_init()
-        mpi_comm_rank(mpi_comm_world, myRank)
-        mpi_comm_size(mpi_comm_world, nRanks)
+        MPI_CHECK(mpi_init())
+        MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
+        MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
 
         // calculating localRank
         // for now, localRank = 0
@@ -125,10 +123,10 @@ class NCCLTest extends TutorialFunSuite {
         if (myRank == 0) {
           ncclCheck(ncclGetUniqueId(id))
         }
-        mpi_bcast_one[ncclUniqueId](id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world)
+        MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
         // picking a GPU based on localRank, allocate device buffers
-        cudaCall(cudaSetDevice(localRank))
+        cudaCall(cudaSetDevice(myRank))
         var sendbuff = cudaMalloc2[Float](size)
         var recvbuff = cudaMalloc2[Float](size)
         val s = cudaStream
@@ -152,17 +150,17 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommDestroy(comm))
 
         // finalizing MPI
-        mpi_finalize()
+        MPI_CHECK(mpi_finalize())
 
         printf("[MPI Rank %d] Success \n", myRank)
       }
     }
-    // System.out.println(indent(driver.code))
+    check("one-device-per-process", driver.code, "cu")
   }
-  
+
   test("mpi-reduce") {
     // based on file: main/scala/lms/thirdparty/nccl/cu_examples/mpi/mpi_test.cu
-    val driver = new DslDriverCNCCLMPI[Int, Unit] {
+    val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg:Rep[Int]) = {
         val SIZE = 128
@@ -172,9 +170,9 @@ class NCCLTest extends TutorialFunSuite {
         var size = 0
         var rank = 0
 
-        mpi_init()
-        mpi_comm_rank(mpi_comm_world, size)
-        mpi_comm_size(mpi_comm_world, rank)
+        MPI_CHECK(mpi_init())
+        MPI_CHECK(mpi_comm_rank(mpi_comm_world, rank))
+        MPI_CHECK(mpi_comm_size(mpi_comm_world, size))
 
         if (arg < size) {
           if (rank == 0) {
@@ -183,17 +181,16 @@ class NCCLTest extends TutorialFunSuite {
           exit(1)
         }
 
+        // We have to set our device before NCCL init
         // change to atoi(argv[rank+1]) later
         val gpu = 0
-
-        // We have to set our device before NCCL init
-        cudaCall(cudaSetDevice(gpu))
-        mpi_barrier(mpi_comm_world)
+        cudaCall(cudaSetDevice(rank))
+        MPI_CHECK(mpi_barrier(mpi_comm_world))
 
         // NCCL Communicator creation
         val comm = ncclComm
         ncclCheck(ncclGetUniqueId(commId))
-        mpi_bcast_one[ncclUniqueId](commId, ncclUniqueIdBytes, mpi_char, 0, mpi_comm_world)
+        MPI_CHECK(mpi_bcast_one(commId, ncclUniqueIdBytes, mpi_char, 0, mpi_comm_world))
         ncclCheck(ncclCommInitRank(comm, size, commId, rank))
 
         // cuda stream creation
@@ -202,13 +199,11 @@ class NCCLTest extends TutorialFunSuite {
 
         // initialize input values
         // split dptr to dptr_send and dptr_recv to avoid pointer addition
-        var dptr_send = cudaMalloc2[Int](SIZE)
-        var dptr_recv = cudaMalloc2[Int](SIZE)
-        var value = cudaMalloc2[Int](SIZE)
-        var i = 0;
-        while (i < SIZE) {
+        val dptr_send = cudaMalloc2[Int](SIZE)
+        val dptr_recv = cudaMalloc2[Int](SIZE)
+        val value = NewArray[Int](SIZE)
+        for (i <- (0 until SIZE): Rep[Range]) {
           value(i) = rank + 1
-          i = i + 1
         }
         cudaCall(cudaMemcpy[Int](dptr_send, value, SizeT(SIZE), host2device))
 
@@ -217,42 +212,36 @@ class NCCLTest extends TutorialFunSuite {
 
         // run allreduce
         var errors = 0
-        i = 0;
-        while (i < NITERS) {
+        for (i <- (0 until NITERS): Rep[Range]) {
           ncclCheck(ncclAllReduce(dptr_send, dptr_recv, SizeT(SIZE), ncclInt, ncclSum, comm, stream))
-          i = i + 1
         }
 
         // Check results
         cudaCall(cudaStreamSynchronize(stream))
-        cudaCall(cudaMemcpy[Int](value, dptr_recv, SizeT(SIZE), host2device))
-        i = 0
-        while (i < SIZE) {
+        cudaCall(cudaMemcpy[Int](value, dptr_recv, SizeT(SIZE), device2host))
+        for (i <- (0 until SIZE): Rep[Range]) {
           if (value(i) != ref) {
             errors = errors + 1
             printf("error")
           }
-          i = i + 1
         }
+
         cudaCall(cudaFree(dptr_recv))
         cudaCall(cudaFree(dptr_send))
 
-        val errors1 = errors
-        mpi_allReduce_one_inplace[Int](errors1, 1, mpi_integer, mpi_sum, mpi_comm_world)
+        MPI_CHECK(mpi_allReduce_one_inplace(errors, 1, mpi_integer, mpi_sum, mpi_comm_world))
         if (rank == 0) {
-          if (errors1 > 0) {
-            printf("%d errors. Test FAILED.\n", errors1)
+          if (errors > 0) {
+            printf("%d errors. Test FAILED.\n", errors)
           } else {
             printf("test PASSED.\n")
           }
         }
-        mpi_finalize();
+        MPI_CHECK(mpi_finalize())
         ncclCheck(ncclCommDestroy(comm))
-
-        printf("success\n")
       }
     }
-    // System.out.println(indent(driver.code))
+    check("mpi-reduce", driver.code, "cu")
   }
 }
 

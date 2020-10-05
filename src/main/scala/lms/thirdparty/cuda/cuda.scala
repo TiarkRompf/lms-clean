@@ -238,8 +238,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     libFunction[CudaErrorT]("cudaSetDevice", Unwrap(device))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   class cudaStreamT
-  // def cudaStream: Rep[cudaStreamT] = cmacro[cudaStreamT]("cudaStreamT")
-  def cudaStream: Rep[cudaStreamT] = newStruct[cudaStreamT]("cudaStreamT")
+  def cudaStream: Rep[cudaStreamT] = newStruct[cudaStreamT]("cudaStream_t")
 
   def cudaStreamDefault: Rep[Int] = cmacro[Int]("cudaStreamDefault")
   def cudaStreamNonBlocking: Rep[Int] = cmacro[Int]("cudaStreamNonBlocking")
