@@ -14,7 +14,7 @@ import Backend._
 
 
 class FixedSizeDevicedTensorTest extends TutorialFunSuite {
-  val under = "transformer/deviced_tensor"
+  val under = "transformer/deviced_tensor/"
 
   abstract class CompilerCDevicedTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorDeviceOps { q =>
 

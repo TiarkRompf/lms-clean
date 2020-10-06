@@ -13,7 +13,7 @@ import lms.thirdparty.array_computation.{CCodeGenCBLASOps}
 import Backend._
 
 class FixedSizeTensorTest extends TutorialFunSuite {
-  val under = "transformer/tensor2"
+  val under = "transformer/tensor2/"
 
   abstract class CompilerCTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeTensorOps { q =>
 
