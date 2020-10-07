@@ -49,7 +49,9 @@ object FixedSizeDistributedTensorTypeLess {
   }
 
   abstract class Anno extends Serializable // Annotation class
-  object NAnno extends Anno // Null Annotation
+  object NAnno extends Anno { // Null Annotation
+    override def toString = "NAnno"
+  }
   case class SAnno(dim: Dim, devices: Seq[Device], stable: Boolean = true) extends Anno // spatial splitting annotation
   case class KAnno(pipeline: Int) extends Anno // stacked pipelines
   case class QAnno(pipeline: Int) extends Anno // queued pipelines
@@ -118,11 +120,11 @@ object FixedSizeDistributedTensorTypeLess {
     }
 
     def += (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("accum_tensor", x, y.x)(x, y.x)(x))
+      UNIT(Adapter.g.reflectEffect("accum_tensor", C(anno), x, y.x)(x, y.x)(x))
     }
 
     def optimize(grad: TENSOR, momentum: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("optimize_tensor", x, grad.x, momentum.x)(x, grad.x, momentum.x)(x))
+      UNIT(Adapter.g.reflectEffect("optimize_tensor", C(anno), x, grad.x, momentum.x)(x, grad.x, momentum.x)(x))
     }
 
     def elemWiseNoBroadCasting(y: TENSOR, anno: Anno, __pos: SourceContext)(op: String): TENSOR = {
@@ -143,6 +145,12 @@ object FixedSizeDistributedTensorTypeLess {
     def / (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
       elemWiseNoBroadCasting(y, anno, __pos)("tensor_div")
 
+    def transpose(anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
+      assert(shape_size.size == 2, "input of transpose must be 2D")
+      val res_tt = TensorType(Seq(tensor_type.shape(1), tensor_type.shape(0)), et)
+      (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), x)(x))).withSrcType(__pos, et)
+    }
+
     def dot(y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
       val res_tt = (shape_size.size, y.shape_size.size) match {
         case (1,1) => // vector-vector-dot
@@ -162,7 +170,7 @@ object FixedSizeDistributedTensorTypeLess {
   }
 
   // FIXME(feiw) the return type fo MODULE is strange
-  def MODULE(f: () => TENSOR): () => UNIT = {
+  def MODULE(f: () => TENSOR)(implicit __pos: SourceContext): () => UNIT = {
     val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f().x))(Adapter.CTRL)
     () => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(()))(Adapter.CTRL))
   }
@@ -174,7 +182,7 @@ trait FixedSizeDistributedTensorOps extends Dsl {
   import PrimitiveTypeLess._
   import FixedSizeDistributedTensorTypeLess._
 
-  def module[T](f: () => Rep[Tensor[T]]) = {
+  def module[T](f: () => Rep[Tensor[T]])(implicit __pos: SourceContext) = {
     MODULE(() => new TENSOR(Unwrap(f())))
   }
 
@@ -252,13 +260,15 @@ trait FixedSizeDistributedTensorOps extends Dsl {
       Wrap[Tensor[T]](t.x)
     }
 
-    def dot(y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+    def transpose(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self transpose anno
+      Wrap[Tensor[T]](t.x)
+    }
+
+    // def dot(y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+    def dot(y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = self dot (tensor(y), anno)
       Wrap[Tensor[T]](t.x)
     }
-    // def dot(y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-    //   val t = self dot (tensor(y), anno)
-    //   Wrap[Tensor[T]](t.x)
-    // }
   }
 }

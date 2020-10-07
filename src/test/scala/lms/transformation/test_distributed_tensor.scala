@@ -56,23 +56,46 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     check("AD", driver.code, "cu")
   }
 
-  test("AD") {
+  test("Annotation") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-        implicit val anno = NAnno
+        val inputTensorType = tensor_type[Float](Seq(32,32))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
         val model = module { () =>
-          val tensor_input = Tensor.input[Float](Seq(3, 3))
-          val tensor_weight = Tensor.weight[Float](Seq(3, 3))
-          tensor_input * tensor_weight
+          val tensor_input = Tensor.input[Float](inputTensorType)
+          val tensor_weight = Tensor.weight[Float](Seq(32, 32))
+          tensor_input * (tensor_weight, batchSplitAnno)
         }
         model()
         printf("compile")
       }
     }
-    System.out.println(indent(driver.code))
+    check("Annotation", driver.code, "cu")
+  }
+
+  test("dot") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val inputTensorType = tensor_type[Float](Seq(32,32))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
+        val model = module { () =>
+          val tensor_input = Tensor.input[Float](inputTensorType)
+          val tensor_weight = Tensor.weight[Float](Seq(32, 32))
+          tensor_input dot (tensor_weight, batchSplitAnno)
+        }
+        model()
+        printf("compile")
+      }
+    }
+    check("dot", driver.code, "cu")
   }
 
   test("show") {
@@ -86,31 +109,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val b = INPUT(Seq(32,64), manifest[Float], 1, gpus)
         val c = a + (b, a.annotation)
         c.show
-        ()
-      }
-    }
-    System.out.println(indent(driver.code))
-  }
-
-  test("dot") {
-    val driver = new CompilerCDistributedTensor[Int, Unit] {
-      import FixedSizeDistributedTensorTypeLess._
-
-      @virtualize
-      def snippet(arg: Rep[Int]): Rep[Unit] = {
-        val inputTensorType = tensor_type[Float](Seq(32,32))
-        val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-        def annoEnv[T:Numeric:Manifest](clo: Anno => Rep[Tensor[T]]): Rep[Tensor[T]] = {
-          clo(batchSplitAnno)
-        }
-
-        val res = annoEnv { implicit anno =>
-          val input = Tensor.input[Float](inputTensorType)
-          val weight = Tensor.weight[Float](Seq(32,32))
-          input dot weight
-        }
-
-        res.show
         ()
       }
     }
