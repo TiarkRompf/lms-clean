@@ -1,7 +1,7 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
-#include <nccl_header.h>
+#include "nccl_header.h"
 #include <string.h>
 #include <stdlib.h>
 #include <cuda_header.h>
@@ -9,7 +9,6 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 #include <mpi_header.h>
-#include <nccl.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
   ncclUniqueId x1;

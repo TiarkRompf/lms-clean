@@ -1,7 +1,7 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
-#include <nccl_header.h>
+#include "nccl_header.h"
 #include <string.h>
 #include <stdlib.h>
 #include <cuda_header.h>
@@ -9,7 +9,6 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 #include <mpi_header.h>
-#include <nccl.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = 0;
@@ -22,9 +21,9 @@ void Snippet(int x0) {
   MPICHECK(MPI_Bcast(&x3, NCCL_UNIQUE_ID_BYTES, MPI_BYTE, 0, MPI_COMM_WORLD));
   CUDA_CALL(cudaSetDevice(x1));
   float* x4 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x4, (size_t)(33554432 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)(33554432 * sizeof(float))));
   float* x5 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x5, (size_t)(33554432 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x5, (size_t)(33554432 * sizeof(float))));
   cudaStream_t x6;
   CUDA_CALL(cudaStreamCreateWithFlags(&x6, cudaStreamDefault));
   ncclComm_t x7;

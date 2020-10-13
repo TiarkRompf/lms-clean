@@ -97,8 +97,7 @@ class NCCLTest extends TutorialFunSuite {
         printf("Success \n")
       }
     }
-    // check("single-process-single-device", driver.code, "cu")
-    System.out.println(indent(driver.code))
+    check("single-process-single-device", driver.code, "cu")
   }
 
 
@@ -159,7 +158,7 @@ class NCCLTest extends TutorialFunSuite {
         printf("[MPI Rank %d] Success \n", myRank)
       }
     }
-    // check("one-device-per-process", driver.code, "cu")
+    check("one-device-per-process", driver.code, "cu")
   }
 
   test("mpi-reduce") {
@@ -245,7 +244,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommDestroy(comm))
       }
     }
-    // check("mpi-reduce", driver.code, "cu")
+    check("mpi-reduce", driver.code, "cu")
   }
 }
 
