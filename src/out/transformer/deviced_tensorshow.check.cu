@@ -11,9 +11,9 @@ Emitting C Generated Code
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x1, (size_t)(6 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x1, (size_t)(6 * sizeof(float))));
   float* x2 = (float*)malloc(6 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(6 * sizeof(int)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(6 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x3 = 0;
   while (x3 != 6) {
     printf("%f ", x2[x3]);
