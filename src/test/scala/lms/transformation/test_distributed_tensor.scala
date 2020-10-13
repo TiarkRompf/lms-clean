@@ -43,6 +43,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
         implicit val anno = NAnno
         val model = module { () =>
           val tensor_input = Tensor.input[Float](Seq(3, 3))
@@ -62,6 +63,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
         val inputTensorType = tensor_type[Float](Seq(32,32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
@@ -83,6 +85,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
         val inputTensorType = tensor_type[Float](Seq(32,32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
@@ -104,6 +107,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
         val gpus = List(GPU(0), GPU(1))
         val a = INPUT(Seq(32,64), manifest[Float], 1, gpus)
         val b = INPUT(Seq(32,64), manifest[Float], 1, gpus)

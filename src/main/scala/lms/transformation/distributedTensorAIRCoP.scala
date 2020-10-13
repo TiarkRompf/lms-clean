@@ -51,6 +51,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
           grad_map(a) += (a_grad, anno); ()
         }) +=: backwardNodes
       case n@Node(s, "tensor_dot", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes
         forwardNodes += n
         // save backward op in backwardNodes
