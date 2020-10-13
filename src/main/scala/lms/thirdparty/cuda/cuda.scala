@@ -263,7 +263,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // cudaError_t cudaMemset( void* devPtr, int value, size_t count )
   def cudaMemset[T:Manifest](devPtr: Rep[Array[T]], value: Rep[Int], count: Rep[SizeT]) =
     libFunction[CudaErrorT]("cudaMemset", Unwrap(devPtr), Unwrap(value), Unwrap(count))(Seq(1,2), Seq(0), Set())
-  def cudaMemset2[T:Manifest](devPtr: Rep[Array[T]], value: Rep[Int], count: Rep[Int]) = {
+  def cudaMemset2[T:Manifest](devPtr: Rep[Array[T]], value: Rep[Int], count: Rep[Int])(implicit __pos: SourceContext) = {
     cudaMemset[T](devPtr, value, SizeT(count * sizeOf[T]))
   }
 
