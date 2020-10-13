@@ -39,8 +39,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitAll(comms, 1, devs))
 
         val s = cudaStream
-        // the same as cudaStreamCreate(s)
-        cudaStreamCreateWithFlags(s, cudaStreamDefault)
+        cudaStreamCreate(s)
         var sendbuff = cudaMalloc2[Float](0)
         var recvbuff = cudaMalloc2[Float](0)
         ncclCheck(ncclAllReduce(sendbuff, recvbuff, SizeT(0), ncclFloat, ncclSum, comms, s))
@@ -48,12 +47,13 @@ class NCCLTest extends TutorialFunSuite {
         printf("end")
       }
     }
-    // System.out.println(indent(driver.code))
+    check("sanity-check", driver.code, "cu")
   }
 
   test("single-process-single-device") {
+    // based on
     // https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/examples.html
-    // example 1, but single device
+    // example 1, but single device (nDev = 1)
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -70,11 +70,8 @@ class NCCLTest extends TutorialFunSuite {
         cudaCall(cudaSetDevice(0))
         var sendbuff = cudaMalloc2[Float](size)
         var recvbuff = cudaMalloc2[Float](size)
-        // cudaCall(cudaMemset[Float](sendbuff, 1, SizeT(size)))
-        // cudaCall(cudaMemset[Float](recvbuff, 0, SizeT(size)))
         cudaCall(cudaMemset2[Float](sendbuff, 1, size))
         cudaCall(cudaMemset2[Float](recvbuff, 0, size))
-        // cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
         cudaCall(cudaStreamCreate(s))
 
         // initializing NCCL
@@ -102,6 +99,7 @@ class NCCLTest extends TutorialFunSuite {
 
 
   test("one-device-per-process") {
+    // based on
     // https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/examples.html
     // example 2
     val driver = new DslDriverCNCCL[Int, Unit] {
