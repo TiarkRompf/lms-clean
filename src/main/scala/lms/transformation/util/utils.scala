@@ -4,6 +4,13 @@ import scala.collection.immutable._
 
 trait DataStructure {
 
+  /**
+   * This is the UnionFind data structure.
+   *
+   * One use case it to give Tensor Dimensions names (named dimension), which have to be unified based on operation features.
+   * In AIRCoP, the dimensions are named. However, if we don't expect the user to provide the names correctly,
+   * we have to unify the names based on operation features. Then we would need a union find data structure.
+   */
   class USet[T](val ele: T, var parent: USet[T], var size: Int = 1) {
 
     def head: USet[T] = if (parent == this) this else {
