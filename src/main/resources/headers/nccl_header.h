@@ -8,7 +8,8 @@
 #ifndef SRC_TEST_UTILITIES_H_
 #define SRC_TEST_UTILITIES_H_
 
-#include <curand.h>
+// #include <curand.h>
+#include <nccl.h>
 #include <cerrno>
 #include <string>
 
@@ -30,6 +31,7 @@
   }                                                 \
 } while(0)
 
+/*
 template<typename T>
 void Randomize(T* const dest, const int N, const int randomSeed);
 
@@ -434,5 +436,5 @@ int strToNonNeg(const char* s) {
     return -1;
   return (int)temp;
 }
-
+*/
 #endif // SRC_TEST_UTILITIES_H_

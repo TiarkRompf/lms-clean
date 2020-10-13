@@ -246,6 +246,10 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // __host__ ​ __device__ ​cudaError_t cudaStreamCreateWithFlags ( cudaStream_t* pStream, unsigned int  flags )
   def cudaStreamCreateWithFlags(stream: Rep[cudaStreamT], flag: Rep[Int]) =
     libFunction[CudaErrorT]("cudaStreamCreateWithFlags", Unwrap(stream), Unwrap(flag))(Seq(0), Seq(0), Set(0))
+  
+  // __host__​cudaError_t cudaStreamCreate ( cudaStream_t* pStream )
+  def cudaStreamCreate(stream: Rep[cudaStreamT]) =
+    libFunction[CudaErrorT]("cudaStreamCreate", Unwrap(stream))(Seq(0), Seq(0), Set(0))
 
   // __host__ ​cudaError_t cudaStreamSynchronize ( cudaStream_t stream ) // Waits for stream tasks to complete.
   def cudaStreamSynchronize(stream: Rep[cudaStreamT]) =
@@ -257,8 +261,11 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     libFunction[CudaErrorT]("cudaGetDeviceCount", UnwrapV(count))(Seq(), Seq(0), Set(0))
 
   // cudaError_t cudaMemset( void* devPtr, int value, size_t count )
-  def cudaMemset[T:Manifest](devPtr: Rep[Array[T]], value: Rep[T], count: Rep[SizeT]) =
+  def cudaMemset[T:Manifest](devPtr: Rep[Array[T]], value: Rep[Int], count: Rep[SizeT]) =
     libFunction[CudaErrorT]("cudaMemset", Unwrap(devPtr), Unwrap(value), Unwrap(count))(Seq(1,2), Seq(0), Set())
+  def cudaMemset2[T:Manifest](devPtr: Rep[Array[T]], value: Rep[Int], count: Rep[Int]) = {
+    cudaMemset[T](devPtr, value, SizeT(count * sizeOf[T]))
+  }
 
 
   // CUDA Kernel Basics:

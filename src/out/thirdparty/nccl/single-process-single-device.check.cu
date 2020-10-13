@@ -20,8 +20,8 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x4, (size_t)(33554432 * sizeof(int))));
   float* x5 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x5, (size_t)(33554432 * sizeof(int))));
-  CUDA_CALL(cudaMemset(x4, 1.0, 33554432));
-  CUDA_CALL(cudaMemset(x5, 0.0, 33554432));
+  CUDA_CALL(cudaMemset(x4, 1, 33554432));
+  CUDA_CALL(cudaMemset(x5, 0, 33554432));
   CUDA_CALL(cudaStreamCreateWithFlags(&x3, cudaStreamDefault));
   NCCLCHECK(ncclCommInitAll(&x1, 1, x2));
   NCCLCHECK(ncclAllReduce(x4, x5, 33554432, ncclFloat, ncclSum, x1, x3));
