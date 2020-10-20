@@ -20,7 +20,7 @@ class RandomDataTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]) = {
         for (i <- (0 until 10): Rep[Range]) {
-          printf("%d ", randInt + arg)
+          printf("%d ", randomValue[Int] + arg)
         }
       }
     }
@@ -33,7 +33,7 @@ class RandomDataTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]) = {
         for (i <- (0 until 10): Rep[Range]) {
-          printf("%f ", randFloat)
+          printf("%f ", randomValue[Float])
         }
       }
     }

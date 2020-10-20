@@ -25,6 +25,12 @@ object RandomDataTypeLess {
     val q = CAST_HELPER(rand_max, manifest[Int], manifest[Float], __pos)
     FLOAT(NUM(p) / NUM(q))
   }
+
+  def random_value(m: Manifest[_])(implicit __pos: SourceContext): TOP = m match {
+    case ma if ma == manifest[Int] => rand_int
+    case ma if ma == manifest[Float] => rand_float
+    case ma => throw new Exception(s"manifest $ma is not yet handled in random_value function")
+  }
 }
 
 trait RandomDataOps extends Base {
@@ -34,4 +40,5 @@ trait RandomDataOps extends Base {
   def randInt(implicit __pos: SourceContext): Rep[Int] = Wrap[Int](rand_int.x)
   def randMax(implicit __pos: SourceContext): Rep[Int] = Wrap[Int](rand_max.x)
   def randFloat(implicit __pos: SourceContext): Rep[Float] = Wrap[Float](rand_float.x)
+  def randomValue[T:Numeric:Manifest](implicit __pos: SourceContext): Rep[T] = Wrap[T](random_value(manifest[T]).x)
 }
