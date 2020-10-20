@@ -806,6 +806,11 @@ trait LiftPrimitives {
 object PrimitiveTypeLess {
   import BaseTypeLess._
 
+  def CAST_HELPER(x: TOP, mX: Manifest[_], mY: Manifest[_], pos: SourceContext): TOP = {
+    assert(x.t == mX, s"input ${x} is not of type manifest ${mX}")
+    TOP(Adapter.g.reflect("cast", x.x, Backend.Const(mY)), mY)
+  }
+
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
       assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
@@ -831,6 +836,7 @@ object PrimitiveTypeLess {
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =
     (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
+  def NUM(x: TOP): NUM = new NUM(x.x)
 
 
   class INT(override val x: Backend.Exp) extends NUM(x) {
@@ -845,6 +851,8 @@ object PrimitiveTypeLess {
   }
   def FLOAT(x: Backend.Exp)(implicit __pos: SourceContext): FLOAT = (new FLOAT(x)).withSource(__pos)
   implicit def FLOAT(i: Float)(implicit __pos: SourceContext): FLOAT = (new FLOAT(Backend.Const(i))).withSource(__pos)
+
+  def FLOAT(x: TOP): FLOAT = (new FLOAT(x.x))
 }
 
 /**
