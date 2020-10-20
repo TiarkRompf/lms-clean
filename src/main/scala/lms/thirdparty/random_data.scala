@@ -13,6 +13,10 @@ object RandomDataTypeLess {
   import PrimitiveTypeLess._
   import CLibTypeLess._
 
+  // FIXME(feiw) add support for this:
+  /* Intializes random number generator */
+  // srand((unsigned) time(&t));
+
   def rand_int(implicit __pos: SourceContext): INT = INT(CMACRO("rand()", manifest[Int]))
   def rand_max(implicit __pos: SourceContext): INT = INT(CMACRO("RAND_MAX", manifest[Int]))
 
