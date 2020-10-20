@@ -806,7 +806,7 @@ trait LiftPrimitives {
 object PrimitiveTypeLess {
   import BaseTypeLess._
 
-  def CAST_HELPER(x: TOP, mX: Manifest[_], mY: Manifest[_], pos: SourceContext): TOP = {
+  def CAST_HELPER(x: TOP, mX: Manifest[_], mY: Manifest[_], pos: SourceContext)(implicit __pos: SourceContext): TOP = {
     assert(x.t == mX, s"input ${x} is not of type manifest ${mX}")
     TOP(Adapter.g.reflect("cast", x.x, Backend.Const(mY)), mY)
   }
