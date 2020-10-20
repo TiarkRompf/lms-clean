@@ -12,8 +12,8 @@ Emitting C Generated Code
 void Snippet(int x0) {
   module([&]() {
     float x1 = tensor_weight(TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno), SAnno(Dim(0),List(GPU(0), GPU(1)),true));
-    float x2 = tensor_weight(TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno), SAnno(Dim(0),List(GPU(0), GPU(1)),true));
-    float x3 = tensor_weight(TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno), SAnno(Dim(0),List(GPU(0), GPU(1)),true));
+    float x2 = tensor_zeros(TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno), SAnno(Dim(0),List(GPU(0), GPU(1)),true));
+    float x3 = tensor_zeros(TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno), SAnno(Dim(0),List(GPU(0), GPU(1)),true));
     int x4 = 0;
     while (x4 != 5) {
       float x5 = tensor_input(TensorType(List(Size(Dim(0),32), Size(Dim(1),32)),Float,NAnno), SAnno(Dim(0),List(GPU(0), GPU(1)),true));

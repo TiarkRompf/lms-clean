@@ -148,8 +148,8 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val new_weight = WEIGHT(tt, anno)
-      grad_map(s) = WEIGHT(tt, anno)
-      momentum_map(s) = WEIGHT(tt, anno)
+      grad_map(s) = ZEROS(tt, anno)
+      momentum_map(s) = ZEROS(tt, anno)
       // FIXME(feiw) how do we deal with the case where multiple nodes are generated?
       new_weight.x
 
