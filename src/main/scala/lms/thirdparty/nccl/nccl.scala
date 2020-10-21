@@ -10,6 +10,41 @@ import lms.macros.SourceContext
 import lms.thirdparty.array_computation.CudaOps
 
 import lms.collection._
+import lms.collection.mutable.ArrayTypeLess
+
+object NCCLTypeLess {
+
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
+  import ArrayTypeLess._
+  import SIZE_TTypeLess._
+  import CLibTypeLess._
+
+  class NCCL_RESULT
+
+  def NCCL_CHECK(result: TOP)(implicit __pos: SourceContext): UNIT = {
+    assert(result.t == manifest[NCCL_RESULT], "NCCL_CHECK must take the NCCL_RESULT type as input")
+    UNIT(LIB_FUNCTION(manifest[Unit], "NCCLCHECK", result.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))
+  }
+
+  def NCCL_ALLREDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, dataType: TOP, op: TOP, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclAllReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, comm.x, stream.x)(Seq(0,3,4,5,6), Seq(1,5,6), Set[Int]())
+
+  def NCCL_BROADCAST(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, dataType: TOP, root: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclBroadCast", sendbuf.x, recvbuf.x, count.x, dataType.x, root.x, comm.x, stream.x)(Seq(0,3,5,6), Seq(1,5,6), Set[Int]())
+
+  def NCCL_REDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, dataType: TOP, op: TOP, root: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, root.x, comm.x, stream.x)(Seq(0,3,4,6,7), Seq(1,6,7), Set[Int]())
+
+  def NCCL_ALLGATHER(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, sendcount: SIZE_T, dataType: TOP, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclAllGather", sendbuf.x, recvbuf.x, sendcount.x, dataType.x, comm.x, stream.x)(Seq(0,3,4,5), Seq(1,4,5), Set[Int]())
+
+  def NCCL_SEND(m: Manifest[_], sendbuf: ARRAY, count: SIZE_T, dataType: TOP, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclSend", sendbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(0,2,4,5), Seq(4,5), Set[Int]())
+
+  def NCCL_RECV(m: Manifest[_], recvbuf: ARRAY, count: SIZE_T, dataType: TOP, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclRecv", recvbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(2,4,5), Seq(0,4,5), Set[Int]())
+}
 
 trait NCCLOps extends CLibs with SizeTOps with CudaOps {
 
@@ -216,7 +251,5 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * Thread Safety
    * NCCL primitives are generally not thread-safe, however, they are reentrant. Multiple threads should use separate communicator objects.
    */
-
-
 
 }

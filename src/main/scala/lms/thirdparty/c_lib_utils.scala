@@ -24,6 +24,14 @@ object CLibTypeLess {
   def NEW_STRUCT(m: Manifest[_])(implicit __pos: SourceContext): TOP = {
     TOP(Adapter.g.reflectUnsafe("lib-struct", Backend.Const(m)), m)
   }
+
+  // FIXME(feiw) this LIB_FUNCTION needs explicit cast to return non-TOP
+  def LIB_FUNCTION(manifest: Manifest[_], m: String, rhs: lms.core.Backend.Exp*)(rkeys:Seq[Int], wkeys: Seq[Int], pkeys: Set[Int], keys: lms.core.Backend.Exp*)(implicit __pos: SourceContext): TOP = {
+    val readKeys = rkeys.map(rhs(_))
+    val writeKeys = wkeys.map(rhs(_)) ++ keys
+    val defs = Seq(lms.core.Backend.Const(m), lms.core.Backend.Const(pkeys)) ++ rhs
+    TOP(Adapter.g.reflectEffect("lib-function", defs:_*)(readKeys: _*)(writeKeys: _*), manifest)
+  }
 }
 
 

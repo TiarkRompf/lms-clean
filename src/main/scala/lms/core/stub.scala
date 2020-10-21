@@ -113,6 +113,7 @@ object BaseTypeLess {
     Adapter.typeMap(x) = manifest[Unit]
   }
   def UNIT(x: Backend.Exp)(implicit __pos: SourceContext): UNIT = (new UNIT(x)).withSource(__pos)
+  def UNIT(x: TOP): UNIT = new UNIT(x.x)
 
 
   class BOOL(override val x: Backend.Exp) extends TOP(x) {
@@ -1321,9 +1322,9 @@ abstract class DslSnippet[A:Manifest, B:Manifest] extends Dsl {
 }
 
 // Basic DslDriver for Scala CodeGen
-abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslExp { self =>
+abstract class DslDriver[A:Manifest,B:Manifest] extends DslSnippet[A,B] with DslExp { q =>
   val codegen = new DslGen {
-    val IR: self.type = self
+    val IR: q.type = q
   }
   lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
