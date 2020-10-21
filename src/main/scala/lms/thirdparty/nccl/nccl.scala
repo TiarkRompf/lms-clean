@@ -22,28 +22,51 @@ object NCCLTypeLess {
 
   class NCCL_RESULT
 
+  def NCCL_DATATYPE(m: Manifest[_])(implicit __pos: SourceContext) = m match {
+    case ma if ma == manifest[Int] => CMACRO("ncclInt32", manifest[Int])
+    case ma if ma == manifest[Float] => CMACRO("ncclFloat32", manifest[Int])
+    case ma => throw new Exception(s"manifest $ma is not yet handled in NCCL_DATATYPE function")
+  }
+
+  def NCCL_SUM(implicit __pos: SourceContext) = CMACRO("ncclSum", manifest[Int])
+  def NCCL_PROD(implicit __pos: SourceContext) = CMACRO("ncclProd", manifest[Int])
+  def NCCL_MIN(implicit __pos: SourceContext) = CMACRO("ncclMin", manifest[Int])
+  def NCCL_MAX(implicit __pos: SourceContext) = CMACRO("ncclMax", manifest[Int])
+
   def NCCL_CHECK(result: TOP)(implicit __pos: SourceContext): UNIT = {
     assert(result.t == manifest[NCCL_RESULT], "NCCL_CHECK must take the NCCL_RESULT type as input")
     UNIT(LIB_FUNCTION(manifest[Unit], "NCCLCHECK", result.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))
   }
 
-  def NCCL_ALLREDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, dataType: TOP, op: TOP, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+  def NCCL_ALLREDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, op: TOP, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
+    val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclAllReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, comm.x, stream.x)(Seq(0,3,4,5,6), Seq(1,5,6), Set[Int]())
+  }
 
-  def NCCL_BROADCAST(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, dataType: TOP, root: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+  def NCCL_BROADCAST(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, root: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
+    val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclBroadCast", sendbuf.x, recvbuf.x, count.x, dataType.x, root.x, comm.x, stream.x)(Seq(0,3,5,6), Seq(1,5,6), Set[Int]())
+  }
 
-  def NCCL_REDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, dataType: TOP, op: TOP, root: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+  def NCCL_REDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, op: TOP, root: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
+    val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, root.x, comm.x, stream.x)(Seq(0,3,4,6,7), Seq(1,6,7), Set[Int]())
+  }
 
-  def NCCL_ALLGATHER(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, sendcount: SIZE_T, dataType: TOP, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+  def NCCL_ALLGATHER(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, sendcount: SIZE_T, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
+    val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclAllGather", sendbuf.x, recvbuf.x, sendcount.x, dataType.x, comm.x, stream.x)(Seq(0,3,4,5), Seq(1,4,5), Set[Int]())
+  }
 
-  def NCCL_SEND(m: Manifest[_], sendbuf: ARRAY, count: SIZE_T, dataType: TOP, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+  def NCCL_SEND(m: Manifest[_], sendbuf: ARRAY, count: SIZE_T, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
+    val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclSend", sendbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(0,2,4,5), Seq(4,5), Set[Int]())
+  }
 
-  def NCCL_RECV(m: Manifest[_], recvbuf: ARRAY, count: SIZE_T, dataType: TOP, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) =
+  def NCCL_RECV(m: Manifest[_], recvbuf: ARRAY, count: SIZE_T, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
+    val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclRecv", recvbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(2,4,5), Seq(0,4,5), Set[Int]())
+  }
 }
 
 trait NCCLOps extends CLibs with SizeTOps with CudaOps {
