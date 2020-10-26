@@ -7,7 +7,7 @@ import macros.SourceContext
 import lms.collection._
 
 class SizeTTest extends TutorialFunSuite {
-  val under = "thirdparty/size_t"
+  val under = "thirdparty/size_t/"
 
   abstract class DslDriverCSizeT[A: Manifest, B: Manifest] extends DslDriverC[A,B] with SizeTOps { q =>
     override val codegen = new DslGenC with CCodeGenSizeTOps {

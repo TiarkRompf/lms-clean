@@ -38,21 +38,22 @@ class MPITest extends TutorialFunSuite {
     val driver = new DslDriverCMPI[Int,Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        mpi_init()
+        MPI_CHECK(mpi_init())
 
         var world_size = 0
-        mpi_comm_size(mpi_comm_world, world_size)
+        MPI_CHECK(mpi_comm_size(mpi_comm_world, world_size))
 
         var world_rank = 0
-        mpi_comm_rank(mpi_comm_world, world_rank)
+        MPI_CHECK(mpi_comm_rank(mpi_comm_world, world_rank))
 
         val processor_name = NewArray[Char](mpi_max_processor_name)
         var name_len = 0
-        mpi_get_processor_name(processor_name, name_len)
+        MPI_CHECK(mpi_get_processor_name(processor_name, name_len))
 
         printf("Hellw world from processor %s, rank %d out of %d processors\n",
           processor_name.ArrayOfCharToString, world_rank, world_size)
-        mpi_finalize()
+
+        MPI_CHECK(mpi_finalize())
       }
     }
     check("mpi_hello_world", driver.code, "c")

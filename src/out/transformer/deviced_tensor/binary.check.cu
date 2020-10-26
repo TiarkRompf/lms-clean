@@ -50,46 +50,46 @@ void Snippet(int x0) {
   float x1[6] = { 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 };
   float x2[6] = { 6.0, 5.0, 4.0, 3.0, 2.0, 1.0 };
   float* x3 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x3, (size_t)(6 * sizeof(int))));
-  CUDA_CALL(cudaMemcpy(x3, x1, (size_t)(6 * sizeof(int)), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&x3, (size_t)(6 * sizeof(float))));
+  CUDA_CALL(cudaMemcpy(x3, x1, (size_t)(6 * sizeof(float)), cudaMemcpyHostToDevice));
   float* x4 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x4, (size_t)(6 * sizeof(int))));
-  CUDA_CALL(cudaMemcpy(x4, x2, (size_t)(6 * sizeof(int)), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)(6 * sizeof(float))));
+  CUDA_CALL(cudaMemcpy(x4, x2, (size_t)(6 * sizeof(float)), cudaMemcpyHostToDevice));
   float* x5 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x5, (size_t)(6 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x5, (size_t)(6 * sizeof(float))));
   x6<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x3, x4, x5, 6);
   float* x14 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x14, (size_t)(6 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x14, (size_t)(6 * sizeof(float))));
   x15<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x3, x4, x14, 6);
   float* x23 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x23, (size_t)(6 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x23, (size_t)(6 * sizeof(float))));
   x24<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x3, x4, x23, 6);
   float* x32 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x32, (size_t)(6 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x32, (size_t)(6 * sizeof(float))));
   x33<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x3, x4, x32, 6);
   float* x41 = (float*)malloc(6 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x41, x5, (size_t)(6 * sizeof(int)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x41, x5, (size_t)(6 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x42 = 0;
   while (x42 != 6) {
     printf("%f ", x41[x42]);
     x42 = x42 + 1;
   }
   float* x43 = (float*)malloc(6 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x43, x14, (size_t)(6 * sizeof(int)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x43, x14, (size_t)(6 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x44 = 0;
   while (x44 != 6) {
     printf("%f ", x43[x44]);
     x44 = x44 + 1;
   }
   float* x45 = (float*)malloc(6 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x45, x23, (size_t)(6 * sizeof(int)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x45, x23, (size_t)(6 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x46 = 0;
   while (x46 != 6) {
     printf("%f ", x45[x46]);
     x46 = x46 + 1;
   }
   float* x47 = (float*)malloc(6 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x47, x32, (size_t)(6 * sizeof(int)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x47, x32, (size_t)(6 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x48 = 0;
   while (x48 != 6) {
     printf("%f ", x47[x48]);

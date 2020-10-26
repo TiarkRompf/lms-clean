@@ -1,24 +1,28 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
+#include "nccl_header.h"
 #include <string.h>
-#include <cblas.h>
 #include <stdlib.h>
 #include <cuda_header.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <mpi_header.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  float* x1 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x1, (size_t)(6 * sizeof(float))));
-  float* x2 = (float*)malloc(6 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(6 * sizeof(float)), cudaMemcpyDeviceToHost));
-  int x3 = 0;
-  while (x3 != 6) {
-    printf("%f ", x2[x3]);
-    x3 = x3 + 1;
-  }
+  ncclComm_t x1;
+  int x2[1] = { 0 };
+  NCCLCHECK(ncclCommInitAll(&x1, 1, x2));
+  cudaStream_t x3;
+  cudaStreamCreate(&x3);
+  float* x4 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)0));
+  float* x5 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x5, (size_t)0));
+  NCCLCHECK(ncclAllReduce(x4, x5, 0, ncclFloat, ncclSum, x1, x3));
+  CUDA_CALL(cudaStreamSynchronize(x3));
+  printf("end");
 }
 /*****************************************
 End of C Generated Code

@@ -75,8 +75,8 @@ trait CCodeGenSizeTOps extends ExtendedCCodeGen with CCodeGenLibs {
   }
 
   override def shallow(n: Node): Unit = n match {
-    case Node(s, "sizeof", _, _) =>
-      emit(s"sizeof(${remap(typeMap(s))})")
+    case Node(s, "sizeof", List(Backend.Const(m:Manifest[_])), _) =>
+      emit(s"sizeof(${remap(m)})")
     case _ => super.shallow(n)
   }
 }
