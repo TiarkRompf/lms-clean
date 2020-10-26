@@ -104,7 +104,10 @@ object BaseTypeLess {
     def p: SourceContext = Adapter.sourceMap(x)
     def t: Manifest[_] = Adapter.typeMap(x)
     def equals(that: this.type) = x == that.x
+
+    def castTo(mY: Manifest[_])(implicit pos: SourceContext) = TOP(Adapter.g.reflect("cast", x, Backend.Const(mY)), mY)
   }
+
   def TOP(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): TOP =
     (new TOP(x)).withSrcType(__pos, m)
 
@@ -113,6 +116,7 @@ object BaseTypeLess {
     Adapter.typeMap(x) = manifest[Unit]
   }
   def UNIT(x: Backend.Exp)(implicit __pos: SourceContext): UNIT = (new UNIT(x)).withSource(__pos)
+  def UNIT(x: TOP): UNIT = new UNIT(x.x)
 
 
   class BOOL(override val x: Backend.Exp) extends TOP(x) {
@@ -805,11 +809,6 @@ trait LiftPrimitives {
 
 object PrimitiveTypeLess {
   import BaseTypeLess._
-
-  def CAST_HELPER(x: TOP, mX: Manifest[_], mY: Manifest[_], pos: SourceContext)(implicit __pos: SourceContext): TOP = {
-    assert(x.t == mX, s"input ${x} is not of type manifest ${mX}")
-    TOP(Adapter.g.reflect("cast", x.x, Backend.Const(mY)), mY)
-  }
 
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
