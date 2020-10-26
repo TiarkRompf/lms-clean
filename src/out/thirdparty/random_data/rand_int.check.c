@@ -5,6 +5,7 @@ Emitting C Generated Code
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = 0;
