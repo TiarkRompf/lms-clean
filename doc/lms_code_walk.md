@@ -27,7 +27,7 @@ Then the LMS backend compiles the LMS IR to target programs.
 
 The basic components of LMS support includes:
 1. LMS IR: defining how the core LMS IR looks like.
-2. CodeGen: defining how to generate target language.
+2. CodeGen: defining how to generate code in the target language.
 3. FrontEnd: defining how to construct the LMS IR nicely.
 
 The basic LMS IR is defined in this file `lms-clean/src/main/scala/lms/core/backend.scala`:
@@ -36,7 +36,7 @@ The basic LMS IR is defined in this file `lms-clean/src/main/scala/lms/core/back
 The simple typeless frontend is defined in this file `lms-clean/src/main/scala/lms/core/frontend.scala`:
 [LMS Simple Frontend](main/scala/lms/core/frontend.md)
 
-The iconic typed (`Rep[T]`) frondend is defined in this file `lms-clean/src/main/scala/lms/core/stub.scala`:
+The iconic typed (`Rep[T]`) frontend is defined in this file `lms-clean/src/main/scala/lms/core/stub.scala`:
 [LMS Frontend](main/scala/lms/core/stub.md)
 
 The basic codegen support is in the file `lms-clean/src/main/scala/lms/core/codegen.scala`
@@ -46,7 +46,7 @@ TODO(feiw): add a markdown file for codegen.
 
 ### Extension
 
-Besides the basic LMS support mensioned above, LMS can be extended to support the following:
+Besides the basic LMS support mentioned above, LMS has included a number of extensions:
 1. Collections (Array, List, Tuple, ...)
 2. ThirdParty library (MPI, NCCL, ...)
 3. Other Types (fp16, tensor, ...)
@@ -78,16 +78,16 @@ function in this trait is `override def shallow` that generates code for each `R
 Several examples of third party libraries are implemented here (`lms-clean/src/main/scala/lms/thirdparty`). The key functionality is provide by `lms-clean/src/main/scala/lms/thirdparty/c_lib_utils.scala`.
 
 In the `c_lib_utils.scala` file, we provide the following functionalities:
-1. Create a Macro by `def cmacro` function.
-2. Create a C Struct by `def newStruct` function.
-3. Create a call to library function by `def libFunction` function.
+1. Create a macro by the `cmacro` function.
+2. Create a C struct by `newStruct` function.
+3. Create a call to library functions by `libFunction` function.
 
 We only create three types of nodes for thirdparty libraries.
-1. The `def cmacro` function creates nodes with `op = "cmacro"`.
-2. The `def newStruct` function creates nodes with `op = "lib-struct"`.
-3. The `def libFunction` function creates nodes with `op = "lib-Function"`.
+1. The `cmacro` function creates nodes with `op = "cmacro"`.
+2. The `newStruct` function creates nodes with `op = "lib-struct"`.
+3. The `libFunction` function creates nodes with `op = "lib-Function"`.
 
-The codegen support those nodes are in this same file.
+The codegen supporting those nodes are in this same file.
 To mix in traits for the frontend support, just extend the `trait CLibs`.
 To mix in traits for the codegen support, just extend the `trait CCodeGenLibs`.
 
@@ -98,7 +98,7 @@ With the support in frontends and codegen, we want to introduce a driver or a co
 The basic components of a driver or compiler include:
 1. All the needed frontend traits.
 2. All the needed codegen traits.
-3. An abstract `def snippet` that is the user application code
+3. An abstract method `snippet`, which will be overridden by the user application code
 4. Facilities to print code to files, compile them, and evaluate them.
 
 For example:
@@ -184,4 +184,3 @@ abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
 ```
 
 where you can override the `def transform` to add in your desired transformation.
-
