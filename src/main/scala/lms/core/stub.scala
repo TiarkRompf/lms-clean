@@ -104,7 +104,10 @@ object BaseTypeLess {
     def p: SourceContext = Adapter.sourceMap(x)
     def t: Manifest[_] = Adapter.typeMap(x)
     def equals(that: this.type) = x == that.x
+
+    def castTo(mY: Manifest[_])(implicit pos: SourceContext) = TOP(Adapter.g.reflect("cast", x, Backend.Const(mY)), mY)
   }
+
   def TOP(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): TOP =
     (new TOP(x)).withSrcType(__pos, m)
 
@@ -113,6 +116,7 @@ object BaseTypeLess {
     Adapter.typeMap(x) = manifest[Unit]
   }
   def UNIT(x: Backend.Exp)(implicit __pos: SourceContext): UNIT = (new UNIT(x)).withSource(__pos)
+  def UNIT(x: TOP): UNIT = new UNIT(x.x)
 
 
   class BOOL(override val x: Backend.Exp) extends TOP(x) {
@@ -831,6 +835,7 @@ object PrimitiveTypeLess {
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =
     (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
+  def NUM(x: TOP): NUM = new NUM(x.x)
 
 
   class INT(override val x: Backend.Exp) extends NUM(x) {
@@ -845,6 +850,8 @@ object PrimitiveTypeLess {
   }
   def FLOAT(x: Backend.Exp)(implicit __pos: SourceContext): FLOAT = (new FLOAT(x)).withSource(__pos)
   implicit def FLOAT(i: Float)(implicit __pos: SourceContext): FLOAT = (new FLOAT(Backend.Const(i))).withSource(__pos)
+
+  def FLOAT(x: TOP): FLOAT = (new FLOAT(x.x))
 }
 
 /**

@@ -19,10 +19,10 @@ __global__ void x2(float* x3, float x4, int x5) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x1, (size_t)(5 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x1, (size_t)(5 * sizeof(float))));
   x2<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x1, 3.0, 5);
   float* x8 = (float*)malloc(5 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x8, x1, (size_t)(5 * sizeof(int)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x8, x1, (size_t)(5 * sizeof(float)), cudaMemcpyDeviceToHost));
   printf("%f %f", x8[2], x8[3]);
   CUDA_CALL(cudaFree(x1));
 }

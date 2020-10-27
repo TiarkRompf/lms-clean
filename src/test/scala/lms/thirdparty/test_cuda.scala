@@ -9,7 +9,7 @@ import lms.collection.mutable.ArrayTypeLess
 
 
 class CudaTest extends TutorialFunSuite {
-  val under = "thirdparty/cuda"
+  val under = "thirdparty/cuda/"
 
   // first: get a driver :)
   abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaOps { q =>
