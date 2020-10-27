@@ -46,6 +46,9 @@ object FixedSizeDistributedTensorTypeLess {
   case class Size(dim: Dim, size: Int) // dim and length
   case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno) { // tensor type
     def namedDim(x: Int) = shape(x).dim
+    def contains(d: Dim) = shape.map(_.dim).contains(d)
+    def shapeSize = shape.map(_.size)
+    def shapeSizeAfterSplit(d: Dim, degree: Int) = shape.map(s => if (s.dim == d) s.size / degree else s.size)
   }
 
   abstract class Anno extends Serializable // Annotation class
@@ -88,6 +91,8 @@ object FixedSizeDistributedTensorTypeLess {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
+
+    def pos: SourceContext = if (useOldMetadata) Adapter.oldSourceMap(x) else Adapter.sourceMap(x)
 
     def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
