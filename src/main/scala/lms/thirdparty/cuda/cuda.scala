@@ -27,7 +27,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   // a typeless interface for CUDA_MALLOC
   def CUDA_MALLOC(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
     val addr = ARRAY(0, m)
-    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, SIZE_T(count * sizeOf(m)).x)(Seq(1), Seq(0), Set(0))))
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, SIZE_T(count * SIZE_OF(m)).x)(Seq(1), Seq(0), Set(0))))
     addr
   }
 
@@ -46,8 +46,13 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   def CPYDefault(implicit __pos: SourceContext): CUDA_MEMCPY_KIND = CUDA_MEMCPY_KIND(CMACRO("cudaMemcpyDefault", manifest[Any]))
 
   // ​cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
-  def CUDA_MEMCOPY(dst: ARRAY, src: ARRAY, count: INT, kind: CUDA_MEMCPY_KIND, m: Manifest[_])(implicit __pos: SourceContext) =
-    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, SIZE_T(count * sizeOf(m)).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
+  def CUDA_MEMCPY(dst: ARRAY, src: ARRAY, count: INT, kind: CUDA_MEMCPY_KIND, m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, SIZE_T(count * SIZE_OF(m)).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
+
+  // cudaSetDevice(int)
+  def CUDA_SET_DEVICE(device: INT) =
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaSetDevice", device.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)))
+
 
   class DIM3(override val x: Backend.Exp) extends TOP(x)
   def DIM3(a: Int, b: Int = 1, c: Int = 1)(implicit __pos: SourceContext): DIM3 =
@@ -131,7 +136,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
   // Element-wise Accumulation (+=)
   def CUDA_ACCUM_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
-    CUDA_ELEMENTWISE_MUTATION_BINARY_KERNEL(m)(_ + _)
+    CUDA_ELEMENTWISE_MUTATION_BINARY_KERNEL(m, _ + _)
   val CUDA_ACCUM_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_ACCUM_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ACCUM_KERNEL_MAP.getOrElseUpdate(m, CUDA_ACCUM_KERNEL(m))
 
@@ -149,7 +154,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     val tid = threadIdxX + blockIdxX * blockDimX
     for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
       val index = INT(Unwrap(i))
-      (t0_new, t2_new) = op(t0(index), t1(index), t2(index))
+      val (t0_new, t2_new) = op(t0(index), t1(index), t2(index))
       t0(index) = t0_new
       t2(index) = t2_new; ()
     }
@@ -161,10 +166,10 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   def CUDA_SGD_Nesterov_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
     CUDA_ELEMENTWISE_M_I_M_KERNEL(m, (w: NUM, g: NUM, v: NUM) => {
       // default \mu as 0.5 and learning rate to 0.0001 for now
-      val mu = 0.5
-      val lr = 0.0001
-      val v_1 = v * mu + g
-      val w_1 = w - v_1 * lr
+      val mu = 0.5f
+      val lr = 0.0001f
+      val v_1 = v * FLOAT(mu) + g
+      val w_1 = w - v_1 * FLOAT(lr)
       (w_1, v_1)
     })
   val CUDA_SGD_Nesterov_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()

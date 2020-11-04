@@ -94,7 +94,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     }
     // FIXME(feiw) change res to updated weights
     val updated_weights = weightSyms.map(w => subst(w)).toList
-    g.reflectEffect("save", updated_weights: _*)(updated_weights: _*)(Adapter.CTRL)
+    updated_weights.foreach(w => (new TENSOR(w)).save)
     Backend.Const(())
   }
 

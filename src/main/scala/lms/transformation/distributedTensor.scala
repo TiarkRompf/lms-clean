@@ -124,6 +124,11 @@ object FixedSizeDistributedTensorTypeLess {
       UNIT(Adapter.g.reflectEffect("show_tensor", x)(x)(Adapter.CTRL))
     }
 
+    // FIXME(feiw) save to where?
+    def save(implicit __pos: SourceContext): UNIT = {
+      UNIT(Adapter.g.reflectEffect("save", x)(x)(Adapter.CTRL))
+    }
+
     def += (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("accum_tensor", C(anno), x, y.x)(x, y.x)(x))
     }

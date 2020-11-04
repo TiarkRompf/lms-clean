@@ -125,6 +125,13 @@ object BaseTypeLess {
   }
   def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
 
+  // FIXME(feiw) maybe check the manifest? Not so easy since manifest do not have to be the same
+  // FIXME(feiw) maybe move to a separate object other than BaseTypeLess?
+  def infix_!=(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
+    BOOL(Adapter.g.reflect("!=", a.x, b.x))
+  def infix_==(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
+    BOOL(Adapter.g.reflect("==", a.x, b.x))
+
 
   class VAR(override val x: Backend.Exp) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x)
@@ -140,6 +147,16 @@ object BaseTypeLess {
   def VAR(x: TOP)(implicit __pos: SourceContext): VAR =
     (new VAR(Adapter.g.reflectMutable("var_new", x.x))).withSrcType(__pos, x.t)
 
+  def IF(c: BOOL)(a: => TOP)(b: => TOP): TOP = {
+    val aBlock = g.reifyHere(a.x)
+    val bBlock = g.reifyHere(b.x)
+    // compute effect (aBlock || bBlock)
+    val pure = aBlock.isPure && bBlock.isPure
+    if (pure)
+      INT(g.reflect("?",c.x,aBlock,bBlock))
+    else
+      INT(g.reflectEffectSummaryHere("?",c.x,aBlock,bBlock)(g.mergeEffKeys(aBlock, bBlock)))
+  }
 
   def WHILE(c: => BOOL)(b: => Unit): Unit = {
     val cBlock = Adapter.g.reify(c.x)
@@ -148,6 +165,9 @@ object BaseTypeLess {
     Adapter.g.reflectEffectSummary("W", cBlock,
       bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock))
   }
+
+  def PRINTF(f: String, xs: TOP*)(implicit pos: SourceContext): UNIT =
+    UNIT(Adapter.g.reflectWrite("printf", Backend.Const(f)::xs.map(_.x).toList:_*)(Adapter.CTRL))
 }
 
 /**
@@ -633,6 +653,30 @@ trait UtilOps extends Base {
   case class StrSubHashCode(o: Rep[String], len: Rep[Int])(implicit pos: SourceContext) extends Def[Long]
   def infix_HashCode[T:Typ](o: Rep[T])(implicit pos: SourceContext) = ObjHashCode(o)
   def infix_HashCodeS(o: Rep[String], len: Rep[Int])(implicit v: Overloaded1, pos: SourceContext) = StrSubHashCode(o,len)
+}
+
+
+object RangeTypeLess {
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
+
+  class RANGE(override val x: Backend.Exp) extends TOP(x) {
+    this.withType(manifest[Range])
+
+    def foreach(f: INT => UNIT)(implicit __pos: SourceContext) = x match {
+      case Adapter.g.Def("range_until", List(x0: Backend.Exp, x1: Backend.Exp)) =>
+        val i = VAR(INT(x0))
+        WHILE(INT(i) != INT(x1)) {
+          f(INT(i))
+          i.update(INT(i) + 1); ()
+        }
+    }
+  }
+  def RANGE(x: Backend.Exp)(implicit __pos: SourceContext): RANGE = (new RANGE(x)).withSource(__pos)
+
+  def RANGE_UNTIL(start: INT, end: INT)(implicit __pos: SourceContext) =
+    RANGE(Adapter.g.reflect("range_until", start.x, end.x))
+
 }
 
 trait RangeOps extends Equal with OrderingOps {

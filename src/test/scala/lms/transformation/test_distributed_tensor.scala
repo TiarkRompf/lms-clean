@@ -33,7 +33,8 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       graph1.show
       val graph2 = (new DistributeTensorAIRCoP {}).transform(graph1)
       graph2.show
-      graph2
+      val graph3 = (new DistributeTensor2MPI_NCCL {}).transform(graph2)
+      graph3
     }
   }
 

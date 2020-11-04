@@ -101,11 +101,11 @@ class CudaTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]) = {
         val cuda_arr = CUDA_MALLOC(5, manifest[Float])
-        val cudaFillFloat = CUDA_FILL(manifest[Float])
+        val cudaFillFloat = CUDA_FILL_FUN(manifest[Float])
         cudaFillFloat(cuda_arr, 3.0f, 5, DIM3(gridSize), DIM3(blockSize))
 
         val arr = ARRAY(5, manifest[Float])
-        CUDA_MEMCOPY(arr, cuda_arr, 5, DEVICE2HOST, manifest[Float])
+        CUDA_MEMCPY(arr, cuda_arr, 5, DEVICE2HOST, manifest[Float])
         printf("%f %f", Wrap[Float](arr(2).x), Wrap[Float](arr(3).x))
         CUDA_FREE(cuda_arr)
         unit(())

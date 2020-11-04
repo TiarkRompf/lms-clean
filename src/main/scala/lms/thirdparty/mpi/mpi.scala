@@ -10,7 +10,7 @@ import lms.macros.SourceContext
 
 import lms.collection._
 
-trait MPIOps extends CMacro with LibStruct with LibFunction { b: Base =>
+trait MPIOps extends CMacro with LibStruct with LibFunction {
   /* LMS support for MPI library */
 
   // this is how we deal with constant macros
