@@ -312,14 +312,15 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
           val count = numeral(sourceTensor.shape_size)
           val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
 
-          IF (myNCCLRank == INT(root)) {
-            val recvbuf = CUDA_MALLOC(count, m)
-          } {
-            // only send buffers
-            ???
-          }
+          // IF (EQUAL(myNCCLRank, INT(root))) {
+          //   val recvbuf = CUDA_MALLOC(count, m)
+          // } {
+          //   // only send buffers
+          //   ???
+          // }
 
           // step 1: Gather
+          val recvbuf = CUDA_MALLOC(count, m)
           NCCL_CHECK(NCCL_GROUP_START)
           if (myNCCLRank == root) {
             for (r <- RANGE_UNTIL(0, myNCCLSize)) {

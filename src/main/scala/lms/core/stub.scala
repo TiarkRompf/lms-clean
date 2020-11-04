@@ -127,9 +127,9 @@ object BaseTypeLess {
 
   // FIXME(feiw) maybe check the manifest? Not so easy since manifest do not have to be the same
   // FIXME(feiw) maybe move to a separate object other than BaseTypeLess?
-  def infix_!=(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
+  def NOT_EQUAL(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
     BOOL(Adapter.g.reflect("!=", a.x, b.x))
-  def infix_==(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
+  def EQUAL(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
     BOOL(Adapter.g.reflect("==", a.x, b.x))
 
 
@@ -147,15 +147,19 @@ object BaseTypeLess {
   def VAR(x: TOP)(implicit __pos: SourceContext): VAR =
     (new VAR(Adapter.g.reflectMutable("var_new", x.x))).withSrcType(__pos, x.t)
 
-  def IF(c: BOOL)(a: => TOP)(b: => TOP): TOP = {
-    val aBlock = g.reifyHere(a.x)
-    val bBlock = g.reifyHere(b.x)
+  def IF(c: BOOL)(a: => TOP)(b: => TOP)(implicit __pos: SourceContext): TOP = {
+    val aBlock = Adapter.g.reifyHere(a.x)
+    val bBlock = Adapter.g.reifyHere(b.x)
     // compute effect (aBlock || bBlock)
     val pure = aBlock.isPure && bBlock.isPure
+    val aManifest = Adapter.typeMap(aBlock.res)
+    val bManifest = Adapter.typeMap(bBlock.res)
+    // FIXME(feiw) maybe we should check the equality of the `aManifest` and `bManifest` but
+    // that might not consider subtypes
     if (pure)
-      INT(g.reflect("?",c.x,aBlock,bBlock))
+      TOP(Adapter.g.reflect("?",c.x,aBlock,bBlock), aManifest)
     else
-      INT(g.reflectEffectSummaryHere("?",c.x,aBlock,bBlock)(g.mergeEffKeys(aBlock, bBlock)))
+      TOP(Adapter.g.reflectEffectSummaryHere("?",c.x,aBlock,bBlock)(Adapter.g.mergeEffKeys(aBlock, bBlock)), aManifest)
   }
 
   def WHILE(c: => BOOL)(b: => Unit): Unit = {
@@ -666,7 +670,7 @@ object RangeTypeLess {
     def foreach(f: INT => UNIT)(implicit __pos: SourceContext) = x match {
       case Adapter.g.Def("range_until", List(x0: Backend.Exp, x1: Backend.Exp)) =>
         val i = VAR(INT(x0))
-        WHILE(INT(i) != INT(x1)) {
+        WHILE(NOT_EQUAL(INT(i), INT(x1))) {
           f(INT(i))
           i.update(INT(i) + 1); ()
         }
