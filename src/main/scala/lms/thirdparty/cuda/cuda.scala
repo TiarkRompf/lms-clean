@@ -589,6 +589,7 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
 
   override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
     case s: String if s.endsWith("Dim3") => "dim3"
+    case s: String if s.endsWith("CudaErrorT") => "cudaError_t"
     case _ => super.remap(m)
   }
 

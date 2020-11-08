@@ -131,6 +131,10 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
   def ncclCommInitAll(comm: Rep[ncclCommT], ndev: Rep[Int], devlist: Rep[Array[Int]]) =
     libFunction[ncclResultT]("ncclCommInitAll", Unwrap(comm), Unwrap(ndev),
       Unwrap(devlist))(Seq(0,2), Seq(0), Set(0))
+  /*
+  def ncclCommInitAll(comm: Rep[Array[ncclCommT]], ndev: Rep[Int], devlist: Rep[Array[Int]]) =
+    libFunction[ncclResultT]("ncclCommInitAll", Unwrap(comm), Unwrap(ndev),
+      Unwrap(devlist))(Seq(0,2), Seq(0), Set())*/
 
   def ncclUniqueIdBytes: Rep[Int] = cmacro[Int]("NCCL_UNIQUE_ID_BYTES")
 
@@ -307,4 +311,11 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * NCCL primitives are generally not thread-safe, however, they are reentrant. Multiple threads should use separate communicator objects.
    */
 
+}
+
+trait CCodeGenNCCLOps extends CCodeGenSizeTOps with CCodeGenLibs {
+  override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
+    case s: String if s.endsWith("ncclResultT") => "ncclResult_t"
+    case _ => super.remap(m)
+  }
 }
