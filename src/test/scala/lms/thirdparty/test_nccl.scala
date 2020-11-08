@@ -1,19 +1,21 @@
 package lms
 package thirdparty
 
+import lms.core._
 import lms.core.stub._
 import lms.core.virtualize
 import lms.macros.SourceContext
 import lms.collection._
-import lms.collection.mutable.ArrayTypeLess
+// import lms.collection.mutable.ArrayTypeLess
+import lms.collection.mutable._
 import lms.thirdparty.array_computation.{CUDATypeLess, CCodeGenCudaOps, CudaOps}
 
 
 class NCCLTest extends TutorialFunSuite {
   val under = "thirdparty/nccl/"
 
-  abstract class DslDriverCNCCL[A: Manifest, B: Manifest] extends DslDriverC[A,B] with NCCLOps with CudaOps with SizeTOps with MPIOps { q =>
-    override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCudaOps with CCodeGenSizeTOps with CCodeGenMPI {
+  abstract class DslDriverCNCCL[A: Manifest, B: Manifest] extends DslDriverC[A,B] with NCCLOps with CudaOps with SizeTOps with MPIOps with ArrayOps{ q =>
+    override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCudaOps with CCodeGenSizeTOps with CCodeGenMPI with CCodeGenNCCLOps {
       val IR: q.type = q
 
       registerHeader("\"nccl_header.h\"")
@@ -27,7 +29,7 @@ class NCCLTest extends TutorialFunSuite {
     override val executable = s"$curPath/snippet"
   }
 
-
+ 
   test("sanity-check") {
     // just sanity check. Output code not runnable
     val driver = new DslDriverCNCCL[Int, Unit] {
@@ -243,6 +245,346 @@ class NCCLTest extends TutorialFunSuite {
       }
     }
     check("mpi-reduce", driver.code, "cu")
+  }
+
+  test("p2p-sendrecv") {
+    val driver = new DslDriverCNCCL[Int, Unit] {
+      @virtualize
+      def snippet(arg:Rep[Int]) = {
+        val size = 32*1024*1024
+        var myRank = 0
+        var nRanks = 0
+        val localRank = 0
+
+        // initializing MPI
+        MPI_CHECK(mpi_init())
+        MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
+        MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
+
+        // calculating localRank
+        // for now, localRank = 0
+
+        // get NCCL unique ID at rank 0 and broadcast it to all others
+        var id = ncclUniqueId
+        if (myRank == 0) {
+          ncclCheck(ncclGetUniqueId(id))
+        }
+        MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
+
+        // picking a GPU based on localRank
+        cudaCall(cudaSetDevice(localRank))
+
+        val s = cudaStream
+        cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
+
+        // initializing NCCL
+        val comm = ncclComm
+        ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
+
+        // allocate and initialize buffers
+        val sendbuff = cudaMalloc2[Float](size)
+        val recvbuff = cudaMalloc2[Float](size)
+        val zero = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          zero(i) = 0
+        }
+        cudaCall(cudaMemcpy[Float](sendbuff, zero, SizeT(size), host2device))
+        val one = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          one(i) = 1
+        }
+        cudaCall(cudaMemcpy[Float](recvbuff, one, SizeT(size), host2device))
+
+        // one-to-all (scatter)
+        ncclCheck(ncclGroupStart())
+        ncclCheck(ncclSend(sendbuff, SizeT(size), ncclFloat, 1, comm, s))
+        ncclCheck(ncclRecv(recvbuff, SizeT(size), ncclFloat, 0, comm, s))
+        ncclCheck(ncclGroupEnd())
+
+        cudaCall(cudaStreamSynchronize(s))
+
+        // check results
+        cudaCall(cudaMemcpy[Float](zero, sendbuff, SizeT(size), device2host))
+        for (i <- (0 until size): Rep[Range]) {
+          if (zero(0) != 1) {
+            printf("error")
+          }
+        }
+        cudaCall(cudaMemcpy[Float](one, recvbuff, SizeT(size), device2host))
+        for (i <- (0 until size): Rep[Range]) {
+          if (one(0) != 0) {
+            printf("error")
+          }
+        }
+
+        // free device buffers
+        cudaCall(cudaFree(sendbuff))
+        cudaCall(cudaFree(recvbuff))
+
+        // finalizing NCCL
+        ncclCheck(ncclCommDestroy(comm))
+
+        // finalizing MPI
+        MPI_CHECK(mpi_finalize())
+
+        printf("[MPI Rank %d] Success \n", myRank)
+      }
+    }
+    // System.out.println(indent(driver.code))
+    check("p2p-sendrecv", driver.code, "cu")
+  }
+  
+  test("p2p-scatter") {
+    val driver = new DslDriverCNCCL[Int, Unit] {
+      @virtualize
+      def snippet(arg:Rep[Int]) = {
+        val size = 32*1024*1024
+        var myRank = 0
+        var nRanks = 0
+        val localRank = 0
+
+        // initializing MPI
+        MPI_CHECK(mpi_init())
+        MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
+        MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
+
+        // calculating localRank
+        // for now, localRank = 0
+
+        // get NCCL unique ID at rank 0 and broadcast it to all others
+        var id = ncclUniqueId
+        if (myRank == 0) {
+          ncclCheck(ncclGetUniqueId(id))
+        }
+        MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
+
+        // picking a GPU based on localRank
+        cudaCall(cudaSetDevice(localRank))
+
+        val s = cudaStream
+        cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
+
+        // initializing NCCL
+        val comm = ncclComm
+        ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
+
+        // allocte and initialize buffers
+        val one = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          one(i) = 1
+        }
+        val sendbuff = NewArray[Array[Float]](nRanks)
+        for (i <- (0 until nRanks): Rep[Range]) {
+          cudaCall(cudaMalloc[Float](sendbuff(i), SizeT(size)))
+          cudaCall(cudaMemcpy[Float](sendbuff(i), one, SizeT(size), host2device))
+        }
+        val recvbuff = cudaMalloc2[Float](size)
+        
+        
+        // one-to-all (scatter)
+        ncclCheck(ncclGroupStart())
+        if (myRank == localRank) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            ncclCheck(ncclSend(sendbuff(i), SizeT(size), ncclFloat, i, comm, s))
+          }
+          ncclCheck(ncclRecv(recvbuff, SizeT(size), ncclFloat, 0, comm, s))
+        }
+        ncclCheck(ncclGroupEnd())
+
+        cudaCall(cudaStreamSynchronize(s))
+
+        // check results
+        cudaCall(cudaMemcpy[Float](one, recvbuff, SizeT(size), device2host))
+        for (i <- (0 until size): Rep[Range]) {
+          if (one(0) != 1) {
+            printf("error")
+          }
+        }
+
+        // free device buffers
+        cudaCall(cudaFree(sendbuff))
+        cudaCall(cudaFree(recvbuff))
+
+        // finalizing NCCL
+        ncclCheck(ncclCommDestroy(comm))
+
+        // finalizing MPI
+        MPI_CHECK(mpi_finalize())
+
+        printf("[MPI Rank %d] Success \n", myRank)
+      }
+    }
+    // System.out.println(indent(driver.code))
+    check("p2p-scatter", driver.code, "cu")
+  }
+
+  test("p2p-gather") {
+    val driver = new DslDriverCNCCL[Int, Unit] {
+      @virtualize
+      def snippet(arg:Rep[Int]) = {
+        val size = 32*1024*1024
+        var myRank = 0
+        var nRanks = 0
+        val localRank = 0
+
+        // initializing MPI
+        MPI_CHECK(mpi_init())
+        MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
+        MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
+
+        // calculating localRank
+        // for now, localRank = 0
+
+        // get NCCL unique ID at rank 0 and broadcast it to all others
+        var id = ncclUniqueId
+        if (myRank == 0) {
+          ncclCheck(ncclGetUniqueId(id))
+        }
+        MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
+
+        // picking a GPU based on localRank
+        cudaCall(cudaSetDevice(localRank))
+
+        val s = cudaStream
+        cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
+
+        // initializing NCCL
+        val comm = ncclComm
+        ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
+
+        // allocate and initialize buffers
+        val sendbuff = cudaMalloc2[Float](size)
+        val one = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          one(i) = 1
+        }
+        val recvbuff = NewArray[Array[Float]](nRanks)
+        for (i <- (0 until nRanks): Rep[Range]) {
+          cudaCall(cudaMalloc[Float](recvbuff(i), SizeT(size)))
+          cudaCall(cudaMemcpy[Float](recvbuff(i), one, SizeT(size), host2device))
+        }
+        
+        // one-to-all (scatter)
+        ncclCheck(ncclGroupStart())
+        if (myRank == localRank) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            ncclCheck(ncclRecv(recvbuff(i), SizeT(size), ncclFloat, i, comm, s))
+          }
+          ncclCheck(ncclSend(sendbuff, SizeT(size), ncclFloat, 0, comm, s))
+        }
+        ncclCheck(ncclGroupEnd())
+
+        cudaCall(cudaStreamSynchronize(s))
+
+        // check results
+        cudaCall(cudaMemcpy[Float](one, sendbuff, SizeT(size), device2host))
+        for (i <- (0 until size): Rep[Range]) {
+          if (one(0) != 1) {
+            printf("error")
+          }
+        }
+
+        // free device buffers
+        cudaCall(cudaFree(sendbuff))
+        cudaCall(cudaFree(recvbuff))
+
+        // finalizing NCCL
+        ncclCheck(ncclCommDestroy(comm))
+
+        // finalizing MPI
+        MPI_CHECK(mpi_finalize())
+
+        printf("[MPI Rank %d] Success \n", myRank)
+      }
+    }
+    // System.out.println(indent(driver.code))
+    check("p2p-gather", driver.code, "cu")
+  }
+
+  test("p2p-all2all") {
+    val driver = new DslDriverCNCCL[Int, Unit] {
+      @virtualize
+      def snippet(arg:Rep[Int]) = {
+        val size = 32*1024*1024
+        var myRank = 0
+        var nRanks = 0
+        val localRank = 0
+
+        // initializing MPI
+        MPI_CHECK(mpi_init())
+        MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
+        MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
+
+        // calculating localRank
+        // for now, localRank = 0
+
+        // get NCCL unique ID at rank 0 and broadcast it to all others
+        var id = ncclUniqueId
+        if (myRank == 0) {
+          ncclCheck(ncclGetUniqueId(id))
+        }
+        MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
+
+        // picking a GPU based on localRank
+        cudaCall(cudaSetDevice(localRank))
+
+        val s = cudaStream
+        cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
+
+        // initializing NCCL
+        val comm = ncclComm
+        ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
+
+        // allocate and initialize buffers
+        val one = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          one(i) = 1
+        }
+        val sendbuff = NewArray[Array[Float]](nRanks)
+        for (i <- (0 until nRanks): Rep[Range]) {
+          cudaCall(cudaMalloc[Float](sendbuff(i), SizeT(size)))
+          cudaCall(cudaMemcpy[Float](sendbuff(i), one, SizeT(size), host2device))
+        }
+        val recvbuff = NewArray[Array[Float]](nRanks)
+        for (i <- (0 until nRanks): Rep[Range]) {
+          cudaCall(cudaMalloc[Float](recvbuff(i), SizeT(size)))
+        }
+        
+        // all-to-all
+        ncclCheck(ncclGroupStart())
+        if (myRank == localRank) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            ncclCheck(ncclSend(sendbuff(i), SizeT(size), ncclFloat, i, comm, s))
+            ncclCheck(ncclRecv(recvbuff(i), SizeT(size), ncclFloat, i, comm, s))
+          }
+        }
+        ncclCheck(ncclGroupEnd())
+
+        cudaCall(cudaStreamSynchronize(s))
+
+        // check results
+        for (i <- (0 until size): Rep[Range]) {
+          cudaCall(cudaMemcpy[Float](one, recvbuff(i), SizeT(size), device2host))
+          if (one(0) != 1) {
+            printf("error")
+          }
+        }
+
+        // free device buffers
+        cudaCall(cudaFree(sendbuff))
+        cudaCall(cudaFree(recvbuff))
+
+        // finalizing NCCL
+        ncclCheck(ncclCommDestroy(comm))
+
+        // finalizing MPI
+        MPI_CHECK(mpi_finalize())
+
+        printf("[MPI Rank %d] Success \n", myRank)
+      }
+    }
+    // System.out.println(indent(driver.code))
+    check("p2p-all2all", driver.code, "cu")
   }
 }
 
