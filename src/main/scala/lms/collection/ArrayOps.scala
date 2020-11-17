@@ -17,6 +17,8 @@ object ArrayTypeLess {
   def ARRAY(size: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
     (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m.arrayManifest)
 
+  def ARRAY(x: TOP): ARRAY = new ARRAY(x.x)
+
   class ARRAY(override val x: Backend.Exp) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
     def size: Int = {

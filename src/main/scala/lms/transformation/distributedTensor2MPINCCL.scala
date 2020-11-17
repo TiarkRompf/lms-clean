@@ -48,16 +48,20 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
   }
   // helper function for declaring a GPU array with random initialization
   def gpu_random_array(size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
+    generate_comment(s"begin initializing random GPU array of size $size and type $m at device (pre-rename) ${device.x}")
     val cpuArray = cpu_random_array(size, m)
     val gpuArray = gpu_array(size, m, device)
     CUDA_MEMCPY(gpuArray, cpuArray, size, HOST2DEVICE, m)
+    generate_comment(s"end initializing random GPU array of size $size and type $m at device (pre-rename) ${device.x}")
     gpuArray
   }
   // helper function for declaring a GPU array with fixed value
   def gpu_fixed_array(size: Int, device: INT, value: NUM)(implicit __pos: SourceContext): ARRAY = {
+    generate_comment(s"begin initialize fixed GPU array of size $size and type ${value.t} and device (pre-rename) ${device.x}")
     val array = gpu_array(size, value.t, device)
     val fill_fun = CUDA_FILL_FUN(value.t)
     fill_fun(array, value, size, DIM3(gridSize), DIM3(blockSize))
+    generate_comment(s"end initialize fixed GPU array of size $size and type ${value.t} and device (pre-rename) ${device.x}")
     array
   }
   // helper function for computing element-wise multiplication in GPUs
@@ -92,6 +96,9 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
 
   // lazy local functions that initialize the MPI and NCCL
   lazy val (myNCCLSizeRep, myNCCLRankRep, myNCCLCommRep, myNCCLStreamRep) = {
+
+    generate_comment("begin setting up the working environment")
+
     val size = var_new(unit(0))
     val rank = var_new(unit(0))
     MPI_CHECK(mpi_init())
@@ -111,7 +118,9 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
     val stream = cudaStream
     cudaCall(cudaStreamCreateWithFlags(stream, cudaStreamNonBlocking))
 
-    (readVar(size), readVar(rank), ncclComm, stream)
+    generate_comment("end setting up the working environment")
+
+    (readVar(size), readVar(rank), comm, stream)
   }
 
   def myNCCLSize(implicit __pos: SourceContext) = INT(Unwrap(myNCCLSizeRep))
@@ -306,41 +315,40 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in save_tensor")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           // collect the tensors from all GPUs in `anno` and concat them as the final result
-          generate_comment("saving tensor by Gathering them first")
 
           val root = 0
           val count = numeral(sourceTensor.shape_size)
           val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
 
-          // IF (EQUAL(myNCCLRank, INT(root))) {
-          //   val recvbuf = CUDA_MALLOC(count, m)
-          // } {
-          //   // only send buffers
-          //   ???
-          // }
+          // declare recv buffer
+          generate_comment("Only declare recv buffer if this is the root")
+          val recvbuf = ARRAY(IF (EQUAL(myNCCLRank, INT(root))) { CUDA_MALLOC(count, m) } { CUDA_MALLOC(0, m) })
 
-          // step 1: Gather
-          val recvbuf = CUDA_MALLOC(count, m)
+          // Gather + Concat + Print
+          generate_comment("Gather by groups of NCCL send/recv")
           NCCL_CHECK(NCCL_GROUP_START)
-          if (myNCCLRank == root) {
+          NCCL_CHECK(NCCL_SEND(m, new ARRAY(tensor), SIZE_T(count), root, myNCCLComm, myNCCLStream))
+          IF (EQUAL(myNCCLRank, INT(root))) {
             for (r <- RANGE_UNTIL(0, myNCCLSize)) {
               NCCL_CHECK(NCCL_RECV(m, recvbuf.slice(INT(r * count2), INT((r + 1) * count2)), SIZE_T(count), r, myNCCLComm, myNCCLStream))
             }
-          }
-          NCCL_CHECK(NCCL_SEND(m, new ARRAY(tensor), SIZE_T(count), root, myNCCLComm, myNCCLStream))
+          } { UNIT(Backend.Const(())) }
           NCCL_CHECK(NCCL_GROUP_END)
-          // step 2: Concat (done implicitly but might be wrong when the Tensor is not row-major?)
-          // step 3: Print
-          if (myNCCLRank == 0) {
-            gpu_to_cpu_and_print(count, m, recvbuf.x)
-          }
+
+          generate_comment("print the array only if this is the root")
+          IF (EQUAL(myNCCLRank, INT(root))) {
+            gpu_to_cpu_and_print(count, m, recvbuf.x); UNIT(Backend.Const(()))
+          } { UNIT(Backend.Const(())) }
+
           Backend.Const(())
+
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           // copy the tensor from GPU(0) is enough
-          if (myNCCLRank == 0) {
+          IF (EQUAL(myNCCLRank, INT(0))) {
             val count = numeral(sourceTensor.shape_size)
             gpu_to_cpu_and_print(count, m, transform(tensor))
-          }
+            UNIT(Backend.Const(()))
+          } { UNIT(Backend.Const(())) }
           Backend.Const(())
       }
 

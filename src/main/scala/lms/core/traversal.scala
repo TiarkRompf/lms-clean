@@ -398,7 +398,10 @@ class CompactTraverser extends Traverser {
           Some(df(n))
       else None }
     // (shouldInline is protected by withScope)
-
+    for (node <- ns) {
+      val n = node.n
+      System.out.println(s"$node => ${df contains n}, ${hm.getOrElse(n, 0)}, ${!hmi(n)}")
+    }
 
     // ----- backward pass -----
 

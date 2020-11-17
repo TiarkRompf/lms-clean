@@ -162,12 +162,12 @@ object BaseTypeLess {
       TOP(Adapter.g.reflectEffectSummaryHere("?",c.x,aBlock,bBlock)(Adapter.g.mergeEffKeys(aBlock, bBlock)), aManifest)
   }
 
-  def WHILE(c: => BOOL)(b: => Unit): Unit = {
+  def WHILE(c: => BOOL)(b: => Unit): UNIT = {
     val cBlock = Adapter.g.reify(c.x)
     val bBlock = Adapter.g.reify({ b; Backend.Const(()) } )
     // compute effect (cBlock bBlock)* cBlock
-    Adapter.g.reflectEffectSummary("W", cBlock,
-      bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock))
+    UNIT(Adapter.g.reflectEffectSummary("W", cBlock,
+      bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock)))
   }
 
   def PRINTF(f: String, xs: TOP*)(implicit pos: SourceContext): UNIT =

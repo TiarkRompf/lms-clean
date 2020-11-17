@@ -293,7 +293,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   // __host__ ​ __device__ ​cudaError_t cudaStreamCreateWithFlags ( cudaStream_t* pStream, unsigned int  flags )
   def cudaStreamCreateWithFlags(stream: Rep[cudaStreamT], flag: Rep[Int]) =
-    libFunction[CudaErrorT]("cudaStreamCreateWithFlags", Unwrap(stream), Unwrap(flag))(Seq(0), Seq(0), Set(0))
+    // FIXME(feiw) have to remove the effect on stream to make sure Inlining is working
+    libFunction[CudaErrorT]("cudaStreamCreateWithFlags", Unwrap(stream), Unwrap(flag))(Seq(), Seq(), Set(0))
+    // libFunction[CudaErrorT]("cudaStreamCreateWithFlags", Unwrap(stream), Unwrap(flag))(Seq(0), Seq(0), Set(0))
 
   // __host__​cudaError_t cudaStreamCreate ( cudaStream_t* pStream )
   def cudaStreamCreate(stream: Rep[cudaStreamT]) =
