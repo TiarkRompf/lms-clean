@@ -1,0 +1,16 @@
+=================
+x2 = (Array 1 2 3 4 5 6 7 8)  [STORE : _ | x0]
+x3 = (printf %d  List(2, 2, 2))  [CTRL*: _ | x0]
+x4 = (range_until 0 8)  
+x5 = (var_new 0)  [STORE : _ | x0]
+x7 = (var_get x5)  [x5 : _ | x6]
+x8 = (!= x7 8)  
+x10 = (var_get x5)  [x5 : _ | x9]
+x11 = (array_get x2 x10)  [x2 : _ | x9]
+x12 = (printf %d  x11)  [CTRL*: _ | x9]
+x13 = (var_get x5)  [x5 : _ | x9]
+x14 = (+ x13 1)  
+x15 = (var_set x5 x14)  [x5*: x10, x13 | x9]
+x16 = (W Block(List(),x8,x6,[x5 : _ | x6]) Block(List(),(),x9,[x2 x5 CTRL* x5*: _ | x12, x15]))  [x2 x5 CTRL* x5*: _ | x2, x3, x5]
+Block(List(x1),(),x0,[STORE CTRL*: _ | x16])
+=================

@@ -1408,7 +1408,6 @@ abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
     }
     (source.toString, statics)
   }
-
 }
 
 // These empty traits have to be here for backward compatibility :(
