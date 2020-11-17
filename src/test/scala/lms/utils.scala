@@ -60,6 +60,21 @@ trait TutorialFunSuite extends LibSuite {
       assert(expected == code, name)
     }
   }
+  def logGraphs(label: String, graphs: List[String]) = {
+    val fileprefix = prefix+under+label
+    val directory = new File(fileprefix + "/");
+    if (!directory.exists()) {
+      directory.mkdir()
+    } else if (directory.isDirectory) {
+      directory.listFiles.foreach(_.delete)
+    }
+    for ((graph, i) <- graphs.zipWithIndex)
+      writeFile(s"$fileprefix/graphLog$i.txt", graph)
+  }
+  def checkWithLog(label: String, raw_code: String, graphs: List[String], suffix: String = "scala") = {
+    check(label, raw_code, suffix)
+    logGraphs(label, graphs)
+  }
   def indent(str: String) = {
     val s = new StringWriter
     printIndented(str)(new PrintWriter(s))

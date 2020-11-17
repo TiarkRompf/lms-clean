@@ -1436,19 +1436,22 @@ abstract class DslDriverCPP[A: Manifest, B: Manifest] extends DslDriverC[A, B] w
 abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
 
   // get original graph
-  val graph = Adapter.genGraph1(manifest[A], manifest[B])(x => Unwrap(wrapper(Wrap[A](x))))
+  val initial_graph = Adapter.genGraph1(manifest[A], manifest[B])(x => Unwrap(wrapper(Wrap[A](x))))
 
   // run some transformation
-  def transform(graph: Graph): Graph = graph
+  def transform(graph: Graph): (List[String], Graph) = (List(graph.toString), graph)
+
+  var all_graphs: List[String] = _
 
   // codegen
   override lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
     val statics = time("codegen") {
-      val final_g = transform(graph)
+      val (graphs, final_graph) = transform(initial_graph)
+      all_graphs = graphs
       codegen.typeMap = Adapter.typeMap
       codegen.stream = new java.io.PrintStream(source)
-      codegen.emitAll(final_g, "Snippet")(manifest[A], manifest[B])
+      codegen.emitAll(final_graph, "Snippet")(manifest[A], manifest[B])
       codegen.extractAllStatics.toList
     }
     (source.toString, statics)
