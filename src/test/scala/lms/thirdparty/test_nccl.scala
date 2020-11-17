@@ -23,7 +23,6 @@ class NCCLTest extends TutorialFunSuite {
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"
 
-
     val curPath = System.getProperty("user.dir")
     override val sourceFile = s"$curPath/snippet.cu"
     override val executable = s"$curPath/snippet"
