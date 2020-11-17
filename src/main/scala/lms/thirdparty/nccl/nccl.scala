@@ -38,6 +38,8 @@ object NCCLTypeLess {
     UNIT(LIB_FUNCTION(manifest[Unit], "NCCLCHECK", result.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))
   }
 
+
+  // Collective Operations
   def NCCL_ALLREDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, op: TOP, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclAllReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, comm.x, stream.x)(Seq(0,3,4,5,6), Seq(1,5,6), Set[Int]())
@@ -58,6 +60,8 @@ object NCCLTypeLess {
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclAllGather", sendbuf.x, recvbuf.x, sendcount.x, dataType.x, comm.x, stream.x)(Seq(0,3,4,5), Seq(1,4,5), Set[Int]())
   }
 
+
+  // Point-to-Point Operations
   def NCCL_SEND(m: Manifest[_], sendbuf: ARRAY, count: SIZE_T, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclSend", sendbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(0,2,4,5), Seq(4,5), Set[Int]())
@@ -67,6 +71,34 @@ object NCCLTypeLess {
     val dataType = NCCL_DATATYPE(m)
     LIB_FUNCTION(manifest[NCCL_RESULT], "ncclRecv", recvbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(2,4,5), Seq(0,4,5), Set[Int]())
   }
+
+
+  // FIXME(feiw) The effect of NCCL_GROUP_START and NCCL_GROUP_END are interesting ones:
+  // 1. The order of them should never be changed
+  // 2. Other nccl calls cannot swap order with NCCL_GROUP_START or NCCL_GROUP_END
+  // 3. NCCL_GROUP_START and NCCL_GROUP_END can be removed if there is no other NCCL calls in between, but they must be removed in pairs
+  // I am not sure what kind of read/write effect can we use to achive this dependency pattern
+  // For now, let's make sure that the NCCL_GROUP_START/END are called within NCCL_CHECK, which has CTRL effect
+  def NCCL_GROUP_START(implicit pos: SourceContext) = CMACRO("ncclGroupStart()", manifest[NCCL_RESULT])
+  def NCCL_GROUP_END(implicit pos: SourceContext) = CMACRO("ncclGroupEnd()", manifest[NCCL_RESULT])
+  // def NCCL_GROUP_START(implicit pos: SourceContext) =
+  //   LIB_FUNCTION(manifest[NCCL_RESULT], "ncclGroupStart")(Seq[Int](), Seq[Int](), Set[Int]())
+  // def NCCL_GROUP_END(implicit pos: SourceContext) =
+  //   LIB_FUNCTION(manifest[NCCL_RESULT], "ncclGroupEnd")(Seq[Int](), Seq[Int](), Set[Int]())
+
+  // Point-to-Point Operations in Collection
+  /**
+   * Scatter
+   * ncclGroupStart();
+   * if (rank == root) {
+   *   for (int r=0; r<nranks; r++)
+   *     ncclSend(sendbuff[r], size, type, r, comm, stream);
+   * }
+   * ncclRecv(recvbuff, size, type, root, comm, stream);
+   * ncclGroupEnd();
+   */
+  // def NCCL_SCATTER(m: Manifest[_], sendbufs: ARRAY, recvbuf: ARRAY, ???)
+
 }
 
 trait NCCLOps extends CLibs with SizeTOps with CudaOps {
@@ -275,4 +307,11 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * NCCL primitives are generally not thread-safe, however, they are reentrant. Multiple threads should use separate communicator objects.
    */
 
+}
+
+trait CCodeGenNCCLOps extends CCodeGenSizeTOps with CCodeGenLibs {
+  override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
+    case s: String if s.endsWith("ncclResultT") => "ncclResult_t"
+    case _ => super.remap(m)
+  }
 }
