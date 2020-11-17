@@ -47,57 +47,61 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
     CUDA_MALLOC(size, m)
   }
   // helper function for declaring a GPU array with random initialization
-  def gpu_random_array(size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
-    generate_comment(s"begin initializing random GPU array of size $size and type $m at device (pre-rename) ${device.x}")
-    val cpuArray = cpu_random_array(size, m)
-    val gpuArray = gpu_array(size, m, device)
-    CUDA_MEMCPY(gpuArray, cpuArray, size, HOST2DEVICE, m)
-    generate_comment(s"end initializing random GPU array of size $size and type $m at device (pre-rename) ${device.x}")
-    gpuArray
-  }
+  def gpu_random_array(size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"initializing random GPU array of size $size and type $m at device (pre-rename) ${device.x}") {
+      val cpuArray = cpu_random_array(size, m)
+      val gpuArray = gpu_array(size, m, device)
+      CUDA_MEMCPY(gpuArray, cpuArray, size, HOST2DEVICE, m)
+      gpuArray
+    }
   // helper function for declaring a GPU array with fixed value
-  def gpu_fixed_array(size: Int, device: INT, value: NUM)(implicit __pos: SourceContext): ARRAY = {
-    generate_comment(s"begin initialize fixed GPU array of size $size and type ${value.t} and device (pre-rename) ${device.x}")
-    val array = gpu_array(size, value.t, device)
-    val fill_fun = CUDA_FILL_FUN(value.t)
-    fill_fun(array, value, size, DIM3(gridSize), DIM3(blockSize))
-    generate_comment(s"end initialize fixed GPU array of size $size and type ${value.t} and device (pre-rename) ${device.x}")
-    array
-  }
+  def gpu_fixed_array(size: Int, device: INT, value: NUM)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"initializing fixed GPU array of size $size and type ${value.t} and device (pre-rename) ${device.x}") {
+      val array = gpu_array(size, value.t, device)
+      val fill_fun = CUDA_FILL_FUN(value.t)
+      fill_fun(array, value, size, DIM3(gridSize), DIM3(blockSize))
+      array
+    }
   // helper function for computing element-wise multiplication in GPUs
-  def gpu_mult_array(size: Int, m: Manifest[_], device: INT, left_operand: Backend.Exp, right_operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY = {
-    def array = gpu_array(size, m, device)
-    val mult_fun = CUDA_MULT_FUN(m)
-    mult_fun(new ARRAY(left_operand), new ARRAY(right_operand), array, size, DIM3(gridSize), DIM3(blockSize))
-    array
-  }
+  def gpu_mult_array(size: Int, m: Manifest[_], device: INT, left_operand: Backend.Exp, right_operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"computing MULT on GPU for size $size and type $m at device (pre-rename) ${device.x} with left_operand $left_operand and right_operand $right_operand") {
+      val array = gpu_array(size, m, device)
+      val mult_fun = CUDA_MULT_FUN(m)
+      mult_fun(new ARRAY(left_operand), new ARRAY(right_operand), array, size, DIM3(gridSize), DIM3(blockSize))
+      array
+    }
+  // helper function for computing dot product in GPUs
+  def gpu_dot_array(size: Int, m: Manifest[_], device: INT, left_operand: Backend.Exp, right_operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"")
+    {???}
   // helper function for accumulate (+=) a GPU array element-wise
-  def gpu_accum_array(size: Int, m: Manifest[_], device: INT, base_operand: Backend.Exp, addition_operand: Backend.Exp)(implicit __pos: SourceContext) = {
-    CUDA_SET_DEVICE(device)
-    val accum_fun = CUDA_ACCUM_FUN(m)
-    accum_fun(new ARRAY(base_operand), new ARRAY(addition_operand), size, DIM3(gridSize), DIM3(blockSize))
-    Backend.Const(())
-  }
+  def gpu_accum_array(size: Int, m: Manifest[_], device: INT, base_operand: Backend.Exp, addition_operand: Backend.Exp)(implicit __pos: SourceContext) =
+    withComment(s"computing ACCUM on GPU for size $size and type $m at device (pre-rename) ${device.x} with base_operand $base_operand and addition_operand $addition_operand") {
+      CUDA_SET_DEVICE(device)
+      val accum_fun = CUDA_ACCUM_FUN(m)
+      accum_fun(new ARRAY(base_operand), new ARRAY(addition_operand), size, DIM3(gridSize), DIM3(blockSize))
+      Backend.Const(())
+    }
   // helper function for SGD optimization on GPU array
-  def gpu_sgd_array(size: Int, m: Manifest[_], device: INT, weight_operand: Backend.Exp, grad_operand: Backend.Exp, momentum_operand: Backend.Exp)(implicit __pos: SourceContext) = {
-    CUDA_SET_DEVICE(device)
-    val sgd_fun = CUDA_SGD_Nesterov_FUN(m)
-    sgd_fun(new ARRAY(weight_operand), new ARRAY(grad_operand), new ARRAY(momentum_operand), size, DIM3(gridSize), DIM3(blockSize))
-    Backend.Const(())
-  }
+  def gpu_sgd_array(size: Int, m: Manifest[_], device: INT, weight_operand: Backend.Exp, grad_operand: Backend.Exp, momentum_operand: Backend.Exp)(implicit __pos: SourceContext) =
+    withComment(s"computing SGD on GPU for size $size and type $m at device (pre-name) ${device.x} with weight $weight_operand, grad $grad_operand, and momentum $momentum_operand") {
+      CUDA_SET_DEVICE(device)
+      val sgd_fun = CUDA_SGD_Nesterov_FUN(m)
+      sgd_fun(new ARRAY(weight_operand), new ARRAY(grad_operand), new ARRAY(momentum_operand), size, DIM3(gridSize), DIM3(blockSize))
+      Backend.Const(())
+    }
   // helper function for saving GPU array
-  def gpu_to_cpu_and_print(size: Int, m: Manifest[_], tensor: Backend.Exp)(implicit __pos: SourceContext) = {
-    // declare array space in CPU
-    val cpu_array = ARRAY(size, m)
-    // copy the array from CPU to GPU
-    CUDA_MEMCPY(cpu_array, new ARRAY(tensor), size, DEVICE2HOST, m)
-    cpu_array.print
-  }
+  def gpu_to_cpu_and_print(size: Int, m: Manifest[_], tensor: Backend.Exp)(implicit __pos: SourceContext) =
+    withComment(s"copying GPU array $tensor to CPU and print for size $size and type $m") {
+      // declare array space in CPU
+      val cpu_array = ARRAY(size, m)
+      // copy the array from CPU to GPU
+      CUDA_MEMCPY(cpu_array, new ARRAY(tensor), size, DEVICE2HOST, m)
+      cpu_array.print
+    }
 
   // lazy local functions that initialize the MPI and NCCL
-  lazy val (myNCCLSizeRep, myNCCLRankRep, myNCCLCommRep, myNCCLStreamRep) = {
-
-    generate_comment("begin setting up the working environment")
+  lazy val (myNCCLSizeRep, myNCCLRankRep, myNCCLCommRep, myNCCLStreamRep) = withComment("setting up the MPI/NCCL environment") {
 
     val size = var_new(unit(0))
     val rank = var_new(unit(0))
@@ -117,8 +121,6 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
     ncclCheck(ncclCommInitRank(comm, readVar(size), commId, readVar(rank)))
     val stream = cudaStream
     cudaCall(cudaStreamCreateWithFlags(stream, cudaStreamNonBlocking))
-
-    generate_comment("end setting up the working environment")
 
     (readVar(size), readVar(rank), comm, stream)
   }
@@ -226,6 +228,27 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           gpu_fixed_array(count, myNCCLRank, NUM(Backend.Const(1), m)).x
         case a => throw new Exception(s"annotation $a is not yet handled in tensor_ones")
+      }
+
+    case Node(s, "tensor_dot", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::_, _) =>
+      val sourceTensor = new TENSOR(s, useOldMetadata = true)
+
+      implicit val sc_ : SourceContext = sourceTensor.pos
+      val m = sourceTensor.et
+
+      // Load the `left` and `right`, and maybe add communication ops to resolve split annotation conflicts
+      val left_operand = get_operand(left, anno)
+      val right_operand = get_operand(right, anno)
+      // then we should run this dot op in all devices in the `anno`
+      // FIXME(feiw) for now, let's assume that `anno` is for all devices
+      anno match {
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in dot op")
+        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
+          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
+          gpu_dot_array(count2, m, myNCCLRank, left_operand, right_operand).x
+        case SAnno(dim: Dim, devices: Seq[Device], _) =>
+          throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_dot")
       }
 
     case Node(s, "tensor_mult", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::_, _) =>

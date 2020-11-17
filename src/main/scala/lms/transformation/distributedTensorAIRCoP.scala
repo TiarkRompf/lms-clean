@@ -134,7 +134,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     cont
   }
 
-  def transfromModuleBlock(b: Block): Block = b match {
+  def transformModuleBlock(b: Block): Block = b match {
     case b @ Block(Nil, res, block, eff) => g.reify {
       scheduleBlock(b)(traverseModule)
     }
@@ -142,8 +142,14 @@ abstract class DistributeTensorAIRCoP extends Transformer {
 
   override def transform(n: Node): Backend.Exp = n match {
 
-    case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) =>
-      g.reflectWrite("module", transfromModuleBlock(b))(Adapter.CTRL)
+    case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => scheduleBlock(b)(traverseModule)
+      // g.reflectWrite("module", transformModuleBlock(b))(Adapter.CTRL)
+
+    case Node(s, "@", List(a: Backend.Sym, Backend.Const(())), _) =>
+      Adapter.oldDefsCache(a) match {
+        case Node(s, "module", _, _) => Backend.Const(())
+        case _ => super.transform(n)
+      }
 
     case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)

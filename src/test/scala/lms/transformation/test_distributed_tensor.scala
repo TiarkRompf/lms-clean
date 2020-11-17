@@ -27,14 +27,11 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
 
-    override def transform(graph: Graph): Graph = {
-      graph.show
+    override def transform(graph: Graph): (List[String], Graph) = {
       val graph1 = (new DistributeTensorDimName {}).transform(graph)
-      graph1.show
       val graph2 = (new DistributeTensorAIRCoP {}).transform(graph1)
-      graph2.show
       val graph3 = (new DistributeTensor2MPI_NCCL {}).transform(graph2)
-      graph3
+      (List(graph, graph1, graph2, graph3).map(_.toString), graph3)
     }
   }
 
@@ -77,7 +74,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         printf("compile")
       }
     }
-    check("Annotation", driver.code, "cu")
+    checkWithLog("Annotation", driver.code, driver.all_graphs, "cu")
   }
 
   test("dot") {
@@ -99,7 +96,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         printf("compile")
       }
     }
-    check("dot", driver.code, "cu")
+    checkWithLog("dot", driver.code, driver.all_graphs, "cu")
   }
 
   test("show") {

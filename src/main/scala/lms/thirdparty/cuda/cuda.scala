@@ -65,7 +65,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     (a: TOP, b: TOP, c: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
       Seq(a, b, c).zip(ms).foreach {
-        case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man)
+        case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man, s"${arg.x} ${arg.t} $man")
       }
       UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, dim1.x, dim2.x))
     }
@@ -135,8 +135,9 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
 
   // Element-wise Accumulation (+=)
-  def CUDA_ACCUM_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+  def CUDA_ACCUM_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = withComment(s"generating kernel function for ACCUM of type $m"){
     CUDA_ELEMENTWISE_MUTATION_BINARY_KERNEL(m, _ + _)
+  }
   val CUDA_ACCUM_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_ACCUM_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ACCUM_KERNEL_MAP.getOrElseUpdate(m, CUDA_ACCUM_KERNEL(m))
 
@@ -163,7 +164,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
 
   // Simple SGD Nesterov (https://github.com/pytorch/pytorch/blob/master/torch/optim/sgd.py)
-  def CUDA_SGD_Nesterov_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+  def CUDA_SGD_Nesterov_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = withComment(s"generating kernel function for SGD of type $m"){
     CUDA_ELEMENTWISE_M_I_M_KERNEL(m, (w: NUM, g: NUM, v: NUM) => {
       // default \mu as 0.5 and learning rate to 0.0001 for now
       val mu = 0.5f
@@ -172,6 +173,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       val w_1 = w - v_1 * FLOAT(lr)
       (w_1, v_1)
     })
+  }
   val CUDA_SGD_Nesterov_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_SGD_Nesterov_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_SGD_Nesterov_KERNEL_MAP.getOrElseUpdate(m, CUDA_SGD_Nesterov_KERNEL(m))
 
@@ -195,8 +197,9 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
 
   // Element-wise Add
-  def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+  def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = withComment(s"generating kernel function for ADD of type $m"){
     CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ + _)
+  }
   val CUDA_ADD_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_ADD_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ADD_KERNEL_MAP.getOrElseUpdate(m, CUDA_ADD_KERNEL(m))
   // Deprecated. Use CUDA_ADD_FUN instead
@@ -207,8 +210,9 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
 
   // Element-wise Minus
-  def CUDA_MINUS_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+  def CUDA_MINUS_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = withComment(s"generating kernel function for MINUS of type $m"){
     CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ - _)
+  }
   val CUDA_MINUS_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_MINUS_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_MINUS_KERNEL_MAP.getOrElseUpdate(m, CUDA_MINUS_KERNEL(m))
   // Deprecated. Use CUDA_MINUS_FUN instead
@@ -219,8 +223,9 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
 
   // Element-wise Mult
-  def CUDA_MULT_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+  def CUDA_MULT_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = withComment(s"generating kernel function for MULT of type $m"){
     CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ * _)
+  }
   val CUDA_MULT_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_MULT_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_MULT_KERNEL_MAP.getOrElseUpdate(m, CUDA_MULT_KERNEL(m))
   // Deprecated. Use CUDA_MULT_FUN instead
@@ -231,8 +236,9 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
 
   // Element-wise Div
-  def CUDA_DIV_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+  def CUDA_DIV_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = withComment(s"generating kernel function for DIV of type $m") {
     CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ / _)
+  }
   val CUDA_DIV_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_DIV_FUN(m: Manifest[_])(implicit __pos: SourceContext) =
     CUDA_DIV_KERNEL_MAP.getOrElseUpdate(m, CUDA_DIV_KERNEL(m))
@@ -242,6 +248,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
   }
 }
+
 
 trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */

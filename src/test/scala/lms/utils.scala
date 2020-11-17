@@ -72,8 +72,8 @@ trait TutorialFunSuite extends LibSuite {
       writeFile(s"$fileprefix/graphLog$i.txt", graph)
   }
   def checkWithLog(label: String, raw_code: String, graphs: List[String], suffix: String = "scala") = {
-    check(label, raw_code, suffix)
     logGraphs(label, graphs)
+    check(label, raw_code, suffix)
   }
   def indent(str: String) = {
     val s = new StringWriter

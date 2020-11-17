@@ -162,7 +162,7 @@ object BaseTypeLess {
       TOP(Adapter.g.reflectEffectSummaryHere("?",c.x,aBlock,bBlock)(Adapter.g.mergeEffKeys(aBlock, bBlock)), aManifest)
   }
 
-  def WHILE(c: => BOOL)(b: => Unit): UNIT = {
+  def WHILE(c: => BOOL)(b: => Unit)(implicit __pos: SourceContext): UNIT = {
     val cBlock = Adapter.g.reify(c.x)
     val bBlock = Adapter.g.reify({ b; Backend.Const(()) } )
     // compute effect (cBlock bBlock)* cBlock
@@ -501,6 +501,12 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   // case class Comment[A:Manifest](l: String, verbose: Boolean, b: Block[A]) extends Def[A]
   def generate_comment(l: String): Rep[Unit] = {
     Wrap[Unit](Adapter.g.reflectWrite("generate-comment", Backend.Const(l))(Adapter.CTRL))
+  }
+  def withComment[T](s: String)(clo: => T): T = {
+    generate_comment(s"begin $s")
+    val kernel = clo
+    generate_comment(s"end $s")
+    kernel
   }
   def comment[A:Manifest](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A] = {
     val g = Adapter.g
