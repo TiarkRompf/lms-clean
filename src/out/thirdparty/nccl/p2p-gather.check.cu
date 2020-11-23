@@ -4,11 +4,11 @@ Emitting C Generated Code
 #include "nccl_header.h"
 #include <string.h>
 #include <stdlib.h>
-#include <cuda_header.h>
+#include "cuda_header.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <mpi_header.h>
+#include "mpi_header.h"
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = 0;
@@ -22,13 +22,13 @@ void Snippet(int x0) {
   MPICHECK(MPI_Bcast(&x4, NCCL_UNIQUE_ID_BYTES, MPI_BYTE, 0, MPI_COMM_WORLD));
   CUDA_CALL(cudaSetDevice(0));
   cudaStream_t x5;
-  CudaError_T x6 = cudaStreamCreateWithFlags(&x5, cudaStreamDefault);
+  cudaError_t x6 = cudaStreamCreateWithFlags(&x5, cudaStreamDefault);
   CUDA_CALL(x6);
   ncclComm_t x7;
   ncclResult_t x8 = ncclCommInitRank(&x7, x2, x4, x1);
   NCCLCHECK(x8);
   float* x9 = (float*)malloc(0 * sizeof(float));
-  CudaError_T x10 = cudaMalloc(&x9, (size_t)(33554432 * sizeof(float)));
+  cudaError_t x10 = cudaMalloc(&x9, (size_t)(33554432 * sizeof(float)));
   CUDA_CALL(x10);
   float* x11 = (float*)malloc(33554432 * sizeof(float));
   int x12 = 0;

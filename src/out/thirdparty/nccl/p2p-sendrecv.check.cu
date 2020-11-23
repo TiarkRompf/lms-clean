@@ -4,66 +4,58 @@ Emitting C Generated Code
 #include "nccl_header.h"
 #include <string.h>
 #include <stdlib.h>
-#include <cuda_header.h>
+#include "cuda_header.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <mpi_header.h>
+#include "mpi_header.h"
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int x1 = 0;
   int x2 = 0;
   MPICHECK(MPI_Init(NULL, NULL));
-  MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &x1));
+  int x3 = MPI_Comm_rank(MPI_COMM_WORLD, &x1);
+  MPICHECK(x3);
   MPICHECK(MPI_Comm_size(MPI_COMM_WORLD, &x2));
-  ncclUniqueId x3;
-  if (x1 == 0) NCCLCHECK(ncclGetUniqueId(&x3));
-  MPICHECK(MPI_Bcast(&x3, NCCL_UNIQUE_ID_BYTES, MPI_BYTE, 0, MPI_COMM_WORLD));
-  CUDA_CALL(cudaSetDevice(0));
-  cudaStream_t x4;
-  CUDA_CALL(cudaStreamCreateWithFlags(&x4, cudaStreamDefault));
+  printf("myRank: %d, nRanks: %d\n", x1, x2);
+  ncclUniqueId x4;
   ncclComm_t x5;
-  NCCLCHECK(ncclCommInitRank(&x5, x2, x3, x1));
-  float* x6 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x6, (size_t)(33554432 * sizeof(float))));
+  cudaStream_t x6;
+  if (x1 == 0) NCCLCHECK(ncclGetUniqueId(&x4));
+  MPICHECK(MPI_Bcast(&x4, NCCL_UNIQUE_ID_BYTES, MPI_BYTE, 0, MPI_COMM_WORLD));
+  CUDA_CALL(cudaSetDevice(x1));
   float* x7 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x7, (size_t)(33554432 * sizeof(float))));
-  float* x8 = (float*)malloc(33554432 * sizeof(float));
-  int x9 = 0;
-  while (x9 != 33554432) {
-    x8[x9] = 0.0;
-    x9 = x9 + 1;
+  CUDA_CALL(cudaMalloc(&x7, (size_t)(1024 * sizeof(float))));
+  float* x8 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x8, (size_t)(1024 * sizeof(float))));
+  float* x9 = (float*)malloc(1024 * sizeof(float));
+  int x10 = 0;
+  while (x10 != 1024) {
+    x9[x10] = 2.0;
+    x10 = x10 + 1;
   }
-  CUDA_CALL(cudaMemcpy(x6, x8, 33554432, cudaMemcpyHostToDevice));
-  float* x10 = (float*)malloc(33554432 * sizeof(float));
-  int x11 = 0;
-  while (x11 != 33554432) {
-    x10[x11] = 1.0;
-    x11 = x11 + 1;
-  }
-  CUDA_CALL(cudaMemcpy(x7, x10, 33554432, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(x7, x9, 1024, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaStreamCreateWithFlags(&x6, cudaStreamDefault));
+  NCCLCHECK(ncclCommInitRank(&x5, x2, x4, x1));
+  int x11 = x1 == 0 ? 1 : 0;
   NCCLCHECK(ncclGroupStart());
-  NCCLCHECK(ncclSend(x6, 33554432, ncclFloat, 1, x5, x4));
-  NCCLCHECK(ncclRecv(x7, 33554432, ncclFloat, 0, x5, x4));
+  NCCLCHECK(ncclSend(x7, 1024, ncclFloat, x11, x5, x6));
+  NCCLCHECK(ncclRecv(x8, 1024, ncclFloat, x11, x5, x6));
   NCCLCHECK(ncclGroupEnd());
-  CUDA_CALL(cudaStreamSynchronize(x4));
-  CUDA_CALL(cudaMemcpy(x8, x6, 33554432, cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaStreamSynchronize(x6));
+  CUDA_CALL(cudaMemcpy(x9, x8, 1024, cudaMemcpyDeviceToHost));
   int x12 = 0;
-  while (x12 != 33554432) {
-    if (x8[0] != 1) printf("error");
-    x12 = x12 + 1;
-  }
-  CUDA_CALL(cudaMemcpy(x10, x7, 33554432, cudaMemcpyDeviceToHost));
   int x13 = 0;
-  while (x13 != 33554432) {
-    if (x10[0] != 0) printf("error");
+  while (x13 != 1024) {
+    if (x9[0] != 2) x12 = x12 + 1;
     x13 = x13 + 1;
   }
-  CUDA_CALL(cudaFree(x6));
   CUDA_CALL(cudaFree(x7));
+  CUDA_CALL(cudaFree(x8));
   NCCLCHECK(ncclCommDestroy(x5));
   MPICHECK(MPI_Finalize());
-  printf("[MPI Rank %d] Success \n", x1);
+  if (x12 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x12);
+  else printf("[MPI Rank %d] Success \n", x1);
 }
 /*****************************************
 End of C Generated Code
