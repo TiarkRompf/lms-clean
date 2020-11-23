@@ -34,7 +34,7 @@ void Snippet(int x0) {
     x9[x10] = 2.0;
     x10 = x10 + 1;
   }
-  CUDA_CALL(cudaMemcpy(x7, x9, 1024, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(x7, x9, (size_t)(1024 * sizeof(float)), cudaMemcpyHostToDevice));
   CUDA_CALL(cudaStreamCreateWithFlags(&x6, cudaStreamDefault));
   NCCLCHECK(ncclCommInitRank(&x5, x2, x4, x1));
   int x11 = x1 == 0 ? 1 : 0;
@@ -43,7 +43,7 @@ void Snippet(int x0) {
   NCCLCHECK(ncclRecv(x8, 1024, ncclFloat, x11, x5, x6));
   NCCLCHECK(ncclGroupEnd());
   CUDA_CALL(cudaStreamSynchronize(x6));
-  CUDA_CALL(cudaMemcpy(x9, x8, 1024, cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x9, x8, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x12 = 0;
   int x13 = 0;
   while (x13 != 1024) {
