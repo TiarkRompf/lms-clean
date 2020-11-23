@@ -24,9 +24,9 @@ void Snippet(int x0) {
   cudaStream_t x7;
   if (x1 == 0) NCCLCHECK(ncclGetUniqueId(&x5));
   MPICHECK(MPI_Bcast(&x5, NCCL_UNIQUE_ID_BYTES, MPI_BYTE, 0, MPI_COMM_WORLD));
-  float* x8 = (float*)malloc(2014 * sizeof(float));
+  float* x8 = (float*)malloc(1024 * sizeof(float));
   int x9 = 0;
-  while (x9 != 2014) {
+  while (x9 != 1024) {
     x8[x9] = 2.0;
     x9 = x9 + 1;
   }
@@ -36,12 +36,12 @@ void Snippet(int x0) {
   int x12 = 0;
   while (x12 != x11) {
     int x13 = x12;
-    CUDA_CALL(cudaMalloc(&x10[x13], 2014));
-    CUDA_CALL(cudaMemcpy(x10[x13], x8, (size_t)(2014 * sizeof(float)), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMalloc(&x10[x13], (size_t)(1024 * sizeof(float))));
+    CUDA_CALL(cudaMemcpy(x10[x13], x8, (size_t)(1024 * sizeof(float)), cudaMemcpyHostToDevice));
     x12 = x12 + 1;
   }
   float* x14 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x14, (size_t)(2014 * sizeof(float))));
+  CUDA_CALL(cudaMalloc(&x14, (size_t)(1024 * sizeof(float))));
   cudaError_t x15 = cudaStreamCreateWithFlags(&x7, cudaStreamDefault);
   CUDA_CALL(x15);
   ncclResult_t x16 = ncclCommInitRank(&x6, x2, x5, x1);
@@ -52,17 +52,17 @@ void Snippet(int x0) {
     int x18 = 0;
     while (x18 != x17) {
       int x19 = x18;
-      NCCLCHECK(ncclSend(x10[x19], 2014, ncclFloat, x19, x6, x7));
+      NCCLCHECK(ncclSend(x10[x19], 1024, ncclFloat, x19, x6, x7));
       x18 = x18 + 1;
     }
   }
-  NCCLCHECK(ncclRecv(x14, 2014, ncclFloat, 0, x6, x7));
+  NCCLCHECK(ncclRecv(x14, 1024, ncclFloat, 0, x6, x7));
   NCCLCHECK(ncclGroupEnd());
   CUDA_CALL(cudaStreamSynchronize(x7));
-  CUDA_CALL(cudaMemcpy(x8, x14, (size_t)(2014 * sizeof(float)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x8, x14, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x20 = 0;
   int x21 = 0;
-  while (x21 != 2014) {
+  while (x21 != 1024) {
     if (x8[0] != 2) x20 = x20 + 1;
     x21 = x21 + 1;
   }

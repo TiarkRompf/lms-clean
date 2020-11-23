@@ -329,7 +329,7 @@ class NCCLTest extends TutorialFunSuite {
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg:Rep[Int]) = {
-        val size = 2014
+        val size = 1024
         var myRank = 0
         var nRanks = 0
 
@@ -359,7 +359,7 @@ class NCCLTest extends TutorialFunSuite {
         cudaCall(cudaSetDevice(myRank))
         val sendbuff = NewArray[Array[Float]](nRanks)
         for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaMalloc[Float](sendbuff(i), SizeT(size)))
+          cudaCall(cudaMalloc3[Float](sendbuff(i), size))
           cudaCall(cudaMemcpyOfT[Float](sendbuff(i), values, size, host2device))
         }
         val recvbuff = cudaMalloc2[Float](size)
