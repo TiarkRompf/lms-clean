@@ -386,7 +386,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   // All CUDA calls return error code:
   // Except for kernel launches cudaError_t type
-  // cudaError_t cudaGetLastError(void)
+  //  cudaGetLastError(void)
   // Returns the code for the last error (no error has a code) Can be used to get error from kernel execution
   // char* cudaGetErrorString(cudaError_t code)
   // Returns a null-terminated character string describing the error
