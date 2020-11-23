@@ -214,6 +214,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaCall(cudaMalloc(addr, SizeT(count * sizeOf[T])))
     addr
   }
+  def cudaMalloc3[T:Manifest](devPtr: Rep[Array[T]], count: Rep[Int])(implicit __pos: SourceContext) = {
+    libFunction[CudaErrorT]("cudaMalloc", Unwrap(devPtr), Unwrap(SizeT(count * sizeOf[T])))(Seq(1), Seq(0), Set(0))
+  }
 
   // cudaError_t cudaFree ( void* devPtr )
   def cudaFree[T:Manifest](devPtr: Rep[Array[T]]) =
@@ -537,11 +540,11 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
   // need to register the headers
-  registerHeader("<cuda_header.h>")
+  registerHeader("\"cuda_header.h\"")
 
   override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
     case s: String if s.endsWith("Dim3") => "dim3"
-    case s: String if s.endsWith("CudaErrorT") => "CudaError_T"
+    case s: String if s.endsWith("CudaErrorT") => "cudaError_t"
     case _ => super.remap(m)
   }
 
