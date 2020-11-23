@@ -37,7 +37,7 @@ void Snippet(int x0) {
   while (x12 != x11) {
     int x13 = x12;
     CUDA_CALL(cudaMalloc(&x10[x13], 2014));
-    CUDA_CALL(cudaMemcpy(x10[x13], x8, 2014, cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(x10[x13], x8, (size_t)(2014 * sizeof(float)), cudaMemcpyHostToDevice));
     x12 = x12 + 1;
   }
   float* x14 = (float*)malloc(0 * sizeof(float));
@@ -59,7 +59,7 @@ void Snippet(int x0) {
   NCCLCHECK(ncclRecv(x14, 2014, ncclFloat, 0, x6, x7));
   NCCLCHECK(ncclGroupEnd());
   CUDA_CALL(cudaStreamSynchronize(x7));
-  CUDA_CALL(cudaMemcpy(x8, x14, 2014, cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x8, x14, (size_t)(2014 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x20 = 0;
   int x21 = 0;
   while (x21 != 2014) {
