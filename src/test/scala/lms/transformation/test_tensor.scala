@@ -22,10 +22,8 @@ class FixedSizeTensorTest extends TutorialFunSuite {
     }
 
     override def transform(graph: Graph) = {
-      graph.show
       val graph1 = (new TensorLoweringCPU {}).transform(graph)
-      graph1.show
-      graph1
+      List(graph, graph1)
     }
   }
 
@@ -38,7 +36,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
         tensor.show
       }
     }
-    check("show", driver.code, "c")
+    checkWithLog("show", driver.code, driver.all_graphs, "c")
   }
 
   test("tensor_construction_effect") {
