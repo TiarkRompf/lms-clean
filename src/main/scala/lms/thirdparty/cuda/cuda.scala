@@ -249,7 +249,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // __host__ ​ __device__ ​cudaError_t cudaStreamCreateWithFlags ( cudaStream_t* pStream, unsigned int  flags )
   def cudaStreamCreateWithFlags(stream: Rep[cudaStreamT], flag: Rep[Int]) =
     libFunction[CudaErrorT]("cudaStreamCreateWithFlags", Unwrap(stream), Unwrap(flag))(Seq(0), Seq(0), Set(0))
-  
+
   // __host__​cudaError_t cudaStreamCreate ( cudaStream_t* pStream )
   def cudaStreamCreate(stream: Rep[cudaStreamT]) =
     libFunction[CudaErrorT]("cudaStreamCreate", Unwrap(stream))(Seq(0), Seq(0), Set(0))
@@ -386,7 +386,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   // All CUDA calls return error code:
   // Except for kernel launches cudaError_t type
-  //  cudaGetLastError(void)
+  // cudaError_t cudaGetLastError(void)
   // Returns the code for the last error (no error has a code) Can be used to get error from kernel execution
   // char* cudaGetErrorString(cudaError_t code)
   // Returns a null-terminated character string describing the error

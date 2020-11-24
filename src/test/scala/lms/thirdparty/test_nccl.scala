@@ -28,7 +28,7 @@ class NCCLTest extends TutorialFunSuite {
     override val executable = s"$curPath/snippet"
   }
 
- 
+
   test("sanity-check") {
     // just sanity check. Output code not runnable
     val driver = new DslDriverCNCCL[Int, Unit] {
@@ -250,7 +250,6 @@ class NCCLTest extends TutorialFunSuite {
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg:Rep[Int]) = {
-        // val size = 32*1024*1024
         val size = 1024
         var myRank = 0
         var nRanks = 0
@@ -272,7 +271,6 @@ class NCCLTest extends TutorialFunSuite {
         }
         MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
-        // picking a GPU based on localRank, allocate device buffers
         cudaCall(cudaSetDevice(myRank))
         val sendbuff = cudaMalloc2[Float](size)
         val recvbuff = cudaMalloc2[Float](size)
@@ -321,10 +319,10 @@ class NCCLTest extends TutorialFunSuite {
         }
       }
     }
-    // System.out.println(indent(driver.code))
     check("p2p-sendrecv", driver.code, "cu")
   }
-  
+
+
   test("p2p-scatter") {
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
@@ -350,8 +348,7 @@ class NCCLTest extends TutorialFunSuite {
         }
         MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
-        // picking a GPU based on myRank
-        
+        // initialize values as array of 2
         val values = NewArray[Float](size)
         for (i <- (0 until size): Rep[Range]) {
           values(i) = 2
@@ -368,7 +365,7 @@ class NCCLTest extends TutorialFunSuite {
 
         // initializing NCCL
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
-        
+
         // one-to-all (scatter)
         ncclCheck(ncclGroupStart())
         if (myRank == 0) {
@@ -438,8 +435,7 @@ class NCCLTest extends TutorialFunSuite {
         }
         MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
-        // picking a GPU based on myRank
-
+        // initialize values as array of 2
         val values = NewArray[Float](size)
         for (i <- (0 until size): Rep[Range]) {
           values(i) = 2
@@ -457,7 +453,7 @@ class NCCLTest extends TutorialFunSuite {
 
         // initializing NCCL
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
-        
+
         // one-to-all (scatter)
         ncclCheck(ncclGroupStart())
         if (myRank == 0) {
@@ -502,7 +498,6 @@ class NCCLTest extends TutorialFunSuite {
         }
       }
     }
-    // System.out.println(indent(driver.code))
     check("p2p-gather", driver.code, "cu")
   }
 
@@ -520,7 +515,7 @@ class NCCLTest extends TutorialFunSuite {
         MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
 
         printf("myRank: %d, nRanks: %d\n", myRank, nRanks)
-        
+
         var id = ncclUniqueId
         val comm = ncclComm
         val s = cudaStream
@@ -551,7 +546,7 @@ class NCCLTest extends TutorialFunSuite {
 
         // initializing NCCL
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
-        
+
         // all-to-all
         ncclCheck(ncclGroupStart())
         for (i <- (0 until nRanks): Rep[Range]) {
@@ -592,7 +587,6 @@ class NCCLTest extends TutorialFunSuite {
         }
       }
     }
-    // System.out.println(indent(driver.code))
     check("p2p-all2all", driver.code, "cu")
   }
 }
