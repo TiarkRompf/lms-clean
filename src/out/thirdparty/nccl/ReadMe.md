@@ -32,6 +32,10 @@ nvcc -o mpitest mpitest.cu -l nccl -I/usr/lib/x86_64-linux-gnu/openmpi/include -
 #### 4. Run the srun command to request a job:
 `--gres:gpu` specifies the number of GPUs are required to run the job.
 ```bash
+# check available ml machines
+sinfo
+
+# request 2 GPUs
 srun --gres=gpu:2 --cpus-per-task=2 --nice=1000 --partition=ml-all-gpu --time=00:30:00 --pty bash
 ```
 ​

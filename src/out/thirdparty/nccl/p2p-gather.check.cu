@@ -35,11 +35,13 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x10, (size_t)(1024 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x10, x8, (size_t)(1024 * sizeof(float)), cudaMemcpyHostToDevice));
   float** x11 = (float**)malloc(x2 * sizeof(float*));
-  int x12 = x2;
-  int x13 = 0;
-  while (x13 != x12) {
-    CUDA_CALL(cudaMalloc(&x11[x13], (size_t)(1024 * sizeof(float))));
-    x13 = x13 + 1;
+  if (x1 == 0) {
+    int x12 = x2;
+    int x13 = 0;
+    while (x13 != x12) {
+      CUDA_CALL(cudaMalloc(&x11[x13], (size_t)(1024 * sizeof(float))));
+      x13 = x13 + 1;
+    }
   }
   cudaError_t x14 = cudaStreamCreateWithFlags(&x7, cudaStreamDefault);
   CUDA_CALL(x14);
@@ -60,24 +62,27 @@ void Snippet(int x0) {
   CUDA_CALL(cudaStreamSynchronize(x7));
   int x19 = 0;
   if (x1 == 0) {
-    int x20 = x2;
-    int x21 = 0;
-    while (x21 != x20) {
-      CUDA_CALL(cudaMemcpy(x8, x11[x21], (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
-      int x22 = 0;
-      while (x22 != 1024) {
-        if (x8[x22] != 2) x19 = x19 + 1;
-        x22 = x22 + 1;
+    float* x20 = (float*)malloc(1024 * sizeof(float));
+    int x21 = x2;
+    int x22 = 0;
+    while (x22 != x21) {
+      CUDA_CALL(cudaMemcpy(x20, x11[x22], (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
+      int x23 = 0;
+      while (x23 != 1024) {
+        if (x20[x23] != 2) x19 = x19 + 1;
+        x23 = x23 + 1;
       }
-      x21 = x21 + 1;
+      x22 = x22 + 1;
     }
   }
   CUDA_CALL(cudaFree(x10));
-  int x23 = x2;
-  int x24 = 0;
-  while (x24 != x23) {
-    CUDA_CALL(cudaFree(x11[x24]));
-    x24 = x24 + 1;
+  if (x1 == 0) {
+    int x24 = x2;
+    int x25 = 0;
+    while (x25 != x24) {
+      CUDA_CALL(cudaFree(x11[x25]));
+      x25 = x25 + 1;
+    }
   }
   NCCLCHECK(ncclCommDestroy(x6));
   MPICHECK(MPI_Finalize());

@@ -58,21 +58,22 @@ void Snippet(int x0) {
   int x18 = x2;
   int x19 = 0;
   while (x19 != x18) {
-    CUDA_CALL(cudaMemcpy(x7, x10[x19], (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
-    int x20 = 0;
-    while (x20 != 1024) {
-      if (x7[x20] != 2) x17 = x17 + 1;
-      x20 = x20 + 1;
+    float* x20 = (float*)malloc(1024 * sizeof(float));
+    CUDA_CALL(cudaMemcpy(x20, x10[x19], (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
+    int x21 = 0;
+    while (x21 != 1024) {
+      if (x20[x21] != 2) x17 = x17 + 1;
+      x21 = x21 + 1;
     }
     x19 = x19 + 1;
   }
-  int x21 = x2;
-  int x22 = 0;
-  while (x22 != x21) {
-    int x23 = x22;
-    CUDA_CALL(cudaFree(x9[x23]));
-    CUDA_CALL(cudaFree(x10[x23]));
-    x22 = x22 + 1;
+  int x22 = x2;
+  int x23 = 0;
+  while (x23 != x22) {
+    int x24 = x23;
+    CUDA_CALL(cudaFree(x9[x24]));
+    CUDA_CALL(cudaFree(x10[x24]));
+    x23 = x23 + 1;
   }
   NCCLCHECK(ncclCommDestroy(x5));
   MPICHECK(MPI_Finalize());

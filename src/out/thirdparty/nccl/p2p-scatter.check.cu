@@ -32,13 +32,15 @@ void Snippet(int x0) {
   }
   CUDA_CALL(cudaSetDevice(x1));
   float** x10 = (float**)malloc(x2 * sizeof(float*));
-  int x11 = x2;
-  int x12 = 0;
-  while (x12 != x11) {
-    int x13 = x12;
-    CUDA_CALL(cudaMalloc(&x10[x13], (size_t)(1024 * sizeof(float))));
-    CUDA_CALL(cudaMemcpy(x10[x13], x8, (size_t)(1024 * sizeof(float)), cudaMemcpyHostToDevice));
-    x12 = x12 + 1;
+  if (x1 == 0) {
+    int x11 = x2;
+    int x12 = 0;
+    while (x12 != x11) {
+      int x13 = x12;
+      CUDA_CALL(cudaMalloc(&x10[x13], (size_t)(1024 * sizeof(float))));
+      CUDA_CALL(cudaMemcpy(x10[x13], x8, (size_t)(1024 * sizeof(float)), cudaMemcpyHostToDevice));
+      x12 = x12 + 1;
+    }
   }
   float* x14 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x14, (size_t)(1024 * sizeof(float))));
@@ -59,23 +61,26 @@ void Snippet(int x0) {
   NCCLCHECK(ncclRecv(x14, 1024, ncclFloat, 0, x6, x7));
   NCCLCHECK(ncclGroupEnd());
   CUDA_CALL(cudaStreamSynchronize(x7));
-  CUDA_CALL(cudaMemcpy(x8, x14, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
-  int x20 = 0;
+  float* x20 = (float*)malloc(1024 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x20, x14, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
   int x21 = 0;
-  while (x21 != 1024) {
-    if (x8[0] != 2) x20 = x20 + 1;
-    x21 = x21 + 1;
+  int x22 = 0;
+  while (x22 != 1024) {
+    if (x20[x22] != 2) x21 = x21 + 1;
+    x22 = x22 + 1;
   }
-  int x22 = x2;
-  int x23 = 0;
-  while (x23 != x22) {
-    CUDA_CALL(cudaFree(x10[x23]));
-    x23 = x23 + 1;
+  if (x1 == 0) {
+    int x23 = x2;
+    int x24 = 0;
+    while (x24 != x23) {
+      CUDA_CALL(cudaFree(x10[x24]));
+      x24 = x24 + 1;
+    }
   }
   CUDA_CALL(cudaFree(x14));
   NCCLCHECK(ncclCommDestroy(x6));
   MPICHECK(MPI_Finalize());
-  if (x20 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x20);
+  if (x21 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x21);
   else printf("[MPI Rank %d] Success \n", x1);
 }
 /*****************************************

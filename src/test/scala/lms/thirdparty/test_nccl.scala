@@ -353,11 +353,14 @@ class NCCLTest extends TutorialFunSuite {
         for (i <- (0 until size): Rep[Range]) {
           values(i) = 2
         }
+
         cudaCall(cudaSetDevice(myRank))
         val sendbuff = NewArray[Array[Float]](nRanks)
-        for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaMalloc3[Float](sendbuff(i), size))
-          cudaCall(cudaMemcpyOfT[Float](sendbuff(i), values, size, host2device))
+        if (myRank == 0) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaMalloc3[Float](sendbuff(i), size))
+            cudaCall(cudaMemcpyOfT[Float](sendbuff(i), values, size, host2device))
+          }
         }
         val recvbuff = cudaMalloc2[Float](size)
 
@@ -377,19 +380,24 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclGroupEnd())
 
         cudaCall(cudaStreamSynchronize(s))
-        cudaCall(cudaMemcpyOfT[Float](values, recvbuff, size, device2host))
+
+        // copy recved values out for checking
+        val outputs = NewArray[Float](size)
+        cudaCall(cudaMemcpyOfT[Float](outputs, recvbuff, size, device2host))
 
         // check results
         var errors = 0
         for (i <- (0 until size): Rep[Range]) {
-          if (values(0) != 2) {
+          if (outputs(i) != 2) {
             errors += 1;
           }
         }
 
         // free device buffers
-        for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaFree(sendbuff(i)))
+        if (myRank == 0) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaFree(sendbuff(i)))
+          }
         }
         cudaCall(cudaFree(recvbuff))
 
@@ -406,7 +414,6 @@ class NCCLTest extends TutorialFunSuite {
         }
       }
     }
-    // System.out.println(indent(driver.code))
     check("p2p-scatter", driver.code, "cu")
   }
 
@@ -445,8 +452,11 @@ class NCCLTest extends TutorialFunSuite {
         val sendbuff = cudaMalloc2[Float](size)
         cudaCall(cudaMemcpyOfT[Float](sendbuff, values, size, host2device))
         val recvbuff = NewArray[Array[Float]](nRanks)
-        for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaMalloc3[Float](recvbuff(i), size))
+
+        if (myRank == 0) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaMalloc3[Float](recvbuff(i), size))
+          }
         }
 
         cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
@@ -454,7 +464,7 @@ class NCCLTest extends TutorialFunSuite {
         // initializing NCCL
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
-        // one-to-all (scatter)
+        // all-to-one (gather)
         ncclCheck(ncclGroupStart())
         if (myRank == 0) {
           for (i <- (0 until nRanks): Rep[Range]) {
@@ -469,10 +479,11 @@ class NCCLTest extends TutorialFunSuite {
         // check results
         var errors = 0
         if (myRank == 0) {
+          val outputs = NewArray[Float](size)
           for (j <- (0 until nRanks): Rep[Range]) {
-            cudaCall(cudaMemcpyOfT[Float](values, recvbuff(j), size, device2host))
+            cudaCall(cudaMemcpyOfT[Float](outputs, recvbuff(j), size, device2host))
             for (i <- (0 until size): Rep[Range]) {
-              if (values(i) != 2) {
+              if (outputs(i) != 2) {
                 errors += 1;
               }
             }
@@ -481,8 +492,10 @@ class NCCLTest extends TutorialFunSuite {
 
         // free device buffers
         cudaCall(cudaFree(sendbuff))
-        for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaFree(recvbuff(i)))
+        if (myRank == 0) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaFree(recvbuff(i)))
+          }
         }
 
         // finalizing NCCL
@@ -526,8 +539,7 @@ class NCCLTest extends TutorialFunSuite {
         }
         MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
-        // picking a GPU based on myRank
-
+        // initialize the values to array of 2
         val values = NewArray[Float](size)
         for (i <- (0 until size): Rep[Range]) {
           values(i) = 2
@@ -560,9 +572,10 @@ class NCCLTest extends TutorialFunSuite {
         // check results
         var errors = 0
         for (j <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaMemcpyOfT[Float](values, recvbuff(j), size, device2host))
+          val outputs = NewArray[Float](size)
+          cudaCall(cudaMemcpyOfT[Float](outputs, recvbuff(j), size, device2host))
           for (i <- (0 until size): Rep[Range]) {
-            if (values(i) != 2) {
+            if (outputs(i) != 2) {
               errors += 1;
             }
           }
