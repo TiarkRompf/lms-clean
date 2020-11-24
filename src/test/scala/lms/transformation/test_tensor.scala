@@ -23,7 +23,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
 
     override def transform(graph: Graph) = {
       val graph1 = (new TensorLoweringCPU {}).transform(graph)
-      (List(graph, graph1).map(_.toString), graph1)
+      List(graph, graph1)
     }
   }
 

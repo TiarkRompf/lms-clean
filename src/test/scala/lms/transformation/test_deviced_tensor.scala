@@ -25,7 +25,7 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
     override def transform(graph: Graph) = {
       val graph1 = (new TensorResolvingDevice {}).transform(graph)
       val graph2 = (new DevicedTensorLowering {}).transform(graph1)
-      (List(graph, graph1, graph2).map(_.toString), graph2)
+      List(graph, graph1, graph2)
     }
   }
 
