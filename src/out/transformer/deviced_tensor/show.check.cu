@@ -4,7 +4,7 @@ Emitting C Generated Code
 #include <string.h>
 #include <cblas.h>
 #include <stdlib.h>
-#include <cuda_header.h>
+#include "cuda_header.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
