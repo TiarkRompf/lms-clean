@@ -47,46 +47,47 @@ void Snippet(int x0) {
   CUDA_CALL(x14);
   ncclResult_t x15 = ncclCommInitRank(&x6, x2, x5, x1);
   NCCLCHECK(x15);
+  ncclDataType_t x16 = ncclFloat;
   NCCLCHECK(ncclGroupStart());
   if (x1 == 0) {
-    int x16 = x2;
-    int x17 = 0;
-    while (x17 != x16) {
-      int x18 = x17;
-      NCCLCHECK(ncclRecv(x11[x18], 1024, ncclFloat, x18, x6, x7));
-      x17 = x17 + 1;
+    int x17 = x2;
+    int x18 = 0;
+    while (x18 != x17) {
+      int x19 = x18;
+      NCCLCHECK(ncclRecv(x11[x19], 1024, x16, x19, x6, x7));
+      x18 = x18 + 1;
     }
   }
-  NCCLCHECK(ncclSend(x10, 1024, ncclFloat, 0, x6, x7));
+  NCCLCHECK(ncclSend(x10, 1024, x16, 0, x6, x7));
   NCCLCHECK(ncclGroupEnd());
   CUDA_CALL(cudaStreamSynchronize(x7));
-  int x19 = 0;
+  int x20 = 0;
   if (x1 == 0) {
-    float* x20 = (float*)malloc(1024 * sizeof(float));
-    int x21 = x2;
-    int x22 = 0;
-    while (x22 != x21) {
-      CUDA_CALL(cudaMemcpy(x20, x11[x22], (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
-      int x23 = 0;
-      while (x23 != 1024) {
-        if (x20[x23] != 2) x19 = x19 + 1;
-        x23 = x23 + 1;
+    float* x21 = (float*)malloc(1024 * sizeof(float));
+    int x22 = x2;
+    int x23 = 0;
+    while (x23 != x22) {
+      CUDA_CALL(cudaMemcpy(x21, x11[x23], (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
+      int x24 = 0;
+      while (x24 != 1024) {
+        if (x21[x24] != 2) x20 = x20 + 1;
+        x24 = x24 + 1;
       }
-      x22 = x22 + 1;
+      x23 = x23 + 1;
     }
   }
   CUDA_CALL(cudaFree(x10));
   if (x1 == 0) {
-    int x24 = x2;
-    int x25 = 0;
-    while (x25 != x24) {
-      CUDA_CALL(cudaFree(x11[x25]));
-      x25 = x25 + 1;
+    int x25 = x2;
+    int x26 = 0;
+    while (x26 != x25) {
+      CUDA_CALL(cudaFree(x11[x26]));
+      x26 = x26 + 1;
     }
   }
   NCCLCHECK(ncclCommDestroy(x6));
   MPICHECK(MPI_Finalize());
-  if (x19 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x19);
+  if (x20 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x20);
   else printf("[MPI Rank %d] Success \n", x1);
 }
 /*****************************************

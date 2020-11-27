@@ -285,11 +285,10 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // communicating using NCCL (send-recv)
+        
         val peer = if (myRank == 0) { 1 } else { 0 }
-        ncclCheck(ncclGroupStart())
-        ncclCheck(ncclSend(sendbuff, SizeT(size), ncclFloat, peer, comm, s))
-        ncclCheck(ncclRecv(recvbuff, SizeT(size), ncclFloat, peer, comm, s))
-        ncclCheck(ncclGroupEnd())
+        ncclSendRecv(sendbuff, recvbuff, SizeT(size), ncclFloat, peer, comm, s)
+
 
         cudaCall(cudaStreamSynchronize(s))
         cudaCall(cudaMemcpyOfT[Float](values, recvbuff, size, device2host))
@@ -370,14 +369,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // one-to-all (scatter)
-        ncclCheck(ncclGroupStart())
-        if (myRank == 0) {
-          for (i <- (0 until nRanks): Rep[Range]) {
-            ncclCheck(ncclSend(sendbuff(i), SizeT(size), ncclFloat, i, comm, s))
-          }
-        }
-        ncclCheck(ncclRecv(recvbuff, SizeT(size), ncclFloat, 0, comm, s))
-        ncclCheck(ncclGroupEnd())
+        ncclScatter(sendbuff, recvbuff, 0, myRank, nRanks, SizeT(size), ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 
@@ -465,14 +457,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // all-to-one (gather)
-        ncclCheck(ncclGroupStart())
-        if (myRank == 0) {
-          for (i <- (0 until nRanks): Rep[Range]) {
-            ncclCheck(ncclRecv(recvbuff(i), SizeT(size), ncclFloat, i, comm, s))
-          }
-        }
-        ncclCheck(ncclSend(sendbuff, SizeT(size), ncclFloat, 0, comm, s))
-        ncclCheck(ncclGroupEnd())
+        ncclGather(sendbuff, recvbuff, 0, myRank, nRanks, SizeT(size), ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 
@@ -560,12 +545,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // all-to-all
-        ncclCheck(ncclGroupStart())
-        for (i <- (0 until nRanks): Rep[Range]) {
-          ncclCheck(ncclSend(sendbuff(i), SizeT(size), ncclFloat, i, comm, s))
-          ncclCheck(ncclRecv(recvbuff(i), SizeT(size), ncclFloat, i, comm, s))
-        }
-        ncclCheck(ncclGroupEnd())
+        ncclAll2All(sendbuff, recvbuff, nRanks, SizeT(size), ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 

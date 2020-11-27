@@ -307,11 +307,74 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * NCCL primitives are generally not thread-safe, however, they are reentrant. Multiple threads should use separate communicator objects.
    */
 
+
+  /**
+   * Sendrecv
+   * Exchange data between two ranks, both sending and receiving at the same time
+   */
+  def ncclSendRecv[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], count: Rep[SizeT], datatype: Rep[ncclDataTypeT], peer: Rep[Int],
+      comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) = {
+    ncclCheck(ncclGroupStart())
+    ncclCheck(ncclSend(sendbuff, count, datatype, peer, comm, stream))
+    ncclCheck(ncclRecv(recvbuff, count, datatype, peer, comm, stream))
+    ncclCheck(ncclGroupEnd())
+  }
+
+  /** 
+   * One-to-all (scatter)
+   * A one-to-all operation from a root rank can be expressed by merging all send and receive operations in a group
+   * `root` is the root rank, `myRank` is the rank of current device, `nRanks` is the number of devices associated with 
+   * the communicator `comm`.
+   */
+  def ncclScatter[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[T]], root: Rep[Int], myRank: Rep[Int], nRanks: Rep[Int], 
+      count: Rep[SizeT], datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) = {
+    ncclCheck(ncclGroupStart())
+    val isRoot: Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("==", Unwrap(myRank), Unwrap(root)))
+    __ifThenElse(isRoot, {
+      for (i <- (0 until nRanks): Rep[Range]) {
+        ncclCheck(ncclSend(sendbuff(i), count, datatype, i, comm, stream))
+      }
+    }, {})
+    ncclCheck(ncclRecv(recvbuff, count, datatype, root, comm, stream))
+    ncclCheck(ncclGroupEnd())
+  }
+
+  /**
+   * All-to-one (gather)
+   * Similar to One-to-all (scatter)
+   */
+  def ncclGather[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[Array[T]]], root: Rep[Int], myRank: Rep[Int], nRanks: Rep[Int], 
+        count: Rep[SizeT], datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) = {
+    ncclCheck(ncclGroupStart())
+    val isRoot: Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("==", Unwrap(myRank), Unwrap(root)))
+    __ifThenElse(isRoot, {
+      for (i <- (0 until nRanks): Rep[Range]) {
+        ncclCheck(ncclRecv(recvbuff(i), count, datatype, i, comm, stream))
+      }
+    }, {})
+    ncclCheck(ncclSend(sendbuff, count, datatype, root, comm, stream))
+    ncclCheck(ncclGroupEnd())
+  }
+
+  /**
+   * All-to-all
+   * A merged loop of send/recv operations to/from all peers
+   */
+  def ncclAll2All[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[Array[T]]], nRanks: Rep[Int], count: Rep[SizeT], 
+      datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) = {
+    ncclCheck(ncclGroupStart())
+    for (i <- (0 until nRanks): Rep[Range]) {
+      ncclCheck(ncclSend(sendbuff(i), count, datatype, i, comm, stream))
+      ncclCheck(ncclRecv(recvbuff(i), count, datatype, i, comm, stream))
+    }
+    ncclCheck(ncclGroupEnd())
+  }
 }
 
 trait CCodeGenNCCLOps extends CCodeGenSizeTOps with CCodeGenLibs {
   override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
     case s: String if s.endsWith("ncclResultT") => "ncclResult_t"
+    case s: String if s.endsWith("ncclDataTypeT") => "ncclDataType_t"
     case _ => super.remap(m)
   }
 }

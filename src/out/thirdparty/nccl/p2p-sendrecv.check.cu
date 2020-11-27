@@ -38,23 +38,24 @@ void Snippet(int x0) {
   CUDA_CALL(cudaStreamCreateWithFlags(&x6, cudaStreamDefault));
   NCCLCHECK(ncclCommInitRank(&x5, x2, x4, x1));
   int x11 = x1 == 0 ? 1 : 0;
+  ncclDataType_t x12 = ncclFloat;
   NCCLCHECK(ncclGroupStart());
-  NCCLCHECK(ncclSend(x7, 1024, ncclFloat, x11, x5, x6));
-  NCCLCHECK(ncclRecv(x8, 1024, ncclFloat, x11, x5, x6));
+  NCCLCHECK(ncclSend(x7, 1024, x12, x11, x5, x6));
+  NCCLCHECK(ncclRecv(x8, 1024, x12, x11, x5, x6));
   NCCLCHECK(ncclGroupEnd());
   CUDA_CALL(cudaStreamSynchronize(x6));
   CUDA_CALL(cudaMemcpy(x9, x8, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
-  int x12 = 0;
   int x13 = 0;
-  while (x13 != 1024) {
-    if (x9[0] != 2) x12 = x12 + 1;
-    x13 = x13 + 1;
+  int x14 = 0;
+  while (x14 != 1024) {
+    if (x9[0] != 2) x13 = x13 + 1;
+    x14 = x14 + 1;
   }
   CUDA_CALL(cudaFree(x7));
   CUDA_CALL(cudaFree(x8));
   NCCLCHECK(ncclCommDestroy(x5));
   MPICHECK(MPI_Finalize());
-  if (x12 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x12);
+  if (x13 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x13);
   else printf("[MPI Rank %d] Success \n", x1);
 }
 /*****************************************

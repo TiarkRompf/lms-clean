@@ -43,41 +43,42 @@ void Snippet(int x0) {
   }
   CUDA_CALL(cudaStreamCreateWithFlags(&x6, cudaStreamDefault));
   NCCLCHECK(ncclCommInitRank(&x5, x2, x4, x1));
-  NCCLCHECK(ncclGroupStart());
   int x14 = x2;
-  int x15 = 0;
-  while (x15 != x14) {
-    int x16 = x15;
-    NCCLCHECK(ncclSend(x9[x16], 1024, ncclFloat, x16, x5, x6));
-    NCCLCHECK(ncclRecv(x10[x16], 1024, ncclFloat, x16, x5, x6));
-    x15 = x15 + 1;
+  ncclDataType_t x15 = ncclFloat;
+  NCCLCHECK(ncclGroupStart());
+  int x16 = 0;
+  while (x16 != x14) {
+    int x17 = x16;
+    NCCLCHECK(ncclSend(x9[x17], 1024, x15, x17, x5, x6));
+    NCCLCHECK(ncclRecv(x10[x17], 1024, x15, x17, x5, x6));
+    x16 = x16 + 1;
   }
   NCCLCHECK(ncclGroupEnd());
   CUDA_CALL(cudaStreamSynchronize(x6));
-  int x17 = 0;
-  int x18 = x2;
-  int x19 = 0;
-  while (x19 != x18) {
-    float* x20 = (float*)malloc(1024 * sizeof(float));
-    CUDA_CALL(cudaMemcpy(x20, x10[x19], (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
-    int x21 = 0;
-    while (x21 != 1024) {
-      if (x20[x21] != 2) x17 = x17 + 1;
-      x21 = x21 + 1;
+  int x18 = 0;
+  int x19 = x2;
+  int x20 = 0;
+  while (x20 != x19) {
+    float* x21 = (float*)malloc(1024 * sizeof(float));
+    CUDA_CALL(cudaMemcpy(x21, x10[x20], (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
+    int x22 = 0;
+    while (x22 != 1024) {
+      if (x21[x22] != 2) x18 = x18 + 1;
+      x22 = x22 + 1;
     }
-    x19 = x19 + 1;
+    x20 = x20 + 1;
   }
-  int x22 = x2;
-  int x23 = 0;
-  while (x23 != x22) {
-    int x24 = x23;
-    CUDA_CALL(cudaFree(x9[x24]));
-    CUDA_CALL(cudaFree(x10[x24]));
-    x23 = x23 + 1;
+  int x23 = x2;
+  int x24 = 0;
+  while (x24 != x23) {
+    int x25 = x24;
+    CUDA_CALL(cudaFree(x9[x25]));
+    CUDA_CALL(cudaFree(x10[x25]));
+    x24 = x24 + 1;
   }
   NCCLCHECK(ncclCommDestroy(x5));
   MPICHECK(MPI_Finalize());
-  if (x17 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x17);
+  if (x18 != 0) printf("[MPI Rank %d] Found %d errors.\n", x1, x18);
   else printf("[MPI Rank %d] Success \n", x1);
 }
 /*****************************************
