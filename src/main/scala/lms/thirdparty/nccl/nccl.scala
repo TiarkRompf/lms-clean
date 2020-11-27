@@ -187,7 +187,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * Reduce data arrays of length count in sendbuff using op operation and leaves identical copies of the result on each recvbuff.
    * In-place operation will happen if sendbuff == recvbuff.
    */
-  def ncclAllReduce[T:Manifest](sendbuf: Rep[Array[T]], recvbuf: Rep[Array[T]], count: Rep[SizeT],
+  def ncclAllReduce[T:Manifest](sendbuf: Rep[Array[T]], recvbuf: Rep[Array[T]], count: Rep[Int],
       dataType: Rep[ncclDataTypeT], op: Rep[ncclRedOpT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) =
     libFunction[ncclResultT]("ncclAllReduce", Unwrap(sendbuf), Unwrap(recvbuf), Unwrap(count), Unwrap(dataType),
       Unwrap(op), Unwrap(comm), Unwrap(stream))(Seq(0,3,4,5,6), Seq(1,5,6), Set[Int]())
@@ -197,7 +197,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * Copies count elements from sendbuff on the root` rank to all ranks' ``recvbuff. sendbuff is only used on rank root and ignored for other ranks.
    * In-place operation will happen if sendbuff == recvbuff.
    */
-  def ncclBroadcast[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], count: Rep[SizeT],
+  def ncclBroadcast[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], count: Rep[Int],
       dataType: Rep[ncclDataTypeT], root: Rep[Int], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) =
     libFunction[ncclResultT]("ncclBroadCast", Unwrap(sendbuff), Unwrap(recvbuff), Unwrap(count), Unwrap(dataType),
       Unwrap(root), Unwrap(comm), Unwrap(stream))(Seq(0,3,5,6), Seq(1,5,6), Set[Int]())
@@ -207,7 +207,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * Reduce data arrays of length count in sendbuff into recvbuff on the root rank using the op operation. recvbuff is only used on rank root and ignored for other ranks.
    * In-place operation will happen if sendbuff == recvbuff.
    */
-  def ncclReduce[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], count: Rep[SizeT], datatype: Rep[ncclDataTypeT],
+  def ncclReduce[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], count: Rep[Int], datatype: Rep[ncclDataTypeT],
       op: Rep[ncclRedOpT], root: Rep[Int], comm: Rep[ncclCommT], stream:Rep[cudaStreamT]) =
     libFunction[ncclResultT]("ncclReduce", Unwrap(sendbuff), Unwrap(recvbuff), Unwrap(count), Unwrap(datatype),
       Unwrap(op), Unwrap(root), Unwrap(comm), Unwrap(stream))(Seq(0,3,4,6,7), Seq(1,6,7), Set[Int]())
@@ -218,7 +218,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * Note : This assumes the receive count is equal to nranks*sendcount, which means that recvbuff should have a size of at least nranks*sendcount elements.
    * In-place operation will happen if sendbuff == recvbuff + rank * sendcount.
    */
-  def ncclAllGather[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], sendcount: Rep[SizeT], datatype: Rep[ncclDataTypeT],
+  def ncclAllGather[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], sendcount: Rep[Int], datatype: Rep[ncclDataTypeT],
       comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) =
     libFunction[ncclResultT]("ncclAllGather", Unwrap(sendbuff), Unwrap(recvbuff), Unwrap(sendcount), Unwrap(datatype), Unwrap(comm),
       Unwrap(stream))(Seq(0,3,4,5), Seq(1,4,5), Set[Int]())
@@ -228,7 +228,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * Reduce data in sendbuff from all GPUs using the op operation and leave the reduced result scattered over the devices so that the recvbuff on rank i will contain the i-th block of the result.
    * Note: This assumes the send count is equal to nranks*recvcount, which means that sendbuff should have a size of at least nranks*recvcount elements.
    */
-  def ncclReduceScatter[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], recvcount: Rep[SizeT], datatype: Rep[ncclDataTypeT],
+  def ncclReduceScatter[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], recvcount: Rep[Int], datatype: Rep[ncclDataTypeT],
       op: Rep[ncclRedOpT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) =
     libFunction[ncclResultT]("ncclReduceScatter", Unwrap(sendbuff), Unwrap(recvbuff), Unwrap(recvcount), Unwrap(datatype),
       Unwrap(op), Unwrap(comm), Unwrap(stream))(Seq(0,3,4,5,6), Seq(1,5,6), Set[Int]())
@@ -285,7 +285,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * This operation is blocking for the GPU. If multiple ncclSend() and ncclRecv() operations need to progress concurrently to complete,
    * they must be fused within a ncclGroupStart()/ ncclGroupEnd() section.
    */
-  def ncclSend[T:Manifest](sendbuff: Rep[Array[T]], count: Rep[SizeT], datatype: Rep[ncclDataTypeT], peer: Rep[Int],
+  def ncclSend[T:Manifest](sendbuff: Rep[Array[T]], count: Rep[Int], datatype: Rep[ncclDataTypeT], peer: Rep[Int],
       comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) =
     libFunction[ncclResultT]("ncclSend", Unwrap(sendbuff), Unwrap(count), Unwrap(datatype), Unwrap(peer), Unwrap(comm),
       Unwrap(stream))(Seq(0,2,4,5), Seq(4,5), Set[Int]())
@@ -297,7 +297,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * This operation is blocking for the GPU. If multiple ncclSend() and ncclRecv() operations need to progress concurrently to complete,
    *   they must be fused within a ncclGroupStart()/ ncclGroupEnd() section.
    */
-  def ncclRecv[T:Manifest](recvbuff: Rep[Array[T]], count: Rep[SizeT], datatype: Rep[ncclDataTypeT], peer: Rep[Int],
+  def ncclRecv[T:Manifest](recvbuff: Rep[Array[T]], count: Rep[Int], datatype: Rep[ncclDataTypeT], peer: Rep[Int],
       comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) =
     libFunction[ncclResultT]("ncclRecv", Unwrap(recvbuff), Unwrap(count), Unwrap(datatype), Unwrap(peer),
       Unwrap(comm), Unwrap(stream))(Seq(2,4,5), Seq(0,4,5), Set[Int]())
@@ -312,7 +312,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * Sendrecv
    * Exchange data between two ranks, both sending and receiving at the same time
    */
-  def ncclSendRecv[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], count: Rep[SizeT], datatype: Rep[ncclDataTypeT], peer: Rep[Int],
+  def ncclSendRecv[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[T]], count: Rep[Int], datatype: Rep[ncclDataTypeT], peer: Rep[Int],
       comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) = {
     ncclCheck(ncclGroupStart())
     ncclCheck(ncclSend(sendbuff, count, datatype, peer, comm, stream))
@@ -327,7 +327,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * the communicator `comm`.
    */
   def ncclScatter[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[T]], root: Rep[Int], myRank: Rep[Int], nRanks: Rep[Int], 
-      count: Rep[SizeT], datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) = {
+      count: Rep[Int], datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT])(implicit __pos: SourceContext) = {
     ncclCheck(ncclGroupStart())
     val isRoot: Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("==", Unwrap(myRank), Unwrap(root)))
     __ifThenElse(isRoot, {
@@ -344,7 +344,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * Similar to One-to-all (scatter)
    */
   def ncclGather[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[Array[T]]], root: Rep[Int], myRank: Rep[Int], nRanks: Rep[Int], 
-        count: Rep[SizeT], datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) = {
+        count: Rep[Int], datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT])(implicit __pos: SourceContext) = {
     ncclCheck(ncclGroupStart())
     val isRoot: Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("==", Unwrap(myRank), Unwrap(root)))
     __ifThenElse(isRoot, {
@@ -360,8 +360,8 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * All-to-all
    * A merged loop of send/recv operations to/from all peers
    */
-  def ncclAll2All[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[Array[T]]], nRanks: Rep[Int], count: Rep[SizeT], 
-      datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT]) = {
+  def ncclAll2All[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[Array[T]]], nRanks: Rep[Int], count: Rep[Int], 
+      datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT])(implicit __pos: SourceContext) = {
     ncclCheck(ncclGroupStart())
     for (i <- (0 until nRanks): Rep[Range]) {
       ncclCheck(ncclSend(sendbuff(i), count, datatype, i, comm, stream))
