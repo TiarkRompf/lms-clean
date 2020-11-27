@@ -43,7 +43,7 @@ class NCCLTest extends TutorialFunSuite {
         cudaStreamCreate(s)
         var sendbuff = cudaMalloc2[Float](0)
         var recvbuff = cudaMalloc2[Float](0)
-        ncclCheck(ncclAllReduce(sendbuff, recvbuff, SizeT(0), ncclFloat, ncclSum, comms, s))
+        ncclCheck(ncclAllReduce(sendbuff, recvbuff, 0, ncclFloat, ncclSum, comms, s))
         cudaCall(cudaStreamSynchronize(s))
         printf("end")
       }
@@ -79,7 +79,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitAll(comms, nDev, devs))
 
         // calling NCCL communication API
-        ncclCheck(ncclAllReduce(sendbuff, recvbuff, SizeT(size), ncclFloat, ncclSum, comms, s))
+        ncclCheck(ncclAllReduce(sendbuff, recvbuff, size, ncclFloat, ncclSum, comms, s))
 
         // synchronizing on CUDA streams to wait form completion of NCCL operation
         cudaCall(cudaSetDevice(0))
@@ -139,7 +139,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // communicating using NCCL
-        ncclCheck(ncclAllReduce(sendbuff, recvbuff, SizeT(size), ncclFloat, ncclSum, comm, s))
+        ncclCheck(ncclAllReduce(sendbuff, recvbuff, size, ncclFloat, ncclSum, comm, s))
 
         // completing NCCL operation by synchronizing on the CUDA stream
         cudaCall(cudaStreamSynchronize(s))
@@ -207,7 +207,7 @@ class NCCLTest extends TutorialFunSuite {
         for (i <- (0 until SIZE): Rep[Range]) {
           value(i) = rank + 1
         }
-        cudaCall(cudaMemcpy[Int](dptr_send, value, SizeT(SIZE), host2device))
+        cudaCall(cudaMemcpyOfT[Int](dptr_send, value, SIZE, host2device))
 
         // compute final value
         val ref = size * (size + 1) / 2
@@ -215,12 +215,12 @@ class NCCLTest extends TutorialFunSuite {
         // run allreduce
         var errors = 0
         for (i <- (0 until NITERS): Rep[Range]) {
-          ncclCheck(ncclAllReduce(dptr_send, dptr_recv, SizeT(SIZE), ncclInt, ncclSum, comm, stream))
+          ncclCheck(ncclAllReduce(dptr_send, dptr_recv, SIZE, ncclInt, ncclSum, comm, stream))
         }
 
         // Check results
         cudaCall(cudaStreamSynchronize(stream))
-        cudaCall(cudaMemcpy[Int](value, dptr_recv, SizeT(SIZE), device2host))
+        cudaCall(cudaMemcpyOfT[Int](value, dptr_recv, SIZE, device2host))
         for (i <- (0 until SIZE): Rep[Range]) {
           if (value(i) != ref) {
             errors = errors + 1
@@ -287,7 +287,7 @@ class NCCLTest extends TutorialFunSuite {
         // communicating using NCCL (send-recv)
         
         val peer = if (myRank == 0) { 1 } else { 0 }
-        ncclSendRecv(sendbuff, recvbuff, SizeT(size), ncclFloat, peer, comm, s)
+        ncclSendRecv(sendbuff, recvbuff, size, ncclFloat, peer, comm, s)
 
 
         cudaCall(cudaStreamSynchronize(s))
@@ -369,7 +369,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // one-to-all (scatter)
-        ncclScatter(sendbuff, recvbuff, 0, myRank, nRanks, SizeT(size), ncclFloat, comm, s)
+        ncclScatter(sendbuff, recvbuff, 0, myRank, nRanks, size, ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 
@@ -457,7 +457,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // all-to-one (gather)
-        ncclGather(sendbuff, recvbuff, 0, myRank, nRanks, SizeT(size), ncclFloat, comm, s)
+        ncclGather(sendbuff, recvbuff, 0, myRank, nRanks, size, ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 
@@ -545,7 +545,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // all-to-all
-        ncclAll2All(sendbuff, recvbuff, nRanks, SizeT(size), ncclFloat, comm, s)
+        ncclAll2All(sendbuff, recvbuff, nRanks, size, ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 
