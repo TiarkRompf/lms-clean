@@ -320,17 +320,16 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
     ncclCheck(ncclGroupEnd())
   }
 
-  /** 
+  /**
    * One-to-all (scatter)
    * A one-to-all operation from a root rank can be expressed by merging all send and receive operations in a group
-   * `root` is the root rank, `myRank` is the rank of current device, `nRanks` is the number of devices associated with 
+   * `root` is the root rank, `myRank` is the rank of current device, `nRanks` is the number of devices associated with
    * the communicator `comm`.
    */
-  def ncclScatter[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[T]], root: Rep[Int], myRank: Rep[Int], nRanks: Rep[Int], 
+  def ncclScatter[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[T]], root: Rep[Int], myRank: Rep[Int], nRanks: Rep[Int],
       count: Rep[Int], datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT])(implicit __pos: SourceContext) = {
     ncclCheck(ncclGroupStart())
-    val isRoot: Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("==", Unwrap(myRank), Unwrap(root)))
-    __ifThenElse(isRoot, {
+    __ifThenElse(equals(myRank, root), {
       for (i <- (0 until nRanks): Rep[Range]) {
         ncclCheck(ncclSend(sendbuff(i), count, datatype, i, comm, stream))
       }
@@ -343,11 +342,10 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * All-to-one (gather)
    * Similar to One-to-all (scatter)
    */
-  def ncclGather[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[Array[T]]], root: Rep[Int], myRank: Rep[Int], nRanks: Rep[Int], 
+  def ncclGather[T:Manifest](sendbuff: Rep[Array[T]], recvbuff: Rep[Array[Array[T]]], root: Rep[Int], myRank: Rep[Int], nRanks: Rep[Int],
         count: Rep[Int], datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT])(implicit __pos: SourceContext) = {
     ncclCheck(ncclGroupStart())
-    val isRoot: Rep[Boolean] = Wrap[Boolean](Adapter.g.reflect("==", Unwrap(myRank), Unwrap(root)))
-    __ifThenElse(isRoot, {
+    __ifThenElse(equals(myRank, root), {
       for (i <- (0 until nRanks): Rep[Range]) {
         ncclCheck(ncclRecv(recvbuff(i), count, datatype, i, comm, stream))
       }
@@ -360,7 +358,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    * All-to-all
    * A merged loop of send/recv operations to/from all peers
    */
-  def ncclAll2All[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[Array[T]]], nRanks: Rep[Int], count: Rep[Int], 
+  def ncclAll2All[T:Manifest](sendbuff: Rep[Array[Array[T]]], recvbuff: Rep[Array[Array[T]]], nRanks: Rep[Int], count: Rep[Int],
       datatype: Rep[ncclDataTypeT], comm: Rep[ncclCommT], stream: Rep[cudaStreamT])(implicit __pos: SourceContext) = {
     ncclCheck(ncclGroupStart())
     for (i <- (0 until nRanks): Rep[Range]) {
