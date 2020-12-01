@@ -27,11 +27,12 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
 
-    override def transform(graph: Graph): (List[String], Graph) = {
+    override def transform(graph: Graph): List[Graph] = {
       val graph1 = (new DistributeTensorDimName {}).transform(graph)
       val graph2 = (new DistributeTensorAIRCoP {}).transform(graph1)
-      val graph3 = (new DistributeTensor2MPI_NCCL {}).transform(graph2)
-      (List(graph, graph1, graph2, graph3).map(_.toString), graph3)
+      val graph2_5 = (new Canonicalize {}).transform(graph2)
+      val graph3 = (new DistributeTensor2MPI_NCCL {}).transform(graph2_5)
+      List(graph, graph1, graph2, graph2_5, graph3)
     }
   }
 

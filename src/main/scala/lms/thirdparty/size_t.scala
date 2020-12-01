@@ -41,6 +41,7 @@ trait SizeTOps extends Base with PrimitiveOps with CLibs {
   implicit def sizeTVarToOps(x: Var[SizeT])(implicit __pos: SourceContext): SizeTOps = new SizeTOps(readVar(x))(__pos)
   class SizeTOps(x: Rep[SizeT])(implicit __pos: SourceContext) {
     def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("cast", Unwrap(x), Backend.Const("Int")))
+    def * (y: Rep[Int]) = Wrap[SizeT](Adapter.g.reflect("*", Unwrap(x), Unwrap(y)))
   }
 
   // void * memset ( void * ptr, int value, size_t num );

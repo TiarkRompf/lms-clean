@@ -161,6 +161,29 @@ object FixedSizeDistributedTensorTypeLess {
       (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), x)(x))).withSrcType(__pos, et)
     }
 
+    def dot_with_transpose(y: TENSOR, anno: Anno = NAnno, transL: Boolean = false, transR: Boolean = false)(implicit __pos: SourceContext): TENSOR = {
+      val res_tt = (shape_size.size, y.shape_size.size) match {
+        case (1,1) => // vector-vector-dot
+          assert(!transL && !transR, "cannot transpose the operand in vector-vector-dot")
+          assert(shape_size == y.shape_size)
+          TensorType(Seq(Size(Dim(next_dim_name), 1)), et)
+        case (2,1) => // matrix-vector-dot
+          assert(!transL && !transR, "cannot transpose the operand in matrix-vector-dot for now")
+          assert(shape_size(1) == y.shape_size(0))
+          TensorType(tensor_type.shape.take(1), et)
+        case (2,2) => // matrix-matrix-dot
+          val left_check = if (transL) shape_size(0) else shape_size(1)
+          val left_dim = if (transL) tensor_type.shape(1) else tensor_type.shape(0)
+          val right_check = if (transR) shape_size(1) else shape_size(0)
+          val right_dim = if (transR) y.tensor_type.shape(0) else y.tensor_type.shape(1)
+          assert(left_check == right_check)
+          TensorType(Seq(left_dim, right_dim), et)
+        case _ => throw new Exception("not yet supporting high dimension dot")
+      }
+      assert (et == y.et)
+      (new TENSOR(Adapter.g.reflectRead("tensor_dot_with_transpose", C(res_tt), C(anno), C(transL), C(transR), x, y.x)(x, y.x))).withSrcType(__pos, et)
+    }
+
     def dot(y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
       val res_tt = (shape_size.size, y.shape_size.size) match {
         case (1,1) => // vector-vector-dot

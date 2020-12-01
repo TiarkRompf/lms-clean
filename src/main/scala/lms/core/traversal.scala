@@ -573,6 +573,19 @@ abstract class Transformer extends Traverser {
 
 }
 
+abstract class Canonicalize extends Transformer {
+  override def transform(graph: Graph): Graph = {
+    assert (g == null)
+    g = new GraphBuilderOpt()
+    Adapter.g = g
+    try {
+      super.transform(graph)
+    } finally {
+      g = null; Adapter.g = null
+    }
+  }
+}
+
 abstract class CPSTransformer extends Transformer {
 
   val forwardMap = mutable.Map[Sym, Sym]()  // this Map set up connection for lambda-forward node (sTo -> sFrom)

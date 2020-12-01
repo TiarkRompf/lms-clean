@@ -55,16 +55,26 @@ abstract class DistributeTensorAIRCoP extends Transformer {
         // save forward op in forwardNodes
         forwardNodes += n
         // save backward op in backwardNodes
+        // (() => {
+        //   val b_tensor = new TENSOR(transform(b))
+        //   val b_transpose = b_tensor.transpose(anno)
+        //   val a_grad = grad_map(s) dot (b_transpose, anno)
+        //   grad_map(a) += (a_grad, anno); ()
+        // }) +=: backwardNodes
+        // (() => {
+        //   val a_tensor = new TENSOR(transform(a))
+        //   val a_transpose = a_tensor.transpose(anno)
+        //   val b_grad = a_transpose dot (grad_map(s), anno)
+        //   grad_map(b) += (b_grad, anno); ()
+        // }) +=: backwardNodes
         (() => {
           val b_tensor = new TENSOR(transform(b))
-          val b_transpose = b_tensor.transpose(anno)
-          val a_grad = grad_map(s) dot (b_transpose, anno)
+          val a_grad = grad_map(s) dot_with_transpose(b_tensor, anno, transL = false, transR = true)
           grad_map(a) += (a_grad, anno); ()
         }) +=: backwardNodes
         (() => {
           val a_tensor = new TENSOR(transform(a))
-          val a_transpose = a_tensor.transpose(anno)
-          val b_grad = a_transpose dot (grad_map(s), anno)
+          val b_grad = a_tensor dot_with_transpose (grad_map(s), anno, transL = true, transR = false)
           grad_map(b) += (b_grad, anno); ()
         }) +=: backwardNodes
       case n => throw new Exception(s"$n todo")

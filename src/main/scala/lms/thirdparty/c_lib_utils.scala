@@ -21,8 +21,8 @@ object CLibTypeLess {
   }
 
   // FIXME(feiw) this NEW_STRUCT needs explicit cast to return non-TOP
-  def NEW_STRUCT(m: Manifest[_])(implicit __pos: SourceContext): TOP = {
-    TOP(Adapter.g.reflectUnsafe("lib-struct", Backend.Const(m)), m)
+  def NEW_STRUCT(m: Manifest[_], typeName: String)(implicit __pos: SourceContext): TOP = {
+    TOP(Adapter.g.reflectUnsafe("lib-struct", Backend.Const(typeName)), m)
   }
 
   // FIXME(feiw) this LIB_FUNCTION needs explicit cast to return non-TOP

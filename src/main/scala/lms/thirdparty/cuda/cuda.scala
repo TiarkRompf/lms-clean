@@ -143,6 +143,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
 
   // M_I_M means that there are 3 input tensors, and the first and last tensors are mutated
+  // that is why it is named `M_I_M` kernel, for Mutate_Input_Mutate Kernel
   def CUDA_ELEMENTWISE_M_I_M_KERNEL(m: Manifest[_], op: (NUM, NUM, NUM) => (NUM, NUM))(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
     // type cast
     val t0 = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
