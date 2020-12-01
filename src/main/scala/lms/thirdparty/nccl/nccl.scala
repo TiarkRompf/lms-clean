@@ -311,3 +311,10 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
    */
 
 }
+
+trait CCodeGenNCCLOps extends CCodeGenSizeTOps with CCodeGenLibs {
+  override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
+    case s: String if s.endsWith("ncclResultT") => "ncclResult_t"
+    case _ => super.remap(m)
+  }
+}
