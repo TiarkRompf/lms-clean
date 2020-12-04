@@ -5,7 +5,7 @@ Emitting C Generated Code
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <mpi_header.h>
+#include "mpi_header.h"
 /**************** Snippet ****************/
 void Snippet(int x0) {
   MPICHECK(MPI_Init(NULL, NULL));

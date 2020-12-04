@@ -4,11 +4,11 @@ Emitting C Generated Code
 #include "nccl_header.h"
 #include <string.h>
 #include <stdlib.h>
-#include <cuda_header.h>
+#include "cuda_header.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <mpi_header.h>
+#include "mpi_header.h"
 /**************** Snippet ****************/
 void Snippet(int x0) {
   ncclUniqueId x1;
@@ -40,7 +40,7 @@ void Snippet(int x0) {
     x9[x10] = x3 + 1;
     x10 = x10 + 1;
   }
-  CUDA_CALL(cudaMemcpy(x7, x9, 128, cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(x7, x9, (size_t)(128 * sizeof(int)), cudaMemcpyHostToDevice));
   int x11 = x2 * (x2 + 1) / 2;
   int x12 = 0;
   int x13 = 0;
@@ -49,7 +49,7 @@ void Snippet(int x0) {
     x13 = x13 + 1;
   }
   CUDA_CALL(cudaStreamSynchronize(x6));
-  CUDA_CALL(cudaMemcpy(x9, x8, 128, cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x9, x8, (size_t)(128 * sizeof(int)), cudaMemcpyDeviceToHost));
   int x14 = 0;
   while (x14 != 128) {
     if (x9[x14] != x11) {

@@ -28,7 +28,7 @@ class NCCLTest extends TutorialFunSuite {
     override val executable = s"$curPath/snippet"
   }
 
- 
+
   test("sanity-check") {
     // just sanity check. Output code not runnable
     val driver = new DslDriverCNCCL[Int, Unit] {
@@ -43,7 +43,7 @@ class NCCLTest extends TutorialFunSuite {
         cudaStreamCreate(s)
         var sendbuff = cudaMalloc2[Float](0)
         var recvbuff = cudaMalloc2[Float](0)
-        ncclCheck(ncclAllReduce(sendbuff, recvbuff, SizeT(0), ncclFloat, ncclSum, comms, s))
+        ncclCheck(ncclAllReduce(sendbuff, recvbuff, 0, ncclFloat, ncclSum, comms, s))
         cudaCall(cudaStreamSynchronize(s))
         printf("end")
       }
@@ -79,7 +79,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitAll(comms, nDev, devs))
 
         // calling NCCL communication API
-        ncclCheck(ncclAllReduce(sendbuff, recvbuff, SizeT(size), ncclFloat, ncclSum, comms, s))
+        ncclCheck(ncclAllReduce(sendbuff, recvbuff, size, ncclFloat, ncclSum, comms, s))
 
         // synchronizing on CUDA streams to wait form completion of NCCL operation
         cudaCall(cudaSetDevice(0))
@@ -139,7 +139,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // communicating using NCCL
-        ncclCheck(ncclAllReduce(sendbuff, recvbuff, SizeT(size), ncclFloat, ncclSum, comm, s))
+        ncclCheck(ncclAllReduce(sendbuff, recvbuff, size, ncclFloat, ncclSum, comm, s))
 
         // completing NCCL operation by synchronizing on the CUDA stream
         cudaCall(cudaStreamSynchronize(s))
@@ -207,7 +207,7 @@ class NCCLTest extends TutorialFunSuite {
         for (i <- (0 until SIZE): Rep[Range]) {
           value(i) = rank + 1
         }
-        cudaCall(cudaMemcpy[Int](dptr_send, value, SizeT(SIZE), host2device))
+        cudaCall(cudaMemcpyOfT[Int](dptr_send, value, SIZE, host2device))
 
         // compute final value
         val ref = size * (size + 1) / 2
@@ -215,12 +215,12 @@ class NCCLTest extends TutorialFunSuite {
         // run allreduce
         var errors = 0
         for (i <- (0 until NITERS): Rep[Range]) {
-          ncclCheck(ncclAllReduce(dptr_send, dptr_recv, SizeT(SIZE), ncclInt, ncclSum, comm, stream))
+          ncclCheck(ncclAllReduce(dptr_send, dptr_recv, SIZE, ncclInt, ncclSum, comm, stream))
         }
 
         // Check results
         cudaCall(cudaStreamSynchronize(stream))
-        cudaCall(cudaMemcpy[Int](value, dptr_recv, SizeT(SIZE), device2host))
+        cudaCall(cudaMemcpyOfT[Int](value, dptr_recv, SIZE, device2host))
         for (i <- (0 until SIZE): Rep[Range]) {
           if (value(i) != ref) {
             errors = errors + 1
@@ -250,69 +250,54 @@ class NCCLTest extends TutorialFunSuite {
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg:Rep[Int]) = {
-        val size = 32*1024*1024
+        val size = 1024
         var myRank = 0
         var nRanks = 0
-        val localRank = 0
 
         // initializing MPI
         MPI_CHECK(mpi_init())
         MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
         MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
 
-        // calculating localRank
-        // for now, localRank = 0
+        printf("myRank: %d, nRanks: %d\n", myRank, nRanks)
+
+        val id = ncclUniqueId
+        val comm = ncclComm
+        val s = cudaStream
 
         // get NCCL unique ID at rank 0 and broadcast it to all others
-        var id = ncclUniqueId
         if (myRank == 0) {
           ncclCheck(ncclGetUniqueId(id))
         }
         MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
-        // picking a GPU based on localRank
-        cudaCall(cudaSetDevice(localRank))
-
-        val s = cudaStream
+        cudaCall(cudaSetDevice(myRank))
+        val sendbuff = cudaMalloc2[Float](size)
+        val recvbuff = cudaMalloc2[Float](size)
+        val values = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          values(i) = 2
+        }
+        cudaCall(cudaMemcpyOfT[Float](sendbuff, values, size, host2device))
         cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
 
         // initializing NCCL
-        val comm = ncclComm
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
-        // allocate and initialize buffers
-        val sendbuff = cudaMalloc2[Float](size)
-        val recvbuff = cudaMalloc2[Float](size)
-        val zero = NewArray[Float](size)
-        for (i <- (0 until size): Rep[Range]) {
-          zero(i) = 0
-        }
-        cudaCall(cudaMemcpy[Float](sendbuff, zero, SizeT(size), host2device))
-        val one = NewArray[Float](size)
-        for (i <- (0 until size): Rep[Range]) {
-          one(i) = 1
-        }
-        cudaCall(cudaMemcpy[Float](recvbuff, one, SizeT(size), host2device))
+        // communicating using NCCL (send-recv)
+        
+        val peer = if (myRank == 0) { 1 } else { 0 }
+        ncclSendRecv(sendbuff, recvbuff, size, ncclFloat, peer, comm, s)
 
-        // one-to-all (scatter)
-        ncclCheck(ncclGroupStart())
-        ncclCheck(ncclSend(sendbuff, SizeT(size), ncclFloat, 1, comm, s))
-        ncclCheck(ncclRecv(recvbuff, SizeT(size), ncclFloat, 0, comm, s))
-        ncclCheck(ncclGroupEnd())
 
         cudaCall(cudaStreamSynchronize(s))
+        cudaCall(cudaMemcpyOfT[Float](values, recvbuff, size, device2host))
 
-        // check results
-        cudaCall(cudaMemcpy[Float](zero, sendbuff, SizeT(size), device2host))
+        // checking results
+        var errors = 0
         for (i <- (0 until size): Rep[Range]) {
-          if (zero(0) != 1) {
-            printf("error")
-          }
-        }
-        cudaCall(cudaMemcpy[Float](one, recvbuff, SizeT(size), device2host))
-        for (i <- (0 until size): Rep[Range]) {
-          if (one(0) != 0) {
-            printf("error")
+          if (values(0) != 2) {
+            errors += 1;
           }
         }
 
@@ -326,82 +311,86 @@ class NCCLTest extends TutorialFunSuite {
         // finalizing MPI
         MPI_CHECK(mpi_finalize())
 
-        printf("[MPI Rank %d] Success \n", myRank)
+        if (errors != 0) {
+          printf("[MPI Rank %d] Found %d errors.\n", myRank, errors);
+        } else {
+          printf("[MPI Rank %d] Success \n", myRank)
+        }
       }
     }
-    // System.out.println(indent(driver.code))
     check("p2p-sendrecv", driver.code, "cu")
   }
-  
+
+
   test("p2p-scatter") {
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg:Rep[Int]) = {
-        val size = 32*1024*1024
+        val size = 1024
         var myRank = 0
         var nRanks = 0
-        val localRank = 0
 
         // initializing MPI
         MPI_CHECK(mpi_init())
         MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
         MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
 
-        // calculating localRank
-        // for now, localRank = 0
+        printf("myRank: %d, nRanks: %d\n", myRank, nRanks)
+
+        val id = ncclUniqueId
+        val comm = ncclComm
+        val s = cudaStream
 
         // get NCCL unique ID at rank 0 and broadcast it to all others
-        var id = ncclUniqueId
         if (myRank == 0) {
           ncclCheck(ncclGetUniqueId(id))
         }
         MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
-        // picking a GPU based on localRank
-        cudaCall(cudaSetDevice(localRank))
+        // initialize values as array of 2
+        val values = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          values(i) = 2
+        }
 
-        val s = cudaStream
+        cudaCall(cudaSetDevice(myRank))
+        val sendbuff = NewArray[Array[Float]](nRanks)
+        if (myRank == 0) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaMalloc3[Float](sendbuff(i), size))
+            cudaCall(cudaMemcpyOfT[Float](sendbuff(i), values, size, host2device))
+          }
+        }
+        val recvbuff = cudaMalloc2[Float](size)
+
         cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
 
         // initializing NCCL
-        val comm = ncclComm
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
-        // allocte and initialize buffers
-        val one = NewArray[Float](size)
-        for (i <- (0 until size): Rep[Range]) {
-          one(i) = 1
-        }
-        val sendbuff = NewArray[Array[Float]](nRanks)
-        for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaMalloc[Float](sendbuff(i), SizeT(size)))
-          cudaCall(cudaMemcpy[Float](sendbuff(i), one, SizeT(size), host2device))
-        }
-        val recvbuff = cudaMalloc2[Float](size)
-        
-        
         // one-to-all (scatter)
-        ncclCheck(ncclGroupStart())
-        if (myRank == localRank) {
-          for (i <- (0 until nRanks): Rep[Range]) {
-            ncclCheck(ncclSend(sendbuff(i), SizeT(size), ncclFloat, i, comm, s))
-          }
-          ncclCheck(ncclRecv(recvbuff, SizeT(size), ncclFloat, 0, comm, s))
-        }
-        ncclCheck(ncclGroupEnd())
+        ncclScatter(sendbuff, recvbuff, 0, myRank, nRanks, size, ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 
+        // copy recved values out for checking
+        val outputs = NewArray[Float](size)
+        cudaCall(cudaMemcpyOfT[Float](outputs, recvbuff, size, device2host))
+
         // check results
-        cudaCall(cudaMemcpy[Float](one, recvbuff, SizeT(size), device2host))
+        var errors = 0
         for (i <- (0 until size): Rep[Range]) {
-          if (one(0) != 1) {
-            printf("error")
+          if (outputs(i) != 2) {
+            errors += 1;
           }
         }
 
         // free device buffers
-        cudaCall(cudaFree(sendbuff))
+        if (myRank == 0) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaFree(sendbuff(i)))
+          }
+        }
         cudaCall(cudaFree(recvbuff))
 
         // finalizing NCCL
@@ -410,10 +399,13 @@ class NCCLTest extends TutorialFunSuite {
         // finalizing MPI
         MPI_CHECK(mpi_finalize())
 
-        printf("[MPI Rank %d] Success \n", myRank)
+        if (errors != 0) {
+          printf("[MPI Rank %d] Found %d errors.\n", myRank, errors);
+        } else {
+          printf("[MPI Rank %d] Success \n", myRank)
+        }
       }
     }
-    // System.out.println(indent(driver.code))
     check("p2p-scatter", driver.code, "cu")
   }
 
@@ -421,71 +413,75 @@ class NCCLTest extends TutorialFunSuite {
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg:Rep[Int]) = {
-        val size = 32*1024*1024
+        val size = 1024
         var myRank = 0
         var nRanks = 0
-        val localRank = 0
 
         // initializing MPI
         MPI_CHECK(mpi_init())
         MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
         MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
 
-        // calculating localRank
-        // for now, localRank = 0
+        printf("myRank: %d, nRanks: %d\n", myRank, nRanks)
+
+        val id = ncclUniqueId
+        val comm = ncclComm
+        val s = cudaStream
 
         // get NCCL unique ID at rank 0 and broadcast it to all others
-        var id = ncclUniqueId
         if (myRank == 0) {
           ncclCheck(ncclGetUniqueId(id))
         }
         MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
-        // picking a GPU based on localRank
-        cudaCall(cudaSetDevice(localRank))
+        // initialize values as array of 2
+        val values = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          values(i) = 2
+        }
 
-        val s = cudaStream
+        cudaCall(cudaSetDevice(myRank))
+        val sendbuff = cudaMalloc2[Float](size)
+        cudaCall(cudaMemcpyOfT[Float](sendbuff, values, size, host2device))
+        val recvbuff = NewArray[Array[Float]](nRanks)
+
+        if (myRank == 0) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaMalloc3[Float](recvbuff(i), size))
+          }
+        }
+
         cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
 
         // initializing NCCL
-        val comm = ncclComm
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
-        // allocate and initialize buffers
-        val sendbuff = cudaMalloc2[Float](size)
-        val one = NewArray[Float](size)
-        for (i <- (0 until size): Rep[Range]) {
-          one(i) = 1
-        }
-        val recvbuff = NewArray[Array[Float]](nRanks)
-        for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaMalloc[Float](recvbuff(i), SizeT(size)))
-          cudaCall(cudaMemcpy[Float](recvbuff(i), one, SizeT(size), host2device))
-        }
-        
-        // one-to-all (scatter)
-        ncclCheck(ncclGroupStart())
-        if (myRank == localRank) {
-          for (i <- (0 until nRanks): Rep[Range]) {
-            ncclCheck(ncclRecv(recvbuff(i), SizeT(size), ncclFloat, i, comm, s))
-          }
-          ncclCheck(ncclSend(sendbuff, SizeT(size), ncclFloat, 0, comm, s))
-        }
-        ncclCheck(ncclGroupEnd())
+        // all-to-one (gather)
+        ncclGather(sendbuff, recvbuff, 0, myRank, nRanks, size, ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 
         // check results
-        cudaCall(cudaMemcpy[Float](one, sendbuff, SizeT(size), device2host))
-        for (i <- (0 until size): Rep[Range]) {
-          if (one(0) != 1) {
-            printf("error")
+        var errors = 0
+        if (myRank == 0) {
+          val outputs = NewArray[Float](size)
+          for (j <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaMemcpyOfT[Float](outputs, recvbuff(j), size, device2host))
+            for (i <- (0 until size): Rep[Range]) {
+              if (outputs(i) != 2) {
+                errors += 1;
+              }
+            }
           }
         }
 
         // free device buffers
         cudaCall(cudaFree(sendbuff))
-        cudaCall(cudaFree(recvbuff))
+        if (myRank == 0) {
+          for (i <- (0 until nRanks): Rep[Range]) {
+            cudaCall(cudaFree(recvbuff(i)))
+          }
+        }
 
         // finalizing NCCL
         ncclCheck(ncclCommDestroy(comm))
@@ -493,10 +489,13 @@ class NCCLTest extends TutorialFunSuite {
         // finalizing MPI
         MPI_CHECK(mpi_finalize())
 
-        printf("[MPI Rank %d] Success \n", myRank)
+        if (errors != 0) {
+          printf("[MPI Rank %d] Found %d errors.\n", myRank, errors);
+        } else {
+          printf("[MPI Rank %d] Success \n", myRank)
+        }
       }
     }
-    // System.out.println(indent(driver.code))
     check("p2p-gather", driver.code, "cu")
   }
 
@@ -504,74 +503,69 @@ class NCCLTest extends TutorialFunSuite {
     val driver = new DslDriverCNCCL[Int, Unit] {
       @virtualize
       def snippet(arg:Rep[Int]) = {
-        val size = 32*1024*1024
+        val size = 1024
         var myRank = 0
         var nRanks = 0
-        val localRank = 0
 
         // initializing MPI
         MPI_CHECK(mpi_init())
         MPI_CHECK(mpi_comm_rank(mpi_comm_world, myRank))
         MPI_CHECK(mpi_comm_size(mpi_comm_world, nRanks))
 
-        // calculating localRank
-        // for now, localRank = 0
+        printf("myRank: %d, nRanks: %d\n", myRank, nRanks)
+
+        var id = ncclUniqueId
+        val comm = ncclComm
+        val s = cudaStream
 
         // get NCCL unique ID at rank 0 and broadcast it to all others
-        var id = ncclUniqueId
         if (myRank == 0) {
           ncclCheck(ncclGetUniqueId(id))
         }
         MPI_CHECK(mpi_bcast_one(id, ncclUniqueIdBytes, mpi_byte, 0, mpi_comm_world))
 
-        // picking a GPU based on localRank
-        cudaCall(cudaSetDevice(localRank))
+        // initialize the values to array of 2
+        val values = NewArray[Float](size)
+        for (i <- (0 until size): Rep[Range]) {
+          values(i) = 2
+        }
 
-        val s = cudaStream
+        cudaCall(cudaSetDevice(myRank))
+        val sendbuff = NewArray[Array[Float]](nRanks)
+        val recvbuff = NewArray[Array[Float]](nRanks)
+        for (i <- (0 until nRanks): Rep[Range]) {
+          cudaCall(cudaMalloc3[Float](sendbuff(i), size))
+          cudaCall(cudaMalloc3[Float](recvbuff(i), size))
+          cudaCall(cudaMemcpyOfT[Float](sendbuff(i), values, size, host2device))
+        }
+
         cudaCall(cudaStreamCreateWithFlags(s, cudaStreamDefault))
 
         // initializing NCCL
-        val comm = ncclComm
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
-        // allocate and initialize buffers
-        val one = NewArray[Float](size)
-        for (i <- (0 until size): Rep[Range]) {
-          one(i) = 1
-        }
-        val sendbuff = NewArray[Array[Float]](nRanks)
-        for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaMalloc[Float](sendbuff(i), SizeT(size)))
-          cudaCall(cudaMemcpy[Float](sendbuff(i), one, SizeT(size), host2device))
-        }
-        val recvbuff = NewArray[Array[Float]](nRanks)
-        for (i <- (0 until nRanks): Rep[Range]) {
-          cudaCall(cudaMalloc[Float](recvbuff(i), SizeT(size)))
-        }
-        
         // all-to-all
-        ncclCheck(ncclGroupStart())
-        if (myRank == localRank) {
-          for (i <- (0 until nRanks): Rep[Range]) {
-            ncclCheck(ncclSend(sendbuff(i), SizeT(size), ncclFloat, i, comm, s))
-            ncclCheck(ncclRecv(recvbuff(i), SizeT(size), ncclFloat, i, comm, s))
-          }
-        }
-        ncclCheck(ncclGroupEnd())
+        ncclAll2All(sendbuff, recvbuff, nRanks, size, ncclFloat, comm, s)
 
         cudaCall(cudaStreamSynchronize(s))
 
         // check results
-        for (i <- (0 until size): Rep[Range]) {
-          cudaCall(cudaMemcpy[Float](one, recvbuff(i), SizeT(size), device2host))
-          if (one(0) != 1) {
-            printf("error")
+        var errors = 0
+        for (j <- (0 until nRanks): Rep[Range]) {
+          val outputs = NewArray[Float](size)
+          cudaCall(cudaMemcpyOfT[Float](outputs, recvbuff(j), size, device2host))
+          for (i <- (0 until size): Rep[Range]) {
+            if (outputs(i) != 2) {
+              errors += 1;
+            }
           }
         }
 
         // free device buffers
-        cudaCall(cudaFree(sendbuff))
-        cudaCall(cudaFree(recvbuff))
+        for (i <- (0 until nRanks): Rep[Range]) {
+          cudaCall(cudaFree(sendbuff(i)))
+          cudaCall(cudaFree(recvbuff(i)))
+        }
 
         // finalizing NCCL
         ncclCheck(ncclCommDestroy(comm))
@@ -579,10 +573,13 @@ class NCCLTest extends TutorialFunSuite {
         // finalizing MPI
         MPI_CHECK(mpi_finalize())
 
-        printf("[MPI Rank %d] Success \n", myRank)
+        if (errors != 0) {
+          printf("[MPI Rank %d] Found %d errors.\n", myRank, errors);
+        } else {
+          printf("[MPI Rank %d] Success \n", myRank)
+        }
       }
     }
-    // System.out.println(indent(driver.code))
     check("p2p-all2all", driver.code, "cu")
   }
 }
