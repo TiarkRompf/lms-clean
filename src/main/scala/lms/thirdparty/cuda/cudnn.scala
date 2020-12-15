@@ -16,6 +16,17 @@ object CUDNNTypeLess extends Dsl with CLibs {
   import SIZE_TTypeLess._
   import CLibTypeLess._
 
+  class CUDNN_HANDLE(override val x: Backend.Exp) extends TOP(x)
+
+  var cache: Option[CUDNN_HANDLE] = None
+  def CUDNN_HANDLE(implicit __pos: SourceContext) = cache match {
+    case Some(x) => x
+    case None => 
+      val handle = new CUDNN_HANDLE(NEW_STRUCT(manifest[CUDNN_HANDLE]).x)
+      cache = Some(handle)
+      handle
+  }
+
   class CUDNN_RESULT
 
   def CUDNN_CHECK(result: TOP)(implicit __pos: SourceContext): UNIT = {
@@ -31,8 +42,9 @@ trait CUDNNOps extends CLibs with CudaOps {
   
   class cudnnStatusT
 
-  class cudnnHandleT
-  def cudnnHandle: Rep[cudnnHandleT] = newStruct[cudnnHandleT]("cudnnHandle_t")
+  abstract class cudnnHandleT
+  // def cudnnHandle: Rep[cudnnHandleT] = newStruct[cudnnHandleT]("cudnnHandle_t")
+  lazy val cudnnHandle = newStruct[cudnnHandleT]("cudnnHandle_t")
 
   class cudnnTensorDescriptorT
   def cudnnTensorDescriptor: Rep[cudnnTensorDescriptorT] = newStruct[cudnnTensorDescriptorT]("cudnnTensorDescriptor_t")
