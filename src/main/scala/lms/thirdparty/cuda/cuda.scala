@@ -214,6 +214,11 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaCall(cudaMalloc(addr, SizeT(count * sizeOf[T])))
     addr
   }
+  def cudaMalloc3[T:Manifest](size: Rep[Int])(implicit __pos: SourceContext) = {
+    val addr: Rep[Array[T]] = NewArray[T](0) // FIXME(feiw) just need an uninitialized pointer
+    cudaCall(cudaMalloc(addr, SizeT(size)))
+    addr
+  }
 
   // cudaError_t cudaFree ( void* devPtr )
   def cudaFree[T:Manifest](devPtr: Rep[Array[T]]) =
