@@ -265,6 +265,7 @@ class CudnnTest extends TutorialFunSuite {
 
       }
     }
-    System.out.println(indent(driver.code))
+    // System.out.println(indent(driver.code))
+    check("test-pooling", driver.code, "cu")
   }
 }
