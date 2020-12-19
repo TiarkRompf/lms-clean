@@ -214,9 +214,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaCall(cudaMalloc(addr, SizeT(count * sizeOf[T])))
     addr
   }
-  def cudaMalloc3[T:Manifest](size: Rep[Int])(implicit __pos: SourceContext) = {
+  def cudaMalloc3[T:Manifest](size: Rep[SizeT])(implicit __pos: SourceContext) = {
     val addr: Rep[Array[T]] = NewArray[T](0) // FIXME(feiw) just need an uninitialized pointer
-    cudaCall(cudaMalloc(addr, SizeT(size)))
+    cudaCall(cudaMalloc(addr, size))
     addr
   }
 
@@ -542,7 +542,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
   // need to register the headers
-  registerHeader("<cuda_header.h>")
+  registerHeader("\"cuda_header.h\"")
 
   override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
     case s: String if s.endsWith("Dim3") => "dim3"
