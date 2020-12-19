@@ -27,6 +27,7 @@ class CudnnTest extends TutorialFunSuite {
   test("test-conv") {
     // modified based on the following example:
     // https://gist.github.com/goldsborough/865e6717e64fbae75cdaf6c9914a130d
+    // TODO: Code Cleanup
     val driver = new DslDriverCPPCudnn[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -139,14 +140,9 @@ class CudnnTest extends TutorialFunSuite {
         // The convolution
         var alpha = 1.0f
         var beta = 0.0f
-        // val alpha = NewArray[Int](1)
-        //  alpha(0) = 1
-        // val beta = NewArray[Int](1)
-        // beta(0) = 0
         printf("convolution\n")
         cudnnCheck(cudnnConvolutionForward(cudnn, alpha, input_descriptor, d_input, kernel_descriptor, d_kernel,
           conv_descriptor, conv_algo, d_workspace, workspace_bytes, beta, output_descriptor, d_output))
-
         
         // sigmoid
         /*
@@ -177,6 +173,7 @@ class CudnnTest extends TutorialFunSuite {
         cudnnCheck(cudnnDestroy(cudnn))
       }
     }
-    System.out.println(indent(driver.code))
+    // System.out.println(indent(driver.code))
+    check("test-conv", driver.code, "cu")
   }
 }
