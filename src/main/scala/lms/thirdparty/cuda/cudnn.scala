@@ -113,9 +113,9 @@ trait CUDNNOps extends CLibs with CudaOps {
   def cudnnActivationElu = cmacro[cudnnActivationModeT]("CUDNN_ACTIVATION_ELU")
   def cudnnActivationIdentity = cmacro[cudnnActivationModeT]("CUDNN_ACTIVATION_IDENTITY")
 
-  class cudnnPropagationT
-  def cudnnPropagateNan = cmacro[cudnnPropagationT]("CUDNN_PROPAGATE_NAN")
-  def cudnnNotPropagateNan = cmacro[cudnnPropagationT]("CUDNN_NOT_PROPAGATE_NAN")
+  class cudnnNanPropagationT
+  def cudnnPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_PROPAGATE_NAN")
+  def cudnnNotPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_NOT_PROPAGATE_NAN")
 
   class cudnnConvolutionBwdFilterAlgoT
   def cudnnConvolutionBwdFilterAlgo0 = cmacro[cudnnConvolutionBwdFilterAlgoT]("CUDNN_CONVOLUTION_BWD_FILTER_ALGO_0")
@@ -124,6 +124,12 @@ trait CUDNNOps extends CLibs with CudaOps {
   def cudnnConvolutionBwdFilterAlgo3 = cmacro[cudnnConvolutionBwdFilterAlgoT]("CUDNN_CONVOLUTION_BWD_FILTER_ALGO_3")
   def cudnnConvolutionBwdFilterWinogradNonfused = cmacro[cudnnConvolutionBwdFilterAlgoT]("CUDNN_CONVOLUTION_BWD_FILTER_WINOGRAD_NONFUSED")
   def cudnnConvolutionBwdFilterAlgoFFTTiling = cmacro[cudnnConvolutionBwdFilterAlgoT]("CUDNN_CONVOLUTION_BWD_FILTER_ALGO_FFT_TILING")
+
+  class cudnnPoolingModeT
+  def cudnnPoolingMax = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_MAX")
+  def cudnnPoolingAvgCntInPadding = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING")
+  def cudnnPoolingAvgCntExPadding = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING")
+  def cudnnPoolingMaxDeterministic = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_MAX_DETERMINISTIC")
 
   def cudnnCheck(res: Rep[cudnnStatusT]) =
     libFunction[Unit]("CUDNNCHECK", Unwrap(res))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
@@ -178,7 +184,7 @@ trait CUDNNOps extends CLibs with CudaOps {
 
   // cudnnStatus_t cudnnCreatePoolingDescriptor(cudnnPoolingDescriptor_t    *poolingDesc)
   def cudnnCreatePoolingDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT]) = 
-    libFunction[cudnnStatusT]("cudnnCreateFilterDescriptor", Unwrap(poolingDesc))(Seq(), Seq(0), Set(0))
+    libFunction[cudnnStatusT]("cudnnCreatePoolingDescriptor", Unwrap(poolingDesc))(Seq(), Seq(0), Set(0))
 
   // cudnnStatus_t cudnnDestroyPoolingDescriptor(cudnnConvolutionDescriptor_t poolingDesc)
   def cudnnDestroyPoolingDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT]) = 
@@ -357,7 +363,36 @@ trait CUDNNOps extends CLibs with CudaOps {
                                     dy: Rep[Array[_]], convDesc: Rep[cudnnConvolutionDescriptorT], algo: Rep[cudnnConvolutionBwdFilterAlgoT], workspace: Rep[Array[_]], 
                                     workSpaceSizeInBytes: Rep[Int], beta: Rep[Array[_]], dwDesc: Rep[cudnnFilterDescriptorT], dw: Rep[Array[_]]) =
     libFunction[cudnnStatusT]("cudnnConvolutionBackwardFilter", Unwrap(handle), Unwrap(alpha), Unwrap(xDesc), Unwrap(x), Unwrap(dyDesc), Unwrap(dy), Unwrap(convDesc), Unwrap(algo),
-      Unwrap(workspace), Unwrap(workSpaceSizeInBytes), Unwrap(beta), Unwrap(dwDesc), Unwrap(dw))(Seq(0,1,2,3,4,5,6,7,8,9,10), Seq(11), Set(1,10))                            
+      Unwrap(workspace), Unwrap(workSpaceSizeInBytes), Unwrap(beta), Unwrap(dwDesc), Unwrap(dw))(Seq(0,1,2,3,4,5,6,7,8,9,10), Seq(11), Set(1,10))    
+  /*
+  cudnnStatus_t cudnnSetPooling2dDescriptor(
+                                cudnnPoolingDescriptor_t    poolingDesc,
+                                cudnnPoolingMode_t          mode,
+                                cudnnNanPropagation_t       maxpoolingNanOpt,
+                                int                         windowHeight,
+                                int                         windowWidth,
+                                int                         verticalPadding,
+                                int                         horizontalPadding,
+                                int                         verticalStride,
+                                int                         horizontalStride)
+  */                        
+  def cudnnSetPooling2dDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT], mode: Rep[cudnnPoolingModeT], maxpoolingNanOpt: Rep[cudnnNanPropagationT], windowHeight: Rep[Int], 
+                                  windowWidth: Rep[Int], verticalPadding: Rep[Int], horizontalPadding: Rep[Int], verticalStride: Rep[Int], horizontalStride: Rep[Int]) =
+    libFunction[cudnnStatusT]("cudnnSetPooling2dDescriptor", Unwrap(poolingDesc), Unwrap(mode), Unwrap(maxpoolingNanOpt), Unwrap(windowHeight), Unwrap(windowWidth), 
+      Unwrap(verticalPadding), Unwrap(horizontalPadding), Unwrap(verticalStride), Unwrap(horizontalStride))(Seq(1,2,3,4,5,6,7,8), Seq(0), Set())   
+
+  /*
+  cudnnStatus_t cudnnGetPooling2dForwardOutputDim(
+                                const cudnnPoolingDescriptor_t      poolingDesc,
+                                const cudnnTensorDescriptor_t       inputDesc,
+                                int                                *outN,
+                                int                                *outC,
+                                int                                *outH,
+                                int                                *outW)
+  */       
+  def cudnnGetPooling2dForwardOutputDim(poolingDesc: Rep[cudnnPoolingDescriptorT], inputDesc: Rep[cudnnTensorDescriptorT], n: Var[Int], c: Var[Int], h: Var[Int], w: Var[Int]) =
+    libFunction[cudnnStatusT]("cudnnGetPooling2dForwardOutputDim", Unwrap(poolingDesc), Unwrap(inputDesc), UnwrapV(n), UnwrapV(c), UnwrapV(h), UnwrapV(w))(Seq(0,1), Seq(2,3,4,5),
+    Set(2,3,4,5))            
 
   /*
   cudnnStatus_t cudnnPoolingForward(
@@ -370,10 +405,10 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 const cudnnTensorDescriptor_t    yDesc,
                                 void                            *y)       // data pointer to output
   */
-  def cudnnPoolingForward(handle: Rep[cudnnHandleT], poolingDesc: Rep[cudnnPoolingDescriptorT], alpha: Rep[Array[_]], xDesc: Rep[cudnnTensorDescriptorT],
-                          x: Rep[Array[_]], beta: Rep[Array[_]], yDesc: Rep[cudnnTensorDescriptorT], y: Rep[Array[_]]) =
-    libFunction[cudnnStatusT]("cudnnPoolingForward", Unwrap(handle), Unwrap(poolingDesc), Unwrap(alpha), Unwrap(xDesc), Unwrap(x), Unwrap(beta), Unwrap(yDesc),
-      Unwrap(y))(Seq(0,1,2,3,4,5,6), Seq(7), Set(2,5))
+  def cudnnPoolingForward(handle: Rep[cudnnHandleT], poolingDesc: Rep[cudnnPoolingDescriptorT], alpha: Var[Float], xDesc: Rep[cudnnTensorDescriptorT],
+                          x: Rep[Array[_]], beta: Var[Float], yDesc: Rep[cudnnTensorDescriptorT], y: Rep[Array[_]]) =
+    libFunction[cudnnStatusT]("cudnnPoolingForward", Unwrap(handle), Unwrap(poolingDesc), UnwrapV(alpha), Unwrap(xDesc), Unwrap(x), UnwrapV(beta), Unwrap(yDesc),
+      Unwrap(y))(Seq(0,1,2,3,4,5,6), Seq(2,5,7), Set(2,5))
 
   /*
   cudnnStatus_t cudnnPoolingBackward(

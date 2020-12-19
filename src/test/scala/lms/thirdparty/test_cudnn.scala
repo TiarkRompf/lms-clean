@@ -176,4 +176,95 @@ class CudnnTest extends TutorialFunSuite {
     // System.out.println(indent(driver.code))
     check("test-conv", driver.code, "cu")
   }
+
+  test("test-pooling") {
+    val driver = new DslDriverCPPCudnn[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        // a simple input 9x9 image
+        printf("setting input image\n");
+        val img_row = 9
+        val img_col = 9
+        val image_bytes = 1 * 1 * img_col * img_col // batch_size * channels * height * width
+        val img = NewArray[Float](image_bytes)
+        for (i <- (0 until image_bytes): Rep[Range]) {
+          img(i) = i
+        }
+
+        // set GPU device
+        printf("setting up device\n");
+        cudaCall(cudaSetDevice(0))
+
+        // create handle, which serves as a sort of context object
+        printf("create handle\n");
+        val cudnn = cudnnHandle
+        cudnnCheck(cudnnCreate(cudnn))
+
+        // describe the input tensor
+        // 1 batch, 1 channel, image shape 9x9
+        printf("create input descriptor\n");
+        val input_descriptor = cudnnTensorDescriptor
+        cudnnCheck(cudnnCreateTensorDescriptor(input_descriptor))
+        cudnnCheck(cudnnSetTensor4dDescriptor(input_descriptor, cudnnNCHW, cudnnFloat, 1, 1, img_row, img_col))
+
+        // describe the pooling operation
+        printf("create pooling descriptor\n");
+        val pooling_descriptor = cudnnPoolingDescriptor
+        cudnnCheck(cudnnCreatePoolingDescriptor(pooling_descriptor))
+        cudnnCheck(cudnnSetPooling2dDescriptor(pooling_descriptor, cudnnPoolingMax, cudnnPropagateNan, 3, 3, 1, 1, 1, 1))
+
+        // find and print the output dimensions
+        var batch_size = 0
+        var channels = 0
+        var height = 0
+        var width = 0
+        cudnnCheck(cudnnGetPooling2dForwardOutputDim(pooling_descriptor, input_descriptor, batch_size, channels, height, width))
+        printf("Output Image: %d x %d x %d\n", height, width, channels)
+        val output_bytes = channels * height * width
+
+        // describe the output tensor
+        // 1 batch, 1 channels, image shape 9x9
+        printf("create output descriptor\n");
+        val output_descriptor = cudnnTensorDescriptor
+        cudnnCheck(cudnnCreateTensorDescriptor(output_descriptor))
+        cudnnCheck(cudnnSetTensor4dDescriptor(output_descriptor, cudnnNCHW, cudnnFloat, 1, 1, height, width))
+ 
+        // allocate memory for input image and copy the image to device
+        printf("allocate memory for input image and copy\n")
+        var d_input = cudaMalloc2[Float](image_bytes)
+        cudaCall(cudaMemcpyOfT[Float](d_input, img, image_bytes, host2device));
+
+        // allocate memory for output image
+        printf("allocate memory for output image\n")
+        var d_output = cudaMalloc2[Float](output_bytes)
+        cudaCall(cudaMemset2[Float](d_output, 0, output_bytes))
+
+        // the pooling
+        var alpha = 1.0f
+        var beta = 0.0f
+        cudnnCheck(cudnnPoolingForward(cudnn, pooling_descriptor, alpha, input_descriptor, d_input, beta, 
+          output_descriptor, d_output))
+        
+        // copy the result image back to the host and print the output image
+        val h_output = NewArray[Float](output_bytes)
+        cudaCall(cudaMemcpyOfT(h_output, d_output, output_bytes, device2host))
+        printf("print output:\n")
+        for (i <- (0 until output_bytes): Rep[Range]) {
+          printf("%f, ", h_output(i))
+        }
+
+        // free resources
+        cudaCall(cudaFree(d_input))
+        cudaCall(cudaFree(d_output))
+
+        cudnnCheck(cudnnDestroyTensorDescriptor(input_descriptor))
+        cudnnCheck(cudnnDestroyTensorDescriptor(output_descriptor))
+        cudnnCheck(cudnnDestroyPoolingDescriptor(pooling_descriptor))
+
+        cudnnCheck(cudnnDestroy(cudnn))
+
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
 }
