@@ -268,4 +268,99 @@ class CudnnTest extends TutorialFunSuite {
     // System.out.println(indent(driver.code))
     check("test-pooling", driver.code, "cu")
   }
+
+  test("test-dropout") {
+    val driver = new DslDriverCPPCudnn[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        // a simple input 9x9 image
+        printf("setting input image\n");
+        val img_row = 9
+        val img_col = 9
+        val image_bytes = 1 * 1 * img_col * img_col // batch_size * channels * height * width
+        val img = NewArray[Float](image_bytes)
+        for (i <- (0 until image_bytes): Rep[Range]) {
+          img(i) = i
+        }
+        
+        // set GPU device
+        printf("setting up device\n");
+        cudaCall(cudaSetDevice(0))
+        
+        // create handle, which serves as a sort of context object
+        printf("create handle\n");
+        val cudnn = cudnnHandle
+        cudnnCheck(cudnnCreate(cudnn))
+        
+        // describe the input tensor
+        // 1 batch, 1 channel, image shape 9x9
+        printf("create input descriptor\n");
+        val input_descriptor = cudnnTensorDescriptor
+        cudnnCheck(cudnnCreateTensorDescriptor(input_descriptor))
+        cudnnCheck(cudnnSetTensor4dDescriptor(input_descriptor, cudnnNCHW, cudnnFloat, 1, 1, img_row, img_col))
+
+        // ask CuDNN for memory of reserve space and states
+        printf("ask CuDNN for memory of reserve space and states\n")
+        var reserve_bytes = SizeT(0)
+        cudnnCheck(cudnnDropoutGetReserveSpaceSize(input_descriptor, reserve_bytes))
+        var states_bytes = SizeT(0)
+        cudnnCheck(cudnnDropoutGetStatesSize(cudnn, states_bytes))
+        printf("reserve_bytes: %zu, states_bytes: %zu\n", reserve_bytes, states_bytes)
+
+        // allocate memory for states and reserve space
+        printf("allocate memory for states and reserve space\n");
+        var d_states = cudaMalloc3[Float](states_bytes)
+        var d_reservespace = cudaMalloc3[Float](reserve_bytes)
+        
+        // describe the dropout operation
+        printf("create dropout descriptor\n");
+        val dropout_descriptor = cudnnDropoutDescriptor
+        cudnnCheck(cudnnCreateDropoutDescriptor(dropout_descriptor))
+        cudnnCheck(cudnnSetDropoutDescriptor(cudnn, dropout_descriptor, 0.5f, d_states, states_bytes, 1))
+        
+        // describe the output tensor
+        // 1 batch, 1 channels, image shape 9x9
+        printf("create output descriptor\n");
+        val output_descriptor = cudnnTensorDescriptor
+        cudnnCheck(cudnnCreateTensorDescriptor(output_descriptor))
+        cudnnCheck(cudnnSetTensor4dDescriptor(output_descriptor, cudnnNCHW, cudnnFloat, 1, 1, img_row, img_col))
+
+        // allocate memory for input image and copy the image to device
+        printf("allocate memory for input image and copy\n")
+        var d_input = cudaMalloc2[Float](image_bytes)
+        cudaCall(cudaMemcpyOfT[Float](d_input, img, image_bytes, host2device));
+        
+        // allocate memory for output image
+        printf("allocate memory for output image\n")
+        var d_output = cudaMalloc2[Float](image_bytes)
+        cudaCall(cudaMemset2[Float](d_output, 0, image_bytes))
+        
+
+        // the dropout
+        cudnnCheck(cudnnDropoutForward(cudnn, dropout_descriptor, input_descriptor, d_input,  
+          output_descriptor, d_output, d_reservespace, reserve_bytes))
+
+        // copy the result image back to the host and print the output image
+        val h_output = NewArray[Float](image_bytes)
+        cudaCall(cudaMemcpyOfT(h_output, d_output, image_bytes, device2host))
+        printf("print output:\n")
+        for (i <- (0 until image_bytes): Rep[Range]) {
+          printf("%f, ", h_output(i))
+        }
+
+        // free resources
+        cudaCall(cudaFree(d_input))
+        cudaCall(cudaFree(d_output))
+        cudaCall(cudaFree(d_reservespace))
+        cudaCall(cudaFree(d_states))
+
+        cudnnCheck(cudnnDestroyTensorDescriptor(input_descriptor))
+        cudnnCheck(cudnnDestroyTensorDescriptor(output_descriptor))
+        cudnnCheck(cudnnDestroyDropoutDescriptor(dropout_descriptor))
+
+        cudnnCheck(cudnnDestroy(cudnn))
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
 }

@@ -429,7 +429,38 @@ trait CUDNNOps extends CLibs with CudaOps {
                           y: Rep[Array[_]], dyDesc: Rep[cudnnTensorDescriptorT], dy: Rep[Array[_]], xDesc: Rep[cudnnTensorDescriptorT], xData: Rep[Array[_]],
                           beta: Rep[Array[_]], dxDesc: Rep[cudnnTensorDescriptorT], dx: Rep[Array[_]]) =
     libFunction[cudnnStatusT]("cudnnPoolingBackward", Unwrap(handle), Unwrap(poolingDesc),  Unwrap(alpha),  Unwrap(yDesc),  Unwrap(y),  Unwrap(dyDesc),  Unwrap(dy),
-       Unwrap(xDesc),  Unwrap(xData), Unwrap(beta),  Unwrap(dxDesc),  Unwrap(dx))(Seq(0,1,2,3,4,5,6,7,8,9,10), Seq(11), Set(2,9))
+      Unwrap(xDesc),  Unwrap(xData), Unwrap(beta),  Unwrap(dxDesc),  Unwrap(dx))(Seq(0,1,2,3,4,5,6,7,8,9,10), Seq(11), Set(2,9))
+
+  /*
+  cudnnStatus_t cudnnSetDropoutDescriptor(
+                                cudnnDropoutDescriptor_t    dropoutDesc,
+                                cudnnHandle_t               handle,
+                                float                       dropout,
+                                void                       *states,
+                                size_t                      stateSizeInBytes,
+                                unsigned long long          seed)
+  */
+  def cudnnSetDropoutDescriptor(handle: Rep[cudnnHandleT], dropoutDesc: Rep[cudnnDropoutDescriptorT], dropout: Rep[Float], states: Rep[Array[_]], 
+                              stateSizeInBytes: Rep[SizeT], seed: Rep[Int]) =
+    libFunction[cudnnStatusT]("cudnnSetDropoutDescriptor", Unwrap(dropoutDesc), Unwrap(handle), Unwrap(dropout), Unwrap(states), Unwrap(stateSizeInBytes), 
+      Unwrap(seed))(Seq(0,1,2,3,4,5), Seq(0,1,2,3), Set())
+
+  /*
+  cudnnStatus_t cudnnDropoutGetReserveSpaceSize(
+                                cudnnTensorDescriptor_t     xDesc,
+                                size_t                     *sizeInBytes)
+  */
+  def cudnnDropoutGetReserveSpaceSize(xDesc: Rep[cudnnTensorDescriptorT], sizeInBytes: Var[SizeT]) =
+    libFunction[cudnnStatusT]("cudnnDropoutGetReserveSpaceSize", Unwrap(xDesc), UnwrapV(sizeInBytes))(Seq(0), Seq(1), Set(1))
+
+  /*
+  cudnnStatus_t cudnnDropoutGetStatesSize(
+                                cudnnHandle_t       handle,
+                                size_t             *sizeInBytes)
+  */
+  def cudnnDropoutGetStatesSize(handle: Rep[cudnnHandleT], sizeInBytes: Var[SizeT]) =
+    libFunction[cudnnStatusT]("cudnnDropoutGetStatesSize", Unwrap(handle), UnwrapV(sizeInBytes))(Seq(0), Seq(1), Set(1))
+
 
   /*
   cudnnStatus_t cudnnDropoutForward(
@@ -443,7 +474,7 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 size_t                              reserveSpaceSizeInBytes)
   */
   def cudnnDropoutForward(handle: Rep[cudnnHandleT], dropoutDesc: Rep[cudnnDropoutDescriptorT], xdesc: Rep[cudnnTensorDescriptorT], x: Rep[Array[_]], 
-                          yDesc: Rep[cudnnTensorDescriptorT], y: Rep[Array[_]], reserveSpace: Rep[Array[_]], reserveSpaceSizeInBytes: Rep[Int]) =
+                          yDesc: Rep[cudnnTensorDescriptorT], y: Rep[Array[_]], reserveSpace: Rep[Array[_]], reserveSpaceSizeInBytes: Rep[SizeT]) =
     libFunction[cudnnStatusT]("cudnnDropoutForward", Unwrap(handle), Unwrap(dropoutDesc), Unwrap(xdesc), Unwrap(x), Unwrap(yDesc), Unwrap(y), Unwrap(reserveSpace),
       Unwrap(reserveSpaceSizeInBytes))(Seq(0,1,2,3,4,7), Seq(5,6), Set())
   
