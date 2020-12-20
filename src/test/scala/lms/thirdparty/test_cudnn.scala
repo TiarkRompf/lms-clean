@@ -174,7 +174,7 @@ class CudnnTest extends TutorialFunSuite {
       }
     }
     // System.out.println(indent(driver.code))
-    check("test-conv", driver.code, "cu")
+    check("cudnn_convolution", driver.code, "cu")
   }
 
   test("test-pooling") {
@@ -266,7 +266,7 @@ class CudnnTest extends TutorialFunSuite {
       }
     }
     // System.out.println(indent(driver.code))
-    check("test-pooling", driver.code, "cu")
+    check("cudnn_pooling", driver.code, "cu")
   }
 
   test("test-dropout") {
@@ -361,6 +361,7 @@ class CudnnTest extends TutorialFunSuite {
         cudnnCheck(cudnnDestroy(cudnn))
       }
     }
-    System.out.println(indent(driver.code))
+    // System.out.println(indent(driver.code))
+    check("cudnn_dropout", driver.code, "cu")
   }
 }
