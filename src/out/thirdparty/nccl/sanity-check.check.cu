@@ -4,11 +4,11 @@ Emitting C Generated Code
 #include "nccl_header.h"
 #include <string.h>
 #include <stdlib.h>
-#include <cuda_header.h>
+#include "cuda_header.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <mpi_header.h>
+#include "mpi_header.h"
 /**************** Snippet ****************/
 void Snippet(int x0) {
   ncclComm_t x1;

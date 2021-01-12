@@ -5,7 +5,7 @@ Emitting C Generated Code
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <mpi_header.h>
+#include "mpi_header.h"
 /************* Functions **************/
 void x1(DataStructure1 x2) {
   printf("a library function that asks for pointers as parameter");

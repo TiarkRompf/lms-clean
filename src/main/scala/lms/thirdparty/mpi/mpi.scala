@@ -187,7 +187,7 @@ trait MPIOps extends CMacro with LibStruct with LibFunction {
 
 trait CCodeGenMPI extends ExtendedCCodeGen {
 
-  registerHeader("<mpi_header.h>")
+  registerHeader("\"mpi_header.h\"")
 
   // NOTE: this type map from `mStr.endsWith("$DataStructure1")` to `DataStructure1`
   //       is necessary only if we may use this type without a struct instance,
