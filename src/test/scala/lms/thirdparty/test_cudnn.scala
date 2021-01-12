@@ -120,7 +120,7 @@ class CudnnTest extends TutorialFunSuite {
         // allocate memory for workspace
         // don't need to `* sizeof(float)` because `workspace_bytes` already has that
         printf("allocate memory for workspace\n")
-        var d_workspace = cudaMalloc3[Float](workspace_bytes)
+        var d_workspace = cudaMalloc2BySize[Float](workspace_bytes)
 
         // allocate memory for input image and copy the image to device
         printf("allocate memory for input image and copy\n")
@@ -309,8 +309,8 @@ class CudnnTest extends TutorialFunSuite {
 
         // allocate memory for states and reserve space
         printf("allocate memory for states and reserve space\n");
-        var d_states = cudaMalloc3[Float](states_bytes)
-        var d_reservespace = cudaMalloc3[Float](reserve_bytes)
+        var d_states = cudaMalloc2BySize[Float](states_bytes)
+        var d_reservespace = cudaMalloc2BySize[Float](reserve_bytes)
 
         // describe the dropout operation
         printf("create dropout descriptor\n");

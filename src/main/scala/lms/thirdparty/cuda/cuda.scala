@@ -214,7 +214,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaCall(cudaMalloc(addr, SizeT(count * sizeOf[T])))
     addr
   }
-  def cudaMalloc3[T:Manifest](size: Rep[SizeT])(implicit __pos: SourceContext) = {
+  def cudaMalloc2BySize[T:Manifest](size: Rep[SizeT])(implicit __pos: SourceContext) = {
     val addr: Rep[Array[T]] = NewArray[T](0) // FIXME(feiw) just need an uninitialized pointer
     cudaCall(cudaMalloc(addr, size))
     addr
@@ -251,7 +251,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // __host__ ​ __device__ ​cudaError_t cudaStreamCreateWithFlags ( cudaStream_t* pStream, unsigned int  flags )
   def cudaStreamCreateWithFlags(stream: Rep[cudaStreamT], flag: Rep[Int]) =
     libFunction[CudaErrorT]("cudaStreamCreateWithFlags", Unwrap(stream), Unwrap(flag))(Seq(0), Seq(0), Set(0))
-  
+
   // __host__​cudaError_t cudaStreamCreate ( cudaStream_t* pStream )
   def cudaStreamCreate(stream: Rep[cudaStreamT]) =
     libFunction[CudaErrorT]("cudaStreamCreate", Unwrap(stream))(Seq(0), Seq(0), Set(0))
