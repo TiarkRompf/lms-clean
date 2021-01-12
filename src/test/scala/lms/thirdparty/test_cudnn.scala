@@ -117,11 +117,11 @@ class CudnnTest extends TutorialFunSuite {
         // val sz = workspace_bytes.x / 1048576.0
         // printf("Workspace size: %f MB", sz)
 
-        // allocate memory for workspace 
+        // allocate memory for workspace
         // don't need to `* sizeof(float)` because `workspace_bytes` already has that
         printf("allocate memory for workspace\n")
         var d_workspace = cudaMalloc3[Float](workspace_bytes)
-        
+
         // allocate memory for input image and copy the image to device
         printf("allocate memory for input image and copy\n")
         var d_input = cudaMalloc2[Float](image_bytes)
@@ -131,7 +131,7 @@ class CudnnTest extends TutorialFunSuite {
         printf("allocate memory for output image\n")
         var d_output = cudaMalloc2[Float](image_bytes)
         cudaCall(cudaMemset2[Float](d_output, 0, image_bytes))
-        
+
         // allocate memory for kernel and copy the kernel to device
         printf("allocate memory for kernel and copy\n")
         val d_kernel = cudaMalloc2[Float](3*3)
@@ -143,14 +143,14 @@ class CudnnTest extends TutorialFunSuite {
         printf("convolution\n")
         cudnnCheck(cudnnConvolutionForward(cudnn, alpha, input_descriptor, d_input, kernel_descriptor, d_kernel,
           conv_descriptor, conv_algo, d_workspace, workspace_bytes, beta, output_descriptor, d_output))
-        
+
         // sigmoid
         /*
         val activation_descriptor = cudnnActivationDescriptor
         cudnnCheck(cudnnCreateActivationDescriptor(activation_descriptor))
         cudnnCheck(cudnnSetActivationDescriptor(activation_descriptor, cudnnActivationSigmoid, cudnnPropagateNan))
         */
-        
+
         // copy the result image back to the host and print the output image
         val h_output = NewArray[Float](image_bytes)
         cudaCall(cudaMemcpyOfT(h_output, d_output, image_bytes, device2host))
@@ -228,7 +228,7 @@ class CudnnTest extends TutorialFunSuite {
         val output_descriptor = cudnnTensorDescriptor
         cudnnCheck(cudnnCreateTensorDescriptor(output_descriptor))
         cudnnCheck(cudnnSetTensor4dDescriptor(output_descriptor, cudnnNCHW, cudnnFloat, 1, 1, height, width))
- 
+
         // allocate memory for input image and copy the image to device
         printf("allocate memory for input image and copy\n")
         var d_input = cudaMalloc2[Float](image_bytes)
@@ -242,9 +242,9 @@ class CudnnTest extends TutorialFunSuite {
         // the pooling
         var alpha = 1.0f
         var beta = 0.0f
-        cudnnCheck(cudnnPoolingForward(cudnn, pooling_descriptor, alpha, input_descriptor, d_input, beta, 
+        cudnnCheck(cudnnPoolingForward(cudnn, pooling_descriptor, alpha, input_descriptor, d_input, beta,
           output_descriptor, d_output))
-        
+
         // copy the result image back to the host and print the output image
         val h_output = NewArray[Float](output_bytes)
         cudaCall(cudaMemcpyOfT(h_output, d_output, output_bytes, device2host))
@@ -282,16 +282,16 @@ class CudnnTest extends TutorialFunSuite {
         for (i <- (0 until image_bytes): Rep[Range]) {
           img(i) = i
         }
-        
+
         // set GPU device
         printf("setting up device\n");
         cudaCall(cudaSetDevice(0))
-        
+
         // create handle, which serves as a sort of context object
         printf("create handle\n");
         val cudnn = cudnnHandle
         cudnnCheck(cudnnCreate(cudnn))
-        
+
         // describe the input tensor
         // 1 batch, 1 channel, image shape 9x9
         printf("create input descriptor\n");
@@ -311,13 +311,13 @@ class CudnnTest extends TutorialFunSuite {
         printf("allocate memory for states and reserve space\n");
         var d_states = cudaMalloc3[Float](states_bytes)
         var d_reservespace = cudaMalloc3[Float](reserve_bytes)
-        
+
         // describe the dropout operation
         printf("create dropout descriptor\n");
         val dropout_descriptor = cudnnDropoutDescriptor
         cudnnCheck(cudnnCreateDropoutDescriptor(dropout_descriptor))
         cudnnCheck(cudnnSetDropoutDescriptor(cudnn, dropout_descriptor, 0.5f, d_states, states_bytes, 1))
-        
+
         // describe the output tensor
         // 1 batch, 1 channels, image shape 9x9
         printf("create output descriptor\n");
@@ -329,15 +329,15 @@ class CudnnTest extends TutorialFunSuite {
         printf("allocate memory for input image and copy\n")
         var d_input = cudaMalloc2[Float](image_bytes)
         cudaCall(cudaMemcpyOfT[Float](d_input, img, image_bytes, host2device));
-        
+
         // allocate memory for output image
         printf("allocate memory for output image\n")
         var d_output = cudaMalloc2[Float](image_bytes)
         cudaCall(cudaMemset2[Float](d_output, 0, image_bytes))
-        
+
 
         // the dropout
-        cudnnCheck(cudnnDropoutForward(cudnn, dropout_descriptor, input_descriptor, d_input,  
+        cudnnCheck(cudnnDropoutForward(cudnn, dropout_descriptor, input_descriptor, d_input,
           output_descriptor, d_output, d_reservespace, reserve_bytes))
 
         // copy the result image back to the host and print the output image

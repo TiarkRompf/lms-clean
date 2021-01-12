@@ -23,7 +23,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
   var cache: Option[CUDNN_HANDLE] = None
   def CUDNN_HANDLE(implicit __pos: SourceContext) = cache match {
     case Some(x) => x
-    case None => 
+    case None =>
       val handle = new CUDNN_HANDLE(NEW_STRUCT(manifest[CUDNN_HANDLE]).x)
       cache = Some(handle)
       handle
@@ -35,13 +35,13 @@ object CUDNNTypeLess extends Dsl with CLibs {
     assert(result.t == manifest[CUDNN_RESULT], "CUDNN_CHECK must take the CUDNN_RESULT type as input")
     UNIT(LIB_FUNCTION(manifest[Unit], "CUDNNCHECK", result.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))
   }
-} 
+}
 
 
 trait CUDNNOps extends CLibs with CudaOps {
 
   /* LMS support for CUDNN library */
-  
+
   class cudnnStatusT
 
   abstract class cudnnHandleT
@@ -90,7 +90,7 @@ trait CUDNNOps extends CLibs with CudaOps {
 
   class cudnnConvolutionFwdAlgoT
   def cudnnConvolutionFwdAlgo = newStruct[cudnnConvolutionFwdAlgoT]("cudnnConvolutionFwdAlgo_t")
-  
+
   class cudnnConvolutionFwdAlgoPerfT
   def cudnnConvolutionFwdAlgoPerf = newStruct[cudnnConvolutionFwdAlgoPerfT]("cudnnConvolutionFwdAlgoPerf_t")
 
@@ -137,13 +137,13 @@ trait CUDNNOps extends CLibs with CudaOps {
   // cudnnStatus_t cudnnCreate(cudnnHandle_t *handle)
   def cudnnCreate(handle: Rep[cudnnHandleT]): Rep[cudnnStatusT] =
     libFunction[cudnnStatusT]("cudnnCreate", Unwrap(handle))(Seq(), Seq(0), Set(0))
-  
+
   // cudnnStatus_t cudnnDestroy(cudnnHandle_t handle)
   def cudnnDestroy(handle: Rep[cudnnHandleT]): Rep[cudnnStatusT] =
     libFunction[cudnnStatusT]("cudnnDestroy", Unwrap(handle))(Seq(), Seq(0), Set())
 
   // cudnnStatus_t cudnnCreateTensorDescriptor(cudnnTensorDescriptor_t *tensorDesc)
-  def cudnnCreateTensorDescriptor(tensorDesc: Rep[cudnnTensorDescriptorT]) = 
+  def cudnnCreateTensorDescriptor(tensorDesc: Rep[cudnnTensorDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnCreateTensorDescriptor", Unwrap(tensorDesc))(Seq(), Seq(0), Set(0))
 
   // cudnnStatus_t cudnnDestroyTensorDescriptor(cudnnTensorDescriptor_t tensorDesc)
@@ -151,7 +151,7 @@ trait CUDNNOps extends CLibs with CudaOps {
     libFunction[cudnnStatusT]("cudnnDestroyTensorDescriptor", Unwrap(tensorDesc))(Seq(), Seq(0), Set())
 
   // cudnnStatus_t cudnnCreateActivationDescriptor(cudnnActivationDescriptor_t *activationDesc)
-  def cudnnCreateActivationDescriptor(activationDesc: Rep[cudnnActivationDescriptorT]) = 
+  def cudnnCreateActivationDescriptor(activationDesc: Rep[cudnnActivationDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnCreateActivationDescriptor", Unwrap(activationDesc))(Seq(), Seq(0), Set(0))
 
   // cudnnStatus_t cudnnDestroyActivationDescriptor(cudnnActivationDescriptor_t activationDesc)
@@ -159,7 +159,7 @@ trait CUDNNOps extends CLibs with CudaOps {
     libFunction[cudnnStatusT]("cudnnDestroyActivationDescriptor", Unwrap(activationDesc))(Seq(), Seq(0), Set())
 
   // cudnnStatus_t cudnnCreateAlgorithmDescriptor(cudnnAlgorithmDescriptor_t *algoDesc)
-  def cudnnCreateAlgorithmDescriptor(algoDesc: Rep[cudnnAlgorithmDescriptorT]) = 
+  def cudnnCreateAlgorithmDescriptor(algoDesc: Rep[cudnnAlgorithmDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnCreateAlgorithmDescriptor", Unwrap(algoDesc))(Seq(), Seq(0), Set(0))
 
   // cudnnStatus_t cudnnDestroyAlgorithmPerformance(cudnnAlgorithmPerformance_t algoPerf)
@@ -167,33 +167,33 @@ trait CUDNNOps extends CLibs with CudaOps {
     libFunction[cudnnStatusT]("cudnnDestroyAlgorithmDescriptor", Unwrap(algoDesc))(Seq(), Seq(0), Set())
 
   // cudnnStatus_t cudnnCreateFilterDescriptor(cudnnFilterDescriptor_t *filterDesc)
-  def cudnnCreateFilterDescriptor(filterDesc: Rep[cudnnFilterDescriptorT]) = 
+  def cudnnCreateFilterDescriptor(filterDesc: Rep[cudnnFilterDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnCreateFilterDescriptor", Unwrap(filterDesc))(Seq(), Seq(0), Set(0))
 
   // cudnnStatus_t cudnnDestroyFilterDescriptor(cudnnFilterDescriptor_t filterDesc)
-  def cudnnDestroyFilterDescriptor(filterDesc: Rep[cudnnFilterDescriptorT]) = 
+  def cudnnDestroyFilterDescriptor(filterDesc: Rep[cudnnFilterDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnDestroyFilterDescriptor", Unwrap(filterDesc))(Seq(), Seq(0), Set())
 
   // cudnnStatus_t cudnnCreateConvolutionDescriptor(cudnnConvolutionDescriptor_t *convDesc)
-  def cudnnCreateConvolutionDescriptor(convDesc: Rep[cudnnConvolutionDescriptorT]) = 
+  def cudnnCreateConvolutionDescriptor(convDesc: Rep[cudnnConvolutionDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnCreateConvolutionDescriptor", Unwrap(convDesc))(Seq(), Seq(0), Set(0))
 
   // cudnnStatus_t cudnnDestroyConvolutionDescriptor(cudnnConvolutionDescriptor_t convDesc)
-  def cudnnDestroyConvolutionDescriptor(convDesc: Rep[cudnnConvolutionDescriptorT]) = 
+  def cudnnDestroyConvolutionDescriptor(convDesc: Rep[cudnnConvolutionDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnDestroyConvolutionDescriptor", Unwrap(convDesc))(Seq(), Seq(0), Set())
 
   // cudnnStatus_t cudnnCreatePoolingDescriptor(cudnnPoolingDescriptor_t    *poolingDesc)
-  def cudnnCreatePoolingDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT]) = 
+  def cudnnCreatePoolingDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnCreatePoolingDescriptor", Unwrap(poolingDesc))(Seq(), Seq(0), Set(0))
 
   // cudnnStatus_t cudnnDestroyPoolingDescriptor(cudnnConvolutionDescriptor_t poolingDesc)
-  def cudnnDestroyPoolingDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT]) = 
+  def cudnnDestroyPoolingDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnDestroyPoolingDescriptor", Unwrap(poolingDesc))(Seq(), Seq(0), Set())
 
   // cudnnStatus_t cudnnCreateDropoutDescriptor(cudnnDropoutDescriptor_t    *dropoutDesc)
   def cudnnCreateDropoutDescriptor(dropoutDesc: Rep[cudnnDropoutDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnCreateDropoutDescriptor", Unwrap(dropoutDesc))(Seq(), Seq(0), Set(0))
-  
+
   // cudnnStatus_t cudnnStatus_t cudnnDestroyDropoutDescriptor(cudnnDropoutDescriptor_t dropoutDesc)
   def cudnnDestroyDropoutDescriptor(dropoutDesc: Rep[cudnnDropoutDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnDestroyDropoutDescriptor", Unwrap(dropoutDesc))(Seq(), Seq(0), Set())
@@ -223,7 +223,7 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 int                     h,          // height of each feature map
                                 int                     w)          // width of each feature map
   */
-  def cudnnSetFilter4dDescriptor(filterDesc: Rep[cudnnFilterDescriptorT], format: Rep[cudnnTensorFormatT], dataType: Rep[cudnnDataTypeT], 
+  def cudnnSetFilter4dDescriptor(filterDesc: Rep[cudnnFilterDescriptorT], format: Rep[cudnnTensorFormatT], dataType: Rep[cudnnDataTypeT],
                                  k: Rep[Int], c: Rep[Int], h: Rep[Int], w: Rep[Int]) =
     libFunction[cudnnStatusT]("cudnnSetFilter4dDescriptor", Unwrap(filterDesc), Unwrap(dataType), Unwrap(format),
       Unwrap(k), Unwrap(c), Unwrap(h), Unwrap(w))(Seq(1,2,3,4,5,6), Seq(0), Set())
@@ -240,9 +240,9 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 cudnnConvolutionMode_t          mode,
                                 cudnnDataType_t                 computeType)
   */
-  def cudnnSetConvolution2dDescriptor(convDesc: Rep[cudnnConvolutionDescriptorT], pad_h: Rep[Int], pad_w: Rep[Int], u: Rep[Int], v: Rep[Int], 
+  def cudnnSetConvolution2dDescriptor(convDesc: Rep[cudnnConvolutionDescriptorT], pad_h: Rep[Int], pad_w: Rep[Int], u: Rep[Int], v: Rep[Int],
                                       dilation_h: Rep[Int], dilation_w: Rep[Int], mode: Rep[cudnnConvolutionModeT], computeType: Rep[cudnnDataTypeT]) =
-    libFunction[cudnnStatusT]("cudnnSetConvolution2dDescriptor", Unwrap(convDesc), Unwrap(pad_h), Unwrap(pad_w), 
+    libFunction[cudnnStatusT]("cudnnSetConvolution2dDescriptor", Unwrap(convDesc), Unwrap(pad_h), Unwrap(pad_w),
       Unwrap(u), Unwrap(v), Unwrap(dilation_h), Unwrap(dilation_w), Unwrap(mode), Unwrap(computeType))(Seq(1,2,3,4,5,6,7,8), Seq(0), Set())
 
   /*
@@ -254,12 +254,12 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 const cudnnTensorDescriptor_t      yDesc,                 // output tensor descriptor
                                 const int                          requestedAlgoCount,    // maximum number of elements to be stored in perfResults
                                 int                               *returnedAlgoCount,     // number of output elements stored in prefResults
-                                cudnnConvolutionFwdAlgoPerf_t     *perfResults)           // a user-allocated array to store performance metrics 
+                                cudnnConvolutionFwdAlgoPerf_t     *perfResults)           // a user-allocated array to store performance metrics
                                                                                           // sorted ascending by compute time
   */
   def cudnnFindConvolutionForwardAlgorithm(handle: Rep[cudnnHandleT], xDesc: Rep[cudnnTensorDescriptorT], wDesc: Rep[cudnnFilterDescriptorT],
-                                           convDesc: Rep[cudnnConvolutionDescriptorT], yDesc: Rep[cudnnTensorDescriptorT], requestedAlgoCount: Rep[Int], 
-                                           returnedAlgoCount: Var[Int], perfResults: Rep[cudnnConvolutionFwdAlgoPerfT]) = 
+                                           convDesc: Rep[cudnnConvolutionDescriptorT], yDesc: Rep[cudnnTensorDescriptorT], requestedAlgoCount: Rep[Int],
+                                           returnedAlgoCount: Var[Int], perfResults: Rep[cudnnConvolutionFwdAlgoPerfT]) =
     libFunction[cudnnStatusT]("cudnnFindConvolutionForwardAlgorithm", Unwrap(handle), Unwrap(xDesc), Unwrap(wDesc), Unwrap(convDesc),
       Unwrap(yDesc), Unwrap(requestedAlgoCount), UnwrapV(returnedAlgoCount), Unwrap(perfResults))(Seq(0,1,2,3,4,5,7), Seq(6,7), Set(6,7))
 
@@ -275,7 +275,7 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 size_t                                 *sizeInBytes)
   */
   def cudnnGetConvolutionForwardWorkspaceSize(handle: Rep[cudnnHandleT], xDesc: Rep[cudnnTensorDescriptorT], wDesc: Rep[cudnnFilterDescriptorT],
-                                              convDesc: Rep[cudnnConvolutionDescriptorT], yDesc: Rep[cudnnTensorDescriptorT], algo: Rep[cudnnConvolutionFwdAlgoT], 
+                                              convDesc: Rep[cudnnConvolutionDescriptorT], yDesc: Rep[cudnnTensorDescriptorT], algo: Rep[cudnnConvolutionFwdAlgoT],
                                               sizeInBytes: Var[SizeT]) = // or sizeT?
     libFunction[cudnnStatusT]("cudnnGetConvolutionForwardWorkspaceSize", Unwrap(handle), Unwrap(xDesc), Unwrap(wDesc), Unwrap(convDesc), Unwrap(yDesc),
       Unwrap(algo), UnwrapV(sizeInBytes))(Seq(0,1,2,3,4,5), Seq(6), Set(6))
@@ -292,7 +292,7 @@ trait CUDNNOps extends CLibs with CudaOps {
   */
   def cudnnGetConvolution2dForwardOutputDim(convDesc: Rep[cudnnConvolutionDescriptorT], inputTensorDesc: Rep[cudnnTensorDescriptorT], filterDesc: Rep[cudnnFilterDescriptorT],
                                 n: Var[Int], c: Var[Int], h: Var[Int], w: Var[Int]) =
-    libFunction[cudnnStatusT]("cudnnGetConvolution2dForwardOutputDim", Unwrap(convDesc), Unwrap(inputTensorDesc), Unwrap(filterDesc), UnwrapV(n), UnwrapV(c), 
+    libFunction[cudnnStatusT]("cudnnGetConvolution2dForwardOutputDim", Unwrap(convDesc), Unwrap(inputTensorDesc), Unwrap(filterDesc), UnwrapV(n), UnwrapV(c),
       UnwrapV(h), UnwrapV(w))(Seq(0,1,2), Seq(3,4,5,6), Set(3,4,5,6))
 
   /*
@@ -311,12 +311,12 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 const cudnnTensorDescriptor_t       yDesc,
                                 void                               *y)
   */
-  def cudnnConvolutionForward(handle: Rep[cudnnHandleT], alpha: Var[Float], xDesc: Rep[cudnnTensorDescriptorT], x: Rep[Array[_]], 
-                              wDesc: Rep[cudnnFilterDescriptorT], w: Rep[Array[_]], convDesc: Rep[cudnnConvolutionDescriptorT], 
-                              algo: Rep[cudnnConvolutionFwdAlgoT], workspace: Rep[Array[_]], workSpaceSizeInBytes: Rep[SizeT], 
+  def cudnnConvolutionForward(handle: Rep[cudnnHandleT], alpha: Var[Float], xDesc: Rep[cudnnTensorDescriptorT], x: Rep[Array[_]],
+                              wDesc: Rep[cudnnFilterDescriptorT], w: Rep[Array[_]], convDesc: Rep[cudnnConvolutionDescriptorT],
+                              algo: Rep[cudnnConvolutionFwdAlgoT], workspace: Rep[Array[_]], workSpaceSizeInBytes: Rep[SizeT],
                               beta: Var[Float], yDesc: Rep[cudnnTensorDescriptorT], y: Rep[Array[_]]) =
-    libFunction[cudnnStatusT]("cudnnConvolutionForward", Unwrap(handle), UnwrapV(alpha), Unwrap(xDesc), Unwrap(x), Unwrap(wDesc), Unwrap(w), Unwrap(convDesc), 
-      Unwrap(algo), Unwrap(workspace), Unwrap(workSpaceSizeInBytes), UnwrapV(beta), Unwrap(yDesc), Unwrap(y))(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(1,5,12), 
+    libFunction[cudnnStatusT]("cudnnConvolutionForward", Unwrap(handle), UnwrapV(alpha), Unwrap(xDesc), Unwrap(x), Unwrap(wDesc), Unwrap(w), Unwrap(convDesc),
+      Unwrap(algo), Unwrap(workspace), Unwrap(workSpaceSizeInBytes), UnwrapV(beta), Unwrap(yDesc), Unwrap(y))(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(1,5,12),
       Set(1,10))
 
 
@@ -336,8 +336,8 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 const cudnnTensorDescriptor_t       dxDesc,
                                 void                               *dx)
   */
-  def cudnnConvolutionBackwardData(handle: Rep[cudnnHandleT], alpha: Rep[Array[_]], wDesc: Rep[cudnnFilterDescriptorT], w: Rep[Array[_]], 
-                                  dyDesc: Rep[cudnnFilterDescriptorT], dy: Rep[Array[_]], convDesc: Rep[cudnnConvolutionDescriptorT], 
+  def cudnnConvolutionBackwardData(handle: Rep[cudnnHandleT], alpha: Rep[Array[_]], wDesc: Rep[cudnnFilterDescriptorT], w: Rep[Array[_]],
+                                  dyDesc: Rep[cudnnFilterDescriptorT], dy: Rep[Array[_]], convDesc: Rep[cudnnConvolutionDescriptorT],
                                   algo: Rep[cudnnConvolutionFwdAlgoT], workspace: Rep[Array[_]], workSpaceSizeInBytes: Rep[Int], beta: Rep[Array[_]],
                                   dxDesc: Rep[cudnnTensorDescriptorT], dx: Rep[Array[_]]) =
     libFunction[cudnnStatusT]("cudnnConvolutionBackwardData", Unwrap(handle), Unwrap(alpha), Unwrap(wDesc), Unwrap(w), Unwrap(dyDesc), Unwrap(dy), Unwrap(convDesc),
@@ -360,10 +360,10 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 void                               *dw)
   */
   def cudnnConvolutionBackwardFilter(handle: Rep[cudnnHandleT], alpha: Rep[Array[_]], xDesc: Rep[cudnnTensorDescriptorT], x: Rep[Array[_]], dyDesc: Rep[cudnnFilterDescriptorT],
-                                    dy: Rep[Array[_]], convDesc: Rep[cudnnConvolutionDescriptorT], algo: Rep[cudnnConvolutionBwdFilterAlgoT], workspace: Rep[Array[_]], 
+                                    dy: Rep[Array[_]], convDesc: Rep[cudnnConvolutionDescriptorT], algo: Rep[cudnnConvolutionBwdFilterAlgoT], workspace: Rep[Array[_]],
                                     workSpaceSizeInBytes: Rep[Int], beta: Rep[Array[_]], dwDesc: Rep[cudnnFilterDescriptorT], dw: Rep[Array[_]]) =
     libFunction[cudnnStatusT]("cudnnConvolutionBackwardFilter", Unwrap(handle), Unwrap(alpha), Unwrap(xDesc), Unwrap(x), Unwrap(dyDesc), Unwrap(dy), Unwrap(convDesc), Unwrap(algo),
-      Unwrap(workspace), Unwrap(workSpaceSizeInBytes), Unwrap(beta), Unwrap(dwDesc), Unwrap(dw))(Seq(0,1,2,3,4,5,6,7,8,9,10), Seq(11), Set(1,10))    
+      Unwrap(workspace), Unwrap(workSpaceSizeInBytes), Unwrap(beta), Unwrap(dwDesc), Unwrap(dw))(Seq(0,1,2,3,4,5,6,7,8,9,10), Seq(11), Set(1,10))
   /*
   cudnnStatus_t cudnnSetPooling2dDescriptor(
                                 cudnnPoolingDescriptor_t    poolingDesc,
@@ -375,11 +375,11 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 int                         horizontalPadding,
                                 int                         verticalStride,
                                 int                         horizontalStride)
-  */                        
-  def cudnnSetPooling2dDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT], mode: Rep[cudnnPoolingModeT], maxpoolingNanOpt: Rep[cudnnNanPropagationT], windowHeight: Rep[Int], 
+  */
+  def cudnnSetPooling2dDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT], mode: Rep[cudnnPoolingModeT], maxpoolingNanOpt: Rep[cudnnNanPropagationT], windowHeight: Rep[Int],
                                   windowWidth: Rep[Int], verticalPadding: Rep[Int], horizontalPadding: Rep[Int], verticalStride: Rep[Int], horizontalStride: Rep[Int]) =
-    libFunction[cudnnStatusT]("cudnnSetPooling2dDescriptor", Unwrap(poolingDesc), Unwrap(mode), Unwrap(maxpoolingNanOpt), Unwrap(windowHeight), Unwrap(windowWidth), 
-      Unwrap(verticalPadding), Unwrap(horizontalPadding), Unwrap(verticalStride), Unwrap(horizontalStride))(Seq(1,2,3,4,5,6,7,8), Seq(0), Set())   
+    libFunction[cudnnStatusT]("cudnnSetPooling2dDescriptor", Unwrap(poolingDesc), Unwrap(mode), Unwrap(maxpoolingNanOpt), Unwrap(windowHeight), Unwrap(windowWidth),
+      Unwrap(verticalPadding), Unwrap(horizontalPadding), Unwrap(verticalStride), Unwrap(horizontalStride))(Seq(1,2,3,4,5,6,7,8), Seq(0), Set())
 
   /*
   cudnnStatus_t cudnnGetPooling2dForwardOutputDim(
@@ -389,10 +389,10 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 int                                *outC,
                                 int                                *outH,
                                 int                                *outW)
-  */       
+  */
   def cudnnGetPooling2dForwardOutputDim(poolingDesc: Rep[cudnnPoolingDescriptorT], inputDesc: Rep[cudnnTensorDescriptorT], n: Var[Int], c: Var[Int], h: Var[Int], w: Var[Int]) =
     libFunction[cudnnStatusT]("cudnnGetPooling2dForwardOutputDim", Unwrap(poolingDesc), Unwrap(inputDesc), UnwrapV(n), UnwrapV(c), UnwrapV(h), UnwrapV(w))(Seq(0,1), Seq(2,3,4,5),
-    Set(2,3,4,5))            
+    Set(2,3,4,5))
 
   /*
   cudnnStatus_t cudnnPoolingForward(
@@ -440,9 +440,9 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 size_t                      stateSizeInBytes,
                                 unsigned long long          seed)
   */
-  def cudnnSetDropoutDescriptor(handle: Rep[cudnnHandleT], dropoutDesc: Rep[cudnnDropoutDescriptorT], dropout: Rep[Float], states: Rep[Array[_]], 
+  def cudnnSetDropoutDescriptor(handle: Rep[cudnnHandleT], dropoutDesc: Rep[cudnnDropoutDescriptorT], dropout: Rep[Float], states: Rep[Array[_]],
                               stateSizeInBytes: Rep[SizeT], seed: Rep[Int]) =
-    libFunction[cudnnStatusT]("cudnnSetDropoutDescriptor", Unwrap(dropoutDesc), Unwrap(handle), Unwrap(dropout), Unwrap(states), Unwrap(stateSizeInBytes), 
+    libFunction[cudnnStatusT]("cudnnSetDropoutDescriptor", Unwrap(dropoutDesc), Unwrap(handle), Unwrap(dropout), Unwrap(states), Unwrap(stateSizeInBytes),
       Unwrap(seed))(Seq(0,1,2,3,4,5), Seq(0,1,2,3), Set())
 
   /*
@@ -473,11 +473,11 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 void                               *reserveSpace,       // pointer to user-allocated GPU memory used by this function.
                                 size_t                              reserveSpaceSizeInBytes)
   */
-  def cudnnDropoutForward(handle: Rep[cudnnHandleT], dropoutDesc: Rep[cudnnDropoutDescriptorT], xdesc: Rep[cudnnTensorDescriptorT], x: Rep[Array[_]], 
+  def cudnnDropoutForward(handle: Rep[cudnnHandleT], dropoutDesc: Rep[cudnnDropoutDescriptorT], xdesc: Rep[cudnnTensorDescriptorT], x: Rep[Array[_]],
                           yDesc: Rep[cudnnTensorDescriptorT], y: Rep[Array[_]], reserveSpace: Rep[Array[_]], reserveSpaceSizeInBytes: Rep[SizeT]) =
     libFunction[cudnnStatusT]("cudnnDropoutForward", Unwrap(handle), Unwrap(dropoutDesc), Unwrap(xdesc), Unwrap(x), Unwrap(yDesc), Unwrap(y), Unwrap(reserveSpace),
       Unwrap(reserveSpaceSizeInBytes))(Seq(0,1,2,3,4,7), Seq(5,6), Set())
-  
+
   /*
   cudnnStatus_t cudnnDropoutBackward(
                                 cudnnHandle_t                   handle,
@@ -489,7 +489,7 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 void                           *reserveSpace,
                                 size_t                          reserveSpaceSizeInBytes)
   */
-  def cudnnDropoutBackward(handle: Rep[cudnnHandleT], dropoutDesc: Rep[cudnnDropoutDescriptorT], dyDesc: Rep[cudnnTensorDescriptorT], dy: Rep[Array[_]], 
+  def cudnnDropoutBackward(handle: Rep[cudnnHandleT], dropoutDesc: Rep[cudnnDropoutDescriptorT], dyDesc: Rep[cudnnTensorDescriptorT], dy: Rep[Array[_]],
                           dxDesc: Rep[cudnnTensorDescriptorT], dx: Rep[Array[_]], reserveSpace: Rep[Array[_]], reserveSpaceSizeInBytes: Rep[Int]) =
     libFunction[cudnnStatusT]("cudnnDropoutBackward", Unwrap(handle), Unwrap(dropoutDesc), Unwrap(dyDesc), Unwrap(dy), Unwrap(dxDesc), Unwrap(dx), Unwrap(reserveSpace),
       Unwrap(reserveSpaceSizeInBytes))(Seq(0,1,2,3,4,6,7), Seq(5), Set())
@@ -506,11 +506,11 @@ trait CUDNNOps extends CLibs with CudaOps {
                                 const cudnnTensorDescriptor_t    yDesc,
                                 void                            *y)
   */
-  def cudnnSoftmaxForward(handle: Rep[cudnnHandleT], algorithm: Rep[cudnnSoftmaxAlgorithmT], mode: Rep[cudnnSoftmaxModeT], alpha: Rep[Array[_]], 
+  def cudnnSoftmaxForward(handle: Rep[cudnnHandleT], algorithm: Rep[cudnnSoftmaxAlgorithmT], mode: Rep[cudnnSoftmaxModeT], alpha: Rep[Array[_]],
                           xDesc: Rep[cudnnTensorDescriptorT],  x: Rep[_], beta: Rep[Array[_]], yDesc: Rep[cudnnTensorDescriptorT], y: Rep[_]) =
-    libFunction[cudnnStatusT]("cudnnSoftmaxForward", Unwrap(handle), Unwrap(algorithm), Unwrap(mode), Unwrap(alpha), Unwrap(xDesc), 
+    libFunction[cudnnStatusT]("cudnnSoftmaxForward", Unwrap(handle), Unwrap(algorithm), Unwrap(mode), Unwrap(alpha), Unwrap(xDesc),
       Unwrap(x), Unwrap(beta), Unwrap(yDesc), Unwrap(y))(Seq(0,1,2,3,4,5,6,7), Seq(8), Set(3,5,6,8))
-  
+
   /*
   cudnnStatus_t cudnnSoftmaxBackward(
                                 cudnnHandle_t                    handle,
@@ -528,7 +528,7 @@ trait CUDNNOps extends CLibs with CudaOps {
   def cudnnSoftmaxBackward(handle: Rep[cudnnHandleT], algorithm: Rep[cudnnSoftmaxAlgorithmT], mode: Rep[cudnnSoftmaxModeT], alpha: Rep[Array[_]],
                           yDesc: Rep[cudnnTensorDescriptorT], yData: Var[_], dyDesc: Rep[cudnnTensorDescriptorT], dy: Var[_], beta: Rep[Array[_]],
                           dxDesc: Rep[cudnnTensorDescriptorT], dx: Var[_]) =
-    libFunction[cudnnStatusT]("cudnnSoftmaxBackward", Unwrap(handle), Unwrap(algorithm), Unwrap(mode), Unwrap(alpha), Unwrap(yDesc), 
+    libFunction[cudnnStatusT]("cudnnSoftmaxBackward", Unwrap(handle), Unwrap(algorithm), Unwrap(mode), Unwrap(alpha), Unwrap(yDesc),
       Unwrap(yData), Unwrap(dyDesc), UnwrapV(dy), Unwrap(beta), Unwrap(dxDesc), UnwrapV(dx))(Seq(0,1,2,3,4,5,6,7,8,9), Seq(10), Set(3,4,5,7,8,10))
 
 }
