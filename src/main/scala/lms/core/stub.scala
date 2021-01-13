@@ -676,9 +676,9 @@ object RangeTypeLess {
     def foreach(f: INT => UNIT)(implicit __pos: SourceContext) = x match {
       case Adapter.g.Def("range_until", List(x0: Backend.Exp, x1: Backend.Exp)) =>
         val i = VAR(INT(x0))
-        WHILE(NOT_EQUAL(INT(i), INT(x1))) {
-          f(INT(i))
-          i.update(INT(i) + 1); ()
+        WHILE(NOT_EQUAL(INT(i(__pos)), INT(x1))) {
+          f(INT(i(__pos)))
+          i.update(INT(i(__pos)) + 1); ()
         }
     }
   }

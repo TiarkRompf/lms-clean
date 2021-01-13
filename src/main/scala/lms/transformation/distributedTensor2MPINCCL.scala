@@ -127,7 +127,6 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
     MPI_CHECK(mpi_comm_size(mpi_comm_world, size))
     MPI_CHECK(mpi_barrier(mpi_comm_world))
 
-    // lazy local functions that initialize NCCL
     cudaCall(cudaSetDevice(readVar(rank)))
 
     val commId = ncclUniqueId
@@ -407,7 +406,7 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
           // Gather + Concat + Print
           generate_comment("Gather by groups of NCCL send/recv")
           NCCL_CHECK(NCCL_GROUP_START)
-          NCCL_CHECK(NCCL_SEND(m, new ARRAY(tensor), SIZE_T(count), root, myNCCLComm, myNCCLStream))
+          NCCL_CHECK(NCCL_SEND(m, new ARRAY(transform(tensor)), SIZE_T(count), root, myNCCLComm, myNCCLStream))
           IF (EQUAL(myNCCLRank, INT(root))) {
             for (r <- RANGE_UNTIL(0, myNCCLSize)) {
               NCCL_CHECK(NCCL_RECV(m, recvbuf.slice(INT(r * count2), INT((r + 1) * count2)), SIZE_T(count), r, myNCCLComm, myNCCLStream))
@@ -448,6 +447,11 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
     } else {
       throw new Exception(s"TODO: not yet handling split annotation conflict $operand_tensor")
     }
+  }
+
+  override def runGraph(graph: Graph): Unit = {
+    super.apply(graph)
+    finalize_nccl
   }
 
   override def transform(graph: Graph): Graph = {

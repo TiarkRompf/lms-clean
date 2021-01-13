@@ -540,6 +540,8 @@ abstract class Transformer extends Traverser {
       Adapter.sourceMap.getOrElseUpdate(subst(n.n), Adapter.oldSourceMap(n.n))
   }
 
+  def runGraph(graph: Graph): Unit = super.apply(graph)
+
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
@@ -557,7 +559,7 @@ abstract class Transformer extends Traverser {
       assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
-      super.apply(graph)
+      runGraph(graph)
       transform(graph.block.res)
     }
 
