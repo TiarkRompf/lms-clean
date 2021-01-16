@@ -29,16 +29,20 @@ class CuBLASTest extends TutorialFunSuite {
         val M = 2
         val K = 2
         val N = 2
-
+        
+        // a MxK matrix whose values are 2.0f
         val mat2 = NewArray[Float](M * K)
         for (i <- (0 until M * K): Rep[Range]) {
           mat2(i) = 2.0f
         }
+
+        // a KxN matrix whose values are 3.0f
         val mat3 = NewArray[Float](K * N)
         for (i <- (0 until M * K): Rep[Range]) {
           mat3(i) = 3.0f
         }
 
+        // allocate memories on device
         val devPtrA = cudaMalloc2[Float](M * K)
         cudaCall(cudaMemcpyOfT[Float](devPtrA, mat2, M * K, host2device))
         val devPtrB = cudaMalloc2[Float](K * N)
@@ -82,6 +86,7 @@ class CuBLASTest extends TutorialFunSuite {
           printf("\n")
         }
 
+        // free resources
         cudaCall(cudaFree(devPtrA))
         cudaCall(cudaFree(devPtrB))
         cudaCall(cudaFree(devPtrC))
@@ -101,15 +106,19 @@ class CuBLASTest extends TutorialFunSuite {
         val K = 2
         val N = 2
 
+        // an array of length M whose values are 1.0f
         val arr1 = NewArray[Float](M)
         for (i <- (0 until M): Rep[Range]) {
           arr1(i) = 1.0f
         }
+
+        // a matrix of size MxK whose values are 2.0f
         val mat2 = NewArray[Float](M * K)
         for (i <- (0 until M * K): Rep[Range]) {
           mat2(i) = 2.0f
         }
 
+        // allocate memories on device
         val devPtrA = cudaMalloc2[Float](M * K)
         cudaCall(cudaMemcpyOfT[Float](devPtrA, mat2, M * K, host2device))
         val devPtrX = cudaMalloc2[Float](K)
@@ -134,6 +143,7 @@ class CuBLASTest extends TutorialFunSuite {
           printf("%f, ", value)
         }
 
+        // free resources
         cudaCall(cudaFree(devPtrA))
         cudaCall(cudaFree(devPtrX))
         cudaCall(cudaFree(devPtrY))
@@ -150,11 +160,14 @@ class CuBLASTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]) = {
 
         val M = 5
+
+        // an array of length M whose values are 1.0f
         val arr1 = NewArray[Float](M)
         for (i <- (0 until M): Rep[Range]) {
           arr1(i) = 1.0f
         }
 
+        // allocate memories on device
         val devPtrA = cudaMalloc2[Float](M)
         cudaCall(cudaMemcpyOfT[Float](devPtrA, arr1, M, host2device))
         val devPtrB = cudaMalloc2[Float](M)
@@ -164,6 +177,7 @@ class CuBLASTest extends TutorialFunSuite {
         val handle = cublasHandle
         cublasCall(cublasCreate(handle))
 
+        // test DOT
         cublasCall(cublasSdot(handle, 10, devPtrA, 1, devPtrB, 1, devPtrC))
         
         val res = NewArray[Float](M)
@@ -171,6 +185,7 @@ class CuBLASTest extends TutorialFunSuite {
         printf("Test DOT:\n")
         printf("%f\n", res(0))
 
+        // free resources
         cudaCall(cudaFree(devPtrA))
         cudaCall(cudaFree(devPtrB))
         cudaCall(cudaFree(devPtrC))
