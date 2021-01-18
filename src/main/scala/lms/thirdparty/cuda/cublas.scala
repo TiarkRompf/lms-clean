@@ -235,3 +235,8 @@ trait CuBLASOps extends Base with CLibs with CudaFunction with StackArrayOps wit
       Unwrap(handle), Unwrap(transa), Unwrap(transb), Unwrap(m), Unwrap(n), Unwrap(k), UnwrapV(alpha),
       Unwrap(A), Unwrap(lda), Unwrap(B), Unwrap(ldb), UnwrapV(beta), Unwrap(C), Unwrap(ldc))(Seq(0,7,9,12), Seq(12), Set(6, 11))
 }
+
+
+trait CCodeGenCuBLASOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
+  registerHeader("\"cublas_header.h\"")
+}
