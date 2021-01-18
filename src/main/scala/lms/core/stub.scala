@@ -125,8 +125,7 @@ object BaseTypeLess {
   }
   def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
 
-  // FIXME(feiw) maybe check the manifest? Not so easy since manifest do not have to be the same
-  // FIXME(feiw) maybe move to a separate object other than BaseTypeLess?
+  // NOTE(feiw) hope to check the manifest but it is not so easy since manifest do not have to be the same
   def NOT_EQUAL(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
     BOOL(Adapter.g.reflect("!=", a.x, b.x))
   def EQUAL(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
@@ -154,7 +153,7 @@ object BaseTypeLess {
     val pure = aBlock.isPure && bBlock.isPure
     val aManifest = Adapter.typeMap(aBlock.res)
     val bManifest = Adapter.typeMap(bBlock.res)
-    // FIXME(feiw) maybe we should check the equality of the `aManifest` and `bManifest` but
+    // NOTE(feiw) hope to check the equality of the `aManifest` and `bManifest` but
     // that might not consider subtypes
     if (pure)
       TOP(Adapter.g.reflect("?",c.x,aBlock,bBlock), aManifest)

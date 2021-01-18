@@ -33,7 +33,9 @@ object CUBLASTypeLess extends Dsl with CLibs {
         cache = Some(handle)
         handle
     }
-    // FIXME(feiw) how do we clean up the cublas constructs? the same question applies to the nccl/mpi stuff!
+
+    def set_up_cublas(implicit __pos: SourceContext) = { val dummy = CUBLAS_HANDLE }
+    def finalize_cublas(implicit __pos: SourceContext) = { CUBLAS_DESTROY(CUBLAS_HANDLE) }
 
     def CUBLAS_CREATE(handle: CUBLAS_HANDLE)(implicit __pos: SourceContext) =
     CUBLAS_CALL(Unwrap(libFunction[Any]("cublasCreate", handle.x)(Seq[Int](), Seq(0), Set(0))))

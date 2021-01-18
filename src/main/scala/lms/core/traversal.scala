@@ -399,6 +399,7 @@ class CompactTraverser extends Traverser {
       else None }
     // (shouldInline is protected by withScope)
 
+
     // ----- backward pass -----
 
     // for nodes that should be inlined, disable if dependencies interfere
@@ -475,7 +476,6 @@ abstract class Transformer extends Traverser {
 
   var g: GraphBuilder = null
 
-  // FIXME(feiw) maybe we should fix typeMap when we add to subst?cd
   val subst = new mutable.HashMap[Sym,Exp]
 
   def transform(s: Exp): Exp = s match {
@@ -540,7 +540,7 @@ abstract class Transformer extends Traverser {
       Adapter.sourceMap.getOrElseUpdate(subst(n.n), Adapter.oldSourceMap(n.n))
   }
 
-  def runGraph(graph: Graph): Unit = super.apply(graph)
+  def wrapGraph(graph: Graph): Unit = super.apply(graph)
 
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
@@ -559,7 +559,7 @@ abstract class Transformer extends Traverser {
       assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
-      runGraph(graph)
+      wrapGraph(graph)
       transform(graph.block.res)
     }
 

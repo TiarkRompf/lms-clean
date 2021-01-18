@@ -146,8 +146,8 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
   def myNCCLComm(implicit __pos: SourceContext) = TOP(Unwrap(myNCCLCommRep), manifest[ncclCommT])
   def myNCCLStream(implicit __pos: SourceContext) = TOP(Unwrap(myNCCLStreamRep), manifest[cudaStreamT])
 
-  // FIXME(feiw) who calls this `finalize` to terminate the MPI and NCCL?
-  lazy val finalize_nccl = {
+  def set_up_mpi_nccl(implicit __pos: SourceContext) = { val dummy = myNCCLSize }
+  def finalize_mpi_nccl(implicit __pos: SourceContext) = {
     MPI_CHECK(mpi_finalize())
     ncclCheck(ncclCommDestroy(myNCCLCommRep))
   }
@@ -449,9 +449,34 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
     }
   }
 
-  override def runGraph(graph: Graph): Unit = {
+  override def wrapGraph(graph: Graph): Unit = {
+    // analyze the graph to see if we need to
+    // 0. Set up MPI/NCCL (this is always a yes)
+    // 1. Set up Cublas handler
+    // 2. Set up Cudnn handler
+    val analysis = new DistributeTensor2MPI_NCCLAnalysis
+    analysis.apply(graph)
+
+    // FIXME(feiw) dummy __pos
+    implicit val pos: SourceContext = Adapter.oldSourceMap.head._2
+
+    // pre set-ups
+    // 0. set up MPI/NCCL
+    set_up_mpi_nccl
+    // 1. maybe set up cublas
+    if (analysis.hasCublas) set_up_cublas
+    // 2. maybe set up cudnn
+    if (analysis.hasCudnn) ???
+
     super.apply(graph)
-    finalize_nccl
+
+    // post clean-ups
+    // 1. maybe clean up cublas
+    if (analysis.hasCublas) finalize_cublas
+    // 2. maybe clean up cudnn
+    if (analysis.hasCudnn) ???
+    // 0. clean up mpi/nccl
+    finalize_mpi_nccl
   }
 
   override def transform(graph: Graph): Graph = {
@@ -464,4 +489,16 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
       g = null; Adapter.g = null
     }
   }
+}
+
+class DistributeTensor2MPI_NCCLAnalysis extends Traverser {
+    var hasCublas = false
+    var hasCudnn = false
+
+    override def traverse(n: Node): Unit = n match {
+        case Node(s, op, _, _) if op.startsWith("tensor_dot") =>
+            hasCublas = true
+            super.traverse(n)
+        case _ => super.traverse(n)
+    }
 }
