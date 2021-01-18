@@ -20,15 +20,15 @@ import Backend._
  *    such that: tensors are moved to GPU or CPU based on the request from tensor computation
  *               tensors can be printed only from CPU.
  */
-object FixedSizeDistributedTensorTypeLess {
-
-  type E = Backend.Exp
-  def C(a: Any) = Backend.Const(a)
+trait FixedSizeDistributedTensorBaseTypeLess {
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
   import ArrayTypeLess._
   import CUDATypeLess._
+
+  type E = Backend.Exp
+  def C(a: Any) = Backend.Const(a)
 
   abstract class Device
   object UnKnownD extends Device
@@ -114,12 +114,6 @@ object FixedSizeDistributedTensorTypeLess {
 
     def shape_size: Seq[Int] = tensor_type.shape.map(_.size)
 
-    // def to(target_device: Device)(implicit __pos: SourceContext): TENSOR = {
-    //   if (device == target_device) this
-    //   else (new TENSOR(Adapter.g.reflect("tensor_sendrecv", C(shape), C(target_device),
-    //     C(device), x))).withSrcType(__pos, et)
-    // }
-
     def show(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("show_tensor", x)(x)(Adapter.CTRL))
     }
@@ -127,78 +121,6 @@ object FixedSizeDistributedTensorTypeLess {
     // FIXME(feiw) save to where?
     def save(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("save", x)(x)(Adapter.CTRL))
-    }
-
-    def += (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("accum_tensor", C(anno), x, y.x)(x, y.x)(x))
-    }
-
-    def optimize(grad: TENSOR, momentum: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("optimize_tensor", C(anno), x, grad.x, momentum.x)(x, grad.x, momentum.x)(x))
-    }
-
-    def elemWiseNoBroadCasting(y: TENSOR, anno: Anno, __pos: SourceContext)(op: String): TENSOR = {
-      assert(shape_size == y.shape_size)
-      assert(et == y.et)
-      (new TENSOR(Adapter.g.reflectRead(op, C(tensor_type), C(anno), x, y.x)(x, y.x))).withSrcType(__pos, et)
-    }
-
-    def + (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
-      elemWiseNoBroadCasting(y, anno, __pos)("tensor_add")
-
-    def - (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
-      elemWiseNoBroadCasting(y, anno, __pos)("tensor_minus")
-
-    def * (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
-      elemWiseNoBroadCasting(y, anno, __pos)("tensor_mult")
-
-    def / (y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
-      elemWiseNoBroadCasting(y, anno, __pos)("tensor_div")
-
-    def transpose(anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-      assert(shape_size.size == 2, "input of transpose must be 2D")
-      val res_tt = TensorType(Seq(tensor_type.shape(1), tensor_type.shape(0)), et)
-      (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), x)(x))).withSrcType(__pos, et)
-    }
-
-    def dot_with_transpose(y: TENSOR, anno: Anno = NAnno, transL: Boolean = false, transR: Boolean = false)(implicit __pos: SourceContext): TENSOR = {
-      val res_tt = (shape_size.size, y.shape_size.size) match {
-        case (1,1) => // vector-vector-dot
-          assert(!transL && !transR, "cannot transpose the operand in vector-vector-dot")
-          assert(shape_size == y.shape_size)
-          TensorType(Seq(Size(Dim(next_dim_name), 1)), et)
-        case (2,1) => // matrix-vector-dot
-          assert(!transL && !transR, "cannot transpose the operand in matrix-vector-dot for now")
-          assert(shape_size(1) == y.shape_size(0))
-          TensorType(tensor_type.shape.take(1), et)
-        case (2,2) => // matrix-matrix-dot
-          val left_check = if (transL) shape_size(0) else shape_size(1)
-          val left_dim = if (transL) tensor_type.shape(1) else tensor_type.shape(0)
-          val right_check = if (transR) shape_size(1) else shape_size(0)
-          val right_dim = if (transR) y.tensor_type.shape(0) else y.tensor_type.shape(1)
-          assert(left_check == right_check)
-          TensorType(Seq(left_dim, right_dim), et)
-        case _ => throw new Exception("not yet supporting high dimension dot")
-      }
-      assert (et == y.et)
-      (new TENSOR(Adapter.g.reflectRead("tensor_dot_with_transpose", C(res_tt), C(anno), C(transL), C(transR), x, y.x)(x, y.x))).withSrcType(__pos, et)
-    }
-
-    def dot(y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-      val res_tt = (shape_size.size, y.shape_size.size) match {
-        case (1,1) => // vector-vector-dot
-          assert(shape_size == y.shape_size)
-          TensorType(Seq(Size(Dim(next_dim_name), 1)), et)
-        case (2,1) => // matrix-vector-dot
-          assert(shape_size(1) == y.shape_size(0))
-          TensorType(tensor_type.shape.take(1), et)
-        case (2,2) => // matrix-matrix-dot
-          assert(shape_size(1) == y.shape_size(0))
-          TensorType(Seq(tensor_type.shape(0), y.tensor_type.shape(1)), et)
-        case _ => throw new Exception("not yet supporting high dimension dot")
-      }
-      assert(et == y.et)
-      (new TENSOR(Adapter.g.reflectRead("tensor_dot", C(res_tt), C(anno), x, y.x)(x, y.x))).withSrcType(__pos, et)
     }
   }
 
@@ -210,7 +132,7 @@ object FixedSizeDistributedTensorTypeLess {
 }
 
 
-trait FixedSizeDistributedTensorOps extends Dsl {
+trait FixedSizeDistributedTensorOpsBase extends Dsl {
 
   import PrimitiveTypeLess._
   import FixedSizeDistributedTensorTypeLess._
@@ -265,43 +187,8 @@ trait FixedSizeDistributedTensorOps extends Dsl {
 
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
-
     def shape: Seq[Int] = self.shape_size
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
-
-    // def + (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.+(y, anno)
-    def + (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self + (tensor(y), anno)
-      Wrap[Tensor[T]](t.x)
-    }
-
-    // def - (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.-(y, anno)
-    def - (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self - (tensor(y), anno)
-      Wrap[Tensor[T]](t.x)
-    }
-
-    // def * (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.*(y, anno)
-    def * (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self * (tensor(y), anno)
-      Wrap[Tensor[T]](t.x)
-    }
-
-    // def / (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this./(y, anno)
-    def / (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self / (tensor(y), anno)
-      Wrap[Tensor[T]](t.x)
-    }
-
-    def transpose(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self transpose anno
-      Wrap[Tensor[T]](t.x)
-    }
-
-    // def dot(y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-    def dot(y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self dot (tensor(y), anno)
-      Wrap[Tensor[T]](t.x)
-    }
   }
 }
+

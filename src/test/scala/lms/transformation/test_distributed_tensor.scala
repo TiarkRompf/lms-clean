@@ -95,7 +95,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val model = module { () =>
           val tensor_input = Tensor.input[Float](inputTensorType)
           val tensor_weight = Tensor.weight[Float](Seq(32, 32))
-          tensor_input dot (tensor_weight, batchSplitAnno)
+          tensor_input gemm (tensor_weight, batchSplitAnno)
         }
         model()
         printf("compile")
@@ -114,7 +114,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val gpus = List(GPU(0), GPU(1))
         val a = INPUT(Seq(32,64), manifest[Float], 1, gpus)
         val b = INPUT(Seq(32,64), manifest[Float], 1, gpus)
-        val c = a + (b, a.annotation)
+        val c = Add(a, b, a.annotation)
         c.show
         ()
       }

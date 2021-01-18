@@ -42,13 +42,13 @@ abstract class DistributeTensorAIRCoP extends Transformer {
         // save backward op in backwardNodes
         (() => {
           val a_tensor = new TENSOR(transform(a))
-          val b_grad = a_tensor * (grad_map(s), anno)
-          grad_map(b) += (b_grad, anno); ()
+          val b_grad = Mul(a_tensor, grad_map(s), anno)
+          Accumulate(grad_map(b), b_grad, anno); ()
         }) +=: backwardNodes
         (() => {
           val b_tensor = new TENSOR(transform(b))
-          val a_grad = b_tensor * (grad_map(s), anno)
-          grad_map(a) += (a_grad, anno); ()
+          val a_grad = Mul(b_tensor, grad_map(s), anno)
+          Accumulate(grad_map(a), a_grad, anno); ()
         }) +=: backwardNodes
       case n@Node(s, "tensor_dot", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
@@ -69,13 +69,13 @@ abstract class DistributeTensorAIRCoP extends Transformer {
         // }) +=: backwardNodes
         (() => {
           val b_tensor = new TENSOR(transform(b))
-          val a_grad = grad_map(s) dot_with_transpose(b_tensor, anno, transL = false, transR = true)
-          grad_map(a) += (a_grad, anno); ()
+          val a_grad = DotWithTranspose(grad_map(s), b_tensor, anno, transL = false, transR = true)
+          Accumulate(grad_map(a), a_grad, anno); ()
         }) +=: backwardNodes
         (() => {
           val a_tensor = new TENSOR(transform(a))
-          val b_grad = a_tensor dot_with_transpose (grad_map(s), anno, transL = true, transR = false)
-          grad_map(b) += (b_grad, anno); ()
+          val b_grad = DotWithTranspose(a_tensor, grad_map(s), anno, transL = true, transR = false)
+          Accumulate(grad_map(b), b_grad, anno); ()
         }) +=: backwardNodes
       case n => throw new Exception(s"$n todo")
     }
@@ -139,7 +139,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     for (w <- weightSyms) {
       implicit val pos = Adapter.oldSourceMap(w)
       val annotation = (new TENSOR(w, useOldMetadata=true)).annotation
-      (new TENSOR(transform(w))).optimize(grad_map(w), momentum_map(w), annotation)
+      Optimize(new TENSOR(transform(w)), grad_map(w), momentum_map(w), annotation)
     }
     cont
   }
@@ -178,7 +178,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
       implicit val pos = Adapter.oldSourceMap(s)
       val left = new TENSOR(transform(x))
       val right = new TENSOR(transform(y))
-      val res = left * (right, anno)
+      val res = Mul(left, right, anno)
       res.x
 
     case _ => super.transform(n)

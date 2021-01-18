@@ -88,15 +88,15 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       // this reconstruction should use new dim names in tensor type :)
       op match {
-        case "tensor_add" => ((new TENSOR(transform(x))) + (new TENSOR(transform(y)), update_dim_name(anno))).x
-        case "tenosr_minus" => ((new TENSOR(transform(x))) - (new TENSOR(transform(y)), update_dim_name(anno))).x
-        case "tensor_mult" => ((new TENSOR(transform(x))) * (new TENSOR(transform(y)), update_dim_name(anno))).x
-        case "tensor_div" => ((new TENSOR(transform(x))) / (new TENSOR(transform(y)), update_dim_name(anno))).x
+        case "tensor_add" => Add(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
+        case "tenosr_minus" => Sub(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
+        case "tensor_mult" => Mul(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
+        case "tensor_div" => Div(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
       }
 
     case Node(s, "tensor_dot", tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-      ((new TENSOR(transform(x))) dot (new TENSOR(transform(y)), update_dim_name(anno))).x
+      Dot(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
 
     case _ => super.transform(n)
   }
