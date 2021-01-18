@@ -64,9 +64,7 @@ object NCCLTypeLess {
   // Point-to-Point Operations
   def NCCL_SEND(m: Manifest[_], sendbuf: ARRAY, count: SIZE_T, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
-    // FIXME(feiw): If I add r/w effect on `comm` and `stream`, I lose some inlining. How to fix?
-    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclSend", sendbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(0,2), Seq[Int](), Set[Int]())
-    // LIB_FUNCTION(manifest[NCCL_RESULT], "ncclSend", sendbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(0,2,4,5), Seq(4,5), Set[Int]())
+    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclSend", sendbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(0,2,4,5), Seq(4,5), Set[Int]())
   }
 
   def NCCL_RECV(m: Manifest[_], recvbuf: ARRAY, count: SIZE_T, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
@@ -127,8 +125,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
   // ncclResult_t ncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank)
   def ncclCommInitRank(comm: Rep[ncclCommT], nranks: Rep[Int], commId: Rep[ncclUniqueId], rank: Rep[Int]) =
     libFunction[ncclResultT]("ncclCommInitRank", Unwrap(comm), Unwrap(nranks), Unwrap(commId),
-      Unwrap(rank))(Seq(2), Seq[Int](), Set(0))
-      // Unwrap(rank))(Seq(0, 2), Seq(0), Set(0))
+      Unwrap(rank))(Seq(0, 2), Seq(0), Set(0))
 
   // ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist)
   def ncclCommInitAll(comm: Rep[ncclCommT], ndev: Rep[Int], devlist: Rep[Array[Int]]) =
