@@ -14,6 +14,7 @@ import Backend._
 
 
 abstract class DistributeTensorAIRCoP extends Transformer {
+  override val name = "DistributeTensorAIRCoP"
 
   import PrimitiveTypeLess._
   import ArrayTypeLess._

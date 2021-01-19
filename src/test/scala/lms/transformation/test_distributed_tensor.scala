@@ -31,13 +31,24 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
 
-    override def transform(graph: Graph): List[Graph] = {
-      val graph1 = (new DistributeTensorDimName {}).transform(graph)
-      val graph2 = (new DistributeTensorAIRCoP {}).transform(graph1)
-      val graph2_5 = (new Canonicalize {}).transform(graph2)
-      val graph3 = (new DistributeTensor2MPI_NCCL {}).transform(graph2_5)
-      List(graph, graph1, graph2, graph2_5, graph3)
+    def logGraph(graph: Graph, logPath: String, index: Int = -1, passName: String = "") =
+      writeFile(s"$logPath/GraphLog${if (index == -1) "--InitialGraph.txt" else s"-$index-$passName"}", graph.toString)
+
+    override def transform(graph: Graph, logPath: String): List[Graph] = {
+      logGraph(graph, logPath)
+      val final_graph = passes.zipWithIndex.foldLeft(graph) { case (graph, (pass, index)) =>
+        val new_graph = pass.transform(graph)
+        logGraph(new_graph, logPath, index, pass.name)
+        new_graph
+      }
+      List(final_graph)
     }
+
+    override val passes = List(
+      new DistributeTensorDimName {},
+      new DistributeTensorAIRCoP {},
+      new Canonicalize {},
+      new DistributeTensor2MPI_NCCL {})
   }
 
   // test("AD") {
@@ -79,7 +90,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         printf("compile")
       }
     }
-    checkWithLog("Annotation", driver.code, driver.all_graphs, "cu")
+    checkWithLogPath("Annotation", driver.code, "cu", driver.setLogPath)
   }
 
   test("dot") {
@@ -101,26 +112,26 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         printf("compile")
       }
     }
-    checkWithLog("dot", driver.code, driver.all_graphs, "cu")
+    checkWithLogPath("dot", driver.code, "cu", driver.setLogPath)
   }
 
-  test("show") {
-    val driver = new CompilerCDistributedTensor[Int, Unit] {
-      import FixedSizeDistributedTensorTypeLess._
+  // test("show") {
+  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
+  //     import FixedSizeDistributedTensorTypeLess._
 
-      @virtualize
-      def snippet(arg: Rep[Int]): Rep[Unit] = {
-        dim_name = 0
-        val gpus = List(GPU(0), GPU(1))
-        val a = INPUT(Seq(32,64), manifest[Float], 1, gpus)
-        val b = INPUT(Seq(32,64), manifest[Float], 1, gpus)
-        val c = Add(a, b, a.annotation)
-        c.show
-        ()
-      }
-    }
-    System.out.println(indent(driver.code))
-  }
+  //     @virtualize
+  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
+  //       dim_name = 0
+  //       val gpus = List(GPU(0), GPU(1))
+  //       val a = INPUT(Seq(32,64), manifest[Float], 1, gpus)
+  //       val b = INPUT(Seq(32,64), manifest[Float], 1, gpus)
+  //       val c = Add(a, b, a.annotation)
+  //       c.show
+  //       ()
+  //     }
+  //   }
+  //   System.out.println(indent(driver.code))
+  // }
 
 }
 

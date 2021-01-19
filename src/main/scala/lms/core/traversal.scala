@@ -473,6 +473,7 @@ class CompactTraverser extends Traverser {
 
 
 abstract class Transformer extends Traverser {
+  val name: String = "Transformer"
 
   var g: GraphBuilder = null
 
@@ -576,6 +577,7 @@ abstract class Transformer extends Traverser {
 }
 
 abstract class Canonicalize extends Transformer {
+  override val name = "Canonicalize"
   override def transform(graph: Graph): Graph = {
     assert (g == null)
     g = new GraphBuilderOpt()

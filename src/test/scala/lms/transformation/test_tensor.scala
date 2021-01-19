@@ -21,7 +21,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
       val IR: q.type = q
     }
 
-    override def transform(graph: Graph) = {
+    override def transform(graph: Graph, log_path: String = "") = {
       val graph1 = (new TensorLoweringCPU {}).transform(graph)
       List(graph, graph1)
     }

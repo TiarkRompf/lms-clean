@@ -15,6 +15,7 @@ import Backend._
 
 
 abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with CudaOps with NCCLOps {
+  override val name = "DistributeTensor2MPI_NCCL"
 
   import BaseTypeLess._
   import PrimitiveTypeLess._

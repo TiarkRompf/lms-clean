@@ -22,7 +22,7 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
       val IR: q.type = q
     }
 
-    override def transform(graph: Graph) = {
+    override def transform(graph: Graph, log_path: String = "") = {
       val graph1 = (new TensorResolvingDevice {}).transform(graph)
       val graph2 = (new DevicedTensorLowering {}).transform(graph1)
       List(graph, graph1, graph2)

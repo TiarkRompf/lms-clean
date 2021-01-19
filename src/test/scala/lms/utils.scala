@@ -60,6 +60,7 @@ trait TutorialFunSuite extends LibSuite {
       assert(expected == code, name)
     }
   }
+  // FIXME(feiw) Deprecate this function
   def logGraphs(label: String, graphs: List[String]) = {
     val fileprefix = prefix+under+label
     val directory = new File(fileprefix + "/");
@@ -71,9 +72,24 @@ trait TutorialFunSuite extends LibSuite {
     for ((graph, i) <- graphs.zipWithIndex)
       writeFile(s"$fileprefix/graphLog$i.txt", graph)
   }
+  // FIXME(feiw) Deprecate this function
   def checkWithLog(label: String, raw_code: String, graphs: List[String], suffix: String = "scala") = {
     logGraphs(label, graphs)
     check(label, raw_code, suffix)
+  }
+  def checkWithLogPath(label: String, raw_code: => String, suffix: String = "scala", func: String => Unit) = {
+    func(log_path(label, suffix))
+    check(label, raw_code, suffix)
+  }
+  def log_path(label: String, suffix: String = "scala") = {
+    val fileprefix = prefix+under+label + "/"
+    val directory = new File(fileprefix);
+    if (!directory.exists()) {
+      directory.mkdir()
+    } else if (directory.isDirectory) {
+      directory.listFiles.foreach(_.delete)
+    }
+    fileprefix
   }
   def indent(str: String) = {
     val s = new StringWriter
