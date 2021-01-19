@@ -1445,25 +1445,18 @@ abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
 
   // run some transformation
   val passes: List[Transformer] = List()
-  def transform(graph: Graph, logPath: String = ""): List[Graph] = {
-    val final_graph = passes.foldLeft(graph) {case (graph, pass) => pass.transform(graph)}
-    List(final_graph)
-  }
-
-  var log_path: String = ""
-  def setLogPath(path: String) { log_path = path }
-
-  var all_graphs:List[String] = _
+  def transformOnePass(pass: Transformer, index: Int, graph: Graph): Graph = pass.transform(graph)
+  def transform(graph: Graph): Graph =
+    passes.zipWithIndex.foldLeft(graph) {case (graph, (pass, index)) => transformOnePass(pass, index, graph)}
 
   // codegen
   override lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
     val statics = time("codegen") {
-      if (log_path == "") throw new Exception("should set the log_path first")
-      val graphs = transform(initial_graph, log_path)
+      val final_graph = transform(initial_graph)
       codegen.typeMap = Adapter.typeMap
       codegen.stream = new java.io.PrintStream(source)
-      codegen.emitAll(graphs.last, "Snippet")(manifest[A], manifest[B])
+      codegen.emitAll(final_graph, "Snippet")(manifest[A], manifest[B])
       codegen.extractAllStatics.toList
     }
     (source.toString, statics)

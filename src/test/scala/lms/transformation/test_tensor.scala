@@ -21,10 +21,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
       val IR: q.type = q
     }
 
-    override def transform(graph: Graph, log_path: String = "") = {
-      val graph1 = (new TensorLoweringCPU {}).transform(graph)
-      List(graph, graph1)
-    }
+    override val passes = List(new TensorLoweringCPU {})
   }
 
   test("show") {
@@ -36,7 +33,7 @@ class FixedSizeTensorTest extends TutorialFunSuite {
         tensor.show
       }
     }
-    checkWithLog("show", driver.code, driver.all_graphs, "c")
+    check("show", driver.code, "c")
   }
 
   test("tensor_construction_effect") {

@@ -31,24 +31,26 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
 
-    def logGraph(graph: Graph, logPath: String, index: Int = -1, passName: String = "") =
-      writeFile(s"$logPath/GraphLog${if (index == -1) "--InitialGraph.txt" else s"-$index-$passName"}", graph.toString)
-
-    override def transform(graph: Graph, logPath: String): List[Graph] = {
-      logGraph(graph, logPath)
-      val final_graph = passes.zipWithIndex.foldLeft(graph) { case (graph, (pass, index)) =>
-        val new_graph = pass.transform(graph)
-        logGraph(new_graph, logPath, index, pass.name)
-        new_graph
-      }
-      List(final_graph)
-    }
-
     override val passes = List(
       new DistributeTensorDimName {},
       new DistributeTensorAIRCoP {},
       new Canonicalize {},
       new DistributeTensor2MPI_NCCL {})
+
+    var log_path: String = ""
+    def setLogPath(path: String) { log_path = path }
+
+    override def transform(graph: Graph): Graph = {
+      logGraph(graph.toString, log_path)
+      super.transform(graph)
+    }
+
+    override def transformOnePass(pass: Transformer, index: Int, graph: Graph) = {
+      val new_graph = pass.transform(graph)
+      if (log_path == "") throw new Exception("should set log_path first")
+      logGraph(new_graph.toString, log_path, index, pass.name)
+      new_graph
+    }
   }
 
   // test("AD") {

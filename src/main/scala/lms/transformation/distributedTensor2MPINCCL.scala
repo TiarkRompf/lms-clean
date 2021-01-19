@@ -56,6 +56,8 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
       gpuArray
     }
   // helper function for declaring a GPU array with fixed value
+  val CUDA_FILL_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_FILL_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_FILL_KERNEL_MAP.getOrElseUpdate(m, CUDA_FILL_KERNEL(m))
   def gpu_fixed_array(size: Int, device: INT, value: NUM)(implicit __pos: SourceContext): ARRAY =
     withComment(s"initializing fixed GPU array of size $size and type ${value.t} and device (pre-rename) ${device.x}") {
       val array = gpu_array(size, value.t, device)
@@ -63,12 +65,44 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
       fill_fun(array, value, size, DIM3(gridSize), DIM3(blockSize))
       array
     }
+  // helper function for computing element-wise addition in GPUs
+  val CUDA_ADD_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_ADD_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ADD_KERNEL_MAP.getOrElseUpdate(m, CUDA_ADD_KERNEL(m))
+  def gpu_add_array(size: Int, m: Manifest[_], device: INT, left_operand: Backend.Exp, right_operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"computing ADD on GPU for size $size and type $m at device (pre-rename) ${device.x} with left_operand $left_operand and right_operand $right_operand") {
+      val array = gpu_array(size, m, device)
+      val add_fun = CUDA_ADD_FUN(m)
+      add_fun(new ARRAY(left_operand), new ARRAY(right_operand), array, size, DIM3(gridSize), DIM3(blockSize))
+      array
+    }
+  // helper function for computing element-wise subtraction in GPUs
+  val CUDA_MINUS_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_MINUS_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_MINUS_KERNEL_MAP.getOrElseUpdate(m, CUDA_MINUS_KERNEL(m))
+  def gpu_sub_array(size: Int, m: Manifest[_], device: INT, left_operand: Backend.Exp, right_operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"computing SUB on GPU for size $size and type $m at device (pre-rename) ${device.x} with left_operand $left_operand and right_operand $right_operand") {
+      val array = gpu_array(size, m, device)
+      val sub_fun = CUDA_MINUS_FUN(m)
+      sub_fun(new ARRAY(left_operand), new ARRAY(right_operand), array, size, DIM3(gridSize), DIM3(blockSize))
+      array
+    }
   // helper function for computing element-wise multiplication in GPUs
+  val CUDA_MULT_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_MULT_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_MULT_KERNEL_MAP.getOrElseUpdate(m, CUDA_MULT_KERNEL(m))
   def gpu_mult_array(size: Int, m: Manifest[_], device: INT, left_operand: Backend.Exp, right_operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
     withComment(s"computing MULT on GPU for size $size and type $m at device (pre-rename) ${device.x} with left_operand $left_operand and right_operand $right_operand") {
       val array = gpu_array(size, m, device)
       val mult_fun = CUDA_MULT_FUN(m)
       mult_fun(new ARRAY(left_operand), new ARRAY(right_operand), array, size, DIM3(gridSize), DIM3(blockSize))
+      array
+    }
+  // helper function for computing element-wise division in GPUs
+  val CUDA_DIV_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_DIV_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_DIV_KERNEL_MAP.getOrElseUpdate(m, CUDA_DIV_KERNEL(m))
+  def gpu_div_array(size: Int, m: Manifest[_], device: INT, left_operand: Backend.Exp, right_operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"computing DIV on GPU for size $size and type $m at device (pre-rename) ${device.x} with left_operand $left_operand and right_operand $right_operand") {
+      val array = gpu_array(size, m, device)
+      val div_fun = CUDA_DIV_FUN(m)
+      div_fun(new ARRAY(left_operand), new ARRAY(right_operand), array, size, DIM3(gridSize), DIM3(blockSize))
       array
     }
   // helper function for computing dot product in GPUs
@@ -93,6 +127,8 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
       array
     }
   // helper function for accumulate (+=) a GPU array element-wise
+  val CUDA_ACCUM_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_ACCUM_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ACCUM_KERNEL_MAP.getOrElseUpdate(m, CUDA_ACCUM_KERNEL(m))
   def gpu_accum_array(size: Int, m: Manifest[_], device: INT, base_operand: Backend.Exp, addition_operand: Backend.Exp)(implicit __pos: SourceContext) =
     withComment(s"computing ACCUM on GPU for size $size and type $m at device (pre-rename) ${device.x} with base_operand $base_operand and addition_operand $addition_operand") {
       CUDA_SET_DEVICE(device)
@@ -101,6 +137,8 @@ abstract class DistributeTensor2MPI_NCCL extends Transformer with MPIOps with Cu
       Backend.Const(())
     }
   // helper function for SGD optimization on GPU array
+  val CUDA_SGD_Nesterov_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_SGD_Nesterov_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_SGD_Nesterov_KERNEL_MAP.getOrElseUpdate(m, CUDA_SGD_Nesterov_KERNEL(m))
   def gpu_sgd_array(size: Int, m: Manifest[_], device: INT, weight_operand: Backend.Exp, grad_operand: Backend.Exp, momentum_operand: Backend.Exp)(implicit __pos: SourceContext) =
     withComment(s"computing SGD on GPU for size $size and type $m at device (pre-name) ${device.x} with weight $weight_operand, grad $grad_operand, and momentum $momentum_operand") {
       CUDA_SET_DEVICE(device)

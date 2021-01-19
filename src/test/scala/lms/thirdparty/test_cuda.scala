@@ -101,7 +101,7 @@ class CudaTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]) = {
         val cuda_arr = CUDA_MALLOC(5, manifest[Float])
-        val cudaFillFloat = CUDA_FILL_FUN(manifest[Float])
+        val cudaFillFloat = CUDA_FILL_KERNEL(manifest[Float])
         cudaFillFloat(cuda_arr, 3.0f, 5, DIM3(gridSize), DIM3(blockSize))
 
         val arr = ARRAY(5, manifest[Float])
