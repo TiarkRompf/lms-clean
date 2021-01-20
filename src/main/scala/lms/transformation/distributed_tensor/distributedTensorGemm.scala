@@ -11,7 +11,7 @@ import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 
 import Backend._
 
-trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorBaseTypeLess {
+trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
 
   def Dot(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
     val res_tt = (x.shape_size.size, y.shape_size.size) match {
@@ -51,6 +51,59 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorB
     }
     assert (x.et == y.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_dot_with_transpose", C(res_tt), C(anno), C(transL), C(transR), x.x, y.x)(x.x, y.x))).withSrcType(__pos, x.et)
+  }
+
+  override def mergable_dims(node: Node) = node match {
+    case Node(s, "tensor_dot", tt::anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      val x_type = (new TENSOR(x, useOldMetadata=true)).tensor_type
+      val y_type = (new TENSOR(y, useOldMetadata=true)).tensor_type
+      (x_type.shape.size, y_type.shape.size) match {
+        case (1,1) => List((x_type.shape.head.dim, y_type.shape.head.dim))
+        case (2,1) => List((x_type.shape.last.dim, y_type.shape.head.dim))
+        case (2,2) => List((x_type.shape.last.dim, y_type.shape.head.dim))
+        case r => throw new Exception(s"not yet handling ranks $r")
+      }
+    case Node(s, "tensor_dot_with_transpose", tt::anno::Backend.Const(transL)::Backend.Const(transR)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      val x_type = (new TENSOR(x, useOldMetadata=true)).tensor_type
+      val y_type = (new TENSOR(y, useOldMetadata=true)).tensor_type
+      (x_type.shape.size, y_type.shape.size, transL, transR) match {
+        case (1, 1, false, false) => List((x_type.shape.head.dim, y_type.shape.head.dim))
+        case (2, 1, false, false) => List((x_type.shape.last.dim, y_type.shape.head.dim))
+        case (2, 1, true, false) => List((x_type.shape.head.dim, y_type.shape.head.dim))
+        case (2, 2, false, false) => List((x_type.shape.last.dim, y_type.shape.head.dim))
+        case (2, 2, true, false) => List((x_type.shape.head.dim, y_type.shape.head.dim))
+        case (2, 2, false, true) => List((x_type.shape.last.dim, y_type.shape.last.dim))
+        case (2, 2, true, true) => List((x_type.shape.head.dim, y_type.shape.last.dim))
+        case r => throw new Exception(s"not yet handling ranks $r")
+      }
+    case _ => super.mergable_dims(node)
+  }
+
+  override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
+      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+      grad_map: mutable.HashMap[Backend.Sym, TENSOR],
+      momentum_map: mutable.HashMap[Backend.Sym, TENSOR],
+      transform: Backend.Exp => Backend.Exp) = node match {
+
+    case Node(s, "tensor_dot", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+      // save forward op in forwardNodes
+      forwardNodes += node
+      // save backward op in backwardNodes
+      (() => {
+        val b_tensor = new TENSOR(transform(b))
+        val a_grad = DotWithTranspose(grad_map(s), b_tensor, anno, transL = false, transR = true)
+        Accumulate(grad_map(a), a_grad, anno); ()
+      }) +=: backwardNodes
+      (() => {
+        val a_tensor = new TENSOR(transform(a))
+        val b_grad = DotWithTranspose(a_tensor, grad_map(s), anno, transL = true, transR = false)
+        Accumulate(grad_map(b), b_grad, anno); ()
+      }) +=: backwardNodes
+
+    case Node(s, "tensor_dot_with_transpose", _, _) => throw new Exception("implement me")
+
+    case n => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, grad_map, momentum_map, transform)
   }
 }
 

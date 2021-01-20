@@ -18,6 +18,22 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     val res_tt = TensorType(Seq(tensor.tensor_type.shape(1), tensor.tensor_type.shape(0)), tensor.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), tensor.x)(tensor.x))).withSrcType(__pos, tensor.et)
   }
+
+  override def mergable_dims(node: Node) = node match {
+    case Node(s, "tensor_transpose", _, _) => List()
+    case _ => super.mergable_dims(node)
+  }
+
+  override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
+      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+      grad_map: mutable.HashMap[Backend.Sym, TENSOR],
+      momentum_map: mutable.HashMap[Backend.Sym, TENSOR],
+      transform: Backend.Exp => Backend.Exp) = node match {
+
+    case Node(s, "tensor_transpose", _, _) => ???
+
+    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, grad_map, momentum_map, transform)
+  }
 }
 
 

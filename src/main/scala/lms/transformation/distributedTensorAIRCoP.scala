@@ -20,8 +20,6 @@ abstract class DistributeTensorAIRCoP extends Transformer {
   import ArrayTypeLess._
   import ArrayCPUTypeLess._
   import FixedSizeDistributedTensorTypeLess._
-  // import CUDATypeLess._
-  // import CUBLASTypeLess._
 
   val forwardNodes = mutable.ArrayBuffer[Node]()
   val weightNodes = mutable.ArrayBuffer[Node]()
@@ -33,53 +31,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
 
   def traverseModule(ns: Seq[Node], res: Block): Backend.Exp = {
     // Step 1: Collection Phase
-    ns.foreach {
-      case n@Node(s, "tensor_input", _, _) => forwardNodes += n
-      case n@Node(s, "tensor_weight", _, _) => weightNodes += n
-      case n@Node(s, "tensor_mult", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
-        implicit val pos = Adapter.oldSourceMap(s)
-        // save forward op in forwardNodes
-        forwardNodes += n
-        // save backward op in backwardNodes
-        (() => {
-          val a_tensor = new TENSOR(transform(a))
-          val b_grad = Mul(a_tensor, grad_map(s), anno)
-          Accumulate(grad_map(b), b_grad, anno); ()
-        }) +=: backwardNodes
-        (() => {
-          val b_tensor = new TENSOR(transform(b))
-          val a_grad = Mul(b_tensor, grad_map(s), anno)
-          Accumulate(grad_map(a), a_grad, anno); ()
-        }) +=: backwardNodes
-      case n@Node(s, "tensor_dot", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
-        implicit val pos = Adapter.oldSourceMap(s)
-        // save forward op in forwardNodes
-        forwardNodes += n
-        // save backward op in backwardNodes
-        // (() => {
-        //   val b_tensor = new TENSOR(transform(b))
-        //   val b_transpose = b_tensor.transpose(anno)
-        //   val a_grad = grad_map(s) dot (b_transpose, anno)
-        //   grad_map(a) += (a_grad, anno); ()
-        // }) +=: backwardNodes
-        // (() => {
-        //   val a_tensor = new TENSOR(transform(a))
-        //   val a_transpose = a_tensor.transpose(anno)
-        //   val b_grad = a_transpose dot (grad_map(s), anno)
-        //   grad_map(b) += (b_grad, anno); ()
-        // }) +=: backwardNodes
-        (() => {
-          val b_tensor = new TENSOR(transform(b))
-          val a_grad = DotWithTranspose(grad_map(s), b_tensor, anno, transL = false, transR = true)
-          Accumulate(grad_map(a), a_grad, anno); ()
-        }) +=: backwardNodes
-        (() => {
-          val a_tensor = new TENSOR(transform(a))
-          val b_grad = DotWithTranspose(a_tensor, grad_map(s), anno, transL = true, transR = false)
-          Accumulate(grad_map(b), b_grad, anno); ()
-        }) +=: backwardNodes
-      case n => throw new Exception(s"$n todo")
-    }
+    ns.foreach { n => aircopCollect(n, forwardNodes, weightNodes, backwardNodes, grad_map, momentum_map, transform) }
     // result of the block
     implicit val pos = Adapter.oldSourceMap(ns.last.n)
     (() => {
@@ -154,7 +106,6 @@ abstract class DistributeTensorAIRCoP extends Transformer {
   override def transform(n: Node): Backend.Exp = n match {
 
     case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => scheduleBlock(b)(traverseModule)
-      // g.reflectWrite("module", transformModuleBlock(b))(Adapter.CTRL)
 
     case Node(s, "@", List(a: Backend.Sym, Backend.Const(())), _) =>
       Adapter.oldDefsCache(a) match {
@@ -170,17 +121,17 @@ abstract class DistributeTensorAIRCoP extends Transformer {
       // FIXME(feiw) how do we deal with the case where multiple nodes are generated?
       new_weight.x
 
-    case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-      implicit val pos = Adapter.oldSourceMap(s)
-      val new_input = INPUT(tt, anno)
-      new_input.x
+    // case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
+    //   implicit val pos = Adapter.oldSourceMap(s)
+    //   val new_input = INPUT(tt, anno)
+    //   new_input.x
 
-    case Node(s, "tensor_mult", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      implicit val pos = Adapter.oldSourceMap(s)
-      val left = new TENSOR(transform(x))
-      val right = new TENSOR(transform(y))
-      val res = Mul(left, right, anno)
-      res.x
+    // case Node(s, "tensor_mult", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+    //   implicit val pos = Adapter.oldSourceMap(s)
+    //   val left = new TENSOR(transform(x))
+    //   val right = new TENSOR(transform(y))
+    //   val res = Mul(left, right, anno)
+    //   res.x
 
     case _ => super.transform(n)
   }

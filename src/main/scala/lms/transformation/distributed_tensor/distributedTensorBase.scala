@@ -129,6 +129,24 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f().x))(Adapter.CTRL)
     () => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(()))(Adapter.CTRL))
   }
+
+  def mergable_dims(node: Node): List[(Dim, Dim)] = node match {
+    case Node(s, op, _, _) if (op == "tensor_input" || op == "tensor_weight") => List()
+    case Node(s, op, _, _) =>
+      assert(!op.startsWith("tensor"), s"node $node is not yet handled in mergable_dims")
+      List()
+  }
+
+  def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
+      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+      grad_map: mutable.HashMap[Backend.Sym, TENSOR],
+      momentum_map: mutable.HashMap[Backend.Sym, TENSOR],
+      transform: Backend.Exp => Backend.Exp): Unit = node match {
+
+    case Node(s, "tensor_input", _, _) => forwardNodes += node
+    case Node(s, "tensor_weight", _, _) => weightNodes += node
+    case Node(s, op, _, _) => throw new Exception(s"op $op is not yet handled in aircopCollect")
+  }
 }
 
 
