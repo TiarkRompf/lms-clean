@@ -18,7 +18,7 @@ productivity and high performance of the target program, thus the slogan "abstra
 
 Lightweight Modular Staging (LMS) is a staging tool built in Scala. In LMS, type information is used to distinguish
 the evaluation stages (i.e., All Rep[T] typed values and expressions are in code generation for the next stage).
-Simply speaking, LMS is a compiler. However, LMS does not have a laxer or parser to transform the input program
+Simply speaking, LMS is a compiler. However, LMS does not have a lexer or a parser to transform the input program
 into intermediate representations (IR). Instead, the IR is generated via executing the input program. All the Rep[T]
 typed expressions in the input program evaluate to LMS IR. This can be considered as the LMS frontend.
 Then the LMS backend compiles the LMS IR to target programs.
