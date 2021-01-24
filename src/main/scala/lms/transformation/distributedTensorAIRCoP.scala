@@ -46,8 +46,8 @@ abstract class DistributeTensorAIRCoP extends Transformer {
 
     // Step 2: Generation Phase
     traverseWeights(weightNodes) {
+      // FIXME(feiw) use 5 training iteration for now
       for (i <- (0 until 5): Rep[Range]) {
-        // FIXME(feiw) use 5 training iteration for now
         traverseForward(forwardNodes) {
           traverseBackward(backwardNodes, forwardSyms) {
             traverseOptimization(weightSyms) { () => () }
