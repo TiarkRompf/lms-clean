@@ -121,18 +121,6 @@ abstract class DistributeTensorAIRCoP extends Transformer {
       // FIXME(feiw) how do we deal with the case where multiple nodes are generated?
       new_weight.x
 
-    // case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-    //   implicit val pos = Adapter.oldSourceMap(s)
-    //   val new_input = INPUT(tt, anno)
-    //   new_input.x
-
-    // case Node(s, "tensor_mult", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-    //   implicit val pos = Adapter.oldSourceMap(s)
-    //   val left = new TENSOR(transform(x))
-    //   val right = new TENSOR(transform(y))
-    //   val res = Mul(left, right, anno)
-    //   res.x
-
     case _ => super.transform(n)
   }
 
