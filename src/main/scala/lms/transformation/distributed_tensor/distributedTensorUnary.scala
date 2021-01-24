@@ -26,13 +26,13 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      grad_map: mutable.HashMap[Backend.Sym, TENSOR],
-      momentum_map: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 
     case Node(s, "tensor_transpose", _, _) => ???
 
-    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, grad_map, momentum_map, transform)
+    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
   }
 }
 

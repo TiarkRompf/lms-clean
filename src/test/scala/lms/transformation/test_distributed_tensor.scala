@@ -61,7 +61,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   //     def snippet(arg: Rep[Int]): Rep[Unit] = {
   //       dim_name = 0
   //       implicit val anno = NAnno
-  //       val model = module { () =>
+  //       val model = module {
   //         val tensor_input = Tensor.input[Float](Seq(3, 3))
   //         val tensor_weight = Tensor.weight[Float](Seq(3, 3))
   //         tensor_input * tensor_weight
@@ -83,7 +83,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val inputTensorType = tensor_type[Float](Seq(32,32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
-        val model = module { () =>
+        val model = module {
           val tensor_input = Tensor.input[Float](inputTensorType)
           val tensor_weight = Tensor.weight[Float](Seq(32, 32))
           tensor_input * (tensor_weight, batchSplitAnno)
@@ -105,7 +105,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val inputTensorType = tensor_type[Float](Seq(32,32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
-        val model = module { () =>
+        val model = module {
           val tensor_input = Tensor.input[Float](inputTensorType)
           val tensor_weight = Tensor.weight[Float](Seq(32, 32))
           tensor_input gemm (tensor_weight, batchSplitAnno)

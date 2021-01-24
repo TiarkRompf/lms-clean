@@ -125,8 +125,8 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   }
 
   // FIXME(feiw) the return type fo MODULE is strange
-  def MODULE(f: () => TENSOR)(implicit __pos: SourceContext): () => UNIT = {
-    val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f().x))(Adapter.CTRL)
+  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): () => UNIT = {
+    val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f.x))(Adapter.CTRL)
     () => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(()))(Adapter.CTRL))
   }
 
@@ -139,8 +139,8 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
   def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      grad_map: mutable.HashMap[Backend.Sym, TENSOR],
-      momentum_map: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp): Unit = node match {
 
     case Node(s, "tensor_input", _, _) => forwardNodes += node
@@ -155,8 +155,8 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
   import PrimitiveTypeLess._
   import FixedSizeDistributedTensorTypeLess._
 
-  def module[T](f: () => Rep[Tensor[T]])(implicit __pos: SourceContext) = {
-    MODULE(() => new TENSOR(Unwrap(f())))
+  def module[T](f: => Rep[Tensor[T]])(implicit __pos: SourceContext) = {
+    MODULE(new TENSOR(Unwrap(f)))
   }
 
   /// Typed Frontend

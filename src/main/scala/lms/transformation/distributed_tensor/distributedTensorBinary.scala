@@ -31,9 +31,11 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
   def Div(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
     ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_div")
 
+  val binaryOps = List("tensor_add", "tensor_minus", "tensor_mult", "tensor_div")
+
   override def mergable_dims(node: Node) = node match {
     case Node(s, op, tt::anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _)
-        if (op == "tensor_add" || op == "tensor_minus" || op == "tensor_mult" || op == "tensor_div") =>
+        if binaryOps.contains(op) =>
       val x_type = (new TENSOR(x, useOldMetadata=true)).tensor_type
       val y_type = (new TENSOR(y, useOldMetadata=true)).tensor_type
       (x_type.shape zip y_type.shape).toList map { case (a:Size, b:Size) => (a.dim, b.dim) }
@@ -42,8 +44,8 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      grad_map: mutable.HashMap[Backend.Sym, TENSOR],
-      momentum_map: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 
     case Node(s, "tensor_add", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
@@ -52,10 +54,10 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
       forwardNodes += node
       // save backward op in backwardNodes
       (() => {
-        Accumulate(grad_map(a), grad_map(s), anno); ()
+        Accumulate(gradMap(a), gradMap(s), anno); ()
       }) +=: backwardNodes
       (() => {
-        Accumulate(grad_map(b), grad_map(s), anno); ()
+        Accumulate(gradMap(b), gradMap(s), anno); ()
       }) +=: backwardNodes
 
     // case Node(s, "tensor_sub", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
@@ -64,11 +66,11 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
     //   forwardNodes += node
     //   // save backward op in backwardNodes
     //   (() => {
-    //     Accumulate(grad_map(a), grad_map(s), anno); ()
+    //     Accumulate(gradMap(a), gradMap(s), anno); ()
     //   }) +=: backwardNodes
     //   (() => {
-    //     val b_grad = Neg(grad_map(s), anno)
-    //     Accumulate(grad_map(b), b_grad, anno); ()
+    //     val b_grad = Neg(gradMap(s), anno)
+    //     Accumulate(gradMap(b), b_grad, anno); ()
     //   }) +=: backwardNodes
 
     case Node(s, "tensor_mult", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
@@ -78,13 +80,13 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
       // save backward op in backwardNodes
       (() => {
         val a_tensor = new TENSOR(transform(a))
-        val b_grad = Mul(a_tensor, grad_map(s), anno)
-        Accumulate(grad_map(b), b_grad, anno); ()
+        val b_grad = Mul(a_tensor, gradMap(s), anno)
+        Accumulate(gradMap(b), b_grad, anno); ()
       }) +=: backwardNodes
       (() => {
         val b_tensor = new TENSOR(transform(b))
-        val a_grad = Mul(b_tensor, grad_map(s), anno)
-        Accumulate(grad_map(a), a_grad, anno); ()
+        val a_grad = Mul(b_tensor, gradMap(s), anno)
+        Accumulate(gradMap(a), a_grad, anno); ()
       }) +=: backwardNodes
 
     case Node(s, "tensor_div", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
@@ -99,7 +101,7 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
         ???
       }) +=: backwardNodes
 
-    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, grad_map, momentum_map, transform)
+    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
   }
 }
 

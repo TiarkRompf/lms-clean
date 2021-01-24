@@ -81,8 +81,8 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      grad_map: mutable.HashMap[Backend.Sym, TENSOR],
-      momentum_map: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 
     case Node(s, "tensor_dot", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
@@ -92,18 +92,18 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
       // save backward op in backwardNodes
       (() => {
         val b_tensor = new TENSOR(transform(b))
-        val a_grad = DotWithTranspose(grad_map(s), b_tensor, anno, transL = false, transR = true)
-        Accumulate(grad_map(a), a_grad, anno); ()
+        val a_grad = DotWithTranspose(gradMap(s), b_tensor, anno, transL = false, transR = true)
+        Accumulate(gradMap(a), a_grad, anno); ()
       }) +=: backwardNodes
       (() => {
         val a_tensor = new TENSOR(transform(a))
-        val b_grad = DotWithTranspose(a_tensor, grad_map(s), anno, transL = true, transR = false)
-        Accumulate(grad_map(b), b_grad, anno); ()
+        val b_grad = DotWithTranspose(a_tensor, gradMap(s), anno, transL = true, transR = false)
+        Accumulate(gradMap(b), b_grad, anno); ()
       }) +=: backwardNodes
 
     case Node(s, "tensor_dot_with_transpose", _, _) => throw new Exception("implement me")
 
-    case n => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, grad_map, momentum_map, transform)
+    case n => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
   }
 }
 
