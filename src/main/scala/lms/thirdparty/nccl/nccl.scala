@@ -370,6 +370,8 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
 }
 
 trait CCodeGenNCCLOps extends CCodeGenSizeTOps with CCodeGenLibs {
+  registerHeader("\"nccl_header.h\"")
+  
   override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
     case s: String if s.endsWith("ncclResultT") => "ncclResult_t"
     case s: String if s.endsWith("ncclDataTypeT") => "ncclDataType_t"
