@@ -17,9 +17,6 @@ class NCCLTest extends TutorialFunSuite {
   abstract class DslDriverCNCCL[A: Manifest, B: Manifest] extends DslDriverC[A,B] with NCCLOps with CudaOps with SizeTOps with MPIOps with ArrayOps{ q =>
     override val codegen = new DslGenC with CCodeGenLibs with CCodeGenCudaOps with CCodeGenSizeTOps with CCodeGenMPI with CCodeGenNCCLOps {
       val IR: q.type = q
-
-      registerHeader("\"nccl_header.h\"")
-      // registerHeader("<nccl.h>")
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"
 

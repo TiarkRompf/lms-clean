@@ -7,7 +7,7 @@ import macros.SourceContext
 
 import lms.core._
 import lms.core.stub._
-import lms.thirdparty.{CCodeGenLibs, CCodeGenMPI}
+import lms.thirdparty.{CCodeGenLibs, CCodeGenMPI, CCodeGenNCCLOps}
 import lms.thirdparty.array_computation.{CCodeGenCBLASOps, CCodeGenCudaOps}
 
 import Backend._
@@ -19,11 +19,8 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   abstract class CompilerCDistributedTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeDistributedTensorOps { q =>
 
     override val codegen = new DslGenCPP with CCodeGenLibs with CCodeGenCBLASOps with
-        CCodeGenCudaOps with CCodeGenMPI {
+        CCodeGenCudaOps with CCodeGenNCCLOps with CCodeGenMPI {
       val IR: q.type = q
-
-      // FIXME(feiw) should we move this to `CCodeGenNCCL`?
-      registerHeader("\"nccl_header.h\"")
 
       override def mayInline(n: Node): Boolean = n match {
         case Node(_, s, _, _) if s.startsWith("tensor") => false
