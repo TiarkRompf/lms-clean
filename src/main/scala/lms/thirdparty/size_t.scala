@@ -12,7 +12,7 @@ object SIZE_TTypeLess {
   import BaseTypeLess._
   import PrimitiveTypeLess._
 
-  def sizeOf(m: Manifest[_])(implicit __pos: SourceContext): INT = INT(Adapter.g.reflectUnsafe("sizeof", Backend.Const(m)))
+  def SIZE_OF(m: Manifest[_])(implicit __pos: SourceContext): INT = INT(Adapter.g.reflectUnsafe("sizeof", Backend.Const(m)))
 
   case class SizeT(x: Int) { override def toString() = x.toString }
 
@@ -20,7 +20,7 @@ object SIZE_TTypeLess {
     this.withType(manifest[SizeT])
   }
   def SIZE_T(x: Backend.Exp)(implicit __pos: SourceContext): SIZE_T = (new SIZE_T(x)).withSource(__pos)
-  def SIZE_T(x: NUM)(implicit __pos: SourceContext): SIZE_T = {
+  implicit def SIZE_T(x: NUM)(implicit __pos: SourceContext): SIZE_T = {
     assert (x.t == manifest[Int])
     SIZE_T(Adapter.g.reflectUnsafe("cast", x.x, Backend.Const("SizeT")))
   }
@@ -41,6 +41,7 @@ trait SizeTOps extends Base with PrimitiveOps with CLibs {
   implicit def sizeTVarToOps(x: Var[SizeT])(implicit __pos: SourceContext): SizeTOps = new SizeTOps(readVar(x))(__pos)
   class SizeTOps(x: Rep[SizeT])(implicit __pos: SourceContext) {
     def toInt: Rep[Int] = Wrap[Int](Adapter.g.reflect("cast", Unwrap(x), Backend.Const("Int")))
+    def * (y: Rep[Int]) = Wrap[SizeT](Adapter.g.reflect("*", Unwrap(x), Unwrap(y)))
   }
 
   // void * memset ( void * ptr, int value, size_t num );

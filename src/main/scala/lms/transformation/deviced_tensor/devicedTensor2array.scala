@@ -44,7 +44,7 @@ abstract class DevicedTensorLowering extends Transformer {
         case (GPU(_), CPU(_)) => DEVICE2HOST
         case (GPU(_), GPU(_)) => DEVICE2DEVICE
       }
-      CUDA_MEMCOPY(res, new ARRAY(transform(x)), count, kind, m)
+      CUDA_MEMCPY(res, new ARRAY(transform(x)), count, kind, m)
       res.x
 
     case Node(s, "tensor_add", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::

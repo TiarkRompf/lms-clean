@@ -12,17 +12,44 @@ import lms.macros.SourceContext
 object ArrayTypeLess {
   import BaseTypeLess._
   import PrimitiveTypeLess._
+  import RangeTypeLess._
 
   def ARRAY(size: Int, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
     (new ARRAY(Adapter.g.reflectMutable("NewArray", Backend.Const(size)))).withSrcType(__pos, m.arrayManifest)
 
-  class ARRAY(override val x: Backend.Exp) extends TOP(x) {
+  def ARRAY(x: TOP): ARRAY = new ARRAY(x.x)
+
+  class ARRAY(override val x: Backend.Exp, val useOldMetadata: Boolean = false) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
+    def size: Int = {
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, "NewArray", Backend.Const(s:Int)::_, _)) => s
+        case a => throw new Exception(s"Not an Array node: $a")
+      }
+    }
 
     def apply(i: INT)(implicit __pos: SourceContext): NUM =
       NUM(Adapter.g.reflectRead("array_get", x, i.x)(x), et)
     def update(i: INT, y: NUM)(implicit __pos: SourceContext): UNIT =
       UNIT(Adapter.g.reflectWrite("array_set", x, i.x, y.x)(x))
+
+    def slice(size: INT, end: INT)(implicit __pos: SourceContext): ARRAY =
+      (new ARRAY(Adapter.g.reflect("array_slice", x, size.x, end.x))).withSrcType(__pos, et.arrayManifest)
+
+    def print(implicit __pos: SourceContext) = {
+
+      val format =
+        if (et == manifest[Int]) "%d "
+        else if (et == manifest[Float]) "%f "
+        else throw new Exception(s"type $et not yet handled in format")
+
+      for (i <- RANGE_UNTIL(0, size)) {
+        PRINTF(format, apply(i))
+      }
+
+      PRINTF("\n"); ()
+    }
   }
 }
 

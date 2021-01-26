@@ -125,7 +125,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
   // ncclResult_t ncclCommInitRank(ncclComm_t* comm, int nranks, ncclUniqueId commId, int rank)
   def ncclCommInitRank(comm: Rep[ncclCommT], nranks: Rep[Int], commId: Rep[ncclUniqueId], rank: Rep[Int]) =
     libFunction[ncclResultT]("ncclCommInitRank", Unwrap(comm), Unwrap(nranks), Unwrap(commId),
-      Unwrap(rank))(Seq(0,2), Seq(0), Set(0))
+      Unwrap(rank))(Seq(0, 2), Seq(0), Set(0))
 
   // ncclResult_t ncclCommInitAll(ncclComm_t* comms, int ndev, const int* devlist)
   def ncclCommInitAll(comm: Rep[ncclCommT], ndev: Rep[Int], devlist: Rep[Array[Int]]) =

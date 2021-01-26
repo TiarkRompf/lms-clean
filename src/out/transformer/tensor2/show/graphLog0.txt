@@ -1,7 +1,0 @@
-=================
-x2 = (Array 1 2 3 4 5 6 7 8)  [STORE : _ | x0]
-x3 = (tensor List(2, 2, 2) x2)  [x2 : _ | x2]
-x4 = (printf %d  List(2, 2, 2))  [CTRL*: _ | x0]
-x5 = (show_tensor x3)  [CTRL*: _ | x4]
-Block(List(x1),(),x0,[STORE CTRL*: _ | x5])
-=================

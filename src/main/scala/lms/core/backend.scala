@@ -378,14 +378,16 @@ class GraphBuilder {
         val ((rk, wk), (prk, pwk), _) = getFunctionLatentEffect(out)
         val ((rk2, wk2), (prk2, pwk2), _) = getFunctionLatentEffect(out2)
         ((rk ++ rk2, wk ++ wk2), (prk ++ prk2, pwk ++ pwk2), None) // FIXME(feiw)
-      case Some(e) =>
-        ??? // FIXME what about @, ?, array_apply => conservative write on all args?
-      // Cleary the current solution is not complete and needs to be extended for more constructs or re-do in a different manner:
-      // Effects: 1. overlay types on variables
-      //          2. be conservative (with stop-the-world)
-      // Aliasing: 1. track precisesly
-      //           2. (like rust) cannot alias mutable variables (onwership tracking)
-      // Regions: (chat with Yuyan)
+      case Some(Node(_, "module", (b:Block)::_, _)) =>
+        getEffKeysWithParam(b)
+      case Some(e) => throw new Exception(s"not yet handling node $e in getFunctionLatentEffect")
+        // FIXME what about @, ?, array_apply => conservative write on all args?
+        // Cleary the current solution is not complete and needs to be extended for more constructs or re-do in a different manner:
+        // Effects: 1. overlay types on variables
+        //          2. be conservative (with stop-the-world)
+        // Aliasing: 1. track precisesly
+        //           2. (like rust) cannot alias mutable variables (onwership tracking)
+        // Regions: (chat with Yuyan)
   }
 
   // getApplyLatentEffect(f: Sym, args: Def*) is for getting latent effects for function application:

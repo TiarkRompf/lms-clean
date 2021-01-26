@@ -473,10 +473,10 @@ class CompactTraverser extends Traverser {
 
 
 abstract class Transformer extends Traverser {
+  val name: String = "Transformer"
 
   var g: GraphBuilder = null
 
-  // FIXME(feiw) maybe we should fix typeMap when we add to subst?cd
   val subst = new mutable.HashMap[Sym,Exp]
 
   def transform(s: Exp): Exp = s match {
@@ -541,6 +541,8 @@ abstract class Transformer extends Traverser {
       Adapter.sourceMap.getOrElseUpdate(subst(n.n), Adapter.oldSourceMap(n.n))
   }
 
+  def wrapGraph(graph: Graph): Unit = super.apply(graph)
+
   def transform(graph: Graph): Graph = {
     // XXX unfortunate code duplication, either
     // with traverser or with transform(Block)
@@ -558,7 +560,7 @@ abstract class Transformer extends Traverser {
       assert(graph.block.in.length == 1)
       subst(graph.block.in(0)) = e
       // subst(graph.block.ein) = g.curBlock.head // XXX
-      super.apply(graph)
+      wrapGraph(graph)
       transform(graph.block.res)
     }
 
@@ -572,6 +574,20 @@ abstract class Transformer extends Traverser {
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
   }
 
+}
+
+abstract class Canonicalize extends Transformer {
+  override val name = "Canonicalize"
+  override def transform(graph: Graph): Graph = {
+    assert (g == null)
+    g = new GraphBuilderOpt()
+    Adapter.g = g
+    try {
+      super.transform(graph)
+    } finally {
+      g = null; Adapter.g = null
+    }
+  }
 }
 
 abstract class CPSTransformer extends Transformer {

@@ -60,19 +60,20 @@ trait TutorialFunSuite extends LibSuite {
       assert(expected == code, name)
     }
   }
-  def logGraphs(label: String, graphs: List[String]) = {
-    val fileprefix = prefix+under+label
-    val directory = new File(fileprefix + "/");
+  def log_path(label: String, suffix: String = "scala") = {
+    val fileprefix = prefix+under+label + "/"
+    val directory = new File(fileprefix);
     if (!directory.exists()) {
       directory.mkdir()
     } else if (directory.isDirectory) {
       directory.listFiles.foreach(_.delete)
     }
-    for ((graph, i) <- graphs.zipWithIndex)
-      writeFile(s"$fileprefix/graphLog$i.txt", graph)
+    fileprefix
   }
-  def checkWithLog(label: String, raw_code: String, graphs: List[String], suffix: String = "scala") = {
-    logGraphs(label, graphs)
+  def logGraph(graph: String, logPath: String, index: Int = -1, passName: String = "") =
+    writeFile(s"$logPath/GraphLog${if (index == -1) "--InitialGraph.txt" else s"-$index-$passName"}", graph)
+  def checkWithLogPath(label: String, raw_code: => String, suffix: String = "scala", setPath: String => Unit) = {
+    setPath(log_path(label, suffix))
     check(label, raw_code, suffix)
   }
   def indent(str: String) = {

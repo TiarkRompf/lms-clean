@@ -24,7 +24,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
   def CUDNN_HANDLE(implicit __pos: SourceContext) = cache match {
     case Some(x) => x
     case None =>
-      val handle = new CUDNN_HANDLE(NEW_STRUCT(manifest[CUDNN_HANDLE]).x)
+      val handle = new CUDNN_HANDLE(NEW_STRUCT(manifest[CUDNN_HANDLE], "cudnnHandle_t").x)
       cache = Some(handle)
       handle
   }

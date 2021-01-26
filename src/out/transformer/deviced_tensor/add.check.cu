@@ -10,6 +10,7 @@ Emitting C Generated Code
 #include <stdbool.h>
 /************* Functions **************/
 __global__ void x6(float* x7, float* x8, float* x9, int x10) {
+  // begin generating kernel function for ADD of type Float
   int x11 = gridDim.x * blockDim.x;
   int x12 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x12 < x10) {
@@ -17,6 +18,7 @@ __global__ void x6(float* x7, float* x8, float* x9, int x10) {
     x9[x13] = x7[x13] + x8[x13];
     x12 = x12 + x11;
   }
+  // end generating kernel function for ADD of type Float
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {

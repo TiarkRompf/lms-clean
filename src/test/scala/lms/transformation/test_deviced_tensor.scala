@@ -22,11 +22,10 @@ class FixedSizeDevicedTensorTest extends TutorialFunSuite {
       val IR: q.type = q
     }
 
-    override def transform(graph: Graph) = {
-      val graph1 = (new TensorResolvingDevice {}).transform(graph)
-      val graph2 = (new DevicedTensorLowering {}).transform(graph1)
-      List(graph, graph1, graph2)
-    }
+    override val passes = List(
+      new TensorResolvingDevice {},
+      new DevicedTensorLowering {}
+    )
   }
 
   test("show") {

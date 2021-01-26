@@ -28,11 +28,14 @@ object CUBLASTypeLess extends Dsl with CLibs {
     def CUBLAS_HANDLE(implicit __pos: SourceContext) = cache match {
       case Some(x) => x
       case None =>
-        val handle = new CUBLAS_HANDLE(NEW_STRUCT(manifest[CUBLAS_HANDLE]).x)
+        val handle = new CUBLAS_HANDLE(NEW_STRUCT(manifest[CUBLAS_HANDLE], "cublasHandle_t").x)
+        CUBLAS_CREATE(handle)
         cache = Some(handle)
         handle
     }
-    // lazy val CUBLAS_HANDLE = new CUBLAS_HANDLE(NEW_STRUCT(manifest[CUBLAS_HANDLE]).x)
+
+    def set_up_cublas(implicit __pos: SourceContext) = { val dummy = CUBLAS_HANDLE }
+    def finalize_cublas(implicit __pos: SourceContext) = { CUBLAS_DESTROY(CUBLAS_HANDLE) }
 
     def CUBLAS_CREATE(handle: CUBLAS_HANDLE)(implicit __pos: SourceContext) =
     CUBLAS_CALL(Unwrap(libFunction[Any]("cublasCreate", handle.x)(Seq[Int](), Seq(0), Set(0))))
@@ -50,9 +53,12 @@ object CUBLASTypeLess extends Dsl with CLibs {
 
     /*
     cublasStatus_t cublasSdot (cublasHandle_t handle, int n,
-                            const float           *x, int incx,
-                            const float           *y, int incy,
-                            float           *result)
+                               const float           *x, int incx,
+                               const float           *y, int incy,
+                               float           *result)
+    This library function computes the dot product of vectors x and y.
+    incx: stride between consecutive elements of x
+    incy: stride between consecutive elements of y
     */
     def CUBLAS_SDOT(handle: CUBLAS_HANDLE, n: INT, x: ARRAY, incx: INT, y: ARRAY, incy: INT, result: ARRAY)(implicit __pos: SourceContext) = {
       assert(x.et == manifest[Float] && y.et == manifest[Float] && result.et == manifest[Float])
@@ -68,6 +74,14 @@ object CUBLASTypeLess extends Dsl with CLibs {
                             const float           *x, int incx,
                             const float           *beta,
                             float           *y, int incy)
+    This library function performs the matrix-vector multiplication
+    y = alpha * (op(A) mat-vec-mul x) + beta * y
+    where A is a m x n matrix stored in column-major format, x and y are vectors,
+    alpha and beta are scalars.
+    op(A) = A   if transa == CUBLAS_OP_N
+            A^T if transa == CUBLAS_OP_T
+            A^H if transa == CUBLAS_OP_H
+    lda: leading dimension of two-dimensional array used to store matrix A
     */
     def CUBLAS_SGEMV(handle: CUBLAS_HANDLE, trans: CUBLAS_OPERATION, m: INT, n: INT, alpha: FLOAT,
                     A: ARRAY, lda: INT, x: ARRAY, incx: INT, beta: FLOAT, y: ARRAY, incy: INT)(implicit __pos: SourceContext) = {
@@ -85,6 +99,18 @@ object CUBLASTypeLess extends Dsl with CLibs {
                             const float           *beta,
                             const float           *B, int ldb,
                             float           *C, int ldc)
+    This library function performs the matrix-matrix addition/transposition
+    C = alpha * op(A) + beta * op(B)
+    where alpha and beta are scalars, and A, B, and C are matrices stored in column-major format with
+    dimention (m x n)
+    op(A) = A   if transa == CUBLAS_OP_N
+            A^T if transa == CUBLAS_OP_T
+            A^H if transa == CUBLAS_OP_C
+    For in-place mode, if C = A, then ldc = lda and transa == CUBLAS_OP_N
+                       if C = B, then ldc = ldb and transb == CUBLAS_OP_N
+    lda: leading dimension of two-dimensional array used to store matrix A
+    ldb: leading dimension of two-dimensional array used to store matrix B
+    ldc: leading dimension of two-dimensional array used to store matrix C
     */
     def CUBLAS_SGEAM(handle: CUBLAS_HANDLE, transa: CUBLAS_OPERATION, transb: CUBLAS_OPERATION,
                     m: INT, n: INT, alpha: FLOAT, A: ARRAY, lda: INT, beta: FLOAT, B: ARRAY, ldb: INT, C: ARRAY, ldc: INT)(implicit __pos: SourceContext) = {
@@ -94,6 +120,7 @@ object CUBLASTypeLess extends Dsl with CLibs {
     }
 
     /*
+    From https://docs.nvidia.com/cuda/cublas/index.html
     cublasStatus_t cublasSgemm(cublasHandle_t handle,
                             cublasOperation_t transa, cublasOperation_t transb,
                             int m, int n, int k,
@@ -102,6 +129,16 @@ object CUBLASTypeLess extends Dsl with CLibs {
                             const float           *B, int ldb,
                             const float           *beta,
                             float           *C, int ldc)
+    This library function performs the matrix-matrix multiplication
+    C = alpha * (op(A) matmul op(B)) + beta * C
+    where alpha and beta are scalars, and A, B, C are matrices stored in column-major format
+    with dimensions op(A): m x k, op(B): k x n, and C: m x n, respectively.
+    op(A) = A   if transa == CUBLAS_OP_N
+            A^T if transa == CUBALS_OP_T
+            A^H if transa == CUBLAS_OP_C
+    lda: leading dimension of two-dimensional array used to store matrix A
+    ldb: leading dimension of two-dimensional array used to store matrix B
+    ldc: leading dimension of two-dimensional array used to store matrix C
     */
     def CUBLAS_SGEMM(handle: CUBLAS_HANDLE, transa: CUBLAS_OPERATION, transb: CUBLAS_OPERATION,
                     m: INT, n: INT, k: INT, alpha: FLOAT, A: ARRAY, lda: INT, B: ARRAY, ldb: INT, beta: FLOAT, C: ARRAY, ldc: INT)(implicit __pos: SourceContext) = {

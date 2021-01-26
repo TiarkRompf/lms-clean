@@ -30,7 +30,7 @@ object RandomDataTypeLess {
     FLOAT(NUM(p) / NUM(q))
   }
 
-  def random_value(m: Manifest[_])(implicit __pos: SourceContext): TOP =
+  def random_value(m: Manifest[_])(implicit __pos: SourceContext): NUM =
     if (m == manifest[Int]) rand_int
     else if (m == manifest[Float]) rand_float
     else throw new Exception(s"manifest $m is not yet handled in random_value function")

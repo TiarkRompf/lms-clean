@@ -125,6 +125,12 @@ object BaseTypeLess {
   }
   def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
 
+  // NOTE(feiw) hope to check the manifest but it is not so easy since manifest do not have to be the same
+  def NOT_EQUAL(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
+    BOOL(Adapter.g.reflect("!=", a.x, b.x))
+  def EQUAL(a: TOP, b: TOP)(implicit pos: SourceContext): BOOL =
+    BOOL(Adapter.g.reflect("==", a.x, b.x))
+
 
   class VAR(override val x: Backend.Exp) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x)
@@ -140,14 +146,31 @@ object BaseTypeLess {
   def VAR(x: TOP)(implicit __pos: SourceContext): VAR =
     (new VAR(Adapter.g.reflectMutable("var_new", x.x))).withSrcType(__pos, x.t)
 
+  def IF(c: BOOL)(a: => TOP)(b: => TOP)(implicit __pos: SourceContext): TOP = {
+    val aBlock = Adapter.g.reifyHere(a.x)
+    val bBlock = Adapter.g.reifyHere(b.x)
+    // compute effect (aBlock || bBlock)
+    val pure = aBlock.isPure && bBlock.isPure
+    val aManifest = Adapter.typeMap(aBlock.res)
+    val bManifest = Adapter.typeMap(bBlock.res)
+    // NOTE(feiw) hope to check the equality of the `aManifest` and `bManifest` but
+    // that might not consider subtypes
+    if (pure)
+      TOP(Adapter.g.reflect("?",c.x,aBlock,bBlock), aManifest)
+    else
+      TOP(Adapter.g.reflectEffectSummaryHere("?",c.x,aBlock,bBlock)(Adapter.g.mergeEffKeys(aBlock, bBlock)), aManifest)
+  }
 
-  def WHILE(c: => BOOL)(b: => Unit): Unit = {
+  def WHILE(c: => BOOL)(b: => Unit)(implicit __pos: SourceContext): UNIT = {
     val cBlock = Adapter.g.reify(c.x)
     val bBlock = Adapter.g.reify({ b; Backend.Const(()) } )
     // compute effect (cBlock bBlock)* cBlock
-    Adapter.g.reflectEffectSummary("W", cBlock,
-      bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock))
+    UNIT(Adapter.g.reflectEffectSummary("W", cBlock,
+      bBlock)(Adapter.g.mergeEffKeys(cBlock, bBlock)))
   }
+
+  def PRINTF(f: String, xs: TOP*)(implicit pos: SourceContext): UNIT =
+    UNIT(Adapter.g.reflectWrite("printf", Backend.Const(f)::xs.map(_.x).toList:_*)(Adapter.CTRL))
 }
 
 /**
@@ -478,6 +501,12 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def generate_comment(l: String): Rep[Unit] = {
     Wrap[Unit](Adapter.g.reflectWrite("generate-comment", Backend.Const(l))(Adapter.CTRL))
   }
+  def withComment[T](s: String)(clo: => T): T = {
+    generate_comment(s"begin $s")
+    val kernel = clo
+    generate_comment(s"end $s")
+    kernel
+  }
   def comment[A:Manifest](l: String, verbose: Boolean = true)(b: => Rep[A]): Rep[A] = {
     val g = Adapter.g
     val bb = g.reify(Unwrap(b))
@@ -633,6 +662,30 @@ trait UtilOps extends Base {
   case class StrSubHashCode(o: Rep[String], len: Rep[Int])(implicit pos: SourceContext) extends Def[Long]
   def infix_HashCode[T:Typ](o: Rep[T])(implicit pos: SourceContext) = ObjHashCode(o)
   def infix_HashCodeS(o: Rep[String], len: Rep[Int])(implicit v: Overloaded1, pos: SourceContext) = StrSubHashCode(o,len)
+}
+
+
+object RangeTypeLess {
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
+
+  class RANGE(override val x: Backend.Exp) extends TOP(x) {
+    this.withType(manifest[Range])
+
+    def foreach(f: INT => UNIT)(implicit __pos: SourceContext) = x match {
+      case Adapter.g.Def("range_until", List(x0: Backend.Exp, x1: Backend.Exp)) =>
+        val i = VAR(INT(x0))
+        WHILE(NOT_EQUAL(INT(i(__pos)), INT(x1))) {
+          f(INT(i(__pos)))
+          i.update(INT(i(__pos)) + 1); ()
+        }
+    }
+  }
+  def RANGE(x: Backend.Exp)(implicit __pos: SourceContext): RANGE = (new RANGE(x)).withSource(__pos)
+
+  def RANGE_UNTIL(start: INT, end: INT)(implicit __pos: SourceContext) =
+    RANGE(Adapter.g.reflect("range_until", start.x, end.x))
+
 }
 
 trait RangeOps extends Equal with OrderingOps {
@@ -1391,19 +1444,19 @@ abstract class CompilerC[A:Manifest, B:Manifest] extends DslDriverC[A, B] { q =>
   val initial_graph = Adapter.genGraph1(manifest[A], manifest[B])(x => Unwrap(wrapper(Wrap[A](x))))
 
   // run some transformation
-  def transform(graph: Graph): List[Graph] = List(graph)
-
-  var all_graphs: List[String] = _
+  val passes: List[Transformer] = List()
+  def transformOnePass(pass: Transformer, index: Int, graph: Graph): Graph = pass.transform(graph)
+  def transform(graph: Graph): Graph =
+    passes.zipWithIndex.foldLeft(graph) {case (graph, (pass, index)) => transformOnePass(pass, index, graph)}
 
   // codegen
   override lazy val (code, statics) = {
     val source = new java.io.ByteArrayOutputStream()
     val statics = time("codegen") {
-      val graphs = transform(initial_graph)
-      all_graphs = graphs.map(_.toString)
+      val final_graph = transform(initial_graph)
       codegen.typeMap = Adapter.typeMap
       codegen.stream = new java.io.PrintStream(source)
-      codegen.emitAll(graphs.last, "Snippet")(manifest[A], manifest[B])
+      codegen.emitAll(final_graph, "Snippet")(manifest[A], manifest[B])
       codegen.extractAllStatics.toList
     }
     (source.toString, statics)

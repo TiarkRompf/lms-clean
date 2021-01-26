@@ -152,8 +152,8 @@ abstract class CompactCodeGen extends CompactTraverser {
     /** `es` for `emit-and-shallow`, which turns an interpolated string
       * such as `es"The quick brown $fox jumps over the lazy $dog"`
       * into `emit("The quick brown "); shallow(fox); emit(" jumps over the lazy "); shallow(dog)`.
-      * Roughly speaking, the intertwined string is decoupled (by the Scala compiler) to a sequence 
-      * of raw strings `sc.parts` and a sequence of non-string arguments `args`, then we alternately 
+      * Roughly speaking, the intertwined string is decoupled (by the Scala compiler) to a sequence
+      * of raw strings `sc.parts` and a sequence of non-string arguments `args`, then we alternately
       * output the head of two sequences.
       * See more doc here: https://docs.scala-lang.org/overviews/core/string-interpolation.html
       */

@@ -27,7 +27,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   // a typeless interface for CUDA_MALLOC
   def CUDA_MALLOC(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
     val addr = ARRAY(0, m)
-    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, SIZE_T(count * sizeOf(m)).x)(Seq(1), Seq(0), Set(0))))
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, SIZE_T(count * SIZE_OF(m)).x)(Seq(1), Seq(0), Set(0))))
     addr
   }
 
@@ -46,8 +46,13 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   def CPYDefault(implicit __pos: SourceContext): CUDA_MEMCPY_KIND = CUDA_MEMCPY_KIND(CMACRO("cudaMemcpyDefault", manifest[Any]))
 
   // ​cudaError_t cudaMemcpy ( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
-  def CUDA_MEMCOPY(dst: ARRAY, src: ARRAY, count: INT, kind: CUDA_MEMCPY_KIND, m: Manifest[_])(implicit __pos: SourceContext) =
-    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, SIZE_T(count * sizeOf(m)).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
+  def CUDA_MEMCPY(dst: ARRAY, src: ARRAY, count: INT, kind: CUDA_MEMCPY_KIND, m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, SIZE_T(count * SIZE_OF(m)).x, kind.x)(Seq(1,2,3), Seq(0), Set[Int]())))
+
+  // cudaSetDevice(int)
+  def CUDA_SET_DEVICE(device: INT) =
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaSetDevice", device.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)))
+
 
   class DIM3(override val x: Backend.Exp) extends TOP(x)
   def DIM3(a: Int, b: Int = 1, c: Int = 1)(implicit __pos: SourceContext): DIM3 =
@@ -60,7 +65,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     (a: TOP, b: TOP, c: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
       Seq(a, b, c).zip(ms).foreach {
-        case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man)
+        case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man, s"${arg.x} ${arg.t} $man")
       }
       UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, dim1.x, dim2.x))
     }
@@ -93,107 +98,142 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   val gridSize = 28
   val blockSize = 512
 
-  def CUDA_FILL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
+  def CUDA_FILL_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
+    // type cast
+    val array = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+    val value = (new NUM(xn(1))).withSrcType(__pos, m)
+    val size  = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+
+    // actual computation
+    val stride = gridDimX * blockDimX
+    val tid = threadIdxX + blockIdxX * blockDimX
+    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+      array(INT(Unwrap(i))) = value; ()
+    }
+    Backend.Const(())
+  }, m.arrayManifest, m, manifest[Int])
+
+
+  def CUDA_ELEMENTWISE_MUTATION_BINARY_KERNEL(m: Manifest[_], op: (NUM, NUM) => NUM, comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
+    withComment(comment) {
       // type cast
-      val array = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
-      val value = (new NUM(xn(1))).withSrcType(__pos, m)
-      val size  = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+      val base = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val other = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val size = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
 
       // actual computation
       val stride = gridDimX * blockDimX
       val tid = threadIdxX + blockIdxX * blockDimX
       for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
-        array(INT(Unwrap(i))) = value; ()
+        val index = INT(Unwrap(i))
+        base(index) = op(base(index), other(index)); ()
       }
       Backend.Const(())
-    }, m.arrayManifest, m, manifest[Int])
+    }
+  }, m.arrayManifest, m.arrayManifest, manifest[Int])
 
+
+  // Element-wise Accumulation (+=)
+  def CUDA_ACCUM_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_ELEMENTWISE_MUTATION_BINARY_KERNEL(m, _ + _, s"generating kernel function for ACCUM of type $m")
+
+
+  // M_I_M means that there are 3 input tensors, and the first and last tensors are mutated
+  // that is why it is named `M_I_M` kernel, for Mutate_Input_Mutate Kernel
+  def CUDA_ELEMENTWISE_M_I_M_KERNEL(m: Manifest[_], op: (NUM, NUM, NUM) => (NUM, NUM), comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
+    withComment(comment) {
+      // type cast
+      val t0 = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val t1 = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val t2 = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+      val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+        val index = INT(Unwrap(i))
+        val (t0_new, t2_new) = op(t0(index), t1(index), t2(index))
+        t0(index) = t0_new
+        t2(index) = t2_new; ()
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+
+  // Simple SGD Nesterov (https://github.com/pytorch/pytorch/blob/master/torch/optim/sgd.py)
+  def CUDA_SGD_Nesterov_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_ELEMENTWISE_M_I_M_KERNEL(m, (w: NUM, g: NUM, v: NUM) => {
+      // default \mu as 0.5 and learning rate to 0.0001 for now
+      val mu = 0.5f
+      val lr = 0.0001f
+      val v_1 = v * FLOAT(mu) + g
+      val w_1 = w - v_1 * FLOAT(lr)
+      (w_1, v_1)
+    }, s"generating kernel function for SGD of type $m")
+
+
+  def CUDA_ELEMENTWISE_BINARY_KERNEL(m: Manifest[_], op: (NUM, NUM) => NUM, comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
+    withComment(comment) {
+      // type cast
+      val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+      val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+        val index = INT(Unwrap(i))
+        res(index) = op(a(index), b(index)); ()
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+
+  // Element-wise Add
+  def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ + _, s"generating kernel function for ADD of type $m")
 
   def CUDA_ARRAY_ADD(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
-    val kernel = CUDA_ARRAY_ADD_KERNEL(a.et)
+    val kernel = CUDA_ADD_KERNEL(a.et)
     kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
   }
-  def CUDA_ARRAY_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
-    // type cast
-    val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
-    val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
-    val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
-    val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
 
-    // actual computation
-    val stride = gridDimX * blockDimX
-    val tid = threadIdxX + blockIdxX * blockDimX
-    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
-      val index = INT(Unwrap(i))
-      res(index) = a(index) + b(index); ()
-    }
-    Backend.Const(())
-  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  // Element-wise Minus
+  def CUDA_MINUS_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ - _, s"generating kernel function for MINUS of type $m")
 
   def CUDA_ARRAY_MINUS(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
-    val kernel = CUDA_ARRAY_MINUS_KERNEL(a.et)
+    val kernel = CUDA_MINUS_KERNEL(a.et)
     kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
   }
-  def CUDA_ARRAY_MINUS_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
-    // type cast
-    val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
-    val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
-    val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
-    val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
 
-    // actual computation
-    val stride = gridDimX * blockDimX
-    val tid = threadIdxX + blockIdxX * blockDimX
-    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
-      val index = INT(Unwrap(i))
-      res(index) = a(index) - b(index); ()
-    }
-    Backend.Const(())
-  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  // Element-wise Mult
+  def CUDA_MULT_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ * _, s"generating kernel function for MULT of type $m")
 
   def CUDA_ARRAY_MULT(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
-    val kernel = CUDA_ARRAY_MULT_KERNEL(a.et)
+    val kernel = CUDA_MULT_KERNEL(a.et)
     kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
   }
-  def CUDA_ARRAY_MULT_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
-    // type cast
-    val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
-    val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
-    val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
-    val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
 
-    // actual computation
-    val stride = gridDimX * blockDimX
-    val tid = threadIdxX + blockIdxX * blockDimX
-    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
-      val index = INT(Unwrap(i))
-      res(index) = a(index) * b(index); ()
-    }
-    Backend.Const(())
-  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  // Element-wise Div
+  def CUDA_DIV_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
+    CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ / _, s"generating kernel function for DIV of type $m")
 
   def CUDA_ARRAY_DIV(a: ARRAY, b: ARRAY, res: ARRAY, size: INT)(implicit __pos: SourceContext) = {
-    val kernel = CUDA_ARRAY_DIV_KERNEL(a.et)
+    val kernel = CUDA_DIV_KERNEL(a.et)
     kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
   }
-  def CUDA_ARRAY_DIV_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL4({xn: List[Backend.Exp] =>
-    // type cast
-    val a = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
-    val b = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
-    val res = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
-    val size = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
-
-    // actual computation
-    val stride = gridDimX * blockDimX
-    val tid = threadIdxX + blockIdxX * blockDimX
-    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
-      val index = INT(Unwrap(i))
-      res(index) = a(index) / b(index); ()
-    }
-    Backend.Const(())
-  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
-
 }
+
 
 trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaFunction {
   /* LMS support for cuda + cublas support */

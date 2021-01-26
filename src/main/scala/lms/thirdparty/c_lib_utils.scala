@@ -21,8 +21,8 @@ object CLibTypeLess {
   }
 
   // FIXME(feiw) this NEW_STRUCT needs explicit cast to return non-TOP
-  def NEW_STRUCT(m: Manifest[_])(implicit __pos: SourceContext): TOP = {
-    TOP(Adapter.g.reflectUnsafe("lib-struct", Backend.Const(m)), m)
+  def NEW_STRUCT(m: Manifest[_], typeName: String)(implicit __pos: SourceContext): TOP = {
+    TOP(Adapter.g.reflectUnsafe("lib-struct", Backend.Const(typeName)), m)
   }
 
   // FIXME(feiw) this LIB_FUNCTION needs explicit cast to return non-TOP
@@ -35,7 +35,7 @@ object CLibTypeLess {
 }
 
 
-trait CMacro { b: Base =>
+trait CMacro extends Base {
   def cmacro[T:Manifest](m:String): Rep[T] = {
     Wrap[T](Adapter.g.reflectUnsafe("macro", lms.core.Backend.Const(m)))
   }
@@ -49,7 +49,7 @@ trait CCodeGenCMacro extends ExtendedCCodeGen {
   }
 }
 
-trait LibStruct { b : Base =>
+trait LibStruct extends Base {
   def newStruct[T: Manifest](typeName: String): Rep[T] = {
     Wrap[T](Adapter.g.reflectUnsafe("lib-struct", Backend.Const(typeName)))
   }
@@ -85,7 +85,7 @@ trait CCodeGenLibStruct extends ExtendedCCodeGen {
   }
 }
 
-trait LibFunction { b: Base =>
+trait LibFunction extends Base {
   def libFunction[T:Manifest](m:String, rhs:lms.core.Backend.Exp*)(rkeys:Seq[Int], wkeys:Seq[Int], pkeys:Set[Int], keys: lms.core.Backend.Exp*): Rep[T] = {
     val readKeys = rkeys.map(rhs(_))
     val writeKeys = wkeys.map(rhs(_)) ++ keys

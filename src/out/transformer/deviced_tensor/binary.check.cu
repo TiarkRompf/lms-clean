@@ -10,6 +10,7 @@ Emitting C Generated Code
 #include <stdbool.h>
 /************* Functions **************/
 __global__ void x6(float* x7, float* x8, float* x9, int x10) {
+  // begin generating kernel function for ADD of type Float
   int x11 = gridDim.x * blockDim.x;
   int x12 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x12 < x10) {
@@ -17,8 +18,10 @@ __global__ void x6(float* x7, float* x8, float* x9, int x10) {
     x9[x13] = x7[x13] + x8[x13];
     x12 = x12 + x11;
   }
+  // end generating kernel function for ADD of type Float
 }
 __global__ void x15(float* x16, float* x17, float* x18, int x19) {
+  // begin generating kernel function for MINUS of type Float
   int x20 = gridDim.x * blockDim.x;
   int x21 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x21 < x19) {
@@ -26,8 +29,10 @@ __global__ void x15(float* x16, float* x17, float* x18, int x19) {
     x18[x22] = x16[x22] - x17[x22];
     x21 = x21 + x20;
   }
+  // end generating kernel function for MINUS of type Float
 }
 __global__ void x24(float* x25, float* x26, float* x27, int x28) {
+  // begin generating kernel function for MULT of type Float
   int x29 = gridDim.x * blockDim.x;
   int x30 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x30 < x28) {
@@ -35,8 +40,10 @@ __global__ void x24(float* x25, float* x26, float* x27, int x28) {
     x27[x31] = x25[x31] * x26[x31];
     x30 = x30 + x29;
   }
+  // end generating kernel function for MULT of type Float
 }
 __global__ void x33(float* x34, float* x35, float* x36, int x37) {
+  // begin generating kernel function for DIV of type Float
   int x38 = gridDim.x * blockDim.x;
   int x39 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x39 < x37) {
@@ -44,6 +51,7 @@ __global__ void x33(float* x34, float* x35, float* x36, int x37) {
     x36[x40] = x34[x40] / x35[x40];
     x39 = x39 + x38;
   }
+  // end generating kernel function for DIV of type Float
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
