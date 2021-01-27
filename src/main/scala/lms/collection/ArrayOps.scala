@@ -19,10 +19,9 @@ object ArrayTypeLess {
 
   def ARRAY(x: TOP): ARRAY = new ARRAY(x.x)
 
-  class ARRAY(override val x: Backend.Exp, val useOldMetadata: Boolean = false) extends TOP(x) {
+  class ARRAY(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
     def size: Int = {
-      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, "NewArray", Backend.Const(s:Int)::_, _)) => s
         case a => throw new Exception(s"Not an Array node: $a")

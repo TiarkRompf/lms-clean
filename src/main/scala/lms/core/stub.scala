@@ -96,15 +96,18 @@ object Adapter extends FrontEnd {
  */
 object BaseTypeLess {
 
-  class TOP(val x: Backend.Exp) {
+  class TOP(val x: Backend.Exp, val useOldMetadata: Boolean = false) {
     def withSource(pos: SourceContext): this.type = { Adapter.sourceMap(x) = pos; this }
     def withType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     def withSrcType(pos: SourceContext, m: Manifest[_]): this.type = withSource(pos).withType(m)
 
-    def p: SourceContext = Adapter.sourceMap(x)
-    def t: Manifest[_] = Adapter.typeMap(x)
-    def equals(that: this.type) = x == that.x
+    // FIXME(feiw): Q1: should these code be put here
+    // FIXME(feiw): Q2: should these code be `val` instead of `def`
+    def p: SourceContext = if (useOldMetadata) Adapter.oldSourceMap(x) else Adapter.sourceMap(x)
+    def t: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
+    def gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
 
+    def equals(that: this.type) = x == that.x
     def castTo(mY: Manifest[_])(implicit pos: SourceContext) = TOP(Adapter.g.reflect("cast", x, Backend.Const(mY)), mY)
   }
 
