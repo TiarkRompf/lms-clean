@@ -125,9 +125,9 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   }
 
   // FIXME(feiw) the return type fo MODULE is strange
-  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): () => UNIT = {
+  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): Int => UNIT = {
     val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f.x))(Adapter.CTRL)
-    () => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(()))(Adapter.CTRL))
+    (iter: Int) => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
   }
 
   def mergable_dims(node: Node): List[(Dim, Dim)] = node match {
