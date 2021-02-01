@@ -26,16 +26,16 @@ object Reflect {
 }
 
 abstract class Type[T] {
-  def reify(x: Exp, tm: TypeMap): TypeMap.TypeExp
+  def reify(x: Exp, tm: TypeMap): TypeExp
 }
 
 abstract class SimpleType[T] extends Type[T] {
-  def reify(x: Exp, tm: TypeMap): TypeMap.TypeExp = reify(tm)
-  def reify(tm: TypeMap): TypeMap.TypeExp
+  def reify(x: Exp, tm: TypeMap): TypeExp = reify(tm)
+  def reify(tm: TypeMap): TypeExp
 }
 
 object TypeExp {
-  def of[T](x: Exp)(implicit t: Type[T], typeMap: TypeMap): TypeMap.TypeExp = t.reify(x, typeMap)
+  def of[T](x: Exp)(implicit t: Type[T], typeMap: TypeMap): TypeExp = t.reify(x, typeMap)
 }
 
 object TypeNames {
