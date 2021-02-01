@@ -11,7 +11,7 @@ import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 
 import Backend._
 
-trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorBaseTypeLess {
+trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
 
   def Transpose(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
     assert(tensor.shape_size.size == 2, "input of transpose must be 2D")
@@ -19,8 +19,14 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), tensor.x)(tensor.x))).withSrcType(__pos, tensor.et)
   }
 
+  def Negate(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
+    val res_tt = tensor.tensor_type
+    (new TENSOR(Adapter.g.reflectRead("tensor_negate", C(res_tt), C(anno), tensor.x)(tensor.x)).withSrcType(__pos, tensor.et))
+  }
+
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_transpose", _, _) => List()
+    case Node(s, "tensor_negate", _, _) => List()
     case _ => super.mergable_dims(node)
   }
 
@@ -31,6 +37,13 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
       transform: Backend.Exp => Backend.Exp) = node match {
 
     case Node(s, "tensor_transpose", _, _) => ???
+
+    case Node(s, "tensor_negate", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+        forwardNodes += node
+
+        (() => {
+          Accumulate(gradMap(a), gradMap(s), anno); ()
+        }) +=: backwardNodes
 
     case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
   }
@@ -45,6 +58,11 @@ trait FixedSizeDistributedTensorOpsUnary extends FixedSizeDistributedTensorOpsBa
 
     def trans(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Transpose(self, anno)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def neg(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = Negate(self, anno)
       Wrap[Tensor[T]](t.x)
     }
   }

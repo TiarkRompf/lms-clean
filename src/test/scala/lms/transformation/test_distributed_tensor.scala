@@ -114,6 +114,27 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("dot", driver.code, "cu", driver.setLogPath)
   }
 
+  test("negate") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
+        val inputTensorType = tensor_type[Float](Seq(32, 32))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
+        val model = module {
+          val tensor_input = Tensor.input[Float](inputTensorType)
+          tensor_input neg (batchSplitAnno)
+        }
+        model()
+        printf("compile")
+      }
+    }
+    checkWithLogPath("negate", driver.code, "cu", driver.setLogPath)
+  }
+
   // test("show") {
   //   val driver = new CompilerCDistributedTensor[Int, Unit] {
   //     import FixedSizeDistributedTensorTypeLess._

@@ -194,6 +194,27 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
 
 
+  // Element-wise Unary Operation
+  def CUDA_UNARY_KERNEL(m: Manifest[_], op: (NUM) => NUM, comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
+    withComment(comment) {
+      // type cast
+      val in = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val out = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val size = (new INT(xn(3))).withSrcType(__pos, manifest[INT])
+
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+        val index = INT(Unwrap(i))
+        out(index) = op(in(index)); ()
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  def CUDA_NEGATE_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, -1 * _, s"generating kernel function for ADD of type $m")
+
   // Element-wise Add
   def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
     CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ + _, s"generating kernel function for ADD of type $m")
