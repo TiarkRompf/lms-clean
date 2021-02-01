@@ -1,6 +1,6 @@
 package lms.core
 
-import lms.core.Backend.{Const, Exp, Sym}
+import lms.core.Backend.{Const, Exp, Node, Sym}
 import lms.core.TypeMap.TypeExp
 
 import scala.collection.mutable
@@ -28,58 +28,32 @@ object TypeExp {
 }
 
 object TypeNames extends Enumeration {
-  // TODO maybe Int?
   val Unit, Boolean, Char, Short, Int, Float, Double = Value
 }
 
-object TypeConstants {
-  val Unit:     TypeExp = Const(TypeNames.Unit)
-  val Boolean:  TypeExp = Const(TypeNames.Boolean)
-  val Char:     TypeExp = Const(TypeNames.Char)
-  val Short:    TypeExp = Const(TypeNames.Short)
-  val Int:      TypeExp = Const(TypeNames.Int)
-  val Float:    TypeExp = Const(TypeNames.Float)
-  val Double:   TypeExp = Const(TypeNames.Double)
-}
+// Primitive types corresponding to Scala ones
+object Types {
 
-object ArrayType {
-  val name = "Array"
-  def apply(et: TypeExp)(implicit tm: TypeMap): TypeExp = tm.g.reflect(ArrayType.name, et)
-  def unapply(x: Any)(implicit tm: TypeMap): Option[TypeExp] = x match {
-    case Reflect(ArrayType.name, t :: Nil) => Some(t)
-  }
-}
-
-object ImplicitScalaTypes {
-  import TypeConstants._
-  implicit val TUnit:     SimpleType[Unit]    = _ => Unit
-  implicit val TBoolean:  SimpleType[Boolean] = _ => Boolean
-  implicit val TChar:     SimpleType[Char]    = _ => Char
-  implicit val TShort:    SimpleType[Short]   = _ => Short
-  implicit val TInt:      SimpleType[Int]     = _ => Int
-  implicit val TFloat:    SimpleType[Float]   = _ => Float
-  implicit val TDouble:   SimpleType[Double]  = _ => Double
-
-  implicit def mkTArray[T](implicit te: SimpleType[T]): SimpleType[Array[T]] =
-    (tm: TypeMap) => ArrayType(te.reify(tm))(tm)
-}
+  val Unit: TypeExp = Const(TypeNames.Unit)
+  val Boolean: TypeExp = Const(TypeNames.Boolean)
+  val Char: TypeExp = Const(TypeNames.Char)
+  val Short: TypeExp = Const(TypeNames.Short)
+  val Int: TypeExp = Const(TypeNames.Int)
+  val Float: TypeExp = Const(TypeNames.Float)
+  val Double: TypeExp = Const(TypeNames.Double)
 
 
-case class Tensor[T:Type](shape: Const)
+  object Array {
+    val name = "Array"
 
-object TensorType {
-  val name = "Tensor"
+    def apply(et: TypeExp)(implicit tm: TypeMap): TypeExp = tm.g.reflect(Array.name, et)
 
-  def apply(et: TypeExp, shape: TypeExp)(implicit tm: TypeMap): TypeExp = tm.g.reflect(TensorType.name, et, shape)
-
-  def unapply(x: Any)(implicit tm: TypeMap): Option[TypeExp] = x match {
-    case Reflect(TensorType.name, t :: Nil) => Some(t)
+    def unapply(x: Any)(implicit tm: TypeMap): Option[TypeExp] = x match {
+      case Reflect(Array.name, t :: Nil) => Some(t)
+    }
   }
 
-  implicit def mkTensorType[T:SimpleType]: Type[Tensor[T]] = (_: Exp, tm: TypeMap) =>
-    TensorType(implicitly[SimpleType[T]].reify(tm), Const(10) /* shape */)(tm)
 }
-
 
 case class TypeMap(g: GraphBuilder) extends mutable.HashMap[Exp, TypeExp]
 
@@ -99,27 +73,71 @@ object TypeMap {
 
 }
 
+object ImplicitScalaTypes {
+  import Types._
+  implicit val mkUnitType:     SimpleType[Unit]    = _ => Unit
+  implicit val mkBooleanType:  SimpleType[Boolean] = _ => Boolean
+  implicit val mkCharType:     SimpleType[Char]    = _ => Char
+  implicit val mkShortType:    SimpleType[Short]   = _ => Short
+  implicit val mkIntType:      SimpleType[Int]     = _ => Int
+  implicit val mkFloatType:    SimpleType[Float]   = _ => Float
+  implicit val mkDoubleType:   SimpleType[Double]  = _ => Double
+
+  implicit def mkArrayType[T](implicit te: SimpleType[T]): SimpleType[Array[T]] =
+    (tm: TypeMap) => Array(te.reify(tm))(tm)
+}
+
+
+// Types and IR nodes defined outside of LMS core
+case class Tensor[T:Type](shape: Const)
+
+object TensorType {
+  val name = "Tensor"
+
+  def apply(et: TypeExp, shape: TypeExp)(implicit tm: TypeMap): TypeExp = tm.g.reflect(TensorType.name, et, shape)
+
+  def unapply(x: Any)(implicit tm: TypeMap): Option[(TypeExp, TypeExp)] = x match {
+    case Reflect(TensorType.name, t :: shape :: Nil) => Some((t, shape))
+  }
+
+  implicit def mkTensorType[T:SimpleType]: Type[Tensor[T]] = (t: Exp, tm: TypeMap) => {
+    val deff = tm.g.findDefinition(t)
+    val shape = deff match {
+      case Some(Node(_, "Tensor", rhs, eff)) => Const(rhs.head)
+      case None => throw new Exception()
+    }
+    TensorType(implicitly[SimpleType[T]].reify(tm), shape)(tm)
+  }
+}
+
 object Main {
 
   def main(args: Array[String]): Unit = {
     import ImplicitScalaTypes._
-    import TypeConstants._
+    import TensorType.mkTensorType
+    val ty = Types
     implicit val tm: TypeMap = TypeMap()
 
     def Wrap[A:Type](x: lms.core.Backend.Exp): Unit = tm(x) = TypeExp.of[A](x)
 
-    val s1 = Sym(10)
-    val s2 = Sym(20)
+    val s1 = Sym(1)
+    val s2 = Sym(2)
+    val s3 = tm.g.reflect("Tensor", Const(/* shape = */List(130, 20)))
 
     Wrap[Array[Array[Float]]](s1)
     Wrap[Array[Array[Int]]](s2)
+    Wrap[Tensor[Float]](s3)
 
     tm(s1) match {
-      case ArrayType(ArrayType(t)) => println(s"element type $t")
+      case ty.Array(ty.Array(t)) => println(s"element type $t")
     }
 
     tm(s2) match {
-      case ArrayType(ArrayType(Int)) => println("is Int")
+      case ty.Array(ty.Array(ty.Int)) => println("is Int")
+    }
+
+    tm(s3) match {
+      case TensorType(et, shape) => println(s"Tensor type $et $shape")
     }
 
     println(tm)
