@@ -35,6 +35,96 @@ object CUDNNTypeLess extends Dsl with CLibs {
     assert(result.t == manifest[CUDNN_RESULT], "CUDNN_CHECK must take the CUDNN_RESULT type as input")
     UNIT(LIB_FUNCTION(manifest[Unit], "CUDNNCHECK", result.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))
   }
+
+  class CUDNN_TENSOR_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_FILTER_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+
+  
+  class CUDNN_TENSOR_FORMAT(override val x: Backend.Exp) extends TOP(x)
+  def CUDNN_NCHW(implicit __pos: SourceContext) = CMACRO("CUDNN_TENSOR_NCHW", manifest[Int])
+  def CUDNN_NHWC(implicit __pos: SourceContext) = CMACRO("CUDNN_TENSOR_NHWC", manifest[Int])
+
+  class CUDNN_TENSOR_DATATYPE(override val x: Backend.Exp) extends TOP(x)
+  def CUDNN_FLOAT(implicit __pos: SourceContext) = CMACRO("CUDNN_DATA_FLOAT", manifest[Int])
+
+  class CUDNN_CONV_FWD_ALG_PERF(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_FWD_ALGO(override val x: Backend.Exp) extends TOP(x)
+  /*
+  def cudnnDouble = cmacro[cudnnDataTypeT]("CUDNN_DATA_DOUBLE")  // 64-bit
+  def cudnnHalf = cmacro[cudnnDataTypeT]("CUDNN_DATA_HALF")  // 16-bit
+  def cudnnInt8 = cmacro[cudnnDataTypeT]("CUDNN_DATA_UINT8")
+  def cudnnInt32 = cmacro[cudnnDataTypeT]("CUDNN_DATA_INT32")
+  def cudnnInt8x4 = cmacro[cudnnDataTypeT]("CUDNN_DATA_INT8x4")
+  def cudnnInt8x32 = cmacro[cudnnDataTypeT]("CUDNN_DATA_INT8x32")
+  def cudnnInt8x64 = cmacro[cudnnDataTypeT]("CUDNN_DATA_UINT8x4")*/
+
+  def CUDNN_CONVOLUTION(implicit __pos: SourceContext) = CMACRO("CUDNN_CONVOLUTION", manifest[Int])
+  def CUDNN_CROSS_CORRELATION(implicit __pos: SourceContext) = CMACRO("CUDNN_CROSS_CORRELATION", manifest[Int])
+
+  def CUDNN_CREATE_TENSOR_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateTensorDescriptor", tensorDesc.x)(Seq(), Seq(0), Set[Int](0))
+
+  def CUDNN_CREATE_FILTER_DESCRIPTOR(filterDesc: CUDNN_FILTER_DESCRIPTOR) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateFilterDescriptor", filterDesc.x)(Seq(), Seq(0), Set[Int](0))
+  
+  def CUDNN_CREATE_CONV_DESCRIPTOR(convDesc: CUDNN_CONV_DESCRIPTOR) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateConvolutionDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int](0))
+
+
+
+  def CUDNN_DESTROY_TENSOR_DESCRIPTOR(tensorDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyTensorDescriptor", tensorDesc.x)(Seq(), Seq(0), Set[Int]())
+  
+  def CUDNN_DESTROY_FILTER_DESCRIPTOR(filterDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyFilterDescriptor", filterDesc.x)(Seq(), Seq(0), Set[Int]())
+
+  def CUDNN_DESTROY_CONV_DESCRIPTOR(convDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyConvolutionDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int]())
+   
+
+  
+  def CUDNN_SET_TENSOR_4D_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR, format: TOP, dataType: TOP, n: INT, c: INT, 
+                                     h: INT, w: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetTensor4dDescriptor", tensorDesc.x, format.x, dataType.x,
+      n.x, c.x, h.x, w.x)(Seq(1,2,3,4,5,6), Seq(0), Set[Int]())
+  
+  def CUDNN_SET_FILTER_4D_DESCRIPTOR(filterDesc: CUDNN_FILTER_DESCRIPTOR, format: TOP, dataType: TOP, k: INT, c: INT,
+                                     h: INT, w: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetFilter4dDescriptor", filterDesc.x, format.x, dataType.x,
+      k.x, c.x, h.x, w.x)(Seq(1,2,3,4,5,6), Seq(0), Set[Int]())
+
+  def CUDNN_SET_CONV_2D_DESCRIPTOR(convDesc: CUDNN_CONV_DESCRIPTOR, pad_h: INT, pad_w: INT, u: INT, v: INT, dilation_h: INT, 
+                                   dilation_w: INT, mode: TOP, computeType: TOP) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetConvolution2dDescriptor", convDesc.x, pad_h.x, pad_w.x, u.x, v.x,
+      dilation_h.x, dilation_w.x, mode.x, computeType.x)(Seq(1,2,3,4,5,6,7,8), Seq(0), Set[Int]())
+
+  def CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(convDesc: CUDNN_CONV_DESCRIPTOR, inputTensorDesc: TOP, 
+                                      filterDesc: TOP, n: INT, c: INT, h: INT, w: INT) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolution2dForwardOutputDim", convDesc.x, inputTensorDesc.x, 
+      filterDesc.x, n.x, c.x, h.x, w.x)(Seq(0,1,2), Seq(3,4,5,6), Set[Int](3,4,5,6))
+
+  def CUDNN_FIND_CONV_FWD_ALG(handle: TOP, xDesc: TOP, wDesc: TOP,
+                               convDesc: CUDNN_CONV_DESCRIPTOR, yDesc: CUDNN_TENSOR_DESCRIPTOR, requestedAlgoCount: INT,
+                               returnedAlgoCount: INT, perfResults: TOP) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnFindConvolutionForwardAlgorithm", handle.x, xDesc.x, wDesc.x, convDesc.x,
+      yDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
+
+  def CUDNN_GET_CONV_FWD_WORKSPACE_SZ(handle: TOP, xDesc: TOP, wDesc: TOP,
+                                      convDesc: CUDNN_CONV_DESCRIPTOR, yDesc: CUDNN_TENSOR_DESCRIPTOR, algo: TOP, 
+                                      sizeInBytes: SIZE_T) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionForwardWorkspaceSize", handle.x, xDesc.x, wDesc.x, convDesc.x,
+      yDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
+
+  def CUDNN_CONV_FWD(handle: TOP, alpha: VAR, xDesc: TOP, x: TOP,
+                              wDesc: TOP, w: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
+                              algo: TOP, workspace: TOP, workSpaceSizeInBytes: SIZE_T,
+                              beta: VAR, yDesc: CUDNN_TENSOR_DESCRIPTOR, y: TOP) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionForward", handle.x, alpha.x, xDesc.x, x.x, wDesc.x, w.x, convDesc.x,
+      algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, yDesc.x, y.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(1,5,12),
+      Set[Int](1,10))
+
+
 }
 
 
