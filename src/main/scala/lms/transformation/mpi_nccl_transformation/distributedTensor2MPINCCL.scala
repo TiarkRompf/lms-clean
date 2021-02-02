@@ -27,6 +27,9 @@ class DistributeTensor2MPI_NCCLAnalysis extends Traverser {
         case Node(s, op, _, _) if op.startsWith("tensor_dot") =>
             hasCublas = true
             super.traverse(n)
+        case Node(s, op, _, _) if op.startsWith("cudnn") =>
+            hasCudnn = true
+            super.traverse(n)
         case _ => super.traverse(n)
     }
 }
