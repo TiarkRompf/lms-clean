@@ -90,7 +90,7 @@ void Snippet(int x0) {
   x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x18, 0, 1024);
   // end initializing fixed GPU array of size 1024 and type Float and device (pre-rename) x39
   int x19 = 0;
-  while (x19 != 5) {
+  while (x19 != 10) {
     // begin initializing random GPU array of size 512 and type Float at device (pre-rename) x39
     float* x36 = (float*)malloc(512 * sizeof(float));
     int x37 = 0;
@@ -138,7 +138,7 @@ void Snippet(int x0) {
     printf("\n");
     // end copying GPU array x68 to CPU and print for size 1024 and type Float
   }
-  printf("compile");
+  printf("compile\n");
   CUBLAS_CALL(cublasDestroy(x7));
   MPICHECK(MPI_Finalize());
   NCCLCHECK(ncclCommDestroy(x4));
