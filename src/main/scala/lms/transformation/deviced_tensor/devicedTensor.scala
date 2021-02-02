@@ -69,7 +69,7 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
    *    2. We always use the `safe` constructor (def TENSOR(..)) in non-transformer cases. It sets `old` to false.
    *    3. We add another `safe` constructor (def tensor(a: Rep[Tensor[T]])) in typed constructor that always sets `old` to false.
    */
-  class TENSOR(override val x: Backend.Exp, val useOldMetadata: Boolean = false) extends TOP(x) {
+  class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
@@ -80,7 +80,6 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
 
     // Convention: every `tensor_*` IR has `shape` as the first Def and the `device` as the second Def
     def shape: Seq[Int] = {
-      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) if s.startsWith("tensor") => size
         case a => System.out.println(a); ???
@@ -88,7 +87,6 @@ object FixedSizeTensorDeviceTypeLess extends Devices {
     }
 
     def device: Device = {
-      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, a::Backend.Const(d:Device)::_, _)) if s.startsWith("tensor") => d
         case a => System.out.println(a); ???

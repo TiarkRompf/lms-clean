@@ -87,7 +87,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(tt), C(anno)))).withSrcType(__pos, tt.et)
   }
 
-  class TENSOR(override val x: Backend.Exp, val useOldMetadata: Boolean = false) extends TOP(x) {
+  class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
@@ -97,7 +97,6 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
     def tensor_type: TensorType = {
-      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(tt:TensorType)::_, _)) if s.startsWith("tensor") => tt
         case a => throw new Exception(s"cannot find node $a")
@@ -105,7 +104,6 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
 
     def annotation: Anno = {
-      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, tt::Backend.Const(a:Anno)::_, _)) if s.startsWith("tensor") => a
         case a => throw new Exception(s"cannot find node $a")
@@ -125,9 +123,9 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   }
 
   // FIXME(feiw) the return type fo MODULE is strange
-  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): () => UNIT = {
+  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): Int => UNIT = {
     val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f.x))(Adapter.CTRL)
-    () => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(()))(Adapter.CTRL))
+    (iter: Int) => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
   }
 
   def mergable_dims(node: Node): List[(Dim, Dim)] = node match {

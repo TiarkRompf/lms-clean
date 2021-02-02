@@ -85,8 +85,8 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val tensor_weight = Tensor.weight[Float](Seq(32, 32))
           tensor_input * (tensor_weight, batchSplitAnno)
         }
-        model()
-        printf("compile")
+        model(10)
+        printf("compile\n")
       }
     }
     checkWithLogPath("Annotation", driver.code, "cu", driver.setLogPath)
@@ -107,8 +107,8 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val tensor_weight = Tensor.weight[Float](Seq(32, 32))
           tensor_input gemm (tensor_weight, batchSplitAnno)
         }
-        model()
-        printf("compile")
+        model(10)
+        printf("compile\n")
       }
     }
     checkWithLogPath("dot", driver.code, "cu", driver.setLogPath)

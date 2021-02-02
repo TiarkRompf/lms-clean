@@ -42,7 +42,7 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
   def TENSOR(shape: Seq[Int], array: ARRAY)(implicit __pos: SourceContext): TENSOR =
     (new TENSOR(Adapter.g.reflectRead("tensor", C(shape), array.x)(array.x))).withSrcType(__pos, array.et)
 
-  class TENSOR(override val x: Backend.Exp, val useOldMetadata: Boolean = false) extends TOP(x) {
+  class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
@@ -50,7 +50,6 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
     def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
     def shape: Seq[Int] = {
-      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) if s.startsWith("tensor") => size
         case a => System.out.println(a); ???

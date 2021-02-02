@@ -29,7 +29,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
   val gradMap = mutable.HashMap[Backend.Sym, TENSOR]()
   val momentumMap = mutable.HashMap[Backend.Sym, TENSOR]()
 
-  def traverseModule(ns: Seq[Node], res: Block): Backend.Exp = {
+  def traverseModule(iter: Int)(ns: Seq[Node], res: Block): Backend.Exp = {
     // Step 1: Collection Phase
     ns.foreach { n => aircopCollect(n, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform) }
     // result of the block
@@ -46,8 +46,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
 
     // Step 2: Generation Phase
     traverseWeights(weightNodes) {
-      // FIXME(feiw) use 5 training iteration for now
-      for (i <- (0 until 5): Rep[Range]) {
+      for (i <- (0 until iter): Rep[Range]) {
         traverseForward(forwardNodes) {
           traverseBackward(backwardNodes, forwardSyms) {
             traverseOptimization(weightSyms) { () => () }
@@ -97,19 +96,19 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     cont
   }
 
-  def transformModuleBlock(b: Block): Block = b match {
-    case b @ Block(Nil, res, block, eff) => g.reify {
-      scheduleBlock(b)(traverseModule)
-    }
-  }
+  // def transformModuleBlock(b: Block): Block = b match {
+  //   case b @ Block(Nil, res, block, eff) => g.reify {
+  //     scheduleBlock(b)(traverseModule)
+  //   }
+  // }
 
   override def transform(n: Node): Backend.Exp = n match {
 
-    case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => scheduleBlock(b)(traverseModule)
+    case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => Backend.Const(())
 
-    case Node(s, "@", List(a: Backend.Sym, Backend.Const(())), _) =>
+    case Node(s, "@", List(a: Backend.Sym, Backend.Const(iter: Int)), _) =>
       Adapter.oldDefsCache(a) match {
-        case Node(s, "module", _, _) => Backend.Const(())
+        case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => scheduleBlock(b)(traverseModule(iter))
         case _ => super.transform(n)
       }
 
