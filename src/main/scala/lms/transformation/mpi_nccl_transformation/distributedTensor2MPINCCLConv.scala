@@ -69,7 +69,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
 
   override def transform(n: Node): Backend.Exp = n match {
     // NHWC as default layout
-    case Node(s, "cudnn_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
+    case Node(s, "tensor_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
       Backend.Const(padding:Seq[Int])::Backend.Const(strides:Seq[Int])::Backend.Const(dilation:Seq[Int])::
       Backend.Const(alpha:Float)::Backend.Const(beta:Float)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
