@@ -65,10 +65,10 @@ object CUDNNTypeLess extends Dsl with CLibs {
   def CUDNN_CREATE_TENSOR_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR)(implicit __pos: SourceContext) = 
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateTensorDescriptor", tensorDesc.x)(Seq(), Seq(0), Set[Int](0))
 
-  def CUDNN_CREATE_FILTER_DESCRIPTOR(filterDesc: CUDNN_FILTER_DESCRIPTOR) =
+  def CUDNN_CREATE_FILTER_DESCRIPTOR(filterDesc: CUDNN_FILTER_DESCRIPTOR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateFilterDescriptor", filterDesc.x)(Seq(), Seq(0), Set[Int](0))
   
-  def CUDNN_CREATE_CONV_DESCRIPTOR(convDesc: CUDNN_CONV_DESCRIPTOR) =
+  def CUDNN_CREATE_CONV_DESCRIPTOR(convDesc: CUDNN_CONV_DESCRIPTOR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateConvolutionDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int](0))
 
 
@@ -95,36 +95,34 @@ object CUDNNTypeLess extends Dsl with CLibs {
       k.x, c.x, h.x, w.x)(Seq(1,2,3,4,5,6), Seq(0), Set[Int]())
 
   def CUDNN_SET_CONV_2D_DESCRIPTOR(convDesc: CUDNN_CONV_DESCRIPTOR, pad_h: INT, pad_w: INT, u: INT, v: INT, dilation_h: INT, 
-                                   dilation_w: INT, mode: TOP, computeType: TOP) =
+                                   dilation_w: INT, mode: TOP, computeType: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetConvolution2dDescriptor", convDesc.x, pad_h.x, pad_w.x, u.x, v.x,
       dilation_h.x, dilation_w.x, mode.x, computeType.x)(Seq(1,2,3,4,5,6,7,8), Seq(0), Set[Int]())
 
   def CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(convDesc: CUDNN_CONV_DESCRIPTOR, inputTensorDesc: TOP, 
-                                      filterDesc: TOP, n: INT, c: INT, h: INT, w: INT) =
+                                      filterDesc: TOP, n: INT, c: INT, h: INT, w: INT)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolution2dForwardOutputDim", convDesc.x, inputTensorDesc.x, 
       filterDesc.x, n.x, c.x, h.x, w.x)(Seq(0,1,2), Seq(3,4,5,6), Set[Int](3,4,5,6))
 
   def CUDNN_FIND_CONV_FWD_ALG(handle: TOP, xDesc: TOP, wDesc: TOP,
                                convDesc: CUDNN_CONV_DESCRIPTOR, yDesc: CUDNN_TENSOR_DESCRIPTOR, requestedAlgoCount: INT,
-                               returnedAlgoCount: INT, perfResults: TOP) =
+                               returnedAlgoCount: INT, perfResults: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnFindConvolutionForwardAlgorithm", handle.x, xDesc.x, wDesc.x, convDesc.x,
       yDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
 
   def CUDNN_GET_CONV_FWD_WORKSPACE_SZ(handle: TOP, xDesc: TOP, wDesc: TOP,
                                       convDesc: CUDNN_CONV_DESCRIPTOR, yDesc: CUDNN_TENSOR_DESCRIPTOR, algo: TOP, 
-                                      sizeInBytes: SIZE_T) =
+                                      sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionForwardWorkspaceSize", handle.x, xDesc.x, wDesc.x, convDesc.x,
       yDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
 
   def CUDNN_CONV_FWD(handle: TOP, alpha: VAR, xDesc: TOP, x: TOP,
                               wDesc: TOP, w: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
                               algo: TOP, workspace: TOP, workSpaceSizeInBytes: SIZE_T,
-                              beta: VAR, yDesc: CUDNN_TENSOR_DESCRIPTOR, y: TOP) =
+                              beta: VAR, yDesc: CUDNN_TENSOR_DESCRIPTOR, y: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionForward", handle.x, alpha.x, xDesc.x, x.x, wDesc.x, w.x, convDesc.x,
       algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, yDesc.x, y.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(1,5,12),
       Set[Int](1,10))
-
-
 }
 
 
