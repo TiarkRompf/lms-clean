@@ -36,9 +36,9 @@ object CUDNNTypeLess extends Dsl with CLibs {
     UNIT(LIB_FUNCTION(manifest[Unit], "CUDNNCHECK", result.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))
   }
 
-  class CUDNN_TENSOR_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
-  class CUDNN_FILTER_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
-  class CUDNN_CONV_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_TENSOR_DESCRIPTOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x)
+  class CUDNN_FILTER_DESCRIPTOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x)
+  class CUDNN_CONV_DESCRIPTOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x)
 
   
   // class CUDNN_TENSOR_FORMAT(override val x: Backend.Exp) extends TOP(x)
