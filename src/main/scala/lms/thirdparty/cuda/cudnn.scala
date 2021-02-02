@@ -41,12 +41,12 @@ object CUDNNTypeLess extends Dsl with CLibs {
   class CUDNN_CONV_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
 
   
-  class CUDNN_TENSOR_FORMAT(override val x: Backend.Exp) extends TOP(x)
-  def CUDNN_NCHW(implicit __pos: SourceContext) = CMACRO("CUDNN_TENSOR_NCHW", manifest[Int])
-  def CUDNN_NHWC(implicit __pos: SourceContext) = CMACRO("CUDNN_TENSOR_NHWC", manifest[Int])
+  // class CUDNN_TENSOR_FORMAT(override val x: Backend.Exp) extends TOP(x)
+  def CUDNN_NCHW(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_TENSOR_NCHW", manifest[Int]))
+  def CUDNN_NHWC(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_TENSOR_NHWC", manifest[Int]))
 
-  class CUDNN_TENSOR_DATATYPE(override val x: Backend.Exp) extends TOP(x)
-  def CUDNN_FLOAT(implicit __pos: SourceContext) = CMACRO("CUDNN_DATA_FLOAT", manifest[Int])
+  // class CUDNN_TENSOR_DATATYPE(override val x: Backend.Exp) extends TOP(x)
+  def CUDNN_FLOAT(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_DATA_FLOAT", manifest[Int]))
 
   class CUDNN_CONV_FWD_ALG_PERF(override val x: Backend.Exp) extends TOP(x)
   class CUDNN_CONV_FWD_ALGO(override val x: Backend.Exp) extends TOP(x)
