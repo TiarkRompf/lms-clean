@@ -72,6 +72,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
     case Node(s, "cudnn_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
       Backend.Const(padding:Seq[Int])::Backend.Const(strides:Seq[Int])::Backend.Const(dilation:Seq[Int])::
       Backend.Const(alpha:Float)::Backend.Const(beta:Float)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
       // these are default settings
       // TODO: perhaps move to base?
       val tensor_dim = 4                // input tensor and input kernel should both be 4d
@@ -155,7 +156,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       // find convolution algorithm
       var res_count = 0
       val res = new CUDNN_CONV_FWD_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_FWD_ALG_PERF], "cudnnConvolutionFwdAlgoPerf_t").x)
-      CUDNN_FIND_CONV_FWD_ALG(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor, INT(1), res_count, res)
+      CUDNN_FIND_CONV_FWD_ALG(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor, INT(1), INT(res_count), res)
       // val conv_algo = READ_FIELD(manifest[CUDNN_CONV_FWD_ALG_PERF], manifest[CUDNN_CONV_FWD_ALGO], res.x, "algo")
       val convAlgoRep = readField[Manifest[CUDNN_CONV_FWD_ALG_PERF], Manifest[CUDNN_CONV_FWD_ALGO]](Wrap[Manifest[CUDNN_CONV_FWD_ALG_PERF]](res.x), "algo")
       val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_FWD_ALGO])
@@ -168,8 +169,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
       // convolution
-      CUDNN_CONV_FWD(myCUDNNComm, VAR(alpha), input_descriptor, leftTensor, filter_descriptor, rightTensor, conv_descriptor, convAlgo, d_workspace, 
-        SIZE_T(workspace_bytes), VAR(beta), output_descriptor, sourceTensor)
+      CUDNN_CONV_FWD(myCUDNNComm, VAR(INT(alpha)), input_descriptor, leftTensor, filter_descriptor, rightTensor, conv_descriptor, convAlgo, d_workspace, 
+        SIZE_T(workspace_bytes), VAR(INT(beta)), output_descriptor, sourceTensor)
 
       // return convolution output
       output.x
