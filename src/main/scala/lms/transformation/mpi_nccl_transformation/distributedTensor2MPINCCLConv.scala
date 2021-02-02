@@ -40,7 +40,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
   // clean_up
   // forall tensor in hashmap, destroy tensor according to its kind
   
-  def get_descriptor(t: Backend.Sym, kind: String): TOP = cudnnTensor2Desc.get(t) match {
+  def get_descriptor(t: Backend.Sym, kind: String)(implicit __pos: SourceContext): TOP = cudnnTensor2Desc.get(t) match {
     case Some((desc, _)) => desc
     case None => 
       val shape = tensor_shape(t, useOldMetadata = true)
@@ -53,13 +53,13 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
         case "tensor" =>
           val desc = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_TENSOR_DESCRIPTOR], "cudnnTensorDescriptor_t").x)
           CUDNN_CREATE_TENSOR_DESCRIPTOR(desc)
-          CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_NHWC, CUDNN_FLOAT, n, c, h, w)
+          CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_NHWC, CUDNN_FLOAT, INT(n), INT(c), INT(h), INT(w))
           cudnnTensor2Desc += ((t, (desc, kind)))
           desc
         case "filter" =>
           val desc = new CUDNN_FILTER_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_FILTER_DESCRIPTOR], "cudnnFilterDescriptor_t").x)
           CUDNN_CREATE_FILTER_DESCRIPTOR(desc)
-          CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_NHWC, CUDNN_FLOAT, n, c, h, w)
+          CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_NHWC, CUDNN_FLOAT, INT(n), INT(c), INT(h), INT(w))
           cudnnTensor2Desc += ((t, (desc, kind)))
           desc
         case _ => throw new Exception("Unknown kind of cudnn tensor descriptor")
@@ -130,7 +130,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       // create convolution descriptor
       val conv_descriptor = new CUDNN_CONV_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_CONV_DESCRIPTOR], "cudnnConvolutionDescriptor_t").x)
       CUDNN_CREATE_CONV_DESCRIPTOR(conv_descriptor)
-      CUDNN_SET_CONV_2D_DESCRIPTOR(conv_descriptor, padding(0), padding(1), strides(0), strides(1), dilation(0), dilation(1),
+      CUDNN_SET_CONV_2D_DESCRIPTOR(conv_descriptor, INT(padding(0)), INT(padding(1)), INT(strides(0)), INT(strides(1)), INT(dilation(0)), INT(dilation(1)),
         mode, datatype)
 
       // find output tensor shape
@@ -139,13 +139,13 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       var output_width = 0
       var output_channels = 0
       CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(conv_descriptor, input_descriptor, filter_descriptor, 
-        output_batchsize, output_channels, output_height, output_width)
+        INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
 
       // create output descriptor
       val output_descriptor = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_CONV_DESCRIPTOR], "cudnnConvolutionDescriptor_t").x)
       CUDNN_CREATE_TENSOR_DESCRIPTOR(output_descriptor)
       CUDNN_SET_TENSOR_4D_DESCRIPTOR(output_descriptor, layout, datatype, 
-        output_batchsize, output_channels, output_height, output_width)
+        INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
       // val output_descriptor = get_descriptor(s, "tensor")  // TODO: use get_descriptor for output_descriptor
 
       // allocate output tensor
@@ -155,7 +155,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       // find convolution algorithm
       var res_count = 0
       val res = new CUDNN_CONV_FWD_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_FWD_ALG_PERF], "cudnnConvolutionFwdAlgoPerf_t").x)
-      CUDNN_FIND_CONV_FWD_ALG(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor, 1, res_count, res)
+      CUDNN_FIND_CONV_FWD_ALG(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor, INT(1), res_count, res)
       // val conv_algo = READ_FIELD(manifest[CUDNN_CONV_FWD_ALG_PERF], manifest[CUDNN_CONV_FWD_ALGO], res.x, "algo")
       val convAlgoRep = readField[Manifest[CUDNN_CONV_FWD_ALG_PERF], Manifest[CUDNN_CONV_FWD_ALGO]](Wrap[Manifest[CUDNN_CONV_FWD_ALG_PERF]](res.x), "algo")
       val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_FWD_ALGO])
