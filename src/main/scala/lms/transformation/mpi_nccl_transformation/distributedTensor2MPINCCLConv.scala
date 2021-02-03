@@ -31,8 +31,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
   import CLibTypeLess._
 
 
-  // given a tensor, get its descriptor.
-  // if desc already in hashmap, reuse it; Otherwise, create a new descriptor
+  // given the shape of a weight tensor or filter(kernel) tensor, return its descriptor.
+  // if cudnnTensor2Desc contains a descriptor matching the required shape, return that descriptor
+  // otherwise, create a new descriptor, store it in the hashmap and return it.
   def getTensorDescriptor(shape: Seq[Int], kind: String)(implicit __pos: SourceContext): TOP = cudnnTensor2Desc.get(shape) match {
     case Some((desc, _)) => desc
     case None => 
@@ -54,7 +55,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       }
   }
 
-  
+  // given the padding, strides and dilation parameters of a convolution operation, return its descriptor.
+  // if cudnnTensor2Desc contains a descriptor matching the required parameters, return that descriptor
+  // otherwise, create a new descriptor, store it in the hashmap and return it.
   def getConvDescriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): CUDNN_CONV_DESCRIPTOR = 
     cudnnConv2Desc.get(padding ++ strides ++ dilation) match {
       case Some(desc) => desc
@@ -64,11 +67,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         CUDNN_SET_CONV_2D_DESCRIPTOR(desc, INT(padding(0)), INT(padding(1)), INT(strides(0)), INT(strides(1)), INT(dilation(0)), INT(dilation(1)),
           CUDNN_CONVOLUTION, CUDNN_FLOAT)
         desc
-    }
+  }
   
 
   override def transform(n: Node): Backend.Exp = n match {
-    // NHWC as default layout
+    // convolution forward operation
     case Node(s, "tensor_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
       Backend.Const(params:ConvParam)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
