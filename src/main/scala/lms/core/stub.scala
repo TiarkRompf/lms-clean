@@ -876,7 +876,7 @@ object PrimitiveTypeLess {
       NUM(Adapter.g.reflect("-", x, y.x), t)
     }
     def *(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
+   //   assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       NUM(Adapter.g.reflect("*", x, y.x), t)
     }
     def /(y: NUM)(implicit pos: SourceContext): NUM = {

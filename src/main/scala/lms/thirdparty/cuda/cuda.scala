@@ -200,7 +200,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       // type cast
       val in = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
       val out = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
-      val size = (new INT(xn(3))).withSrcType(__pos, manifest[INT])
+      val size = (new INT(xn(2))).withSrcType(__pos, manifest[INT])
 
       // actual computation
       val stride = gridDimX * blockDimX

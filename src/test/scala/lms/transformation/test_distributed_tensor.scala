@@ -127,8 +127,8 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val model = module {
           val tensor_input = Tensor.input[Float](inputTensorType)
           val tensor_weight = Tensor.weight[Float](Seq(32, 32))
-          tensor_input neg (batchSplitAnno)
-          tensor_input * (tensor_weight, batchSplitAnno)
+          val tensor_intermediate = tensor_weight neg (batchSplitAnno)
+          tensor_input + (tensor_intermediate, batchSplitAnno)
         }
         model()
         printf("compile")

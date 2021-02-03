@@ -39,10 +39,11 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     case Node(s, "tensor_transpose", _, _) => ???
 
     case Node(s, "tensor_negate", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
 
         (() => {
-          Accumulate(gradMap(a), gradMap(s), anno); ()
+          Accumulate(gradMap(a), Negate(gradMap(s), anno), anno); ()
         }) +=: backwardNodes
 
     case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
