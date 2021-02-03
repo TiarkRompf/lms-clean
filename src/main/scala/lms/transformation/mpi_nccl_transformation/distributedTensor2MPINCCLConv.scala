@@ -95,43 +95,43 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       // var beta = 0.0f   
 
       // get input info and transform input tensors
-      val left_shape = tensor_shape(left, useOldMetadata = true)
-      val right_shape = tensor_shape(right, useOldMetadata = true)
-      val left_operand = get_operand(left, anno)
-      val right_operand = get_operand(right, anno)
+      val weight_shape = tensor_shape(left, useOldMetadata = true)
+      val filter_shape = tensor_shape(right, useOldMetadata = true)
+      val weight_tensor = get_operand(left, anno)
+      val filter_tensor = get_operand(right, anno)
 
       // assertions
-      assert(left_shape.size != tensor_dim, "input tensor of convolution must be 4D")
-      assert(right_shape.size != tensor_dim, "input filter of convolution must be 4D")
+      assert(weight_shape.size != tensor_dim, "input tensor of convolution must be 4D")
+      assert(filter_shape.size != tensor_dim, "input filter of convolution must be 4D")
       assert(padding.size != hyperparam_dim, "padding must be sequence of integer of length 2")
       assert(strides.size != hyperparam_dim, "strides must be sequence of integer of length 2")
       assert(dilation.size != hyperparam_dim, "dilation must be sequence of integer of length 2")
 
       // create input descriptor
       /*
-      val input_batchsize = left_shape(0)
-      val input_height = left_shape(1)
-      val input_width = left_shape(2)
-      val input_channels = left_shape(3)
+      val input_batchsize = weight_shape(0)
+      val input_height = weight_shape(1)
+      val input_width = weight_shape(2)
+      val input_channels = weight_shape(3)
       val input_descriptor = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_TENSOR_DESCRIPTOR], "cudnnTensorDescriptor_t").x)
       CUDNN_CREATE_TENSOR_DESCRIPTOR(input_descriptor)
       CUDNN_SET_TENSOR_4D_DESCRIPTOR(input_descriptor, layout, datatype, 
         input_batchsize, input_channels, input_height, input_width)
       */
-      val input_descriptor = get_descriptor(left_shape, "tensor")
+      val input_descriptor = get_descriptor(weight_shape, "tensor")
 
       // create filter descriptor
       /*
-      val filter_out_channels = right_shape(0)
-      val filter_height = right_shape(1)
-      val filter_width = right_shape(2)
-      val filter_in_channels = right_shape(3)
+      val filter_out_channels = filter_shape(0)
+      val filter_height = filter_shape(1)
+      val filter_width = filter_shape(2)
+      val filter_in_channels = filter_shape(3)
       val filter_descriptor = new CUDNN_FILTER_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_FILTER_DESCRIPTOR], "cudnnFilterDescriptor_t").x)
       CUDNN_CREATE_FILTER_DESCRIPTOR(filter_descriptor)
       CUDNN_SET_FILTER_4D_DESCRIPTOR(filter_descriptor, layout, datatype, 
         filter_out_channels, filter_in_channels, filter_height, filter_width)
       */
-      val filter_descriptor = get_descriptor(right_shape, "filter")
+      val filter_descriptor = get_descriptor(filter_shape, "filter")
 
       // create convolution descriptor
       /*
@@ -178,7 +178,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
       // convolution
-      CUDNN_CONV_FWD(myCUDNNComm, VAR(INT(alpha)), input_descriptor, new ARRAY(left_operand), filter_descriptor, new ARRAY(right_operand), 
+      CUDNN_CONV_FWD(myCUDNNComm, VAR(INT(alpha)), input_descriptor, new ARRAY(weight_tensor), filter_descriptor, new ARRAY(filter_tensor), 
         conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(INT(beta)), output_descriptor, output)
 
       // return convolution output
@@ -188,23 +188,23 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       // Typed interface (not used)
       val sourceTensor = new TENSOR(s, useOldMetadata = true).x
 
-      val left_shape = tensor_shape(left, useOldMetadata = true)
-      val right_shape = tensor_shape(right, useOldMetadata = true)
+      val weight_shape = tensor_shape(left, useOldMetadata = true)
+      val filter_shape = tensor_shape(right, useOldMetadata = true)
 
-      val image_bytes = 1 * 1 * left_shape(0) * left_shape(1)
+      val image_bytes = 1 * 1 * weight_shape(0) * weight_shape(1)
 
-      val left_operand = get_operand(left, anno)
-      val right_operand = get_operand(right, anno)
-      val leftTensor = new TENSOR(left_operand, useOldMetadata = true)
-      val rightTensor = new TENSOR(right_operand, useOldMetadata = true)
+      val weight_tensor = get_operand(left, anno)
+      val filter_tensor = get_operand(right, anno)
+      val leftTensor = new TENSOR(weight_tensor, useOldMetadata = true)
+      val rightTensor = new TENSOR(filter_tensor, useOldMetadata = true)
 
       val input_descriptor = cudnnTensorDescriptor
       cudnnCheck(cudnnCreateTensorDescriptor(input_descriptor))
-      cudnnSetTensor4dDescriptor(input_descriptor, cudnnNCHW, cudnnFloat, unit[Int](1), unit[Int](1), unit[Int](left_shape(0)), unit[Int](left_shape(1)))
+      cudnnSetTensor4dDescriptor(input_descriptor, cudnnNCHW, cudnnFloat, unit[Int](1), unit[Int](1), unit[Int](weight_shape(0)), unit[Int](weight_shape(1)))
 
       val filter_descriptor = cudnnFilterDescriptor
       cudnnCheck(cudnnCreateFilterDescriptor(filter_descriptor))
-      cudnnCheck(cudnnSetFilter4dDescriptor(filter_descriptor, cudnnNCHW, cudnnFloat, unit[Int](1), unit[Int](1), unit[Int](right_shape(0)), unit[Int](right_shape(1))))
+      cudnnCheck(cudnnSetFilter4dDescriptor(filter_descriptor, cudnnNCHW, cudnnFloat, unit[Int](1), unit[Int](1), unit[Int](filter_shape(0)), unit[Int](filter_shape(1))))
 
       val conv_descriptor = cudnnConvolutionDescriptor
       cudnnCheck(cudnnCreateConvolutionDescriptor(conv_descriptor))
@@ -237,8 +237,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       val alpha = var_new[Float](unit(1.0))
       val beta = var_new[Float](unit(0.0))
 
-      Unwrap(cudnnCheck(cudnnConvolutionForward(myCUDNNCommRep, alpha, input_descriptor, Wrap[Array[Float]](left_operand), 
-          filter_descriptor, right_operand, conv_descriptor, conv_algo, d_workspace, readVar(workspace_bytes), beta, 
+      Unwrap(cudnnCheck(cudnnConvolutionForward(myCUDNNCommRep, alpha, input_descriptor, Wrap[Array[Float]](weight_tensor), 
+          filter_descriptor, filter_tensor, conv_descriptor, conv_algo, d_workspace, readVar(workspace_bytes), beta, 
           output_descriptor, sourceTensor)))
       */
 
@@ -267,12 +267,16 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       Backend.Const(dilation:Seq[Int])::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
+
+
       // TODO: dim checks necessary or not?
-      val filter_operand = get_operand(filter, anno)
-      val output_operand = get_operand(doutput, anno)
       val doutput_shape = tensor_shape(s, useOldMetadata = true)
       val weight_shape = tensor_shape(s, useOldMetadata = true)
       val filter_shape = tensor_shape(s, useOldMetadata = true)
+
+      val filter_tensor = get_operand(filter, anno)
+      val output_tensor = get_operand(doutput, anno)
+
       val doutput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
 
 
@@ -300,7 +304,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
         convAlgo, SIZE_T(workspace_bytes))
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
-      CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(INT(alpha)), filter_descriptor, new ARRAY(filter_operand), doutput_descriptor, new ARRAY(output_operand),
+      CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(INT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
         conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(INT(beta)), dweight_descriptor, dweight)
       
       dweight.x
