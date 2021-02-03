@@ -140,7 +140,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
   def CUDNN_CONV_BWD_DATA(handle: TOP, alpha: VAR, wDesc: TOP, w: TOP,
                                   dyDesc: TOP, dy: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
                                   algo: TOP, workspace: TOP, workSpaceSizeInBytes: SIZE_T, 
-                                  beta: VAR, dxDesc: TOP, dx: TOP) =
+                                  beta: VAR, dxDesc: TOP, dx: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionBackwardData", handle.x, alpha.x, wDesc.x, w.x, dyDesc.x, dy.x, 
       convDesc.x, algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, dxDesc.x, dx.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(12), 
       Set[Int](2,9))
