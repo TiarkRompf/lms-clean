@@ -159,5 +159,10 @@ trait FixedSizeTensorOps extends Base with PrimitiveOps with ArrayOps {
       val t = self dot tensor(y)
       Wrap[Tensor[T]](t.x)
     }
+
+    def neg()(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self neg()
+      Wrap[Tensor[T]](t.x)
+    }
   }
 }
