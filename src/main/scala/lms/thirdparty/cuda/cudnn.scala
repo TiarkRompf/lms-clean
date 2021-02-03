@@ -50,6 +50,8 @@ object CUDNNTypeLess extends Dsl with CLibs {
 
   class CUDNN_CONV_FWD_ALG_PERF(override val x: Backend.Exp) extends TOP(x)
   class CUDNN_CONV_FWD_ALGO(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_BWD_DATA_ALG_PERF(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_BWD_DATA_ALGO(override val x: Backend.Exp) extends TOP(x)
   /*
   def cudnnDouble = cmacro[cudnnDataTypeT]("CUDNN_DATA_DOUBLE")  // 64-bit
   def cudnnHalf = cmacro[cudnnDataTypeT]("CUDNN_DATA_HALF")  // 16-bit
@@ -131,7 +133,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
       dxDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
 
   def CUDNN_GET_CONV_BWD_DATA_WORKSPACE_SZ(handle: TOP, wDesc: TOP, dyDesc: TOP,
-                                      convDesc: CUDNN_CONV_DESCRIPTOR, dxDesc: CUDNN_TENSOR_DESCRIPTOR, algo: TOP, 
+                                      convDesc: CUDNN_CONV_DESCRIPTOR, dxDesc: TOP, algo: TOP, 
                                       sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionBackwardDataWorkspaceSize", handle.x, wDesc.x, dyDesc.x, convDesc.x,
       dxDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
