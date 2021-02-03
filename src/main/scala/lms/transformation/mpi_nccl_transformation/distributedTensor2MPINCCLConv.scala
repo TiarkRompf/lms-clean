@@ -33,7 +33,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
   // given a tensor, get its descriptor.
   // if desc already in hashmap, reuse it; Otherwise, create a new descriptor
-  def get_descriptor(shape: Seq[Int], kind: String)(implicit __pos: SourceContext): TOP = cudnnTensor2Desc.get(shape) match {
+  def getTensorDescriptor(shape: Seq[Int], kind: String)(implicit __pos: SourceContext): TOP = cudnnTensor2Desc.get(shape) match {
     case Some((desc, _)) => desc
     case None => 
       val n::h::w::c::_ = shape
@@ -55,7 +55,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
   }
 
   
-  def get_conv_descriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): CUDNN_CONV_DESCRIPTOR = 
+  def getConvDescriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): CUDNN_CONV_DESCRIPTOR = 
     cudnnConv2Desc.get(padding ++ strides ++ dilation) match {
       case Some(desc) => desc
       case None =>
@@ -116,7 +116,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_SET_TENSOR_4D_DESCRIPTOR(input_descriptor, layout, datatype, 
         input_batchsize, input_channels, input_height, input_width)
       */
-      val input_descriptor = get_descriptor(weight_shape, "tensor")
+      val input_descriptor = getTensorDescriptor(weight_shape, "tensor")
 
       // create filter descriptor
       /*
@@ -129,7 +129,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_SET_FILTER_4D_DESCRIPTOR(filter_descriptor, layout, datatype, 
         filter_out_channels, filter_in_channels, filter_height, filter_width)
       */
-      val filter_descriptor = get_descriptor(filter_shape, "filter")
+      val filter_descriptor = getTensorDescriptor(filter_shape, "filter")
 
       // create convolution descriptor
       /*
@@ -138,7 +138,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_SET_CONV_2D_DESCRIPTOR(conv_descriptor, INT(padding(0)), INT(padding(1)), INT(strides(0)), INT(strides(1)), INT(dilation(0)), INT(dilation(1)),
         mode, datatype)
       */
-      val conv_descriptor = get_conv_descriptor(padding, strides, dilation)
+      val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
       // find output tensor shape
       var output_batchsize = 0
@@ -155,7 +155,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_SET_TENSOR_4D_DESCRIPTOR(output_descriptor, layout, datatype, 
         INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
       */
-      val output_descriptor = get_descriptor(Seq(output_batchsize, output_height, output_width, output_channels), "tensor")
+      val output_descriptor = getTensorDescriptor(Seq(output_batchsize, output_height, output_width, output_channels), "tensor")
 
       // allocate output tensor
       val output_size = output_batchsize * output_height * output_width * output_channels
@@ -279,10 +279,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val filter_tensor = get_operand(filter, anno)
       val output_tensor = get_operand(doutput, anno)
 
-      val filter_descriptor = get_descriptor(filter_shape, "filter")
-      val doutput_descriptor = get_descriptor(doutput_shape, "tensor")
-      val dweight_descriptor = get_descriptor(weight_shape, "tensor")  // should this descriptor just be weight descriptor?
-      val conv_descriptor = get_conv_descriptor(padding, strides, dilation)
+      val filter_descriptor = getTensorDescriptor(filter_shape, "filter")
+      val doutput_descriptor = getTensorDescriptor(doutput_shape, "tensor")
+      val dweight_descriptor = getTensorDescriptor(weight_shape, "tensor")  // should this descriptor just be weight descriptor?
+      val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
       // allocate result (d_weight) 
       val dweight_size = weight_shape(0) * weight_shape(1) * weight_shape(2) * weight_shape(3)
