@@ -112,7 +112,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   }
 
   // lazy local function that initializes CUDNN
-  lazy val (myCUDNNCommRep) = withComment("setting uo the CUDNN environment") {
+  lazy val (myCUDNNCommRep) = withComment("setting up the CUDNN environment") {
     val cudnn = cudnnHandle
     cudnnCheck(cudnnCreate(cudnn))
     cudnn
