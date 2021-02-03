@@ -9,20 +9,12 @@ import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps,CUDNNTypeLess,CLibTypeLess}
 import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess, CUBLASTypeLess, CudaOps}
-import lms.transformation.util.DataStructure
+import lms.transformation.util.{DataStructure, ConvParam}
 
 import Backend._
 
 
-trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
-  // TODO: 
-  // rename get_descriptor and get_conv_descriptor, and make their comments better
-  // test backward data and backward filter on the cluster
-  // discuss where to put default settings
-  // use TOP or CUDNN_CONV_DESCRIPTOR as conv2desc map and get_conv_descriptor return type
-  // reorder paramaters for backward data and backward filter
-  // fix hashmap initialization problem
-  // TOP/subtype convention
+trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with ConvParam {
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -263,10 +255,15 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
     // workspace, workspace_size: from cudnnGetConvolutionBackwardDataWorkspaceSize()
     // dx (retval)
     case Node(s, "tensor_conv_bwd_data", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
-      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::
-      Backend.Const(alpha:Float)::Backend.Const(beta:Float)::Backend.Const(padding:Seq[Int])::Backend.Const(strides:Seq[Int])::
-      Backend.Const(dilation:Seq[Int])::_, _) =>
+      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack convolution paratemers
+      val padding = params.padding
+      val strides = params.strides
+      val dilation = params.dilation
+      val alpha = params.alpha
+      val beta = params.beta
 
       // TODO: dim checks necessary or not?
       val doutput_shape = tensor_shape(s, useOldMetadata = true)
