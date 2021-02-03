@@ -22,6 +22,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
   // use TOP or CUDNN_CONV_DESCRIPTOR as conv2desc map and get_conv_descriptor return type
   // reorder paramaters for backward data and backward filter
   // fix hashmap initialization problem
+  // TOP/subtype convention
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -265,46 +266,47 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
     // algo: cudnnConvolutionBwdDataAlgo_t
     // workspace, workspace_size: from cudnnGetConvolutionBackwardDataWorkspaceSize()
     // dx (retval)
-    case Node(s, "tensor_conv_bwd_data", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(filter:Backend.Sym)::(doutput:Backend.Sym)::
+    case Node(s, "tensor_conv_bwd_data", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
+      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::
       Backend.Const(alpha:Float)::Backend.Const(beta:Float)::Backend.Const(padding:Seq[Int])::Backend.Const(strides:Seq[Int])::
       Backend.Const(dilation:Seq[Int])::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // val algo = ???
-
       // TODO: dim checks necessary or not?
       val filter_operand = get_operand(filter, anno)
       val output_operand = get_operand(doutput, anno)
+      val doutput_shape = tensor_shape(s, useOldMetadata = true)
+      val doutput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
 
 
       val filter_descriptor = get_descriptor(filter, "filter")
-      val output_descriptor = get_descriptor(doutput, "tensor")
+      val doutput_descriptor = get_descriptor(doutput, "tensor")
 
       val conv_descriptor = get_conv_descriptor(padding, strides, dilation)
 
       // allocate result (d_weight) 
-      // val dweight = gpu_array(output_size, manifest[Float], myNCCLRank)
+      val dweight = gpu_array(doutput_size, manifest[Float], myNCCLRank)
       // should this descriptor just be weight descriptor?
-      // al dweight_descriptor = 
+      val dweight_descriptor = get_descriptor(weight, "tensor")
 
-      /*
+      // find convolution algorithm
+      var res_count = 0
+      val res = new CUDNN_CONV_BWD_DATA_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], "cudnnConvolutionBwdDataAlgoPerf_t").x)
+      CUDNN_FIND_CONV_BWD_DATA_ALG(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor, INT(1), INT(res_count), res)
+      // val conv_algo = READ_FIELD(manifest[CUDNN_CONV_FWD_ALG_PERF], manifest[CUDNN_CONV_FWD_ALGO], res.x, "algo")
+      val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], Manifest[CUDNN_CONV_BWD_DATA_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF]](res.x), "algo")
+      val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_DATA_ALG_PERF])
+      
       // allocate convolution workspace
       var workspace_bytes = 0
-      CUDNN_GET_CONV_BWD_WORKSPACE_SZ(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor,
+      CUDNN_GET_CONV_BWD_DATA_WORKSPACE_SZ(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor,
         convAlgo, SIZE_T(workspace_bytes))
-      // var d_workspace = CUDA_MALLOC(workspace_bytes, manifest[FLOAT])
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
-      CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(INT(alpha)), filter_descriptor, new ARRAY(filter_operand), output_descriptor, new ARRAY(output_operand),
-        conv_descriptor, algo, d_workspace, SIZE_T(workspace_bytes), VAR(INT(beta)), dweight_descriptor, dweight)
-
+      CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(INT(alpha)), filter_descriptor, new ARRAY(filter_operand), doutput_descriptor, new ARRAY(output_operand),
+        conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(INT(beta)), dweight_descriptor, dweight)
+      
       dweight.x
-      */
-
-
-
-      val dummy = gpu_array(0, manifest[Float], myNCCLRank)
-      dummy.x
 
     
     case _ => super.transform(n) 
