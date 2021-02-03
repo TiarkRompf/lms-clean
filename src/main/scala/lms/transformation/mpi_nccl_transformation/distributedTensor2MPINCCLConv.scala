@@ -282,14 +282,13 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       val conv_descriptor = get_conv_descriptor(padding, strides, dilation)
 
       // allocate result (d_weight) 
-      val doutput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
-      val dweight = gpu_array(doutput_size, manifest[Float], myNCCLRank)
+      val dweight_size = weight_shape(0) * weight_shape(1) * weight_shape(2) * weight_shape(3)
+      val dweight = gpu_array(dweight_size, manifest[Float], myNCCLRank)
       
       // find convolution algorithm
       var res_count = 0
       val res = new CUDNN_CONV_BWD_DATA_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], "cudnnConvolutionBwdDataAlgoPerf_t").x)
       CUDNN_FIND_CONV_BWD_DATA_ALG(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor, INT(1), INT(res_count), res)
-      // val conv_algo = READ_FIELD(manifest[CUDNN_CONV_FWD_ALG_PERF], manifest[CUDNN_CONV_FWD_ALGO], res.x, "algo")
       val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], Manifest[CUDNN_CONV_BWD_DATA_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF]](res.x), "algo")
       val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_DATA_ALGO])
       
