@@ -31,7 +31,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     override val passes = List(
       new DistributeTensorDimName {},
       new DistributeTensorAIRCoP {},
-      new Canonicalize {},
+      new DistributedTensorCanonicalize {},
       new DistributeTensor2MPI_NCCL {})
 
     var log_path: String = ""
@@ -90,6 +90,29 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("Annotation", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("split") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
+        val inputTensorType = tensor_type[Float](Seq(32, 32))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
+        val model = module {
+          val tensor_input = Tensor.input[Float](inputTensorType)
+          val tensor_weight = Tensor.weight[Float](Seq(32, 16))
+          val splits = tensor_input.split(1, List(16, 16), batchSplitAnno)
+          splits(0) * (tensor_weight, batchSplitAnno)
+        }
+        model(10)
+        printf("compile\n")
+      }
+    }
+    checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
   }
 
   test("dot") {

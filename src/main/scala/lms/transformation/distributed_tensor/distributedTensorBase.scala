@@ -25,7 +25,6 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   import BaseTypeLess._
   import PrimitiveTypeLess._
   import ArrayTypeLess._
-  import CUDATypeLess._
 
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
@@ -87,6 +86,16 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(tt), C(anno)))).withSrcType(__pos, tt.et)
   }
 
+  object TENSOR {
+    def isTensor(x: Backend.Exp, useOldMetadata: Boolean = false) = {
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, s, _, _)) => s.startsWith("tensor")
+        case a => false
+      }
+    }
+  }
+
   class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
@@ -110,6 +119,11 @@ trait FixedSizeDistributedTensorBaseTypeLess {
       }
     }
 
+    def op_type = gc.get(x.asInstanceOf[Backend.Sym]) match {
+      case Some(Node(_, s, _, _)) if s.startsWith("tensor") => s
+      case a => throw new Exception(s"cannot find node $a")
+    }
+
     def shape_size: Seq[Int] = tensor_type.shape.map(_.size)
 
     def show(implicit __pos: SourceContext): UNIT = {
@@ -122,14 +136,68 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
   }
 
-  // FIXME(feiw) the return type fo MODULE is strange
+  class OPERATION(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
+    val (resultTypes: List[TensorType], annotation: Anno) = gc.get(x.asInstanceOf[Backend.Sym]) match {
+      case Some(Node(_, s, Backend.Const(result_tensor_types: List[TensorType])::Backend.Const(anno:Anno)::_, _))
+        if s.startsWith("op") => (result_tensor_types, anno)
+      case a => throw new Exception(s"Node $a is not an operation node")
+    }
+
+    val numResults: Int = resultTypes.length
+
+    // build and cache the tensor results of operation
+    if (useOldMetadata) {
+      require(OPERATION.oldResultMap.contains(x.asInstanceOf[Backend.Sym]),
+        s"must already contain $x in the result map: ${OPERATION.oldResultMap}")
+    } else {
+      if (OPERATION.resultMap == null)
+        OPERATION.resultMap = mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
+      OPERATION.resultMap.getOrElseUpdate(x.asInstanceOf[Backend.Sym], results.map(_.x))
+    }
+
+    def getResultType(i: Int): TensorType = {
+      require(i >= 0 && i < numResults, s"parameter must be in Range of $numResults but got $i")
+      resultTypes(i)
+    }
+
+    def getResult(i: Int): TENSOR = {
+      require(i >= 0 && i < numResults, s"parameter must be in Range of $numResults but got $i")
+      getResults(i)
+    }
+
+    def getResults: List[TENSOR] = if (useOldMetadata) {
+      OPERATION.oldResultMap(x.asInstanceOf[Backend.Sym]).map(
+        x => new TENSOR(x, useOldMetadata=true)
+      )
+    } else {
+      OPERATION.resultMap(x.asInstanceOf[Backend.Sym]).map(x => new TENSOR(x))
+    }
+
+    private def result(i: Int): TENSOR = {
+      require(i >= 0 && i < numResults, s"parameter must be in Range of $numResults but got $i")
+      OPERATION.getResult(this, i, getResultType(i), annotation)
+    }
+
+    private def results: List[TENSOR] = (0 until numResults).toList.map(i => result(i))
+  }
+
+  object OPERATION {
+    def getResult(x: OPERATION, i: Int, tensorType: TensorType, anno: Anno)(implicit __pos: SourceContext) = {
+      (new TENSOR(Adapter.g.reflect("tensor_result", C(tensorType), C(anno), x.x, C(i)))).withSrcType(__pos, tensorType.et)
+    }
+
+    // We are using these global data structures to hold operation graph metadata
+    var oldResultMap: mutable.Map[lms.core.Backend.Exp, List[lms.core.Backend.Exp]] = _
+    var resultMap: mutable.Map[lms.core.Backend.Exp, List[lms.core.Backend.Exp]] = _
+  }
+
   def MODULE(f: => TENSOR)(implicit __pos: SourceContext): Int => UNIT = {
     val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f.x))(Adapter.CTRL)
     (iter: Int) => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
   }
 
   def mergable_dims(node: Node): List[(Dim, Dim)] = node match {
-    case Node(s, op, _, _) if (op == "tensor_input" || op == "tensor_weight") => List()
+    case Node(s, op, _, _) if (op == "tensor_input" || op == "tensor_weight" || op == "tensor_result") => List()
     case Node(s, op, _, _) =>
       assert(!op.startsWith("tensor"), s"node $node is not yet handled in mergable_dims")
       List()
@@ -143,10 +211,10 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
     case Node(s, "tensor_input", _, _) => forwardNodes += node
     case Node(s, "tensor_weight", _, _) => weightNodes += node
-    case Node(s, op, _, _) => throw new Exception(s"op $op is not yet handled in aircopCollect")
+    case Node(s, "tensor_result", _, _) => forwardNodes += node
+    case Node(s, op, _, _) => throw new Exception(s"op $op is not yet handled in aircopCollect \n$node")
   }
 }
-
 
 trait FixedSizeDistributedTensorOpsBase extends Dsl {
 

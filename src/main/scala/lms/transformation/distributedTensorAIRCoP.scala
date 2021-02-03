@@ -77,9 +77,20 @@ abstract class DistributeTensorAIRCoP extends Transformer {
   def traverseBackward(backwards: mutable.ArrayBuffer[()=>Unit], forwardSyms: mutable.ArrayBuffer[Backend.Sym])(cont: => Unit) = {
     for (fs <- forwardSyms) {
       implicit val pos = Adapter.oldSourceMap(fs)
-      val node = new TENSOR(transform(fs))
-      val grad = ZEROS(node.tensor_type, node.annotation)
-      gradMap(fs.asInstanceOf[Backend.Sym]) = grad
+
+      if (TENSOR.isTensor(transform(fs))) {
+        val node = new TENSOR(transform(fs))
+        val grad = ZEROS(node.tensor_type, node.annotation)
+        gradMap(fs.asInstanceOf[Backend.Sym]) = grad
+
+      } else { // must be OPERATION
+        val oldOp = new OPERATION(fs, useOldMetadata = true)
+        val newOp = new OPERATION(transform(fs))
+        for ((oldTensor, newTensor) <- oldOp.getResults zip newOp.getResults) {
+          val grad = ZEROS(oldTensor.tensor_type, oldTensor.annotation)
+          gradMap(oldTensor.x.asInstanceOf[Backend.Sym]) = grad
+        }
+      }
     }
     for (b <- backwards) {
       b()
@@ -127,6 +138,11 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     assert (g == null)
     g = new GraphBuilderOpt()
     Adapter.g = g
+
+    // handle the metadata in OPERATION.resultMap
+    OPERATION.oldResultMap = OPERATION.resultMap
+    OPERATION.resultMap = new mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
+
     try {
       super.transform(graph)
     } finally {

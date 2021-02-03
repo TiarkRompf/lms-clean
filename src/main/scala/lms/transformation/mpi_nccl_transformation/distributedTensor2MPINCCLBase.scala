@@ -254,6 +254,12 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
           Backend.Const(())
       }
 
+
+    case Node(s, "tensor_result", _, _) => subst(s)
+
+    case Node(s, op, _, _) if op.startsWith("tensor") || op.startsWith("op") =>
+      throw new Exception(s"not yet handling $n in distributedTensor2MPINCCL transformation")
+
     case _ => super.transform(n)
   }
 
@@ -306,6 +312,11 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     assert (g == null)
     g = new GraphBuilderOpt()
     Adapter.g = g
+
+    // handle the metadata in OPERATION.resultMap
+    OPERATION.oldResultMap = OPERATION.resultMap
+    OPERATION.resultMap = new mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
+
     try {
       super.transform(graph)
     } finally {
