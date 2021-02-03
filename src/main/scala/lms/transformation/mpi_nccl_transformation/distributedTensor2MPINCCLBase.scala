@@ -120,7 +120,8 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
 
   def myCUDNNComm(implicit __pos: SourceContext) = TOP(Unwrap(myCUDNNCommRep), manifest[cudnnHandleT])
 
-  var cudnnTensor2Desc: HashMap[Backend.Sym, (TOP, String)] = HashMap()
+  // var cudnnTensor2Desc: HashMap[Backend.Sym, (TOP, String)] = HashMap()
+  var cudnnTensor2Desc: HashMap[Seq[Int], (TOP, String)] = HashMap()
   var cudnnConv2Desc: HashMap[Seq[Int], CUDNN_CONV_DESCRIPTOR] = HashMap()
   def set_up_cudnn(implicit __pos: SourceContext) = { 
     val dummy = myCUDNNComm 
