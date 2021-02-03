@@ -22,7 +22,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     val res_tt = weight.tensor_type
     (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_data", C(res_tt), C(anno), 
       filter.x, doutput.x, C(alpha), C(beta), C(padding), C(strides), C(dilation)))
-      (weight.x, filter.x, doutput.x)).withSrcType(__pos, weight.et))
+      (weight.x, filter.x, doutput.x)).withSrcType(__pos, weight.et)
   }
 
   def ConvBackwardFilter(weight: TENSOR, filter: TENSOR, doutput: TENSOR, alpha: Float, beta: Float, 
