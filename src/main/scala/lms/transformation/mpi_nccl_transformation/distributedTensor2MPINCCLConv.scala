@@ -70,8 +70,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
   override def transform(n: Node): Backend.Exp = n match {
     // NHWC as default layout
     case Node(s, "tensor_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
-      Backend.Const(padding:Seq[Int])::Backend.Const(strides:Seq[Int])::Backend.Const(dilation:Seq[Int])::
-      Backend.Const(alpha:Float)::Backend.Const(beta:Float)::_, _) =>
+      Backend.Const(params:ConvParam)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       // these are default settings
       // TODO: perhaps move to base?
@@ -84,7 +83,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       // val strides = Seq(1, 1)
       // val dilation = Seq(1, 1)
       // var alpha = 1.0f
-      // var beta = 0.0f   
+      // var beta = 0.0f  
+
+      // unpack convolution paratemers
+      val padding = params.padding
+      val strides = params.strides
+      val dilation = params.dilation
+      val alpha = params.alpha
+      val beta = params.beta 
 
       // get input info and transform input tensors
       val weight_shape = tensor_shape(left, useOldMetadata = true)
