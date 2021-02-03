@@ -151,12 +151,13 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
         INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
 
       // create output descriptor
+      /*
       val output_descriptor = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_CONV_DESCRIPTOR], "cudnnConvolutionDescriptor_t").x)
       CUDNN_CREATE_TENSOR_DESCRIPTOR(output_descriptor)
       CUDNN_SET_TENSOR_4D_DESCRIPTOR(output_descriptor, layout, datatype, 
         INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
-      // val output_descriptor = get_descriptor(s, "tensor")  // TODO: use get_descriptor for output_descriptor
-      // val output_descriptor = get_descriptor(, "tensor")
+      */
+      val output_descriptor = get_descriptor(Seq(output_batchsize, output_height, output_width, output_channels), "tensor")
 
       // allocate output tensor
       val output_size = output_batchsize * output_height * output_width * output_channels
