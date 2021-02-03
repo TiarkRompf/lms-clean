@@ -37,9 +37,9 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
 		neg_fun(new ARRAY(operand), array, size, DIM3(gridSize), DIM3(blockSize))
 		array
   }
-  
+
   val unaryOps = List("tensor_negate")
-  
+
   override def transform(n: Node): Backend.Exp = n match {
 
     case Node(s, op, Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _)
@@ -58,7 +58,7 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           val count = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
           op match {
-            case "tensor_negate" => gpu_neg_array(count, m, myNCCLRank, operand).x
+            case "tensor_negate" => gpu_neg_array(count, m, myNCCLRank, loaded_operand).x
             case _ => throw new Exception(s"op $op is not unary op")
           }
         case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
