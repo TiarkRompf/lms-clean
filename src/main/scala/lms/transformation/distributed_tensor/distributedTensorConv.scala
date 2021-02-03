@@ -21,7 +21,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     assert(weight.et == filter.et && filter.et == doutput.et)
     val res_tt = weight.tensor_type
     (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_data", C(res_tt), C(anno), 
-      filter.x, doutput.x, C(alpha), C(beta), C(padding), C(strides), C(dilation))
+      weight.x, filter.x, doutput.x, C(alpha), C(beta), C(padding), C(strides), C(dilation))
       (weight.x, filter.x, doutput.x)).withSrcType(__pos, weight.et))
   }
 
@@ -31,7 +31,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     assert(weight.et == filter.et && filter.et == doutput.et)
     val res_tt = filter.tensor_type
     (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_filter", C(res_tt), C(anno), 
-      weight.x, doutput.x, C(alpha), C(beta), C(padding), C(strides), C(dilation))
+      weight.x, filter.x, doutput.x, C(alpha), C(beta), C(padding), C(strides), C(dilation))
       (weight.x, filter.x, doutput.x)).withSrcType(__pos, weight.et))
   }
 
@@ -42,7 +42,9 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     transform: Backend.Exp => Backend.Exp) = node match {
       case Node(s, "tensor_conv", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(padding:Seq[Int])::Backend.Const(strides:Seq[Int])::Backend.Const(dilation:Seq[Int])::
         Backend.Const(alpha:Float)::Backend.Const(beta:Float)::_, _) =>
+      // case Node(s, "tensor_conv", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::(Backend.Const(param:ConvParam))_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
+        // val dummy = ConvParam(1.0f, 1,0f, Seq(0), Seq(0), Seq(0))
         // save forward op in forwardNodes
         forwardNodes += node
         // save backward op in backwardNodes
