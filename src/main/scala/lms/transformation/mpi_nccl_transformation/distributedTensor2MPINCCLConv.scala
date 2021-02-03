@@ -268,8 +268,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       Backend.Const(dilation:Seq[Int])::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-
-
       // TODO: dim checks necessary or not?
       val doutput_shape = tensor_shape(s, useOldMetadata = true)
       val weight_shape = tensor_shape(s, useOldMetadata = true)
@@ -278,19 +276,15 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       val filter_tensor = get_operand(filter, anno)
       val output_tensor = get_operand(doutput, anno)
 
-      val doutput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
-
-
       val filter_descriptor = get_descriptor(filter_shape, "filter")
       val doutput_descriptor = get_descriptor(doutput_shape, "tensor")
-
+      val dweight_descriptor = get_descriptor(weight_shape, "tensor")  // should this descriptor just be weight descriptor?
       val conv_descriptor = get_conv_descriptor(padding, strides, dilation)
 
       // allocate result (d_weight) 
+      val doutput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
       val dweight = gpu_array(doutput_size, manifest[Float], myNCCLRank)
-      // should this descriptor just be weight descriptor?
-      val dweight_descriptor = get_descriptor(weight_shape, "tensor")
-
+      
       // find convolution algorithm
       var res_count = 0
       val res = new CUDNN_CONV_BWD_DATA_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], "cudnnConvolutionBwdDataAlgoPerf_t").x)
@@ -305,6 +299,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
         convAlgo, SIZE_T(workspace_bytes))
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
+      // backward data pass
       CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(INT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
         conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(INT(beta)), dweight_descriptor, dweight)
       
