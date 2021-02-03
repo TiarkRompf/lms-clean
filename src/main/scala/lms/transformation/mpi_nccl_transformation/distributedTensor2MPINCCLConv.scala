@@ -20,6 +20,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
   // test backward data and backward filter on the cluster
   // discuss where to put default settings
   // use TOP or CUDNN_CONV_DESCRIPTOR as conv2desc map and get_conv_descriptor return type
+  // reorder paramaters for backward data and backward filter
+  // fix hashmap initialization problem
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -65,7 +67,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
   }
 
   
-  def get_conv_descriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): TOP = 
+  def get_conv_descriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): CUDNN_CONV_DESCRIPTOR = 
     cudnnConv2Desc.get(padding ++ strides ++ dilation) match {
       case Some(desc) => desc
       case None =>
@@ -158,6 +160,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       CUDNN_SET_TENSOR_4D_DESCRIPTOR(output_descriptor, layout, datatype, 
         INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
       // val output_descriptor = get_descriptor(s, "tensor")  // TODO: use get_descriptor for output_descriptor
+      // val output_descriptor = get_descriptor(, "tensor")
 
       // allocate output tensor
       val output_size = output_batchsize * output_height * output_width * output_channels
@@ -262,27 +265,27 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
     // algo: cudnnConvolutionBwdDataAlgo_t
     // workspace, workspace_size: from cudnnGetConvolutionBackwardDataWorkspaceSize()
     // dx (retval)
-    /*
     case Node(s, "tensor_conv_bwd_data", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(filter:Backend.Sym)::(doutput:Backend.Sym)::
-      Backend.Const(alpha:Float)::Backend.Const(beta:Float)::_, _) =>
+      Backend.Const(alpha:Float)::Backend.Const(beta:Float)::Backend.Const(padding:Seq[Int])::Backend.Const(strides:Seq[Int])::
+      Backend.Const(dilation:Seq[Int])::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      val algo = ???
+      // val algo = ???
 
       // TODO: dim checks necessary or not?
       val filter_operand = get_operand(filter, anno)
-      val output_operand = get_operand(output, anno)
+      val output_operand = get_operand(doutput, anno)
 
 
       val filter_descriptor = get_descriptor(filter, "filter")
-      val output_descriptor = get_descriptor(output, "tensor")
+      val output_descriptor = get_descriptor(doutput, "tensor")
 
-      val conv_descriptor = ???
+      val conv_descriptor = get_conv_descriptor(padding, strides, dilation)
 
       // allocate result (d_weight) 
-      val dweight = gpu_array(output_size, manifest[Float], myNCCLRank)
+      // val dweight = gpu_array(output_size, manifest[Float], myNCCLRank)
       // should this descriptor just be weight descriptor?
-      val dweight_descriptor = 
+      // al dweight_descriptor = 
 
       /*
       // allocate convolution workspace
@@ -300,8 +303,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
 
 
 
+      val dummy = gpu_array(0, manifest[Float], myNCCLRank)
+      dummy.x
 
-    */
+    
     case _ => super.transform(n) 
   }
 
