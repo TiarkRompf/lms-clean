@@ -86,14 +86,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       // var alpha = 1.0f
       // var beta = 0.0f   
 
-      // inputs
+      // get input info and transform input tensors
       val left_shape = tensor_shape(left, useOldMetadata = true)
       val right_shape = tensor_shape(right, useOldMetadata = true)
       val left_operand = get_operand(left, anno)
       val right_operand = get_operand(right, anno)
-      val leftTensor = new TENSOR(left_operand, useOldMetadata = true)
-      val rightTensor = new TENSOR(right_operand, useOldMetadata = true)
-      val sourceTensor = new TENSOR(s, useOldMetadata = true)
 
       // assertions
       assert(left_shape.size != tensor_dim, "input tensor of convolution must be 4D")
@@ -169,8 +166,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase {
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
       // convolution
-      CUDNN_CONV_FWD(myCUDNNComm, VAR(INT(alpha)), input_descriptor, leftTensor, filter_descriptor, rightTensor, conv_descriptor, convAlgo, d_workspace, 
-        SIZE_T(workspace_bytes), VAR(INT(beta)), output_descriptor, sourceTensor)
+      CUDNN_CONV_FWD(myCUDNNComm, VAR(INT(alpha)), input_descriptor, new ARRAY(left_operand), filter_descriptor, new ARRAY(right_operand), conv_descriptor, convAlgo, d_workspace, 
+        SIZE_T(workspace_bytes), VAR(INT(beta)), output_descriptor, output)
 
       // return convolution output
       output.x
