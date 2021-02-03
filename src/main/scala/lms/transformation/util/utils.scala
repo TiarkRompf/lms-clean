@@ -52,3 +52,8 @@ trait DataStructure {
 
   }
 }
+
+// encapsulates parameters to a cudnn convolution operation
+trait ConvParam {
+  class ConvParam(val alpha: Float, val beta: Float, val padding: Seq[Int], val strides: Seq[Int], val dilation: Seq[Int])
+}
