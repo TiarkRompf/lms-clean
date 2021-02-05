@@ -2,6 +2,12 @@ package lms.transformation.util
 
 import scala.collection.immutable._
 
+import lms.core._
+import lms.core.stub._
+import lms.collection.mutable._
+import lms.macros.SourceContext
+import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps,CUDNNTypeLess,CLibTypeLess}
+
 trait DataStructure {
 
   /**
@@ -56,4 +62,22 @@ trait DataStructure {
 // encapsulates parameters to a cudnn convolution operation
 trait ConvParam {
   case class ConvParam(val alpha: Float, val beta: Float, val padding: Seq[Int], val strides: Seq[Int], val dilation: Seq[Int])
+}
+
+trait CudnnUtils {
+  import CUDNNTypeLess._
+
+  val CUDNN_LAYOUT = CUDNN_NHWC
+  // val CUDNN_DATATYPE = CUDNN_FLOAT
+  // val CUDNN_MODE = CUDNN_CONVOLUTIONs
+ 
+  val CUDNN_N       = 0
+  val CUDNN_H       = 1
+  val CUDNN_W       = 2
+  val CUDNN_C       = 3
+  val CUDNN_C_OUT   = 0
+  val CUDNN_C_IN    = 3
+
+  val CUDNN_TENSOR_DIM  = 4  // input tensor and input kernel should both be 4d
+  val CUDNN_PARAM_DIM   = 2  // degree of freedom of padding, strides, and dilation
 }

@@ -9,27 +9,25 @@ import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 import lms.thirdparty.{CUDNNTypeLess, CUDNNOps}
-import lms.transformation.util.ConvParam
+import lms.transformation.util.{ConvParam, CudnnUtils}
 
 import Backend._
 
 
-trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess with ConvParam {
+trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess with ConvParam with CudnnUtils {
 
   def ConvForward(weight: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    val tensor_dim = 4                // input tensor and input kernel should both be 4d
-    val hyperparam_dim = 2            // degree of freedom of padding, strides, and dilation
 
     val ConvParam(alpha, beta, padding, strides, dilation) = params
 
     val weight_shape = weight.tensor_type.shape
     val filter_shape = filter.tensor_type.shape
 
-    assert(weight_shape.size != tensor_dim, "input tensor of convolution must be 4D")
-    assert(filter_shape.size != tensor_dim, "input filter of convolution must be 4D")
-    assert(padding.size != hyperparam_dim, "padding must be sequence of integer of length 2")
-    assert(strides.size != hyperparam_dim, "strides must be sequence of integer of length 2")
-    assert(dilation.size != hyperparam_dim, "dilation must be sequence of integer of length 2")
+    assert(weight_shape.size != CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D")
+    assert(filter_shape.size != CUDNN_TENSOR_DIM, "input filter of convolution must be 4D")
+    assert(padding.size != CUDNN_PARAM_DIM, "padding must be sequence of integer of length 2")
+    assert(strides.size != CUDNN_PARAM_DIM, "strides must be sequence of integer of length 2")
+    assert(dilation.size != CUDNN_PARAM_DIM, "dilation must be sequence of integer of length 2")
     assert(weight.et == filter.et)
 
     val res_tt = weight.tensor_type
@@ -57,16 +55,15 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     // output.channels = filter.output_channels
     // NHWC
     case Node(s, "tensor_conv", Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
-      val input_type = (new TENSOR(a, useOldMetadata=true)).tensor_type.shape
-      val filter_type = (new TENSOR(b, useOldMetadata=true)).tensor_type.shape
-      val output_type = (new TENSOR(s, useOldMetadata=true)).tensor_type.shape
-      val inputC = input_type(3).dim
-      val outputC = output_type(3).dim
-      val filterCout = filter_type(0).dim
-      val filterCin = filter_type(3).dim
+      val input_type    = (new TENSOR(a, useOldMetadata=true)).tensor_type.shape
+      val filter_type   = (new TENSOR(b, useOldMetadata=true)).tensor_type.shape
+      val output_type   = (new TENSOR(s, useOldMetadata=true)).tensor_type.shape
+      val inputC      = input_type(CUDNN_C).dim
+      val outputC     = output_type(CUDNN_C).dim
+      val filterCout  = filter_type(CUDNN_C_OUT).dim
+      val filterCin   = filter_type(CUDNN_C_IN).dim
       List((inputC, filterCin), (outputC, filterCout))
 
-      // (x_type.shape zip y_type.shape).toList map { case (a:Size, b:Size) => (a.dim, b.dim) }
     case _ => super.mergable_dims(node)
   }
 

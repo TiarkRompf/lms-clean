@@ -9,12 +9,12 @@ import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps,CUDNNTypeLess,CLibTypeLess}
 import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess, CUBLASTypeLess, CudaOps}
-import lms.transformation.util.{DataStructure, ConvParam}
+import lms.transformation.util.{DataStructure, ConvParam, CudnnUtils}
 
 import Backend._
 
 
-trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with ConvParam {
+trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with ConvParam with CudnnUtils {
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -36,23 +36,23 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
   // otherwise, create a new descriptor, store it in the hashmap and return it.
   def getTensorDescriptor(shape: Seq[Int], kind: String)(implicit __pos: SourceContext): TOP = cudnnTensor2Desc.get(shape) match {
     case Some((desc, _)) => desc
-    case None => 
-      val n::h::w::c::_ = shape
-      kind match {
-        case "tensor" =>
-          val desc = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_TENSOR_DESCRIPTOR], "cudnnTensorDescriptor_t").x)
-          CUDNN_CREATE_TENSOR_DESCRIPTOR(desc)
-          CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_NHWC, CUDNN_FLOAT, INT(n), INT(c), INT(h), INT(w))
-          cudnnTensor2Desc += ((shape, (desc, kind)))
-          desc
-        case "filter" =>
-          val desc = new CUDNN_FILTER_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_FILTER_DESCRIPTOR], "cudnnFilterDescriptor_t").x)
-          CUDNN_CREATE_FILTER_DESCRIPTOR(desc)
-          CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_NHWC, CUDNN_FLOAT, INT(n), INT(c), INT(h), INT(w))
-          cudnnTensor2Desc += ((shape, (desc, kind)))
-          desc
-        case _ => throw new Exception("Unknown kind of cudnn tensor descriptor")
-      }
+    case None => kind match {
+      case "tensor" =>
+        val desc = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_TENSOR_DESCRIPTOR], "cudnnTensorDescriptor_t").x)
+        CUDNN_CREATE_TENSOR_DESCRIPTOR(desc)
+        CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_LAYOUT, CUDNN_FLOAT, 
+          INT(shape(CUDNN_N)), INT(shape(CUDNN_C)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W)))
+        cudnnTensor2Desc += ((shape, (desc, kind)))
+        desc
+      case "filter" =>
+        val desc = new CUDNN_FILTER_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_FILTER_DESCRIPTOR], "cudnnFilterDescriptor_t").x)
+        CUDNN_CREATE_FILTER_DESCRIPTOR(desc)
+        CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_LAYOUT, CUDNN_FLOAT, 
+          INT(shape(CUDNN_C_OUT)), INT(shape(CUDNN_C_IN)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W)))
+        cudnnTensor2Desc += ((shape, (desc, kind)))
+        desc
+      case _ => throw new Exception("Unknown kind of cudnn tensor descriptor")
+    }
   }
 
   // given the padding, strides and dilation parameters of a convolution operation, return its descriptor.
@@ -68,8 +68,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
           CUDNN_CONVOLUTION, CUDNN_FLOAT)
         desc
   }
-  
 
+  
   override def transform(n: Node): Backend.Exp = n match {
     // convolution forward operation
     case Node(s, "tensor_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
@@ -77,9 +77,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       implicit val pos = Adapter.oldSourceMap(s)
       // these are default settings
 
-      val layout = CUDNN_NHWC           // default tensor layout is batch x width x height x channel
-      val datatype = CUDNN_FLOAT        // only consider float
-      val mode = CUDNN_CONVOLUTION      // only consider convolution mode
+      // val layout = CUDNN_NHWC           // default tensor layout is batch x width x height x channel
+      // val datatype = CUDNN_FLOAT        // only consider float
+      // val mode = CUDNN_CONVOLUTION      // only consider convolution mode
 
       // unpack convolution paratemers
       val ConvParam(alpha, beta, padding, strides, dilation) = params
