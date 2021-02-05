@@ -76,17 +76,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       Backend.Const(params:ConvParam)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       // these are default settings
-      // TODO: perhaps move to base?
-      val tensor_dim = 4                // input tensor and input kernel should both be 4d
-      val hyperparam_dim = 2            // degree of freedom of padding, strides, and dilation
+
       val layout = CUDNN_NHWC           // default tensor layout is batch x width x height x channel
       val datatype = CUDNN_FLOAT        // only consider float
       val mode = CUDNN_CONVOLUTION      // only consider convolution mode
-      // val padding = Seq(1, 1)
-      // val strides = Seq(1, 1)
-      // val dilation = Seq(1, 1)
-      // var alpha = 1.0f
-      // var beta = 0.0f  
 
       // unpack convolution paratemers
       val padding = params.padding
@@ -100,13 +93,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val filter_shape = tensor_shape(right, useOldMetadata = true)
       val weight_tensor = get_operand(left, anno)
       val filter_tensor = get_operand(right, anno)
-
-      // assertions
-      assert(weight_shape.size != tensor_dim, "input tensor of convolution must be 4D")
-      assert(filter_shape.size != tensor_dim, "input filter of convolution must be 4D")
-      assert(padding.size != hyperparam_dim, "padding must be sequence of integer of length 2")
-      assert(strides.size != hyperparam_dim, "strides must be sequence of integer of length 2")
-      assert(dilation.size != hyperparam_dim, "dilation must be sequence of integer of length 2")
 
       // create input descriptor
       /*
