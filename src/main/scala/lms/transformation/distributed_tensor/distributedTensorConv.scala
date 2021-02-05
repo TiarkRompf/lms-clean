@@ -16,6 +16,31 @@ import Backend._
 
 trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess with ConvParam {
 
+  def ConvForward(weight: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    val tensor_dim = 4                // input tensor and input kernel should both be 4d
+    val hyperparam_dim = 2            // degree of freedom of padding, strides, and dilation
+
+    val padding = params.padding
+    val strides = params.strides
+    val dilation = params.dilation
+    val alpha = params.alpha
+    val beta = params.beta
+
+    val weight_shape = weight.tensor_type.shape
+    val filter_shape = filter.tensor_type.shape
+
+    assert(weight_shape.size != tensor_dim, "input tensor of convolution must be 4D")
+    assert(filter_shape.size != tensor_dim, "input filter of convolution must be 4D")
+    assert(padding.size != hyperparam_dim, "padding must be sequence of integer of length 2")
+    assert(strides.size != hyperparam_dim, "strides must be sequence of integer of length 2")
+    assert(dilation.size != hyperparam_dim, "dilation must be sequence of integer of length 2")
+    assert(weight.et == filter.et)
+
+    val res_tt = weight.tensor_type
+    (new TENSOR(Adapter.g.reflectRead("tensor_conv", C(res_tt), C(anno),
+      weight.x, filter.x, C(params))(weight.x, filter.x))).withSrcType(__pos, weight.et)
+  }
+
   def ConvBackwardData(weight: TENSOR, filter: TENSOR, doutput: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
     assert(weight.et == filter.et && filter.et == doutput.et)
     val res_tt = weight.tensor_type
