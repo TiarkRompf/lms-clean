@@ -82,11 +82,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val mode = CUDNN_CONVOLUTION      // only consider convolution mode
 
       // unpack convolution paratemers
-      val padding = params.padding
-      val strides = params.strides
-      val dilation = params.dilation
-      val alpha = params.alpha
-      val beta = params.beta 
+      val ConvParam(alpha, beta, padding, strides, dilation) = params
 
       // get input info and transform input tensors
       val weight_shape = tensor_shape(left, useOldMetadata = true)
@@ -254,11 +250,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       implicit val pos = Adapter.oldSourceMap(s)
 
       // unpack convolution paratemers
-      val padding = params.padding
-      val strides = params.strides
-      val dilation = params.dilation
-      val alpha = params.alpha
-      val beta = params.beta
+      val ConvParam(alpha, beta, padding, strides, dilation) = params
 
       // TODO: dim checks necessary or not?
       val doutput_shape = tensor_shape(s, useOldMetadata = true)
@@ -301,11 +293,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       implicit val pos = Adapter.oldSourceMap(s)
 
       // unpack convolution paratemers
-      val padding = params.padding
-      val strides = params.strides
-      val dilation = params.dilation
-      val alpha = params.alpha
-      val beta = params.beta
+      val ConvParam(alpha, beta, padding, strides, dilation) = params
 
       // TODO: dim checks necessary or not?
       val doutput_shape = tensor_shape(s, useOldMetadata = true)

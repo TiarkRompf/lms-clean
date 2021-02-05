@@ -20,11 +20,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     val tensor_dim = 4                // input tensor and input kernel should both be 4d
     val hyperparam_dim = 2            // degree of freedom of padding, strides, and dilation
 
-    val padding = params.padding
-    val strides = params.strides
-    val dilation = params.dilation
-    val alpha = params.alpha
-    val beta = params.beta
+    val ConvParam(alpha, beta, padding, strides, dilation) = params
 
     val weight_shape = weight.tensor_type.shape
     val filter_shape = filter.tensor_type.shape
