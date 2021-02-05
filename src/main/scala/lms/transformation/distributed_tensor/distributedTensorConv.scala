@@ -30,6 +30,25 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       weight.x, filter.x, doutput.x, C(params))(weight.x, filter.x, doutput.x)).withSrcType(__pos, weight.et))
   }
 
+  override def mergable_dims(node: Node) = node match {
+    // constraints: 
+    // input.channels = filter.input_channels
+    // output.channels = filter.output_channels
+    // NHWC
+    case Node(s, "tensor_conv", Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
+      val input_type = (new TENSOR(a, useOldMetadata=true)).tensor_type.shape
+      val filter_type = (new TENSOR(b, useOldMetadata=true)).tensor_type.shape
+      val output_type = (new TENSOR(s, useOldMetadata=true)).tensor_type.shape
+      val inputC = input_type(3).dim
+      val outputC = output_type(3).dim
+      val filterCout = filter_type(0).dim
+      val filterCin = filter_type(3).dim
+      List((inputC, filterCin), (outputC, filterCout))
+
+      // (x_type.shape zip y_type.shape).toList map { case (a:Size, b:Size) => (a.dim, b.dim) }
+    case _ => super.mergable_dims(node)
+  }
+
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
     weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
     gradMap: mutable.HashMap[Backend.Sym, TENSOR],
