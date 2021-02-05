@@ -70,13 +70,24 @@ trait CudnnUtils {
   // val CUDNN_LAYOUT = CUDNN_NHWC
   // val CUDNN_DATATYPE = CUDNN_FLOAT
   // val CUDNN_MODE = CUDNN_CONVOLUTIONs
- 
+
+
+ /* NHWC
   val CUDNN_N       = 0
   val CUDNN_H       = 1
   val CUDNN_W       = 2
   val CUDNN_C       = 3
-  val CUDNN_C_OUT   = 0
-  val CUDNN_C_IN    = 3
+  val CUDNN_C_OUT   = CUDNN_N
+  val CUDNN_C_IN    = CUDNN_C
+  */
+
+  // NCHW
+  val CUDNN_N       = 0
+  val CUDNN_H       = 2
+  val CUDNN_W       = 3
+  val CUDNN_C       = 1
+  val CUDNN_C_OUT   = CUDNN_N
+  val CUDNN_C_IN    = CUDNN_C
 
   val CUDNN_TENSOR_DIM  = 4  // input tensor and input kernel should both be 4d
   val CUDNN_PARAM_DIM   = 2  // degree of freedom of padding, strides, and dilation
