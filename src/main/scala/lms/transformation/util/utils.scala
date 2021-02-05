@@ -67,7 +67,7 @@ trait ConvParam {
 trait CudnnUtils {
   import CUDNNTypeLess._
 
-  val CUDNN_LAYOUT = CUDNN_NHWC
+  // val CUDNN_LAYOUT = CUDNN_NHWC
   // val CUDNN_DATATYPE = CUDNN_FLOAT
   // val CUDNN_MODE = CUDNN_CONVOLUTIONs
  

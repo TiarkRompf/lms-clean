@@ -40,14 +40,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       case "tensor" =>
         val desc = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_TENSOR_DESCRIPTOR], "cudnnTensorDescriptor_t").x)
         CUDNN_CREATE_TENSOR_DESCRIPTOR(desc)
-        CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_LAYOUT, CUDNN_FLOAT, 
+        CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_NHWC, CUDNN_FLOAT, 
           INT(shape(CUDNN_N)), INT(shape(CUDNN_C)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W)))
         cudnnTensor2Desc += ((shape, (desc, kind)))
         desc
       case "filter" =>
         val desc = new CUDNN_FILTER_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_FILTER_DESCRIPTOR], "cudnnFilterDescriptor_t").x)
         CUDNN_CREATE_FILTER_DESCRIPTOR(desc)
-        CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_LAYOUT, CUDNN_FLOAT, 
+        CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_NHWC, CUDNN_FLOAT, 
           INT(shape(CUDNN_C_OUT)), INT(shape(CUDNN_C_IN)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W)))
         cudnnTensor2Desc += ((shape, (desc, kind)))
         desc
@@ -69,7 +69,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         desc
   }
 
-  
+
   override def transform(n: Node): Backend.Exp = n match {
     // convolution forward operation
     case Node(s, "tensor_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
