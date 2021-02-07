@@ -99,7 +99,7 @@ void Snippet(int x0) {
   x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x18, 0, 512);
   // end initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
   int x19 = 0;
-  while (x19 != 5) {
+  while (x19 != 10) {
     // begin initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
     CUDA_CALL(cudaSetDevice(x7));
     float* x43 = (float*)malloc(0 * sizeof(float));

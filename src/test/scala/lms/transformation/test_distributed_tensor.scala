@@ -130,7 +130,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val tensor_intermediate = tensor_weight neg (batchSplitAnno)
           tensor_input + (tensor_intermediate, batchSplitAnno)
         }
-        model()
+        model(10)
         printf("compile")
       }
     }
