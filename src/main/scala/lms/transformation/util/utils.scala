@@ -91,4 +91,7 @@ trait CudnnUtils {
 
   val CUDNN_TENSOR_DIM  = 4  // input tensor and input kernel should both be 4d
   val CUDNN_PARAM_DIM   = 2  // degree of freedom of padding, strides, and dilation
+
+  val CUDNN_PARAM_H     = 0  // height of padding, strides, and dilation
+  val CUDNN_PARAM_W     = 1  // weight of padding, strides, and dilation
 }
