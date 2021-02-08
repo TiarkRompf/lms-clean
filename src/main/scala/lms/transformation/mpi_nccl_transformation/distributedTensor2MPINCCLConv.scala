@@ -331,7 +331,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       
       dfilter.x
 
-    
     case _ => super.transform(n) 
   }
 

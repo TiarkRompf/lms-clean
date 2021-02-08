@@ -15,6 +15,7 @@ import Backend._
 
 
 trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess with ConvParam with CudnnUtils {
+  import BaseTypeLess._
 
   def ConvForward(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
 
@@ -30,7 +31,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     require(dilation.size != CUDNN_PARAM_DIM, "dilation must be sequence of integer of length 2")
     require(input.et == filter.et)
 
-    val res_tt = input.tensor_type
+    val res_tt = ConvForwardOutTensorType(input, filter, params, anno, __pos)
     (new TENSOR(Adapter.g.reflectRead("tensor_conv", C(res_tt), C(anno),
       input.x, filter.x, C(params))(input.x, filter.x))).withSrcType(__pos, input.et)
   }
@@ -47,6 +48,29 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     val res_tt = filter.tensor_type
     (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_filter", C(res_tt), C(anno), 
       input.x, filter.x, doutput.x, C(params))(input.x, filter.x, doutput.x)).withSrcType(__pos, input.et))
+  }
+
+  def ConvForwardOutTensorType(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TensorType = {
+    // add assertions / requires
+    val input_shape = input.tensor_type.shape
+    val filter_shape = filter.tensor_type.shape
+    val ConvParam(alpha, beta, padding, strides, dilation) = params
+
+    val output_N = input_shape(CUDNN_N).size
+    val output_C = filter_shape(CUDNN_C_OUT).size
+
+    def outputDim(inputDim: Int, pad: Int, filterDim: Int, dil: Int, str: Int) = 1 + (inputDim + 2*pad - (((filterDim-1)*dil)+1)) / str
+
+    val output_H = outputDim(input_shape(CUDNN_H).size, padding(0), filter_shape(CUDNN_H).size, dilation(0), strides(0))
+    val output_W = outputDim(input_shape(CUDNN_W).size, padding(1), filter_shape(CUDNN_W).size, dilation(1), strides(1))
+
+    val output_shape = Seq(
+      Size(Dim(CUDNN_N), output_N), 
+      Size(Dim(CUDNN_C), output_C), 
+      Size(Dim(CUDNN_H), output_H), 
+      Size(Dim(CUDNN_W), output_W))
+
+    TensorType(output_shape, input.et, anno)
   }
 
   override def mergable_dims(node: Node) = node match {
