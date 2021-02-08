@@ -249,8 +249,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
       // backward data pass
-      CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(INT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
-        conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(INT(beta)), dweight_descriptor, dweight)
+      CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(FLOAT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
+        conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(FLOAT(beta)), dweight_descriptor, dweight)
       
       dweight.x
 
@@ -292,8 +292,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
       // backward data pass
-      CUDNN_CONV_BWD_FILTER(myCUDNNComm, VAR(INT(alpha)), weight_descriptor, new ARRAY(weight_tensor), doutput_descriptor, new ARRAY(output_tensor),
-        conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(INT(beta)), dfilter_descriptor, dfilter)
+      CUDNN_CONV_BWD_FILTER(myCUDNNComm, VAR(FLOAT(alpha)), weight_descriptor, new ARRAY(weight_tensor), doutput_descriptor, new ARRAY(output_tensor),
+        conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(FLOAT(beta)), dfilter_descriptor, dfilter)
       
       dfilter.x
 
