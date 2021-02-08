@@ -23,12 +23,12 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     val weight_shape = weight.tensor_type.shape
     val filter_shape = filter.tensor_type.shape
 
-    assert(weight_shape.size != CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D")
-    assert(filter_shape.size != CUDNN_TENSOR_DIM, "input filter of convolution must be 4D")
-    assert(padding.size != CUDNN_PARAM_DIM, "padding must be sequence of integer of length 2")
-    assert(strides.size != CUDNN_PARAM_DIM, "strides must be sequence of integer of length 2")
-    assert(dilation.size != CUDNN_PARAM_DIM, "dilation must be sequence of integer of length 2")
-    assert(weight.et == filter.et)
+    require(weight_shape.size != CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D")
+    require(filter_shape.size != CUDNN_TENSOR_DIM, "input filter of convolution must be 4D")
+    require(padding.size != CUDNN_PARAM_DIM, "padding must be sequence of integer of length 2")
+    require(strides.size != CUDNN_PARAM_DIM, "strides must be sequence of integer of length 2")
+    require(dilation.size != CUDNN_PARAM_DIM, "dilation must be sequence of integer of length 2")
+    require(weight.et == filter.et)
 
     val res_tt = weight.tensor_type
     (new TENSOR(Adapter.g.reflectRead("tensor_conv", C(res_tt), C(anno),
