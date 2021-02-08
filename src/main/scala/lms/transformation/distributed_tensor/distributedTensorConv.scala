@@ -16,37 +16,37 @@ import Backend._
 
 trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess with ConvParam with CudnnUtils {
 
-  def ConvForward(weight: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
+  def ConvForward(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
 
     val ConvParam(alpha, beta, padding, strides, dilation) = params
 
-    val weight_shape = weight.tensor_type.shape
+    val input_shape = input.tensor_type.shape
     val filter_shape = filter.tensor_type.shape
 
-    require(weight_shape.size != CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D")
+    require(input_shape.size != CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D")
     require(filter_shape.size != CUDNN_TENSOR_DIM, "input filter of convolution must be 4D")
     require(padding.size != CUDNN_PARAM_DIM, "padding must be sequence of integer of length 2")
     require(strides.size != CUDNN_PARAM_DIM, "strides must be sequence of integer of length 2")
     require(dilation.size != CUDNN_PARAM_DIM, "dilation must be sequence of integer of length 2")
-    require(weight.et == filter.et)
+    require(input.et == filter.et)
 
-    val res_tt = weight.tensor_type
+    val res_tt = input.tensor_type
     (new TENSOR(Adapter.g.reflectRead("tensor_conv", C(res_tt), C(anno),
-      weight.x, filter.x, C(params))(weight.x, filter.x))).withSrcType(__pos, weight.et)
+      input.x, filter.x, C(params))(input.x, filter.x))).withSrcType(__pos, input.et)
   }
 
-  def ConvBackwardData(weight: TENSOR, filter: TENSOR, doutput: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    assert(weight.et == filter.et && filter.et == doutput.et)
-    val res_tt = weight.tensor_type
+  def ConvBackwardData(input: TENSOR, filter: TENSOR, doutput: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    assert(input.et == filter.et && filter.et == doutput.et)
+    val res_tt = input.tensor_type
     (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_data", C(res_tt), C(anno), 
-      weight.x, filter.x, doutput.x, C(params))(weight.x, filter.x, doutput.x)).withSrcType(__pos, weight.et))
+      input.x, filter.x, doutput.x, C(params))(input.x, filter.x, doutput.x)).withSrcType(__pos, input.et))
   }
 
-  def ConvBackwardFilter(weight: TENSOR, filter: TENSOR, doutput: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    assert(weight.et == filter.et && filter.et == doutput.et)
+  def ConvBackwardFilter(input: TENSOR, filter: TENSOR, doutput: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    assert(input.et == filter.et && filter.et == doutput.et)
     val res_tt = filter.tensor_type
     (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_filter", C(res_tt), C(anno), 
-      weight.x, filter.x, doutput.x, C(params))(weight.x, filter.x, doutput.x)).withSrcType(__pos, weight.et))
+      input.x, filter.x, doutput.x, C(params))(input.x, filter.x, doutput.x)).withSrcType(__pos, input.et))
   }
 
   override def mergable_dims(node: Node) = node match {
