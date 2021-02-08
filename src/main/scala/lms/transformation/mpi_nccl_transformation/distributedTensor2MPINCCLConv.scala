@@ -2,6 +2,7 @@ package lms.transformation.tensor
 
 import scala.annotation.implicitNotFound
 import scala.collection._
+import scala.collection.mutable.ListBuffer
 
 import lms.core._
 import lms.core.stub._
@@ -64,7 +65,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       case None =>
         val desc = new CUDNN_CONV_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_CONV_DESCRIPTOR], "cudnnConvolutionDescriptor_t").x)
         CUDNN_CREATE_CONV_DESCRIPTOR(desc)
-        CUDNN_SET_CONV_2D_DESCRIPTOR(desc, INT(padding(0)), INT(padding(1)), INT(strides(0)), INT(strides(1)), INT(dilation(0)), INT(dilation(1)),
+        CUDNN_SET_CONV_2D_DESCRIPTOR(desc, 
+          INT(padding(CUDNN_PARAM_H)),  INT(padding(CUDNN_PARAM_W)), 
+          INT(strides(CUDNN_PARAM_H)),  INT(strides(CUDNN_PARAM_W)), 
+          INT(dilation(CUDNN_PARAM_H)), INT(dilation(CUDNN_PARAM_W)),
           CUDNN_CONVOLUTION, CUDNN_FLOAT)
         desc
   }
@@ -75,11 +79,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
     case Node(s, "tensor_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
       Backend.Const(params:ConvParam)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
-      // these are default settings
-
-      // val layout = CUDNN_NHWC           // default tensor layout is batch x width x height x channel
-      // val datatype = CUDNN_FLOAT        // only consider float
-      // val mode = CUDNN_CONVOLUTION      // only consider convolution mode
 
       // unpack convolution paratemers
       val ConvParam(alpha, beta, padding, strides, dilation) = params
@@ -90,39 +89,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val weight_tensor = get_operand(left, anno)
       val filter_tensor = get_operand(right, anno)
 
-      // create input descriptor
-      /*
-      val input_batchsize = weight_shape(0)
-      val input_height = weight_shape(1)
-      val input_width = weight_shape(2)
-      val input_channels = weight_shape(3)
-      val input_descriptor = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_TENSOR_DESCRIPTOR], "cudnnTensorDescriptor_t").x)
-      CUDNN_CREATE_TENSOR_DESCRIPTOR(input_descriptor)
-      CUDNN_SET_TENSOR_4D_DESCRIPTOR(input_descriptor, layout, datatype, 
-        input_batchsize, input_channels, input_height, input_width)
-      */
       val input_descriptor = getTensorDescriptor(weight_shape, "tensor")
-
-      // create filter descriptor
-      /*
-      val filter_out_channels = filter_shape(0)
-      val filter_height = filter_shape(1)
-      val filter_width = filter_shape(2)
-      val filter_in_channels = filter_shape(3)
-      val filter_descriptor = new CUDNN_FILTER_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_FILTER_DESCRIPTOR], "cudnnFilterDescriptor_t").x)
-      CUDNN_CREATE_FILTER_DESCRIPTOR(filter_descriptor)
-      CUDNN_SET_FILTER_4D_DESCRIPTOR(filter_descriptor, layout, datatype, 
-        filter_out_channels, filter_in_channels, filter_height, filter_width)
-      */
       val filter_descriptor = getTensorDescriptor(filter_shape, "filter")
-
-      // create convolution descriptor
-      /*
-      val conv_descriptor = new CUDNN_CONV_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_CONV_DESCRIPTOR], "cudnnConvolutionDescriptor_t").x)
-      CUDNN_CREATE_CONV_DESCRIPTOR(conv_descriptor)
-      CUDNN_SET_CONV_2D_DESCRIPTOR(conv_descriptor, INT(padding(0)), INT(padding(1)), INT(strides(0)), INT(strides(1)), INT(dilation(0)), INT(dilation(1)),
-        mode, datatype)
-      */
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
       // find output tensor shape
@@ -133,14 +101,12 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(conv_descriptor, input_descriptor, filter_descriptor, 
         INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
 
-      // create output descriptor
-      /*
-      val output_descriptor = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_CONV_DESCRIPTOR], "cudnnConvolutionDescriptor_t").x)
-      CUDNN_CREATE_TENSOR_DESCRIPTOR(output_descriptor)
-      CUDNN_SET_TENSOR_4D_DESCRIPTOR(output_descriptor, layout, datatype, 
-        INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
-      */
-      val output_descriptor = getTensorDescriptor(Seq(output_batchsize, output_height, output_width, output_channels), "tensor")
+      val listBuffer1: ListBuffer[Int] = ListBuffer(0, 0, 0, 0)
+      listBuffer1(CUDNN_N) = output_batchsize
+      listBuffer1(CUDNN_C) = output_channels
+      listBuffer1(CUDNN_H) = output_height
+      listBuffer1(CUDNN_W) = output_width
+      val output_descriptor = getTensorDescriptor(listBuffer1.toList, "tensor")
 
       // allocate output tensor
       val output_size = output_batchsize * output_height * output_width * output_channels

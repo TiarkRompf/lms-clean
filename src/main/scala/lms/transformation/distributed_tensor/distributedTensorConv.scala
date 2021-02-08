@@ -59,10 +59,13 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     val output_N = input_shape(CUDNN_N).size
     val output_C = filter_shape(CUDNN_C_OUT).size
 
-    def outputDim(inputDim: Int, pad: Int, filterDim: Int, dil: Int, str: Int) = 1 + (inputDim + 2*pad - (((filterDim-1)*dil)+1)) / str
+    def outputDim(inputDim: Int, pad: Int, filterDim: Int, dil: Int, str: Int) = 
+      1 + (inputDim + 2*pad - (((filterDim-1)*dil)+1)) / str
 
-    val output_H = outputDim(input_shape(CUDNN_H).size, padding(0), filter_shape(CUDNN_H).size, dilation(0), strides(0))
-    val output_W = outputDim(input_shape(CUDNN_W).size, padding(1), filter_shape(CUDNN_W).size, dilation(1), strides(1))
+    val output_H = outputDim(input_shape(CUDNN_H).size, padding(CUDNN_PARAM_H), 
+      filter_shape(CUDNN_H).size, dilation(CUDNN_PARAM_H), strides(CUDNN_PARAM_H))
+    val output_W = outputDim(input_shape(CUDNN_W).size, padding(CUDNN_PARAM_W), 
+      filter_shape(CUDNN_W).size, dilation(CUDNN_PARAM_W), strides(CUDNN_PARAM_W))
 
     val output_shape = Seq(
       Size(Dim(CUDNN_N), output_N), 
