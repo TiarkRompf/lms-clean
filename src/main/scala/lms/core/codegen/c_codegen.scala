@@ -228,10 +228,10 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case _ => emit(quote(n))
   }
 
-  private val defines = mutable.HashSet[String]()
+  protected val defines = mutable.HashSet[String]()
   def registerDefine(define: String*) = defines ++= define.toSet
 
-  private val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
+  protected val headers = mutable.HashSet[String]("<stdio.h>", "<stdlib.h>", "<stdint.h>","<stdbool.h>")
   def registerHeader(nHeaders: String*): Unit = headers ++= nHeaders.toSet
   def registerHeader(includePath: String, header: String): Unit = {
     registerIncludePath(includePath)
@@ -279,9 +279,9 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     else s"$option ${paths.mkString(s" $option ")}"
   }
 
-  private val registeredFunctions = mutable.HashSet[String]()
-  private val functionsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
-  private val ongoingFun = new mutable.HashSet[String]()
+  protected val registeredFunctions = mutable.HashSet[String]()
+  protected val functionsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
+  protected val ongoingFun = new mutable.HashSet[String]()
   def registerTopLevelFunction(id: String, streamId: String = "general")(f: => Unit) =
     if (!registeredFunctions(id)) {
       if (ongoingFun(streamId)) ???
@@ -294,7 +294,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       })._1)(f)
       ongoingFun -= streamId
     }
-  private val functionDeclsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
+  protected val functionDeclsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
   def registerTopLevelFunctionDecl(id: String, streamId: String = "general")(f: => Unit) = {
     withStream(functionDeclsStreams.getOrElseUpdate(streamId, {
       val functionsStream = new ByteArrayOutputStream()
@@ -318,10 +318,10 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
         functionsStream.writeTo(out)
     }
 
-  private val registeredDatastructures = mutable.HashSet[String]()
-  private val datastructuresStream = new ByteArrayOutputStream()
-  private val datastructuresWriter = new PrintStream(datastructuresStream)
-  private var ongoingData = false
+  protected val registeredDatastructures = mutable.HashSet[String]()
+  protected val datastructuresStream = new ByteArrayOutputStream()
+  protected val datastructuresWriter = new PrintStream(datastructuresStream)
+  protected var ongoingData = false
   def registerDatastructures(id: String)(f: => Unit): Unit =
     if (!registeredDatastructures(id)) {
       if (ongoingData) ???
