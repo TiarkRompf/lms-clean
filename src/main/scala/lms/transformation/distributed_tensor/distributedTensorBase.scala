@@ -47,6 +47,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def namedDim(x: Int) = shape(x).dim
     def contains(d: Dim) = shape.map(_.dim).contains(d)
     def shapeSize = shape.map(_.size)
+    def shapeDim = shape.map(_.dim)
     def shapeSizeAfterSplit(d: Dim, degree: Int) = shape.map(s => if (s.dim == d) s.size / degree else s.size)
   }
 
@@ -96,7 +97,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
   }
 
-  class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
+  class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
@@ -136,7 +137,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
   }
 
-  class OPERATION(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
+  class OPERATION(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
     val (resultTypes: List[TensorType], annotation: Anno) = gc.get(x.asInstanceOf[Backend.Sym]) match {
       case Some(Node(_, s, Backend.Const(result_tensor_types: List[TensorType])::Backend.Const(anno:Anno)::_, _))
         if s.startsWith("op") => (result_tensor_types, anno)

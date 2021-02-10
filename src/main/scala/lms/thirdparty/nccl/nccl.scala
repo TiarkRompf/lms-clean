@@ -81,10 +81,6 @@ object NCCLTypeLess {
   // For now, let's make sure that the NCCL_GROUP_START/END are called within NCCL_CHECK, which has CTRL effect
   def NCCL_GROUP_START(implicit pos: SourceContext) = CMACRO("ncclGroupStart()", manifest[ncclResultT])
   def NCCL_GROUP_END(implicit pos: SourceContext) = CMACRO("ncclGroupEnd()", manifest[ncclResultT])
-  // def NCCL_GROUP_START(implicit pos: SourceContext) =
-  //   LIB_FUNCTION(manifest[ncclResultT], "ncclGroupStart")(Seq[Int](), Seq[Int](), Set[Int]())
-  // def NCCL_GROUP_END(implicit pos: SourceContext) =
-  //   LIB_FUNCTION(manifest[ncclResultT], "ncclGroupEnd")(Seq[Int](), Seq[Int](), Set[Int]())
 
   // Point-to-Point Operations in Collection
   /**
@@ -98,7 +94,6 @@ object NCCLTypeLess {
    * ncclGroupEnd();
    */
   // def NCCL_SCATTER(m: Manifest[_], sendbufs: ARRAY, recvbuf: ARRAY, ???)
-
 }
 
 trait NCCLOps extends CLibs with SizeTOps with CudaOps {

@@ -39,19 +39,33 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
 
   def Concat(xs: List[TENSOR], axis: Int, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
     // FIXME(feiw) assert shape and element type
+    // need to check that the inputs have the same shape except at the `axis` dimension.
+    val elementTypes = xs.map(_.tensor_type.et)
+    require(elementTypes.length > 0, "there must be at least one TENSOR to concat")
+    require(elementTypes.forall(_ == elementTypes.head), "all TENSORs must have the same type")
+    val tensorShapes = xs.map(_.tensor_type.shapeSize)
+    def sameShapeExceptDim(left: Seq[Int], right: Seq[Int], axis: Int) =
+      left.zip(right).zipWithIndex.forall { case ((l, r), i) => i == axis || l == r }
+    require(tensorShapes.forall(sameShapeExceptDim(tensorShapes.head, _, axis)),
+      s"all TENSORs must have the same shape except dim $axis")
+
     val concatSize = xs.map(_.tensor_type).map(_.shape).map(s=>s(axis)).map(_.size).sum
     val concatShape = xs(0).tensor_type.shape.zipWithIndex.map {
       case(s, i) => if (i == axis) Size(s.dim, concatSize) else s
     }
     val concatType = TensorType(concatShape, xs(0).et, anno)
     val defs = xs.map(_.x).toSeq
-    val all_defs = (C(concatType)::C(anno)::xs.map(_.x)).toSeq
+    val all_defs = (C(concatType)::C(anno)::C(axis)::xs.map(_.x)).toSeq
     (new TENSOR(Adapter.g.reflectRead("tensor_concat", all_defs:_*)(defs:_*))).withSrcType(__pos, xs(0).et)
   }
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, "op_split", _, _) => List()
-    case Node(s, "tensor_concat", _, _) => List() // FIXME(feiw) add!
+    case Node(s, "tensor_concat", tt::anno::Backend.Const(axis:Int)::(inputs:List[Backend.Sym]), _) =>
+      val input_types: List[Seq[Dim]] = inputs.map(x => (new TENSOR(x, useOldMetadata=true)).tensor_type.shapeDim)
+      input_types.transpose.zipWithIndex.flatMap { case (dims: List[Dim], index) =>
+        if (index != axis) dims.init zip dims.tail else List()
+      }
     case _ => super.mergable_dims(node)
   }
 

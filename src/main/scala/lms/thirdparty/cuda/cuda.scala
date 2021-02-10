@@ -64,8 +64,9 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     (a: TOP, b: TOP, c: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
       require(ms.toSeq.length == 3, "must have 3 manifest provided")
-      Seq(a, b, c).zip(ms).foreach {
-        case (arg, man) => require(arg.x.isInstanceOf[Backend.Const] || arg.t == man, s"${arg.x} ${arg.t} $man")
+      Seq(a, b, c).zip(ms).zipWithIndex.foreach {
+        case ((arg, man), index) => require(arg.x.isInstanceOf[Backend.Const] || arg.t == man,
+          s"mismatched type for ${index}th argument. Provided: ${arg.x} ${arg.t} Required: $man")
       }
       UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, dim1.x, dim2.x))
     }
@@ -276,6 +277,36 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       Backend.Const(())
     }
   }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int], manifest[Int])
+
+  // This concat op kernel has lots of limitations
+  // 1. it concats 2 inputs
+  // 2. the inputs are 2D, and the split axis is 1
+  // 3. the inputs is by equal sizes
+  // 4. the 3rd input is size of dim 0 of input0, the 4th input is size of dim 1 of input0
+  def CUDA_CONCAT2_2D1_EQUAL_KERNEL(m: Manifest[_], comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL5({xn: List[Backend.Exp] =>
+    withComment(comment) {
+      // type cast
+      val input0 = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val input1 = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val output = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+      val dim0 = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+      val dim1 = (new INT(xn(4))).withSrcType(__pos, manifest[Int])
+
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int]((dim0*dim1).x), Wrap[Int](stride.x))) {
+        val index = INT(Unwrap(i))
+        val size0 = index / dim0
+        val size1 = index % dim0
+        __ifThenElse(Wrap[Boolean]((size1 < dim1).x),
+          { output(index) = input0(INT(size0 * dim1 + size1)); () },
+          { output(index) = input1(INT(size0 * dim1 + size1 - dim1)); ()})
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int], manifest[Int])
+
 }
 
 
