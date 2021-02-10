@@ -64,7 +64,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       WEIGHT(update_dim_name(tt), update_dim_name(anno)).x
-    
+
     case Node(s, op, tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) if (op.startsWith("tensor_")) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       // this reconstruction should use new dim names in tensor type :)
@@ -76,7 +76,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
         case "tensor_dot" => Dot(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
         case _ => throw new Exception(s"op $op is not yet handled in dim name transform")
       }
-    
+
     case Node(s, op, tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::_, _) if (op.startsWith("tensor_")) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       op match {

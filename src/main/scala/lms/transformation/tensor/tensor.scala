@@ -100,10 +100,6 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
       assert(et == y.et)
       (new TENSOR(Adapter.g.reflect("tensor_dot", C(res_shape), x, y.x))).withSrcType(__pos, et)
     }
-
-    def neg()(implicit __pos: SourceContext): TENSOR = {
-      (new TENSOR(Adapter.g.reflect("tensor_negate", C(shape), x))).withSrcType(__pos, et)
-    }
   }
 }
 
@@ -157,11 +153,6 @@ trait FixedSizeTensorOps extends Base with PrimitiveOps with ArrayOps {
 
     def dot(y: Rep[Tensor[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = self dot tensor(y)
-      Wrap[Tensor[T]](t.x)
-    }
-
-    def neg()(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self neg()
       Wrap[Tensor[T]](t.x)
     }
   }

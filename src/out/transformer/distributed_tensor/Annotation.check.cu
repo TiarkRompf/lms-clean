@@ -147,7 +147,7 @@ void Snippet(int x0) {
   });
   // Gather by groups of NCCL send/recv
   NCCLCHECK(ncclGroupStart());
-  lms.thirdparty.nccltypeless$nccl_result x53 = ncclSend(x10, (size_t)1024, ncclFloat32, 0, x5, x6);
+  ncclResult_t x53 = ncclSend(x10, (size_t)1024, ncclFloat32, 0, x5, x6);
   NCCLCHECK(x53);
   if (x49) {
     int x54 = x1;
