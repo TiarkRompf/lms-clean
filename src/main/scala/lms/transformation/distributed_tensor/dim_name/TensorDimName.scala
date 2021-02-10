@@ -110,7 +110,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
         g.reflect(op,args:_*)
 
       // hacky handling of OPERATION.resultMap
-      if (op.startsWith("op_")) new OPERATION(res)
+      if (op.startsWith("op_")) (new OPERATION(res)).withSource(Adapter.oldSourceMap(s))
       res
 
     case _ => super.transform(n)

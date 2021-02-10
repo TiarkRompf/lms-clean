@@ -19,9 +19,10 @@ abstract class DistributedTensorCanonicalize extends Transformer {
   import FixedSizeDistributedTensorTypeLess._
 
   override def transform(n: Node): Exp = n match {
-    case Node(s, "op_split", _, _) =>
+    case Node(s, op, _, _) if op.startsWith("op_") =>
       val ts = super.transform(n)
-      val dummy = new SPLIT_OP(ts)
+      // hacky way to register Operation result
+      val dummy = new OPERATION(ts).withSource(Adapter.oldSourceMap(s))
       ts
     case _ => super.transform(n)
   }

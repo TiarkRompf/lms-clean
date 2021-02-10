@@ -150,10 +150,16 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     if (useOldMetadata) {
       require(OPERATION.oldResultMap.contains(x.asInstanceOf[Backend.Sym]),
         s"must already contain $x in the result map: ${OPERATION.oldResultMap}")
-    } else {
-      if (OPERATION.resultMap == null)
-        OPERATION.resultMap = mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
-      OPERATION.resultMap.getOrElseUpdate(x.asInstanceOf[Backend.Sym], results.map(_.x))
+    }
+
+    override def withSource(pos: SourceContext): this.type = {
+      if (!useOldMetadata) {
+        if (OPERATION.resultMap == null)
+          OPERATION.resultMap = mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
+        implicit val sc_ : SourceContext = pos
+        OPERATION.resultMap.getOrElseUpdate(x.asInstanceOf[Backend.Sym], results.map(_.x))
+      }
+      super.withSource(pos)
     }
 
     def getResultType(i: Int): TensorType = {
@@ -174,12 +180,12 @@ trait FixedSizeDistributedTensorBaseTypeLess {
       OPERATION.resultMap(x.asInstanceOf[Backend.Sym]).map(x => new TENSOR(x))
     }
 
-    private def result(i: Int): TENSOR = {
+    private def result(i: Int)(implicit __pos: SourceContext): TENSOR = {
       require(i >= 0 && i < numResults, s"parameter must be in Range of $numResults but got $i")
       OPERATION.getResult(this, i, getResultType(i), annotation)
     }
 
-    private def results: List[TENSOR] = (0 until numResults).toList.map(i => result(i))
+    private def results(implicit __pos: SourceContext): List[TENSOR] = (0 until numResults).toList.map(i => result(i))
   }
 
   object OPERATION {
