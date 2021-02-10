@@ -64,8 +64,9 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       Backend.Const(0), Backend.Const("__global__"))
     (a: TOP, b: TOP, c: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
-      Seq(a, b, c).zip(ms).foreach {
-        case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man, s"${arg.x} ${arg.t} $man")
+      require(ms.length == 3, s"should have 3 manifests, but got ${ms.length}")
+      Seq(a, b, c).zip(ms).zipWithIndex.foreach {
+        case ((arg, man), index) => require(arg.x.isInstanceOf[Backend.Const] || arg.t == man, s"{$index}th parameter has wrong type. Sym: ${arg.x} Type: ${arg.t} Manifest: $man")
       }
       UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, dim1.x, dim2.x))
     }
@@ -193,6 +194,27 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     }
   }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
 
+
+  // Element-wise Unary Operation
+  def CUDA_UNARY_KERNEL(m: Manifest[_], op: (NUM) => NUM, comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
+    withComment(comment) {
+      // type cast
+      val in = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val out = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val size = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+        val index = INT(Unwrap(i))
+        out(index) = op(in(index)); ()
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  def CUDA_NEGATE_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ZERO(m) - _, s"generating kernel function for NEGATE of type $m")
 
   // Element-wise Add
   def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =

@@ -77,6 +77,13 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
         case _ => throw new Exception(s"op $op is not yet handled in dim name transform")
       }
 
+    case Node(s, op, tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::_, _) if (op.startsWith("tensor_")) =>
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+      op match {
+        case "tensor_negate" => Negate(new TENSOR(transform(x)), update_dim_name(anno)).x
+        case _ => throw new Exception(s"op $op is not yet handled in dim name transform")
+      }
+
     case Node(s, "tensor_dot_with_transpose", tt::Backend.Const(anno:Anno)::Backend.Const(transL:Boolean)::Backend.Const(transR:Boolean)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       DotWithTranspose(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno), transL, transR).x
