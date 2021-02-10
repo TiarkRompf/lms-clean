@@ -55,45 +55,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     case a => a
   }
 
-  // val binaryOps = Set("tensor_add", "tensor_minus", "tensor_mult", "tensor_div", "tensor_dot")
-
-  // override def transform(n: Node): Backend.Exp = n match {
-
-  //   case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-  //     implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-  //     INPUT(update_dim_name(tt), update_dim_name(anno)).x
-
-  //   case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-  //     implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-  //     WEIGHT(update_dim_name(tt), update_dim_name(anno)).x
-
-  //   case Node(s, op, tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) if binaryOps.contains(op) =>
-  //     implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-  //     // this reconstruction should use new dim names in tensor type :)
-  //     op match {
-  //       case "tensor_add" => Add(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-  //       case "tenosr_minus" => Sub(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-  //       case "tensor_mult" => Mul(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-  //       case "tensor_div" => Div(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-  //       case "tensor_dot" => Dot(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-  //     }
-
-  //   case Node(s, "tensor_dot_with_transpose", tt::Backend.Const(anno:Anno)::Backend.Const(transL:Boolean)::Backend.Const(transR:Boolean)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-  //     implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-  //     DotWithTranspose(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno), transL, transR).x
-
-  //   case Node(s, "tensor_result", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::Backend.Const(i:Int)::_, _) =>
-  //     implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-  //     OPERATION.getResult(new OPERATION(transform(x)), i, update_dim_name(tt), update_dim_name(anno)).x
-
-  //   case Node(s, op, _, _) if (op.startsWith("tensor_") || op.startsWith("op_")) =>
-  //     throw new Exception(s"op $op is not yet handled in dim name transform")
-
-  //   case _ => super.transform(n)
-  // }
-
   override def transform(n: Node): Backend.Exp = n match {
-
     case Node(s, op, rs, es) if (op.startsWith("tensor_") || op.startsWith("op_")) =>
       val (effects, pure) = (es.deps, rs)
       val args = pure.map {
