@@ -11,7 +11,6 @@ import lms.collection.mutable.{ArrayOps, ArrayTypeLess, StackArrayOps}
 import lms.transformation.tensor.FixedSizeTensorDeviceTypeLess
 import lms.thirdparty.{CLibs, CCodeGenLibs, CLibTypeLess, SizeTOps, SIZE_TTypeLess, CCodeGenSizeTOps}
 
-import scala.math.tanh
 
 object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction {
   import BaseTypeLess._
