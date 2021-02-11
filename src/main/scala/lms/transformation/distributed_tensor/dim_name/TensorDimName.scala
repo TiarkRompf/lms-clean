@@ -81,6 +81,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       op match {
         case "tensor_negate" => Negate(new TENSOR(transform(x)), update_dim_name(anno)).x
+        case "tensor_invert" => Invert(new TENSOR(transform(x)), update_dim_name(anno)).x
         case _ => throw new Exception(s"op $op is not yet handled in dim name transform")
       }
 

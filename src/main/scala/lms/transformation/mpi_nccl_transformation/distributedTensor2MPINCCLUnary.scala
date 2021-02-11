@@ -38,7 +38,17 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
 		array
   }
 
-  val unaryOps = List("tensor_negate")
+  val CUDA_INVERT_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_INVERT_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_INVERT_KERNEL_MAP.getOrElseUpdate(m, CUDA_INVERT_KERNEL(m))
+  def gpu_inv_array(size: Int, m: Manifest[_], device: INT, operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
+	withComment(s"computing INV on GPU for size $size and type $m at device (pre-rename) ${device.x} with operand $operand") {
+		val array = gpu_array(size, m, device)
+		val inv_fun = CUDA_INVERT_FUN(m)
+		inv_fun(new ARRAY(operand), array, size, DIM3(gridSize), DIM3(blockSize))
+		array
+  }
+
+  val unaryOps = List("tensor_negate", "tensor_invert")
 
   override def transform(n: Node): Backend.Exp = n match {
 
@@ -59,6 +69,7 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
           val count = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
           op match {
             case "tensor_negate" => gpu_neg_array(count, m, myNCCLRank, loaded_operand).x
+            case "tensor_invert" => gpu_inv_array(count, m, myNCCLRank, loaded_operand).x
             case _ => throw new Exception(s"op $op is not unary op")
           }
         case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")

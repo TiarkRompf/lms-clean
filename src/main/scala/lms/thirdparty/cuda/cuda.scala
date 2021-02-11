@@ -216,6 +216,8 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
   def CUDA_NEGATE_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ZERO(m) - _, s"generating kernel function for NEGATE of type $m")
 
+  def CUDA_INVERT_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ONE(m) / _, s"generating kernel function for INVERT of type $m")
+
   // Element-wise Add
   def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
     CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ + _, s"generating kernel function for ADD of type $m")
