@@ -11,6 +11,7 @@ import lms.collection.mutable.{ArrayOps, ArrayTypeLess, StackArrayOps}
 import lms.transformation.tensor.FixedSizeTensorDeviceTypeLess
 import lms.thirdparty.{CLibs, CCodeGenLibs, CLibTypeLess, SizeTOps, SIZE_TTypeLess, CCodeGenSizeTOps}
 
+import scala.math.tanh
 
 object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction {
   import BaseTypeLess._
@@ -217,6 +218,8 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   def CUDA_NEGATE_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ZERO(m) - _, s"generating kernel function for NEGATE of type $m")
 
   def CUDA_INVERT_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ONE(m) / _, s"generating kernel function for INVERT of type $m")
+
+  def CUDA_TANH_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, _ tanh, s"generating kernel function for TANH of type $m")
 
   // Element-wise Add
   def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =

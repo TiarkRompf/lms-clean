@@ -900,6 +900,10 @@ object PrimitiveTypeLess {
       assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       BOOL(Adapter.g.reflect("<", x, y.x))
     }
+
+    def tanh()(implicit pos: SourceContext): NUM = {
+      NUM(Adapter.g.reflect("tanh", x), t)
+    }
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =
     (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
