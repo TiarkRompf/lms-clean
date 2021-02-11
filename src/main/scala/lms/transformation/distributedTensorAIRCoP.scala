@@ -82,7 +82,6 @@ abstract class DistributeTensorAIRCoP extends Transformer {
         val node = new TENSOR(transform(fs))
         val grad = ZEROS(node.tensor_type, node.annotation)
         gradMap(fs.asInstanceOf[Backend.Sym]) = grad
-
       } else { // must be OPERATION
         val oldOp = new OPERATION(fs, useOldMetadata = true)
         val newOp = new OPERATION(transform(fs)).withSource(pos)
