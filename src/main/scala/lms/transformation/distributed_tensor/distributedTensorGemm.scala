@@ -14,15 +14,15 @@ import Backend._
 trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
 
   def Dot(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-    val res_tt = (x.shape_size.size, y.shape_size.size) match {
+    val res_tt = (x.shapeSize.size, y.shapeSize.size) match {
       case (1,1) => // vector-vector-dot
-        assert(x.shape_size == y.shape_size)
+        assert(x.shapeSize == y.shapeSize)
         TensorType(Seq(Size(Dim(next_dim_name), 1)), x.et)
       case (2,1) => // matrix-vector-dot
-        assert(x.shape_size(1) == y.shape_size(0))
+        assert(x.shapeSize(1) == y.shapeSize(0))
         TensorType(x.tensor_type.shape.take(1), x.et)
       case (2,2) => // matrix-matrix-dot
-        assert(x.shape_size(1) == y.shape_size(0))
+        assert(x.shapeSize(1) == y.shapeSize(0))
         TensorType(Seq(x.tensor_type.shape(0), y.tensor_type.shape(1)), x.et)
       case _ => throw new Exception("not yet supporting high dimension dot")
     }
@@ -31,19 +31,19 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
   }
 
   def DotWithTranspose(x: TENSOR, y: TENSOR, anno: Anno = NAnno, transL: Boolean = false, transR: Boolean = false)(implicit __pos: SourceContext): TENSOR = {
-    val res_tt = (x.shape_size.size, y.shape_size.size) match {
+    val res_tt = (x.shapeSize.size, y.shapeSize.size) match {
       case (1,1) => // vector-vector-dot
         assert(!transL && !transR, "cannot transpose the operand in vector-vector-dot")
-        assert(x.shape_size == y.shape_size)
+        assert(x.shapeSize == y.shapeSize)
         TensorType(Seq(Size(Dim(next_dim_name), 1)), x.et)
       case (2,1) => // matrix-vector-dot
         assert(!transL && !transR, "cannot transpose the operand in matrix-vector-dot for now")
-        assert(x.shape_size(1) == y.shape_size(0))
+        assert(x.shapeSize(1) == y.shapeSize(0))
         TensorType(x.tensor_type.shape.take(1), x.et)
       case (2,2) => // matrix-matrix-dot
-        val left_check = if (transL) x.shape_size(0) else x.shape_size(1)
+        val left_check = if (transL) x.shapeSize(0) else x.shapeSize(1)
         val left_dim = if (transL) x.tensor_type.shape(1) else x.tensor_type.shape(0)
-        val right_check = if (transR) x.shape_size(1) else x.shape_size(0)
+        val right_check = if (transR) x.shapeSize(1) else x.shapeSize(0)
         val right_dim = if (transR) y.tensor_type.shape(0) else y.tensor_type.shape(1)
         assert(left_check == right_check)
         TensorType(Seq(left_dim, right_dim), x.et)

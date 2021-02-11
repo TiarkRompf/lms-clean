@@ -90,9 +90,9 @@ trait DistributeTensor2MPI_NCCLSplit extends DistributeTensor2MPI_NCCLBase {
 
       val input_tensors = inputs.map(x => new TENSOR(x, useOldMetadata=true))
       require(inputs.length == 2)
-      require(input_tensors(0).shape_size.length == 2)
+      require(input_tensors(0).shapeSize.length == 2)
       require(axis == 1)
-      require(input_tensors(0).shape_size(1) == input_tensors(1).shape_size(1))
+      require(input_tensors(0).shapeSize(1) == input_tensors(1).shapeSize(1))
 
       // load the inputs
       val input_operands = inputs.map(get_operand(_, anno))
@@ -100,7 +100,7 @@ trait DistributeTensor2MPI_NCCLSplit extends DistributeTensor2MPI_NCCLBase {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in concat op")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          gpu_concat2_2d1_equal_array(input_tensors(0).shape_size(0), input_tensors(0).shape_size(1),
+          gpu_concat2_2d1_equal_array(input_tensors(0).shapeSize(0), input_tensors(0).shapeSize(1),
             m, myNCCLRank, input_operands(0), input_operands(1)).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           System.out.println(s"tt $tt dim $dim")

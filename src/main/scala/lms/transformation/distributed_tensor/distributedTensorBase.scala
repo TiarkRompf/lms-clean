@@ -120,12 +120,12 @@ trait FixedSizeDistributedTensorBaseTypeLess {
       }
     }
 
-    def op_type = gc.get(x.asInstanceOf[Backend.Sym]) match {
+    def opType = gc.get(x.asInstanceOf[Backend.Sym]) match {
       case Some(Node(_, s, _, _)) if s.startsWith("tensor") => s
       case a => throw new Exception(s"cannot find node $a")
     }
 
-    def shape_size: Seq[Int] = tensor_type.shape.map(_.size)
+    def shapeSize: Seq[Int] = tensor_type.shape.map(_.size)
 
     def show(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("show_tensor", x)(x)(Adapter.CTRL))
@@ -278,7 +278,7 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
 
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
-    def shape: Seq[Int] = self.shape_size
+    def shape: Seq[Int] = self.shapeSize
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
   }
 }

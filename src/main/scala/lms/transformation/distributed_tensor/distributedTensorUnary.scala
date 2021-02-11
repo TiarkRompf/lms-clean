@@ -14,7 +14,7 @@ import Backend._
 trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
 
   def Transpose(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-    assert(tensor.shape_size.size == 2, "input of transpose must be 2D")
+    assert(tensor.shapeSize.size == 2, "input of transpose must be 2D")
     val res_tt = TensorType(Seq(tensor.tensor_type.shape(1), tensor.tensor_type.shape(0)), tensor.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), tensor.x)(tensor.x))).withSrcType(__pos, tensor.et)
   }

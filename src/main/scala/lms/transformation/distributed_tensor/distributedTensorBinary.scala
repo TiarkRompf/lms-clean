@@ -14,7 +14,7 @@ import Backend._
 trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
 
   def ElemWiseNoBroadCasting(x: TENSOR, y: TENSOR, anno: Anno, __pos: SourceContext)(op: String): TENSOR = {
-    assert(x.shape_size == y.shape_size)
+    assert(x.shapeSize == y.shapeSize)
     assert(x.et == y.et)
     (new TENSOR(Adapter.g.reflectRead(op, C(x.tensor_type), C(anno), x.x, y.x)(x.x, y.x))).withSrcType(__pos, x.et)
   }
