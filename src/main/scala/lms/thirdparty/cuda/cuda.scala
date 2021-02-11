@@ -221,6 +221,8 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
   def CUDA_TANH_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, _ tanh, s"generating kernel function for TANH of type $m")
 
+  def CUDA_RELU_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ZERO(m) max _, s"generating kernel function for RELU of type $m")
+
   // Element-wise Add
   def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
     CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ + _, s"generating kernel function for ADD of type $m")

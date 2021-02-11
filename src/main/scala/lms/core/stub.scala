@@ -904,6 +904,10 @@ object PrimitiveTypeLess {
     def tanh()(implicit pos: SourceContext): NUM = {
       NUM(Adapter.g.reflect("tanh", x), t)
     }
+
+    def max(y: NUM)(implicit pos: SourceContext): NUM = {
+      NUM(Adapter.g.reflect("fmax", x, y.x), t)
+    }
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =
     (new NUM(x)).withSrcType(__pos, m).asInstanceOf[NUM]
