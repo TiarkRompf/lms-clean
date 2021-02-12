@@ -20,7 +20,7 @@ object NCCLTypeLess {
   import SIZE_TTypeLess._
   import CLibTypeLess._
 
-  class NCCL_RESULT
+  class ncclResultT
 
   def NCCL_DATATYPE(m: Manifest[_])(implicit __pos: SourceContext) = m match {
     case ma if ma == manifest[Int] => CMACRO("ncclInt32", manifest[Int])
@@ -34,7 +34,7 @@ object NCCLTypeLess {
   def NCCL_MAX(implicit __pos: SourceContext) = CMACRO("ncclMax", manifest[Int])
 
   def NCCL_CHECK(result: TOP)(implicit __pos: SourceContext): UNIT = {
-    assert(result.t == manifest[NCCL_RESULT], "NCCL_CHECK must take the NCCL_RESULT type as input")
+    assert(result.t == manifest[ncclResultT], "NCCL_CHECK must take the ncclResultT type as input")
     UNIT(LIB_FUNCTION(manifest[Unit], "NCCLCHECK", result.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))
   }
 
@@ -42,34 +42,34 @@ object NCCLTypeLess {
   // Collective Operations
   def NCCL_ALLREDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, op: TOP, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
-    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclAllReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, comm.x, stream.x)(Seq(0,3,4,5,6), Seq(1,5,6), Set[Int]())
+    LIB_FUNCTION(manifest[ncclResultT], "ncclAllReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, comm.x, stream.x)(Seq(0,3,4,5,6), Seq(1,5,6), Set[Int]())
   }
 
   def NCCL_BROADCAST(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, root: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
-    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclBroadCast", sendbuf.x, recvbuf.x, count.x, dataType.x, root.x, comm.x, stream.x)(Seq(0,3,5,6), Seq(1,5,6), Set[Int]())
+    LIB_FUNCTION(manifest[ncclResultT], "ncclBroadCast", sendbuf.x, recvbuf.x, count.x, dataType.x, root.x, comm.x, stream.x)(Seq(0,3,5,6), Seq(1,5,6), Set[Int]())
   }
 
   def NCCL_REDUCE(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, count: SIZE_T, op: TOP, root: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
-    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, root.x, comm.x, stream.x)(Seq(0,3,4,6,7), Seq(1,6,7), Set[Int]())
+    LIB_FUNCTION(manifest[ncclResultT], "ncclReduce", sendbuf.x, recvbuf.x, count.x, dataType.x, op.x, root.x, comm.x, stream.x)(Seq(0,3,4,6,7), Seq(1,6,7), Set[Int]())
   }
 
   def NCCL_ALLGATHER(m: Manifest[_], sendbuf: ARRAY, recvbuf: ARRAY, sendcount: SIZE_T, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
-    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclAllGather", sendbuf.x, recvbuf.x, sendcount.x, dataType.x, comm.x, stream.x)(Seq(0,3,4,5), Seq(1,4,5), Set[Int]())
+    LIB_FUNCTION(manifest[ncclResultT], "ncclAllGather", sendbuf.x, recvbuf.x, sendcount.x, dataType.x, comm.x, stream.x)(Seq(0,3,4,5), Seq(1,4,5), Set[Int]())
   }
 
 
   // Point-to-Point Operations
   def NCCL_SEND(m: Manifest[_], sendbuf: ARRAY, count: SIZE_T, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
-    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclSend", sendbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(0,2,4,5), Seq(4,5), Set[Int]())
+    LIB_FUNCTION(manifest[ncclResultT], "ncclSend", sendbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(0,2,4,5), Seq(4,5), Set[Int]())
   }
 
   def NCCL_RECV(m: Manifest[_], recvbuf: ARRAY, count: SIZE_T, peer: INT, comm: TOP, stream: TOP)(implicit __pos: SourceContext) = {
     val dataType = NCCL_DATATYPE(m)
-    LIB_FUNCTION(manifest[NCCL_RESULT], "ncclRecv", recvbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(2,4,5), Seq(0,4,5), Set[Int]())
+    LIB_FUNCTION(manifest[ncclResultT], "ncclRecv", recvbuf.x, count.x, dataType.x, peer.x, comm.x, stream.x)(Seq(2,4,5), Seq(0,4,5), Set[Int]())
   }
 
 
@@ -79,12 +79,12 @@ object NCCLTypeLess {
   // 3. NCCL_GROUP_START and NCCL_GROUP_END can be removed if there is no other NCCL calls in between, but they must be removed in pairs
   // I am not sure what kind of read/write effect can we use to achive this dependency pattern
   // For now, let's make sure that the NCCL_GROUP_START/END are called within NCCL_CHECK, which has CTRL effect
-  def NCCL_GROUP_START(implicit pos: SourceContext) = CMACRO("ncclGroupStart()", manifest[NCCL_RESULT])
-  def NCCL_GROUP_END(implicit pos: SourceContext) = CMACRO("ncclGroupEnd()", manifest[NCCL_RESULT])
+  def NCCL_GROUP_START(implicit pos: SourceContext) = CMACRO("ncclGroupStart()", manifest[ncclResultT])
+  def NCCL_GROUP_END(implicit pos: SourceContext) = CMACRO("ncclGroupEnd()", manifest[ncclResultT])
   // def NCCL_GROUP_START(implicit pos: SourceContext) =
-  //   LIB_FUNCTION(manifest[NCCL_RESULT], "ncclGroupStart")(Seq[Int](), Seq[Int](), Set[Int]())
+  //   LIB_FUNCTION(manifest[ncclResultT], "ncclGroupStart")(Seq[Int](), Seq[Int](), Set[Int]())
   // def NCCL_GROUP_END(implicit pos: SourceContext) =
-  //   LIB_FUNCTION(manifest[NCCL_RESULT], "ncclGroupEnd")(Seq[Int](), Seq[Int](), Set[Int]())
+  //   LIB_FUNCTION(manifest[ncclResultT], "ncclGroupEnd")(Seq[Int](), Seq[Int](), Set[Int]())
 
   // Point-to-Point Operations in Collection
   /**
@@ -371,7 +371,7 @@ trait NCCLOps extends CLibs with SizeTOps with CudaOps {
 
 trait CCodeGenNCCLOps extends CCodeGenSizeTOps with CCodeGenLibs {
   registerHeader("\"nccl_header.h\"")
-  
+
   override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
     case s: String if s.endsWith("ncclResultT") => "ncclResult_t"
     case s: String if s.endsWith("ncclDataTypeT") => "ncclDataType_t"

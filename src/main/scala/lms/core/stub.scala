@@ -866,6 +866,18 @@ trait LiftPrimitives {
 object PrimitiveTypeLess {
   import BaseTypeLess._
 
+  def NUM_ONE(m: Manifest[_])(implicit __pos: SourceContext): NUM = m match {
+    case man if (man == manifest[Int]) => (new NUM(Const(1))).withSrcType(__pos, m)
+    case man if (man == manifest[Float]) => (new NUM(Const(1.toFloat))).withSrcType(__pos, m)
+    case man if (man == manifest[Double]) => (new NUM(Const(1.toDouble))).withSrcType(__pos, m)
+  }
+
+  def NUM_ZERO(m: Manifest[_])(implicit __pos: SourceContext) = m match {
+    case man if (man == manifest[Int]) => (new NUM(Const(0))).withSrcType(__pos, m)
+    case man if (man == manifest[Float]) => (new NUM(Const(0.toFloat))).withSrcType(__pos, m)
+    case man if (man == manifest[Double]) => (new NUM(Const(0.toDouble))).withSrcType(__pos, m)
+  }
+
   class NUM(override val x: Backend.Exp) extends TOP(x) {
     def +(y: NUM)(implicit pos: SourceContext): NUM = {
       assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
@@ -876,7 +888,7 @@ object PrimitiveTypeLess {
       NUM(Adapter.g.reflect("-", x, y.x), t)
     }
     def *(y: NUM)(implicit pos: SourceContext): NUM = {
-      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}:: ${x} ${y}")
       NUM(Adapter.g.reflect("*", x, y.x), t)
     }
     def /(y: NUM)(implicit pos: SourceContext): NUM = {
