@@ -155,5 +155,31 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   //   System.out.println(indent(driver.code))
   // }
 
+
+  test("conv") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
+        val inputTensorType = tensor_type[Float](Seq(1, 1, 9, 9))
+        val filterTensorType = tensor_type[Float](Seq(1, 1, 3, 3))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
+        val model = module {
+          val tensor_input = Tensor.input[Float](inputTensorType)
+          val tensor_filter = Tensor.input[Float](filterTensorType)
+          val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
+          tensor_input conv (tensor_filter, batchSplitAnno, params)
+        }
+        model(10)
+        printf("compile")
+      }
+    }
+    checkWithLogPath("conv", driver.code, "cu", driver.setLogPath)
+  }
+
 }
 
