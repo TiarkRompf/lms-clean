@@ -22,13 +22,12 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
     val input_shape = input.tensor_type.shape
     val filter_shape = filter.tensor_type.shape
-
-    require(input_shape.size != CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D")
-    require(filter_shape.size != CUDNN_TENSOR_DIM, "input filter of convolution must be 4D")
-    require(padding.size != CUDNN_PARAM_DIM, "padding must be sequence of integer of length 2")
-    require(strides.size != CUDNN_PARAM_DIM, "strides must be sequence of integer of length 2")
-    require(dilation.size != CUDNN_PARAM_DIM, "dilation must be sequence of integer of length 2")
-    require(input.et == filter.et)
+    require(input_shape.size == CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D, found: " + input_shape.size)
+    require(filter_shape.size == CUDNN_TENSOR_DIM, "input filter of convolution must be 4D, found: " + filter_shape.size)
+    require(padding.size == CUDNN_PARAM_DIM, "padding must be sequence of integer of length 2, found: " + padding.size)
+    require(strides.size == CUDNN_PARAM_DIM, "strides must be sequence of integer of length 2, found: " + strides.size)
+    require(dilation.size == CUDNN_PARAM_DIM, "dilation must be sequence of integer of length 2, found: " + dilation.size)
+    require(input.et == filter.et, "input tensor element type must be equal to filter tensor element type")
 
     val res_tt = ConvForwardOutTensorType(input, filter, params, anno, __pos)
     (new TENSOR(Adapter.g.reflectRead("tensor_conv", C(res_tt), C(anno),
@@ -80,7 +79,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     // input.channels = filter.input_channels
     // output.channels = filter.output_channels
     // NHWC
-    case Node(s, "tensor_conv", Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
+    case Node(s, "tensor_conv", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
       val input_type    = (new TENSOR(a, useOldMetadata=true)).tensor_type.shape
       val filter_type   = (new TENSOR(b, useOldMetadata=true)).tensor_type.shape
       val output_type   = (new TENSOR(s, useOldMetadata=true)).tensor_type.shape
