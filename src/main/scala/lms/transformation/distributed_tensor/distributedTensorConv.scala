@@ -9,15 +9,15 @@ import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 import lms.thirdparty.{CUDNNTypeLess, CUDNNOps}
+import lms.transformation.util.CudnnUtils
 // import lms.transformation.util.{ConvParam, CudnnUtils}
 
 import Backend._
 
 // with ConvParam with CudnnUtils
-trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess  {
+trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess with CudnnUtils  {
   import BaseTypeLess._
   import lms.transformation.util.ConvParam
-  import lms.transformation.util.CudnnUtils
   
 
   def ConvForward(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
