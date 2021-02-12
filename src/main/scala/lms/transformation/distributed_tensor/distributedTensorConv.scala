@@ -102,14 +102,16 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         // save forward op in forwardNodes
         forwardNodes += node
         // save backward op in backwardNodes
-        val x = new TENSOR(transform(a))      // weight
-        val y = new TENSOR(transform(b))      // filter
 
         (() => {
+          val x = new TENSOR(transform(a))      // weight
+          val y = new TENSOR(transform(b))      // filter
           val a_grad = ConvBackwardData(x, y, gradMap(s), params, anno, pos)
           Accumulate(gradMap(a), a_grad, anno); ()
         }) +=: backwardNodes
         (() => {
+          val x = new TENSOR(transform(a))      // weight
+          val y = new TENSOR(transform(b))      // filter
           val b_grad = ConvBackwardFilter(x, y, gradMap(s), params, anno, pos)
           Accumulate(gradMap(b), b_grad, anno); ()
         }) +=: backwardNodes
