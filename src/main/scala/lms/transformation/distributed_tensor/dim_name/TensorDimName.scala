@@ -64,6 +64,11 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       WEIGHT(update_dim_name(tt), update_dim_name(anno)).x
+    
+    // location in case match?
+    case Node(s, "tensor_conv", tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
+      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
+      ConvForward(new TENSOR(transform(x)), new TENSOR(transform(y)), params, update_dim_name(anno), sc_).x
 
     case Node(s, op, tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) if (op.startsWith("tensor_")) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
