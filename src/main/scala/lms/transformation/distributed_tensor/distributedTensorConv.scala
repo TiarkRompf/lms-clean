@@ -9,13 +9,16 @@ import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 import lms.thirdparty.{CUDNNTypeLess, CUDNNOps}
-import lms.transformation.util.{ConvParam, CudnnUtils}
+// import lms.transformation.util.{ConvParam, CudnnUtils}
 
 import Backend._
 
-
-trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess with ConvParam with CudnnUtils {
+// with ConvParam with CudnnUtils
+trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess  {
   import BaseTypeLess._
+  import lms.transformation.util.ConvParam
+  import lms.transformation.util.CudnnUtils
+  
 
   def ConvForward(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
 
@@ -118,4 +121,17 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
     }
+}
+
+trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBase {
+  import FixedSizeDistributedTensorTypeLess._
+
+  implicit class TensorOpsConv[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
+    val self = tensor(x)
+
+    def conv(y: Rep[Tensor[T]], anno: Anno, params: ConvParam)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = ConvForward(self, tensor(y), params, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+  }
 }
