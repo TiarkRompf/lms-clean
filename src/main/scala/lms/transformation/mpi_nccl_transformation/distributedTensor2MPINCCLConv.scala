@@ -10,12 +10,12 @@ import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps,CUDNNTypeLess,CLibTypeLess}
 import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess, CUBLASTypeLess, CudaOps}
-import lms.transformation.util.{DataStructure, ConvParam, CudnnUtils}
+import lms.transformation.util.{DataStructure, CudnnUtils}
 
 import Backend._
 
 
-trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with ConvParam with CudnnUtils {
+trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with CudnnUtils {
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -41,14 +41,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       case "tensor" =>
         val desc = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_TENSOR_DESCRIPTOR], "cudnnTensorDescriptor_t").x)
         CUDNN_CREATE_TENSOR_DESCRIPTOR(desc)
-        CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_NCHW, CUDNN_FLOAT, 
+        CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_NCHW, CUDNN_FLOAT,
           INT(shape(CUDNN_N)), INT(shape(CUDNN_C)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W)))
         cudnnTensor2Desc += ((shape, (desc, kind)))
         desc
       case "filter" =>
         val desc = new CUDNN_FILTER_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_FILTER_DESCRIPTOR], "cudnnFilterDescriptor_t").x)
         CUDNN_CREATE_FILTER_DESCRIPTOR(desc)
-        CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_NCHW, CUDNN_FLOAT, 
+        CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_NCHW, CUDNN_FLOAT,
           INT(shape(CUDNN_C_OUT)), INT(shape(CUDNN_C_IN)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W)))
         cudnnTensor2Desc += ((shape, (desc, kind)))
         desc
@@ -59,15 +59,15 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
   // given the padding, strides and dilation parameters of a convolution operation, return its descriptor.
   // if cudnnTensor2Desc contains a descriptor matching the required parameters, return that descriptor
   // otherwise, create a new descriptor, store it in the hashmap and return it.
-  def getConvDescriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): CUDNN_CONV_DESCRIPTOR = 
+  def getConvDescriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): CUDNN_CONV_DESCRIPTOR =
     cudnnConv2Desc.get(padding ++ strides ++ dilation) match {
       case Some(desc) => desc
       case None =>
         val desc = new CUDNN_CONV_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_CONV_DESCRIPTOR], "cudnnConvolutionDescriptor_t").x)
         CUDNN_CREATE_CONV_DESCRIPTOR(desc)
-        CUDNN_SET_CONV_2D_DESCRIPTOR(desc, 
-          INT(padding(CUDNN_PARAM_H)),  INT(padding(CUDNN_PARAM_W)), 
-          INT(strides(CUDNN_PARAM_H)),  INT(strides(CUDNN_PARAM_W)), 
+        CUDNN_SET_CONV_2D_DESCRIPTOR(desc,
+          INT(padding(CUDNN_PARAM_H)),  INT(padding(CUDNN_PARAM_W)),
+          INT(strides(CUDNN_PARAM_H)),  INT(strides(CUDNN_PARAM_W)),
           INT(dilation(CUDNN_PARAM_H)), INT(dilation(CUDNN_PARAM_W)),
           CUDNN_CONVOLUTION, CUDNN_FLOAT)
         desc
@@ -98,7 +98,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       var output_height = 0
       var output_width = 0
       var output_channels = 0
-      CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(conv_descriptor, input_descriptor, filter_descriptor, 
+      CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(conv_descriptor, input_descriptor, filter_descriptor,
         INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
 
       val listBuffer1: ListBuffer[Int] = ListBuffer(0, 0, 0, 0)
@@ -111,7 +111,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       // allocate output tensor
       val output_size = output_batchsize * output_height * output_width * output_channels
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
-      
+
       // find convolution algorithm
       var res_count = 0
       val res = new CUDNN_CONV_FWD_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_FWD_ALG_PERF], "cudnnConvolutionFwdAlgoPerf_t").x)
@@ -128,7 +128,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val d_workspace = gpu_array(workspace_bytes, manifest[Float], myNCCLRank)
 
       // convolution
-      CUDNN_CONV_FWD(myCUDNNComm, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(weight_tensor), filter_descriptor, new ARRAY(filter_tensor), 
+      CUDNN_CONV_FWD(myCUDNNComm, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(weight_tensor), filter_descriptor, new ARRAY(filter_tensor),
         conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(FLOAT(beta)), output_descriptor, output)
 
       // return convolution output
@@ -158,9 +158,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val conv_descriptor = cudnnConvolutionDescriptor
       cudnnCheck(cudnnCreateConvolutionDescriptor(conv_descriptor))
-      cudnnCheck(cudnnSetConvolution2dDescriptor(conv_descriptor, unit[Int](1), unit[Int](1), unit[Int](1), unit[Int](1), unit[Int](1), unit[Int](1), 
+      cudnnCheck(cudnnSetConvolution2dDescriptor(conv_descriptor, unit[Int](1), unit[Int](1), unit[Int](1), unit[Int](1), unit[Int](1), unit[Int](1),
         cudnnConvolution, cudnnFloat))
-      
+
       val batch_size = var_new(unit(0))
       val channels = var_new(unit(0))
       val height = var_new(unit(0))
@@ -180,15 +180,15 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       var workspace_bytes = var_new[SizeT](unit(0))
       cudnnCheck(cudnnGetConvolutionForwardWorkspaceSize(myCUDNNCommRep, input_descriptor, filter_descriptor, conv_descriptor,
           output_descriptor, conv_algo, workspace_bytes))
-      
-      
+
+
       var d_workspace = cudaMalloc2BySize[Float](readVar(workspace_bytes))
 
       val alpha = var_new[Float](unit(1.0))
       val beta = var_new[Float](unit(0.0))
 
-      Unwrap(cudnnCheck(cudnnConvolutionForward(myCUDNNCommRep, alpha, input_descriptor, Wrap[Array[Float]](weight_tensor), 
-          filter_descriptor, filter_tensor, conv_descriptor, conv_algo, d_workspace, readVar(workspace_bytes), beta, 
+      Unwrap(cudnnCheck(cudnnConvolutionForward(myCUDNNCommRep, alpha, input_descriptor, Wrap[Array[Float]](weight_tensor),
+          filter_descriptor, filter_tensor, conv_descriptor, conv_algo, d_workspace, readVar(workspace_bytes), beta,
           output_descriptor, sourceTensor)))
       */
 
@@ -197,14 +197,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         TOP(Adapter.g.reflectUnsafe("read_field", x, Backend.Const(m)), u)
       }
       */
-    
-    
-    // inputs: 
+
+
+    // inputs:
     // alpha, beta
     // wDesc (filter descriptor)
     // w (filter tensor array)
     // convDesc
-    // 
+    //
     // creates:
     // dyDesc (tensor descriptor of conv output tensor)
     // dy
@@ -231,17 +231,17 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val dweight_descriptor = getTensorDescriptor(weight_shape, "tensor")  // should this descriptor just be weight descriptor?
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
-      // allocate result (d_weight) 
+      // allocate result (d_weight)
       val dweight_size = weight_shape(0) * weight_shape(1) * weight_shape(2) * weight_shape(3)
       val dweight = gpu_array(dweight_size, manifest[Float], myNCCLRank)
-      
+
       // find convolution algorithm
       var res_count = 0
       val res = new CUDNN_CONV_BWD_DATA_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], "cudnnConvolutionBwdDataAlgoPerf_t").x)
       CUDNN_FIND_CONV_BWD_DATA_ALG(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor, INT(1), INT(res_count), res)
       val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], Manifest[CUDNN_CONV_BWD_DATA_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF]](res.x), "algo")
       val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_DATA_ALGO])
-      
+
       // allocate convolution workspace
       var workspace_bytes = 0
       CUDNN_GET_CONV_BWD_DATA_WORKSPACE_SZ(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor,
@@ -251,7 +251,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       // backward data pass
       CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(FLOAT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
         conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(FLOAT(beta)), dweight_descriptor, dweight)
-      
+
       dweight.x
 
     case Node(s, "tensor_conv_bwd_filter", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
@@ -274,17 +274,17 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val dfilter_descriptor = getTensorDescriptor(filter_shape, "filter")
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
-      // allocate result (d_weight) 
+      // allocate result (d_weight)
       val dfilter_size = filter_shape(0) * filter_shape(1) * filter_shape(2) * filter_shape(3)
       val dfilter = gpu_array(dfilter_size, manifest[Float], myNCCLRank)
-      
+
       // find convolution algorithm
       var res_count = 0
       val res = new CUDNN_CONV_BWD_FILTER_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF], "cudnnConvolutionBwdFilterAlgoPerf_t").x)
       CUDNN_FIND_CONV_BWD_FILTER_ALG(myCUDNNComm, weight_descriptor, doutput_descriptor, conv_descriptor, dfilter_descriptor, INT(1), INT(res_count), res)
       val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF], Manifest[CUDNN_CONV_BWD_FILTER_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF]](res.x), "algo")
       val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_FILTER_ALGO])
-      
+
       // allocate convolution workspace
       var workspace_bytes = 0
       CUDNN_GET_CONV_BWD_FILTER_WORKSPACE_SZ(myCUDNNComm, weight_descriptor, doutput_descriptor, conv_descriptor, dfilter_descriptor,
@@ -294,10 +294,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       // backward data pass
       CUDNN_CONV_BWD_FILTER(myCUDNNComm, VAR(FLOAT(alpha)), weight_descriptor, new ARRAY(weight_tensor), doutput_descriptor, new ARRAY(output_tensor),
         conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(FLOAT(beta)), dfilter_descriptor, dfilter)
-      
+
       dfilter.x
 
-    case _ => super.transform(n) 
+    case _ => super.transform(n)
   }
 
 

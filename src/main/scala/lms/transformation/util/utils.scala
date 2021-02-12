@@ -60,12 +60,12 @@ trait DataStructure {
 }
 
 // encapsulates parameters to a cudnn convolution operation
-trait ConvParam {
-  case class ConvParam(val alpha: Float, val beta: Float, val padding: Seq[Int], val strides: Seq[Int], val dilation: Seq[Int])
-}
+// trait ConvParam {
+//   case class ConvParam(val alpha: Float, val beta: Float, val padding: Seq[Int], val strides: Seq[Int], val dilation: Seq[Int])
+// }
 
 trait CudnnUtils {
-  import CUDNNTypeLess._
+  // import CUDNNTypeLess._
 
   // val CUDNN_LAYOUT = CUDNN_NHWC
   // val CUDNN_DATATYPE = CUDNN_FLOAT
@@ -94,4 +94,6 @@ trait CudnnUtils {
 
   val CUDNN_PARAM_H     = 0  // height of padding, strides, and dilation
   val CUDNN_PARAM_W     = 1  // weight of padding, strides, and dilation
+
+  case class ConvParam(val alpha: Float, val beta: Float, val padding: Seq[Int], val strides: Seq[Int], val dilation: Seq[Int])
 }

@@ -9,16 +9,12 @@ import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 import lms.thirdparty.{CUDNNTypeLess, CUDNNOps}
-// import lms.transformation.util.{ConvParam, CudnnUtils}
+import lms.transformation.util.CudnnUtils
 
 import Backend._
 
-// with ConvParam with CudnnUtils
-trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess  {
+trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorMutationTypeLess with CudnnUtils {
   import BaseTypeLess._
-  import lms.transformation.util.ConvParam
-  import lms.transformation.util.CudnnUtils
-  
 
   def ConvForward(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
 
@@ -42,14 +38,14 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
   def ConvBackwardData(input: TENSOR, filter: TENSOR, doutput: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
     assert(input.et == filter.et && filter.et == doutput.et)
     val res_tt = input.tensor_type
-    (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_data", C(res_tt), C(anno), 
+    (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_data", C(res_tt), C(anno),
       input.x, filter.x, doutput.x, C(params))(input.x, filter.x, doutput.x)).withSrcType(__pos, input.et))
   }
 
   def ConvBackwardFilter(input: TENSOR, filter: TENSOR, doutput: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
     assert(input.et == filter.et && filter.et == doutput.et)
     val res_tt = filter.tensor_type
-    (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_filter", C(res_tt), C(anno), 
+    (new TENSOR(Adapter.g.reflectRead("tensor_conv_bwd_filter", C(res_tt), C(anno),
       input.x, filter.x, doutput.x, C(params))(input.x, filter.x, doutput.x)).withSrcType(__pos, input.et))
   }
 
@@ -62,25 +58,25 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     val output_N = input_shape(CUDNN_N).size
     val output_C = filter_shape(CUDNN_C_OUT).size
 
-    def outputDim(inputDim: Int, pad: Int, filterDim: Int, dil: Int, str: Int) = 
+    def outputDim(inputDim: Int, pad: Int, filterDim: Int, dil: Int, str: Int) =
       1 + (inputDim + 2*pad - (((filterDim-1)*dil)+1)) / str
 
-    val output_H = outputDim(input_shape(CUDNN_H).size, padding(CUDNN_PARAM_H), 
+    val output_H = outputDim(input_shape(CUDNN_H).size, padding(CUDNN_PARAM_H),
       filter_shape(CUDNN_H).size, dilation(CUDNN_PARAM_H), strides(CUDNN_PARAM_H))
-    val output_W = outputDim(input_shape(CUDNN_W).size, padding(CUDNN_PARAM_W), 
+    val output_W = outputDim(input_shape(CUDNN_W).size, padding(CUDNN_PARAM_W),
       filter_shape(CUDNN_W).size, dilation(CUDNN_PARAM_W), strides(CUDNN_PARAM_W))
 
     val output_shape = Seq(
-      Size(Dim(CUDNN_N), output_N), 
-      Size(Dim(CUDNN_C), output_C), 
-      Size(Dim(CUDNN_H), output_H), 
+      Size(Dim(CUDNN_N), output_N),
+      Size(Dim(CUDNN_C), output_C),
+      Size(Dim(CUDNN_H), output_H),
       Size(Dim(CUDNN_W), output_W))
 
     TensorType(output_shape, input.et, anno)
   }
 
   override def mergable_dims(node: Node) = node match {
-    // constraints: 
+    // constraints:
     // input.channels = filter.input_channels
     // output.channels = filter.output_channels
     // NHWC
