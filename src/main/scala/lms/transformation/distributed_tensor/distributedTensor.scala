@@ -32,4 +32,5 @@ trait FixedSizeDistributedTensorOps extends FixedSizeDistributedTensorOpsBase
   with FixedSizeDistributedTensorOpsGemm
   with FixedSizeDistributedTensorOpsMutation
   with FixedSizeDistributedTensorOpsUnary
+  with FixedSizeDistributedTensorOpsConv
 
