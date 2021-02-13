@@ -77,11 +77,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
   override def transform(n: Node): Backend.Exp = n match {
     // convolution forward operation
     case Node(s, "tensor_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
-      Backend.Const(params:ConvParam)::_, _) =>
+      Backend.Const(params)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
       // unpack convolution paratemers
-      val ConvParam(alpha, beta, padding, strides, dilation) = params
+      val ConvParam(alpha, beta, padding, strides, dilation) = params.asInstanceOf[ConvParam]
 
       // get input info and transform input tensors
       val weight_shape = tensor_shape(left, useOldMetadata = true)
@@ -135,11 +135,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       output.x
 
     case Node(s, "tensor_conv_bwd_data", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
-      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
+      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
       // unpack convolution paratemers
-      val ConvParam(alpha, beta, padding, strides, dilation) = params
+      val ConvParam(alpha, beta, padding, strides, dilation) = params.asInstanceOf[ConvParam]
 
       // TODO: dim checks necessary or not?
       val doutput_shape = tensor_shape(s, useOldMetadata = true)
@@ -177,7 +177,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       dweight.x
 
-    case Node(s, "tensor_conv_bwd_filter", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
+    case Node(s, "tensor_conv_bwd_filter", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
+      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
       // unpack convolution paratemers
