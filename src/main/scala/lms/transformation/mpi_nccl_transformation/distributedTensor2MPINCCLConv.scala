@@ -254,12 +254,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       dweight.x
 
-    case Node(s, "tensor_conv_bwd_filter", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
-      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
+    case Node(s, "tensor_conv_bwd_filter", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
       // unpack convolution paratemers
-      val ConvParam(alpha, beta, padding, strides, dilation) = params
+      val ConvParam(alpha, beta, padding, strides, dilation) = params.asInstanceOf[ConvParam]
 
       // TODO: dim checks necessary or not?
       val doutput_shape = tensor_shape(s, useOldMetadata = true)
