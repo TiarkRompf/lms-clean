@@ -122,10 +122,11 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
 trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBase {
   import FixedSizeDistributedTensorTypeLess._
+  import scala.collection.immutable.Seq
 
   implicit class TensorOpsConv[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
-
+    val params_def = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
     def conv(y: Rep[Tensor[T]], anno: Anno, params: ConvParam)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = ConvForward(self, tensor(y), params, anno, __pos)
       Wrap[Tensor[T]](t.x)
