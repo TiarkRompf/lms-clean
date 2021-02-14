@@ -150,16 +150,16 @@ void Snippet(int x0) {
     CUDA_CALL(cudaMalloc(&x61, (size_t)(512 * sizeof(float))));
     x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x57, x60, x61, 512);
     // end computing MULT on GPU for size 512 and type Float at device (pre-rename) x39 with left_operand x158 and right_operand x200
-    // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x187 and addition_operand x213
+    // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x174 and addition_operand x213
     CUDA_CALL(cudaSetDevice(x7));
-    x28<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x59, x61, 512);
-    // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x187 and addition_operand x213
-    // begin computing Concat on GPU for size 32 x 64 and type Float at device (pre-rename) x39 with input0 x187 input1 x174
+    x28<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x58, x61, 512);
+    // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x174 and addition_operand x213
+    // begin computing Concat on GPU for size 32 x 64 and type Float at device (pre-rename) x39 with input0 x174 input1 x187
     CUDA_CALL(cudaSetDevice(x7));
     float* x62 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x62, (size_t)(2048 * sizeof(float))));
-    x35<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x59, x58, x62, 32, 32);
-    // end computing Concat on GPU for size 32 x 64 and type Float at device (pre-rename) x39 with input0 x187 input1 x174
+    x35<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x58, x59, x62, 32, 32);
+    // end computing Concat on GPU for size 32 x 64 and type Float at device (pre-rename) x39 with input0 x174 input1 x187
     // begin computing ACCUM on GPU for size 1024 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x294
     CUDA_CALL(cudaSetDevice(x7));
     x28<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x62, 1024);

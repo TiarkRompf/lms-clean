@@ -91,7 +91,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def isTensor(x: Backend.Exp, useOldMetadata: Boolean = false) = {
       val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, _, _)) => s.startsWith("tensor")
+        case Some(Node(_, s, _, _)) => s.startsWith("tensor") && s != "tensor_result"
         case a => false
       }
     }
@@ -196,6 +196,14 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     // We are using these global data structures to hold operation graph metadata
     var oldResultMap: mutable.Map[lms.core.Backend.Exp, List[lms.core.Backend.Exp]] = _
     var resultMap: mutable.Map[lms.core.Backend.Exp, List[lms.core.Backend.Exp]] = _
+
+    def isOperation(x: Backend.Exp, useOldMetadata: Boolean = false) = {
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, s, _, _)) => s.startsWith("op")
+        case a => false
+      }
+    }
   }
 
   def MODULE(f: => TENSOR)(implicit __pos: SourceContext): Int => UNIT = {
