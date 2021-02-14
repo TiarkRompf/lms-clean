@@ -88,6 +88,10 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       val filterCout  = filter_type(CUDNN_C_OUT).dim
       val filterCin   = filter_type(CUDNN_C_IN).dim
       List((inputC, filterCin), (outputC, filterCout))
+    
+    // dropout operation has no mergable dims
+    case Node(s, "tensor_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
+      List()
 
     case _ => super.mergable_dims(node)
   }
