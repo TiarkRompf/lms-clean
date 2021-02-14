@@ -141,16 +141,16 @@ void Snippet(int x0) {
     CUDA_CALL(cudaMalloc(&x60, (size_t)(256 * sizeof(float))));
     x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x60, 1, 256);
     // end initializing fixed GPU array of size 256 and type Float and device (pre-rename) x39
-    // begin computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x174 and right_operand x237
+    // begin computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x174 and right_operand x238
     CUDA_CALL(cudaSetDevice(x7));
     float* x61 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x61, (size_t)(256 * sizeof(float))));
     x31<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x58, x60, x61, 256);
-    // end computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x174 and right_operand x237
-    // begin computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x250
+    // end computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x174 and right_operand x238
+    // begin computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x251
     CUDA_CALL(cudaSetDevice(x7));
     x39<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x61, 256);
-    // end computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x250
+    // end computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x251
     // begin computing SGD on GPU for size 256 and type Float at device (pre-name) x39 with weight x65, grad x81, and momentum x119
     CUDA_CALL(cudaSetDevice(x7));
     x46<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x11, x18, 256);
@@ -184,7 +184,7 @@ void Snippet(int x0) {
   NCCLCHECK(ncclGroupEnd());
   // print the array only if this is the root
   if (x62) {
-    // begin copying GPU array x390 to CPU and print for size 512 and type Float
+    // begin copying GPU array x391 to CPU and print for size 512 and type Float
     float* x70 = (float*)malloc(512 * sizeof(float));
     CUDA_CALL(cudaMemcpy(x70, x63, (size_t)(512 * sizeof(float)), cudaMemcpyDeviceToHost));
     int x71 = 0;
@@ -193,7 +193,7 @@ void Snippet(int x0) {
       x71 = x71 + 1;
     }
     printf("\n");
-    // end copying GPU array x390 to CPU and print for size 512 and type Float
+    // end copying GPU array x391 to CPU and print for size 512 and type Float
   }
   printf("compile\n");
   MPICHECK(MPI_Finalize());

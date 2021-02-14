@@ -255,7 +255,11 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       }
 
 
-    case Node(s, "tensor_result", _, _) => subst(s)
+    case Node(s, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _) => // subst(s)
+      Adapter.g.globalDefsCache.get(transform(op).asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => xs(i)
+        case a => throw new Exception(s"$a is not a tuple view")
+      }
 
     case Node(s, op, _, _) if op.startsWith("tensor") || op.startsWith("op") =>
       throw new Exception(s"not yet handling $n in distributedTensor2MPINCCL transformation")

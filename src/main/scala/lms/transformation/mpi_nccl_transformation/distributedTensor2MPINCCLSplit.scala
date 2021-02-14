@@ -75,8 +75,7 @@ trait DistributeTensor2MPI_NCCLSplit extends DistributeTensor2MPI_NCCLBase {
         case SAnno(dim: Dim, devices: Seq[Device], _) if tts(0).contains(dim) && dim != oldSplitOp.axis =>
           val shape = tts(0).shapeSizeAfterSplit(dim, devices.size)
           val arrays = gpu_split2_2d1_equal_array(shape(0), shape(1), m, myNCCLRank, operand)
-          (oldSplitOp.getResults zip arrays) foreach { case (tensor, array) => subst(tensor.x.asInstanceOf[Backend.Sym]) = array.x }
-          Backend.Const(())
+          Adapter.g.reflect("tuple-view", arrays.map(_.x): _*)
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce in split")
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_mult")
