@@ -106,19 +106,15 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
     def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
-    def tensor_type: TensorType = {
-      gc.get(x.asInstanceOf[Backend.Sym]) match {
+    def tensor_type: TensorType = gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(tt:TensorType)::_, _)) if s.startsWith("tensor") => tt
         case a => throw new Exception(s"cannot find node $a")
       }
-    }
 
-    def annotation: Anno = {
-      gc.get(x.asInstanceOf[Backend.Sym]) match {
+    def annotation: Anno = gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, tt::Backend.Const(a:Anno)::_, _)) if s.startsWith("tensor") => a
         case a => throw new Exception(s"cannot find node $a")
       }
-    }
 
     def opType = gc.get(x.asInstanceOf[Backend.Sym]) match {
       case Some(Node(_, s, _, _)) if s.startsWith("tensor") => s
@@ -219,18 +215,25 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   }
 
   // helper data structure for wrapping hashmap FIXME(feiw): we have to define it here :( for the aircopCollect function
-  case class GradMapWrapper(map: scala.collection.mutable.HashMap[(Backend.Sym, Int), TENSOR]) {
-    def getDefiningOp(x: Backend.Sym): Backend.Sym = Adapter.oldDefsCache.get(x) match {
-      case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::_, _)) => op
-      case _ => x
+  case class GradMapWrapper(map: scala.collection.mutable.HashMap[Backend.Sym, Backend.Sym]) {
+    def apply(x: Backend.Exp): TENSOR = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
+      case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _)) =>
+        Adapter.g.globalDefsCache.get(map(op)) match {
+          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => new TENSOR(xs(i))
+          case a => throw new Exception(s"$a is not a tuple view")
+        }
+      case n@Some(Node(_, op, _, _)) if op.startsWith("op_") => throw new Exception(s"$x is an operation, not a tensor: $n")
+      case _ => new TENSOR(map(x.asInstanceOf[Backend.Sym]))
     }
-    def apply(x: Backend.Sym): TENSOR = map((getDefiningOp(x), 0))
-    def apply(x: Backend.Exp): TENSOR = apply(x.asInstanceOf[Backend.Sym])
-    def apply(x: Backend.Sym, i: Int): TENSOR = map((x, i))
-    def apply(x: Backend.Exp, i: Int): TENSOR = map((x.asInstanceOf[Backend.Sym], i))
-    def update(x: Backend.Sym, grad: TENSOR) = { map((x, 0)) = grad }
-    def update(x: Backend.Exp, grad: TENSOR) = { map((x.asInstanceOf[Backend.Sym], 0)) = grad }
-    def update(key: (Backend.Exp, Int), grad: TENSOR) = { map((key._1.asInstanceOf[Backend.Sym], key._2)) = grad }
+    def getOp(x: Backend.Exp): List[TENSOR] = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
+      case n@Some(Node(_, op, _, _)) if op.startsWith("op_") => Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])) match {
+          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => xs.map(new TENSOR(_))
+          case a => throw new Exception(s"$a is not a tuple view")
+        }
+      case n => throw new Exception(s"$n is not an operation")
+    }
+    def update(x: Backend.Exp, grad: TENSOR) = { map(x.asInstanceOf[Backend.Sym]) = grad.x.asInstanceOf[Backend.Sym] }
+    def update(x: Backend.Exp, grad: Backend.Exp) = { map(x.asInstanceOf[Backend.Sym]) = grad.asInstanceOf[Backend.Sym] }
   }
 
   def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],

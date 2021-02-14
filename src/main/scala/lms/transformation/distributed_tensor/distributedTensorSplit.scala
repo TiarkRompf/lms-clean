@@ -82,7 +82,7 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
       // save backward op in backwardNodes
       (() => {
         val splitOp = new SPLIT_OP(s, useOldMetadata=true)
-        val grads = ((0 until splitOp.numResults): Range).map(i => gradMap(s, i)).toList
+        val grads = gradMap.getOp(s)
         val c_grads = Concat(grads, splitOp.axis, anno)
         Accumulate(gradMap(x), c_grads, anno); ()
       }) +=: backwardNodes

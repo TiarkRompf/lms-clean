@@ -27,7 +27,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
 
   // this is the gradient map from OLD value tensors to NEW gradient tensors
   val momentumMap = mutable.HashMap[Backend.Sym, TENSOR]()
-  val gradMap_ = mutable.HashMap[(Backend.Sym, Int), TENSOR]()
+  val gradMap_ = mutable.HashMap[Backend.Sym, Backend.Sym]()
   val gradMap = GradMapWrapper(gradMap_)
 
   def traverseModule(iter: Int)(ns: Seq[Node], res: Block): Backend.Exp = {
@@ -85,10 +85,8 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
         gradMap(fs) = grad
       } else if (OPERATION.isOperation(transform(fs))) {
         val oldOp = new OPERATION(fs, useOldMetadata = true)
-        for (i <- (0 until oldOp.numResults): Range) {
-          val grad = ZEROS(oldOp.resultTypes(i), oldOp.annotation)
-          gradMap((fs, i)) = grad
-        }
+        val grads = oldOp.resultTypes.map(ZEROS(_, oldOp.annotation))
+        gradMap(fs) = Adapter.g.reflect("tuple-view", grads.map(_.x): _*)
       }
     }
     for (b <- backwards) {
