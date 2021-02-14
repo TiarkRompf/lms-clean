@@ -219,6 +219,50 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         conv_descriptor, convAlgo, d_workspace, SIZE_T(workspace_bytes), VAR(FLOAT(beta)), dfilter_descriptor, dfilter)
 
       dfilter.x
+    
+    case Node(s, "tensor_dropout", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
+      Backend.Const(params)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack dropout paratemers
+      val DropoutParam(dropout, seed) = params.asInstanceOf[DropoutParam]
+
+
+      // get input info and transform input tensors
+      val input_shape = tensor_shape(input, useOldMetadata = true)
+      val input_tensor = get_operand(input, anno)
+
+      val input_descriptor = getTensorDescriptor(input_shape, "tensor")
+
+      // get memory of reserve space and states
+      var reserve_bytes = 0
+      CUDNN_DROPOUT_GET_RESERVE_SPACE_SZ(input_descriptor, SIZE_T(reserve_bytes))
+      var states_bytes = 0
+      CUDNN_DROPOUT_GET_STATES_SZ(myCUDNNComm, SIZE_T(reserve_bytes))
+
+      // allocate memory for states and reserve space
+      val d_states = gpu_array(states_bytes, manifest[Float], myNCCLRank)
+      val d_reservespace = gpu_array(reserve_bytes, manifest[Float], myNCCLRank)
+
+      // create dropout descriptor
+      val dropout_descriptor = new CUDNN_DROPOUT_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_DROPOUT_DESCRIPTOR], "cudnnDropoutDescriptor_t").x)
+      CUDNN_CREATE_DROPOUT_DESCRIPTOR(dropout_descriptor)
+      CUDNN_SET_DROPOUT_DESCRIPTOR(dropout_descriptor, myCUDNNComm, dropout, d_states, SIZE_T(states_bytes), seed)
+
+      // allocate output tensor
+      // output tensor has the same shape as input tensor
+      val output_descriptor = getTensorDescriptor(input_shape, "tensor")
+      val output_size = input_shape(0) * input_shape(1) * input_shape(2) * input_shape(3)
+      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
+
+      // dropout
+      CUDNN_DROPOUT_FWD(myCUDNNComm, dropout_descriptor, input_descriptor, new ARRAY(input_tensor), 
+        output_descriptor, output, d_reservespace, SIZE_T(reserve_bytes))
+
+      // return convolution output
+      output.x
+
+
 
     case _ => super.transform(n)
   }
