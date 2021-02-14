@@ -218,9 +218,24 @@ trait FixedSizeDistributedTensorBaseTypeLess {
       List()
   }
 
+  // helper data structure for wrapping hashmap FIXME(feiw): we have to define it here :( for the aircopCollect function
+  case class GradMapWrapper(map: scala.collection.mutable.HashMap[(Backend.Sym, Int), TENSOR]) {
+    def getDefiningOp(x: Backend.Sym): Backend.Sym = Adapter.oldDefsCache.get(x) match {
+      case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::_, _)) => op
+      case _ => x
+    }
+    def apply(x: Backend.Sym): TENSOR = map((getDefiningOp(x), 0))
+    def apply(x: Backend.Exp): TENSOR = apply(x.asInstanceOf[Backend.Sym])
+    def apply(x: Backend.Sym, i: Int): TENSOR = map((x, i))
+    def apply(x: Backend.Exp, i: Int): TENSOR = map((x.asInstanceOf[Backend.Sym], i))
+    def update(x: Backend.Sym, grad: TENSOR) = { map((x, 0)) = grad }
+    def update(x: Backend.Exp, grad: TENSOR) = { map((x.asInstanceOf[Backend.Sym], 0)) = grad }
+    def update(key: (Backend.Exp, Int), grad: TENSOR) = { map((key._1.asInstanceOf[Backend.Sym], key._2)) = grad }
+  }
+
   def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp): Unit = node match {
 

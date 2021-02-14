@@ -71,7 +71,7 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 
@@ -82,7 +82,7 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
       // save backward op in backwardNodes
       (() => {
         val splitOp = new SPLIT_OP(s, useOldMetadata=true)
-        val grads = splitOp.getResults.map(x => gradMap(x.x.asInstanceOf[Backend.Sym]))
+        val grads = ((0 until splitOp.numResults): Range).map(i => gradMap(s, i)).toList
         val c_grads = Concat(grads, splitOp.axis, anno)
         Accumulate(gradMap(x), c_grads, anno); ()
       }) +=: backwardNodes

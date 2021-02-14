@@ -13,7 +13,7 @@ import lms.transformation.util.DataStructure
 import Backend._
 
 
-abstract class DistributeTensorAIRCoP extends Transformer {
+abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
   override val name = "DistributeTensorAIRCoP"
 
   import PrimitiveTypeLess._
@@ -26,8 +26,9 @@ abstract class DistributeTensorAIRCoP extends Transformer {
   val backwardNodes = mutable.ArrayBuffer[()=>Unit]()
 
   // this is the gradient map from OLD value tensors to NEW gradient tensors
-  val gradMap = mutable.HashMap[Backend.Sym, TENSOR]()
   val momentumMap = mutable.HashMap[Backend.Sym, TENSOR]()
+  val gradMap_ = mutable.HashMap[(Backend.Sym, Int), TENSOR]()
+  val gradMap = GradMapWrapper(gradMap_)
 
   def traverseModule(iter: Int)(ns: Seq[Node], res: Block): Backend.Exp = {
     // Step 1: Collection Phase
@@ -37,7 +38,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     (() => {
       val result = new TENSOR(transform(res.res))
       val grad = ONES(result.tensor_type, result.annotation)
-      gradMap(res.res.asInstanceOf[Backend.Sym]) = grad
+      gradMap(res.res) = grad
     }) +=: backwardNodes
     // collect all weight syms and all forward syms
     val weightSyms = weightNodes.map(s => s.n)
@@ -81,12 +82,12 @@ abstract class DistributeTensorAIRCoP extends Transformer {
       if (TENSOR.isTensor(transform(fs))) {
         val node = new TENSOR(transform(fs))
         val grad = ZEROS(node.tensor_type, node.annotation)
-        gradMap(fs.asInstanceOf[Backend.Sym]) = grad
+        gradMap(fs) = grad
       } else if (OPERATION.isOperation(transform(fs))) {
         val oldOp = new OPERATION(fs, useOldMetadata = true)
-        for (oldTensor <- oldOp.getResults) {
-          val grad = ZEROS(oldTensor.tensor_type, oldTensor.annotation)
-          gradMap(oldTensor.x.asInstanceOf[Backend.Sym]) = grad
+        for (i <- (0 until oldOp.numResults): Range) {
+          val grad = ZEROS(oldOp.resultTypes(i), oldOp.annotation)
+          gradMap((fs, i)) = grad
         }
       }
     }
@@ -104,12 +105,6 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     }
     cont
   }
-
-  // def transformModuleBlock(b: Block): Block = b match {
-  //   case b @ Block(Nil, res, block, eff) => g.reify {
-  //     scheduleBlock(b)(traverseModule)
-  //   }
-  // }
 
   override def transform(n: Node): Backend.Exp = n match {
 

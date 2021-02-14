@@ -81,7 +81,7 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 
