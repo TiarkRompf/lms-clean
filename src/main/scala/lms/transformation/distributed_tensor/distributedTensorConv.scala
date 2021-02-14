@@ -119,6 +119,16 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
           val b_grad = ConvBackwardFilter(x, y, gradMap(s), params, anno, pos)
           Accumulate(gradMap(b), b_grad, anno); ()
         }) +=: backwardNodes
+      
+      case Node(s, "tensor_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        // save forward op in forwardNodes
+        forwardNodes += node
+        // save backward op in backwardNodes
+
+        (() => {
+          ()                // not implemented for now
+        }) +=: backwardNodes
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
     }
