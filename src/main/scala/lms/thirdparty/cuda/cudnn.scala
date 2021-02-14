@@ -39,6 +39,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
   class CUDNN_TENSOR_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
   class CUDNN_FILTER_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
   class CUDNN_CONV_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_DROPOUT_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
 
   
   // class CUDNN_TENSOR_FORMAT(override val x: Backend.Exp) extends TOP(x)
@@ -75,6 +76,9 @@ object CUDNNTypeLess extends Dsl with CLibs {
   def CUDNN_CREATE_CONV_DESCRIPTOR(convDesc: CUDNN_CONV_DESCRIPTOR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateConvolutionDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int](0))
 
+  def CUDNN_CREATE_DROPOUT_DESCRIPTOR(convDesc: CUDNN_DROPOUT_DESCRIPTOR)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateDropoutDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int](0))
+
 
 
   def CUDNN_DESTROY_TENSOR_DESCRIPTOR(tensorDesc: TOP)(implicit __pos: SourceContext) = 
@@ -85,6 +89,9 @@ object CUDNNTypeLess extends Dsl with CLibs {
 
   def CUDNN_DESTROY_CONV_DESCRIPTOR(convDesc: TOP)(implicit __pos: SourceContext) = 
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyConvolutionDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int]())
+
+  def CUDNN_DESTROY_DROPOUT_DESCRIPTOR(convDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyDropoutDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int]())
    
 
   
@@ -102,6 +109,13 @@ object CUDNNTypeLess extends Dsl with CLibs {
                                    dilation_w: INT, mode: TOP, computeType: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetConvolution2dDescriptor", convDesc.x, pad_h.x, pad_w.x, u.x, v.x,
       dilation_h.x, dilation_w.x, mode.x, computeType.x)(Seq(1,2,3,4,5,6,7,8), Seq(0), Set[Int]())
+
+  def CUDNN_SET_DROPOUT_DESCRIPTOR(dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, handle: TOP, dropout: FLOAT, states: TOP,
+                              stateSizeInBytes: SIZE_T, seed: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetDropoutDescriptor", dropoutDesc.x, handle.x, dropout.x, states.x, 
+      stateSizeInBytes.x, seed.x)(Seq(0,1,2,3,4,5), Seq(0,1,2,3), Set[Int]())
+
+
 
   def CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(convDesc: CUDNN_CONV_DESCRIPTOR, inputTensorDesc: TOP, 
                                       filterDesc: TOP, n: INT, c: INT, h: INT, w: INT)(implicit __pos: SourceContext) =
@@ -169,6 +183,20 @@ object CUDNNTypeLess extends Dsl with CLibs {
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionBackwardData", handle.x, alpha.x, xDesc.x, x.x, dyDesc.x, dy.x, 
       convDesc.x, algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, dwDesc.x, dw.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(12), 
       Set[Int](2,9))
+  
+
+
+  def CUDNN_DROPOUT_GET_RESERVE_SPACE_SZ(xDesc: TOP, sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDropoutGetReserveSpaceSize", xDesc.x, sizeInBytes.x)(Seq(0), Seq(1), Set[Int](1))
+  
+  def CUDNN_DROPOUT_GET_STATES_SZ(handle: TOP, sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDropoutGetStatesSize", handle.x, sizeInBytes.x)(Seq(0), Seq(1), Set[Int](1))
+
+  def CUDNN_DROPOUT_FWD(handle: TOP, dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, xdesc: TOP, x: TOP,
+                          yDesc: TOP, y: TOP, reserveSpace: TOP, reserveSpaceSizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT],"cudnnDropoutForward", handle.x, dropoutDesc.x, xdesc.x, x.x, yDesc.x, y.x, reserveSpace.x,
+      reserveSpaceSizeInBytes.x)(Seq(0,1,2,3,4,7), Seq(5,6), Set[Int]())
+
 
 }
 
