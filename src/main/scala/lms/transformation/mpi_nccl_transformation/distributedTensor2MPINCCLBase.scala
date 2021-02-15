@@ -317,10 +317,6 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     g = new GraphBuilderOpt()
     Adapter.g = g
 
-    // handle the metadata in OPERATION.resultMap
-    OPERATION.oldResultMap = OPERATION.resultMap
-    OPERATION.resultMap = new mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
-
     try {
       super.transform(graph)
     } finally {

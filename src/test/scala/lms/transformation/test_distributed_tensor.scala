@@ -31,7 +31,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     override val passes = List(
       new DistributeTensorDimName {},
       new DistributeTensorAIRCoP {},
-      new DistributedTensorCanonicalize {},
+      new Canonicalize {},
       new DistributeTensor2MPI_NCCL {})
 
     var log_path: String = ""

@@ -142,56 +142,17 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
     val numResults: Int = resultTypes.length
 
-    // build and cache the tensor results of operation
-    if (useOldMetadata) {
-      require(OPERATION.oldResultMap.contains(x.asInstanceOf[Backend.Sym]),
-        s"must already contain $x in the result map: ${OPERATION.oldResultMap}")
-    }
-
-    override def withSource(pos: SourceContext): this.type = {
-      if (!useOldMetadata) {
-        if (OPERATION.resultMap == null)
-          OPERATION.resultMap = mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
-        implicit val sc_ : SourceContext = pos
-        OPERATION.resultMap.getOrElseUpdate(x.asInstanceOf[Backend.Sym], results.map(_.x))
-      }
-      super.withSource(pos)
-    }
-
     def getResultType(i: Int): TensorType = {
       require(i >= 0 && i < numResults, s"parameter must be in Range of $numResults but got $i")
       resultTypes(i)
     }
-
-    def getResult(i: Int): TENSOR = {
-      require(i >= 0 && i < numResults, s"parameter must be in Range of $numResults but got $i")
-      getResults(i)
-    }
-
-    def getResults: List[TENSOR] = if (useOldMetadata) {
-      OPERATION.oldResultMap(x.asInstanceOf[Backend.Sym]).map(
-        x => new TENSOR(x, useOldMetadata=true)
-      )
-    } else {
-      OPERATION.resultMap(x.asInstanceOf[Backend.Sym]).map(x => new TENSOR(x))
-    }
-
-    private def result(i: Int)(implicit __pos: SourceContext): TENSOR = {
-      require(i >= 0 && i < numResults, s"parameter must be in Range of $numResults but got $i")
-      OPERATION.getResult(this, i, getResultType(i), annotation)
-    }
-
-    private def results(implicit __pos: SourceContext): List[TENSOR] = (0 until numResults).toList.map(i => result(i))
   }
 
   object OPERATION {
-    def getResult(x: OPERATION, i: Int, tensorType: TensorType, anno: Anno)(implicit __pos: SourceContext) = {
-      (new TENSOR(Adapter.g.reflect("tensor_result", C(tensorType), C(anno), x.x, C(i)))).withSrcType(__pos, tensorType.et)
+    def getResult(x: OPERATION, i: Int)(implicit __pos: SourceContext) = {
+      require(i >= 0 && i < x.numResults, s"parameter must be in Range of ${x.numResults} but got $i")
+      (new TENSOR(Adapter.g.reflect("tensor_result", C(x.getResultType(i)), C(x.annotation), x.x, C(i)))).withSrcType(__pos, x.getResultType(i).et)
     }
-
-    // We are using these global data structures to hold operation graph metadata
-    var oldResultMap: mutable.Map[lms.core.Backend.Exp, List[lms.core.Backend.Exp]] = _
-    var resultMap: mutable.Map[lms.core.Backend.Exp, List[lms.core.Backend.Exp]] = _
 
     def isOperation(x: Backend.Exp, useOldMetadata: Boolean = false) = {
       val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
@@ -225,7 +186,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
       case n@Some(Node(_, op, _, _)) if op.startsWith("op_") => throw new Exception(s"$x is an operation, not a tensor: $n")
       case _ => new TENSOR(map(x.asInstanceOf[Backend.Sym]))
     }
-    def getOp(x: Backend.Exp): List[TENSOR] = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
+    def getGradsOfOp(x: Backend.Exp): List[TENSOR] = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
       case n@Some(Node(_, op, _, _)) if op.startsWith("op_") => Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])) match {
           case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => xs.map(new TENSOR(_))
           case a => throw new Exception(s"$a is not a tuple view")

@@ -71,8 +71,6 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
       else
         g.reflect(op,args:_*)
 
-      // hacky handling of OPERATION.resultMap
-      if (op.startsWith("op_")) (new OPERATION(res)).withSource(Adapter.oldSourceMap(s))
       res
 
     case _ => super.transform(n)
@@ -82,10 +80,6 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     assert (g == null)
     g = new GraphBuilderOpt()
     Adapter.g = g
-
-    // handle the metadata in OPERATION.resultMap
-    OPERATION.oldResultMap = OPERATION.resultMap
-    OPERATION.resultMap = new mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
 
     try {
       super.transform(graph)

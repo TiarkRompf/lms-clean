@@ -60,7 +60,7 @@ trait DistributeTensor2MPI_NCCLSplit extends DistributeTensor2MPI_NCCLBase {
     case Node(s, "op_split", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
       val oldSplitOp = new SPLIT_OP(s, useOldMetadata = true)
       implicit val sc_ : SourceContext = oldSplitOp.p
-      val m = oldSplitOp.getResult(0).et
+      val m = (new TENSOR(input, useOldMetadata = true)).et
 
       require(tts.length == 2)
       require(tts(0).shape.length == 2)

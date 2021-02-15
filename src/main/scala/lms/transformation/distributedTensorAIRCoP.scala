@@ -119,7 +119,6 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
       val new_weight = WEIGHT(tt, anno)
       gradMap(s) = ZEROS(tt, anno)
       momentumMap(s) = ZEROS(tt, anno)
-      // FIXME(feiw) how do we deal with the case where multiple nodes are generated?
       new_weight.x
 
     case _ => super.transform(n)
@@ -129,10 +128,6 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     assert (g == null)
     g = new GraphBuilderOpt()
     Adapter.g = g
-
-    // handle the metadata in OPERATION.resultMap
-    OPERATION.oldResultMap = OPERATION.resultMap
-    OPERATION.resultMap = new mutable.HashMap[lms.core.Backend.Exp, List[lms.core.Backend.Exp]]()
 
     try {
       super.transform(graph)
