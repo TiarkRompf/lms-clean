@@ -14,7 +14,7 @@ import lms.transformation.util.DataStructure
 import Backend._
 
 
-trait DistributeTensor2MPI_NCCLSplit extends DistributeTensor2MPI_NCCLBase {
+trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase {
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -57,14 +57,14 @@ trait DistributeTensor2MPI_NCCLSplit extends DistributeTensor2MPI_NCCLBase {
 
   override def transform(n: Node): Backend.Exp = n match {
 
-    case Node(s, "tensors_split", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
-      val oldSplitOp = new SPLIT_OP(s, useOldMetadata = true)
+    case Node(s, "tensors_split", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
+      val oldSplitOp = new TENSORS(s, useOldMetadata = true)
       implicit val sc_ : SourceContext = oldSplitOp.p
       val m = (new TENSOR(input, useOldMetadata = true)).et
 
       require(tts.length == 2)
       require(tts(0).shape.length == 2)
-      require(oldSplitOp.axis == 1)
+      require(axis == 1)
       require(tts(0).shape(1).size == tts(1).shape(1).size)
 
       val operand = get_operand(input, anno)
@@ -72,7 +72,7 @@ trait DistributeTensor2MPI_NCCLSplit extends DistributeTensor2MPI_NCCLBase {
       // FIXME(feiw) for now, let's assume that `anno` is for all devices
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in mult op")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tts(0).contains(dim) && dim != oldSplitOp.axis =>
+        case SAnno(dim: Dim, devices: Seq[Device], _) if tts(0).contains(dim) && dim != axis =>
           val shape = tts(0).shapeSizeAfterSplit(dim, devices.size)
           val arrays = gpu_split2_2d1_equal_array(shape(0), shape(1), m, myNCCLRank, operand)
           Adapter.g.reflect("tuple-view", arrays.map(_.x): _*)

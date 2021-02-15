@@ -11,17 +11,10 @@ import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 
 import Backend._
 
-trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
+trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
   import BaseTypeLess._
 
-  class SPLIT_OP(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TENSORS(x, useOldMetadata) {
-    val axis: Int = gc.get(x.asInstanceOf[Backend.Sym]) match {
-      case Some(Node(_, "tensors_split", tts::anno::o::Backend.Const(axis:Int)::_, _)) => axis
-      case a => throw new Exception(s"Node $a is not a SplitOp")
-    }
-  }
-
-  def SplitOp(x: TENSOR, axis: Int, slices: List[Int], anno: Anno = NAnno)(implicit __pos: SourceContext): SPLIT_OP = {
+  def Split(x: TENSOR, axis: Int, slices: List[Int], anno: Anno = NAnno)(implicit __pos: SourceContext): TENSORS = {
     val x_resultType = x.resultType
     val x_tensor_shape = x_resultType.shape
     assert(slices.sum == x_tensor_shape(axis).size)
@@ -34,7 +27,7 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
     val result_resultTypes = result_tensor_shapes map { s =>
       TensorType(s, x_resultType.et, anno)
     }
-    new SPLIT_OP(Adapter.g.reflectRead("tensors_split", C(result_resultTypes), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
+    new TENSORS(Adapter.g.reflectRead("tensors_split", C(result_resultTypes), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
   }
 
   def Concat(xs: List[TENSOR], axis: Int, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
@@ -75,15 +68,15 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 
-    case Node(s, "tensors_split", tts::Backend.Const(anno:Anno)::(x:Backend.Sym)::_, _) =>
+    case Node(s, "tensors_split", tts::Backend.Const(anno:Anno)::(x:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
       implicit val pos: SourceContext = Adapter.oldSourceMap(s)
       // save forward op in forwardNodes
       forwardNodes += node
       // save backward op in backwardNodes
       (() => {
-        val splitOp = new SPLIT_OP(s, useOldMetadata=true)
+        val splitOp = new TENSORS(s, useOldMetadata=true)
         val grads = gradMap.getGradsOfOp(s)
-        val c_grads = Concat(grads, splitOp.axis, anno)
+        val c_grads = Concat(grads, axis, anno)
         Accumulate(gradMap(x), c_grads, anno); ()
       }) +=: backwardNodes
 
@@ -94,14 +87,14 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
 }
 
 
-trait FixedSizeDistributedTensorOpsSplit extends FixedSizeDistributedTensorOpsBase {
+trait FixedSizeDistributedTensorOpsSplitConcat extends FixedSizeDistributedTensorOpsBase {
   import FixedSizeDistributedTensorTypeLess._
 
   implicit class TensorOpsSplit[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
 
     def split(axis: Int, slices: List[Int], anno: Anno = NAnno)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
-      val op = SplitOp(self, axis, slices, anno)
+      val op = Split(self, axis, slices, anno)
       ((0 until slices.length): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
     }
   }
