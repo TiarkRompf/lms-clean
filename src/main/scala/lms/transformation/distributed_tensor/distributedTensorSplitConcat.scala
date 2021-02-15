@@ -16,18 +16,18 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
 
   def Split(x: TENSOR, axis: Int, slices: List[Int], anno: Anno = NAnno)(implicit __pos: SourceContext): TENSORS = {
     val x_resultType = x.resultType
-    val x_tensor_shape = x_resultType.shape
-    assert(slices.sum == x_tensor_shape(axis).size)
-    val result_tensor_shapes = slices map { s =>
+    val x_tensorShape = x_resultType.shape
+    assert(slices.sum == x_tensorShape(axis).size)
+    val resultTensorShapes = slices map { s =>
       // FIXME(feiw) we asked the split result to use the same dim at the split axis. is this correct?
-      x_tensor_shape.zipWithIndex.map {
+      x_tensorShape.zipWithIndex.map {
         case(a, i) => if (i == axis) Size(a.dim, s) else a
       }
     }
-    val result_resultTypes = result_tensor_shapes map { s =>
+    val resultTypes = resultTensorShapes map { s =>
       TensorType(s, x_resultType.et, anno)
     }
-    new TENSORS(Adapter.g.reflectRead("tensors_split", C(result_resultTypes), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
+    new TENSORS(Adapter.g.reflectRead("tensors_split", C(resultTypes), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
   }
 
   def Concat(xs: List[TENSOR], axis: Int, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
