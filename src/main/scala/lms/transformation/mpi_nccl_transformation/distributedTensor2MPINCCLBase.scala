@@ -261,7 +261,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
         case a => throw new Exception(s"$a is not a tuple view")
       }
 
-    case Node(s, op, _, _) if op.startsWith("tensor") || op.startsWith("op") =>
+    case Node(s, op, _, _) if op.startsWith("tensor_") || op.startsWith("tensors_") =>
       throw new Exception(s"not yet handling $n in distributedTensor2MPINCCL transformation")
 
     case _ => super.transform(n)

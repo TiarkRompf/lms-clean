@@ -91,7 +91,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def isTensor(x: Backend.Exp, useOldMetadata: Boolean = false) = {
       val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, _, _)) => s.startsWith("tensor") && s != "tensor_result"
+        case Some(Node(_, s, _, _)) => s.startsWith("tensor_") && s != "tensor_result"
         case a => false
       }
     }
@@ -124,11 +124,11 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
   }
 
-  class OPERATION(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
+  class TENSORS(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
     val (resultTypes: List[TensorType], annotation: Anno) = gc.get(x.asInstanceOf[Backend.Sym]) match {
-      case Some(Node(_, s, Backend.Const(result_tensor_types: List[TensorType])::Backend.Const(anno:Anno)::_, _))
-        if s.startsWith("op") => (result_tensor_types, anno)
-      case a => throw new Exception(s"Node $a is not an operation node")
+      case Some(Node(_, s, Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::_, _))
+        if s.startsWith("tensors_") => (tts, anno)
+      case a => throw new Exception(s"Node $a is not an Tensors node")
     }
 
     val numResults: Int = resultTypes.length
@@ -148,7 +148,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def isTensors(x: Backend.Exp, useOldMetadata: Boolean = false) = {
       val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, _, _)) => s.startsWith("op")
+        case Some(Node(_, s, _, _)) => s.startsWith("tensors_")
         case a => false
       }
     }
@@ -162,7 +162,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   def mergable_dims(node: Node): List[(Dim, Dim)] = node match {
     case Node(s, op, _, _) if (op == "tensor_input" || op == "tensor_weight" || op == "tensor_result") => List()
     case Node(s, op, _, _) =>
-      assert(!op.startsWith("tensor"), s"node $node is not yet handled in mergable_dims")
+      assert(!op.startsWith("tensor_"), s"node $node is not yet handled in mergable_dims")
       List()
   }
 
@@ -174,11 +174,11 @@ trait FixedSizeDistributedTensorBaseTypeLess {
           case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => new TENSOR(xs(i))
           case a => throw new Exception(s"$a is not a tuple view")
         }
-      case n@Some(Node(_, op, _, _)) if op.startsWith("op_") => throw new Exception(s"$x is an operation, not a tensor: $n")
+      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => throw new Exception(s"$x is Tensors, not a Tensor: $n")
       case _ => new TENSOR(map(x.asInstanceOf[Backend.Sym]))
     }
     def getGradsOfOp(x: Backend.Exp): List[TENSOR] = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
-      case n@Some(Node(_, op, _, _)) if op.startsWith("op_") => Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])) match {
+      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])) match {
           case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => xs.map(new TENSOR(_))
           case a => throw new Exception(s"$a is not a tuple view")
         }

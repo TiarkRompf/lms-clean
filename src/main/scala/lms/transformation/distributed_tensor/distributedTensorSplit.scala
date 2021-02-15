@@ -34,7 +34,7 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
     val result_resultTypes = result_tensor_shapes map { s =>
       TensorType(s, x_resultType.et, anno)
     }
-    new SPLIT_OP(Adapter.g.reflectRead("op_split", C(result_resultTypes), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
+    new SPLIT_OP(Adapter.g.reflectRead("tensors_split", C(result_resultTypes), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
   }
 
   def Concat(xs: List[TENSOR], axis: Int, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
@@ -60,7 +60,7 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
   }
 
   override def mergable_dims(node: Node) = node match {
-    case Node(s, "op_split", _, _) => List()
+    case Node(s, "tensors_split", _, _) => List()
     case Node(s, "tensor_concat", tt::anno::Backend.Const(axis:Int)::(inputs:List[Backend.Sym]), _) =>
       val input_types: List[Seq[Dim]] = inputs.map(x => (new TENSOR(x, useOldMetadata=true)).resultType.shapeDim)
       input_types.transpose.zipWithIndex.flatMap { case (dims: List[Dim], index) =>
@@ -75,7 +75,7 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 
-    case Node(s, "op_split", tts::Backend.Const(anno:Anno)::(x:Backend.Sym)::_, _) =>
+    case Node(s, "tensors_split", tts::Backend.Const(anno:Anno)::(x:Backend.Sym)::_, _) =>
       implicit val pos: SourceContext = Adapter.oldSourceMap(s)
       // save forward op in forwardNodes
       forwardNodes += node

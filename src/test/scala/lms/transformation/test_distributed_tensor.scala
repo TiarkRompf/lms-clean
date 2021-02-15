@@ -23,7 +23,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       val IR: q.type = q
 
       override def mayInline(n: Node): Boolean = n match {
-        case Node(_, s, _, _) if s.startsWith("tensor") => false
+        case Node(_, s, _, _) if s.startsWith("tensor_") || s.startsWith("tensors_") => false
         case _ => super.mayInline(n)
       }
     }
