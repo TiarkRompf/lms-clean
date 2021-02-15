@@ -18,6 +18,7 @@ abstract class DistributeTensor2MPI_NCCL extends DistributeTensor2MPI_NCCLBase
     with DistributeTensor2MPI_NCCLBinary
     with DistributeTensor2MPI_NCCLGemm
     with DistributeTensor2MPI_NCCLMutation
+    with DistributeTensor2MPI_NCCLSplitConcat
     with DistributedTensor2MPI_NCCLUnary
 
 class DistributeTensor2MPI_NCCLAnalysis extends Traverser {

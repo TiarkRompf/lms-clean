@@ -33,9 +33,13 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     // Step 1: collect all dim names in this block
     val all_dims = scala.collection.mutable.ArrayBuffer[Dim]()
     ns.foreach(n => n match {
-      case Node(s, op, _, _) if op.startsWith("tensor") =>
-        val tensor_type = (new TENSOR(s, useOldMetadata = true)).tensor_type
-        all_dims ++= tensor_type.shape.map(_.dim)
+      case Node(s, op, _, _) if op.startsWith("tensor_") =>
+        val resultType = (new TENSOR(s, useOldMetadata = true)).resultType
+        all_dims ++= resultType.shape.map(_.dim)
+      case Node(s, op, _, _) if op.startsWith("tensors_") =>
+        val resultTypes = (new TENSORS(s, useOldMetadata = true)).resultTypes
+        for (resultType <- resultTypes)
+          all_dims ++= resultType.shape.map(_.dim)
       case _ => ()
     })
     dim_names = new USets[Dim](all_dims.toList)
@@ -56,40 +60,22 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
   }
 
   override def transform(n: Node): Backend.Exp = n match {
-
-    case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-      INPUT(update_dim_name(tt), update_dim_name(anno)).x
-
-    case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-      WEIGHT(update_dim_name(tt), update_dim_name(anno)).x
-
-    case Node(s, op, tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) if (op.startsWith("tensor_")) =>
-      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-      // this reconstruction should use new dim names in tensor type :)
-      op match {
-        case "tensor_add" => Add(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-        case "tenosr_minus" => Sub(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-        case "tensor_mult" => Mul(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-        case "tensor_div" => Div(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-        case "tensor_dot" => Dot(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno)).x
-        case _ => throw new Exception(s"op $op is not yet handled in dim name transform")
+    case Node(s, op, rs, es) if (op.startsWith("tensor_") || op.startsWith("tensors_")) =>
+      val (effects, pure) = (es.deps, rs)
+      val args = pure.map {
+        case b @ Block(_,_,_,_) => transform(b)
+        case s: Backend.Sym => transform(s)
+        case Backend.Const(a: TensorType) => Backend.Const(update_dim_name(a))
+        case Backend.Const(a: List[TensorType]) => Backend.Const(a.map(update_dim_name))
+        case Backend.Const(a: Anno) => Backend.Const(update_dim_name(a))
+        case a => a
       }
+      val res = if (effects.nonEmpty)
+        g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
+      else
+        g.reflect(op,args:_*)
 
-    case Node(s, op, tt::Backend.Const(anno:Anno)::(x:Backend.Sym)::_, _) if (op.startsWith("tensor_")) =>
-      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-      op match {
-        case "tensor_negate" => Negate(new TENSOR(transform(x)), update_dim_name(anno)).x
-        case _ => throw new Exception(s"op $op is not yet handled in dim name transform")
-      }
-
-    case Node(s, "tensor_dot_with_transpose", tt::Backend.Const(anno:Anno)::Backend.Const(transL:Boolean)::Backend.Const(transR:Boolean)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
-      DotWithTranspose(new TENSOR(transform(x)), new TENSOR(transform(y)), update_dim_name(anno), transL, transR).x
-
-    case Node(s, op, _, _) if (op.startsWith("tensor_")) =>
-      throw new Exception(s"op $op is not yet handled in dim name transform")
+      res
 
     case _ => super.transform(n)
   }
@@ -98,6 +84,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     assert (g == null)
     g = new GraphBuilderOpt()
     Adapter.g = g
+
     try {
       super.transform(graph)
     } finally {
