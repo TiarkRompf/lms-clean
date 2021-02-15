@@ -25,7 +25,6 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   import BaseTypeLess._
   import PrimitiveTypeLess._
   import ArrayTypeLess._
-  import CUDATypeLess._
 
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
@@ -48,6 +47,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def namedDim(x: Int) = shape(x).dim
     def contains(d: Dim) = shape.map(_.dim).contains(d)
     def shapeSize = shape.map(_.size)
+    def shapeDim = shape.map(_.dim)
     def shapeSizeAfterSplit(d: Dim, degree: Int) = shape.map(s => if (s.dim == d) s.size / degree else s.size)
   }
 
@@ -87,7 +87,17 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(tt), C(anno)))).withSrcType(__pos, tt.et)
   }
 
-  class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
+  object TENSOR {
+    def isTensor(x: Backend.Exp, useOldMetadata: Boolean = false) = {
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, s, _, _)) => s.startsWith("tensor_") && s != "tensor_result"
+        case a => false
+      }
+    }
+  }
+
+  class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
       withSource(pos).withEleType(m)
@@ -96,21 +106,13 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
     def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
-    def tensor_type: TensorType = {
-      gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, Backend.Const(tt:TensorType)::_, _)) if s.startsWith("tensor") => tt
-        case a => throw new Exception(s"cannot find node $a")
+    val (resultType: TensorType, annotation: Anno) = gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, s, Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _))
+          if s.startsWith("tensor_") => (tt, anno)
+        case a => throw new Exception(s"Node $a is not a Tensor node")
       }
-    }
 
-    def annotation: Anno = {
-      gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, tt::Backend.Const(a:Anno)::_, _)) if s.startsWith("tensor") => a
-        case a => throw new Exception(s"cannot find node $a")
-      }
-    }
-
-    def shape_size: Seq[Int] = tensor_type.shape.map(_.size)
+    val shapeSize: Seq[Int] = resultType.shape.map(_.size)
 
     def show(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("show_tensor", x)(x)(Adapter.CTRL))
@@ -122,31 +124,82 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
   }
 
-  // FIXME(feiw) the return type fo MODULE is strange
+  class TENSORS(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
+    val (resultTypes: List[TensorType], annotation: Anno) = gc.get(x.asInstanceOf[Backend.Sym]) match {
+      case Some(Node(_, s, Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::_, _))
+        if s.startsWith("tensors_") => (tts, anno)
+      case a => throw new Exception(s"Node $a is not an Tensors node")
+    }
+
+    val numResults: Int = resultTypes.length
+
+    def getResultType(i: Int): TensorType = {
+      require(i >= 0 && i < numResults, s"parameter must be in Range of $numResults but got $i")
+      resultTypes(i)
+    }
+  }
+
+  object TENSORS {
+    def getResult(x: TENSORS, i: Int)(implicit __pos: SourceContext) = {
+      require(i >= 0 && i < x.numResults, s"parameter must be in Range of ${x.numResults} but got $i")
+      (new TENSOR(Adapter.g.reflect("tensor_result", C(x.getResultType(i)), C(x.annotation), x.x, C(i)))).withSrcType(__pos, x.getResultType(i).et)
+    }
+
+    def isTensors(x: Backend.Exp, useOldMetadata: Boolean = false) = {
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, s, _, _)) => s.startsWith("tensors_")
+        case a => false
+      }
+    }
+  }
+
   def MODULE(f: => TENSOR)(implicit __pos: SourceContext): Int => UNIT = {
     val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f.x))(Adapter.CTRL)
     (iter: Int) => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
   }
 
   def mergable_dims(node: Node): List[(Dim, Dim)] = node match {
-    case Node(s, op, _, _) if (op == "tensor_input" || op == "tensor_weight") => List()
+    case Node(s, op, _, _) if (op == "tensor_input" || op == "tensor_weight" || op == "tensor_result") => List()
     case Node(s, op, _, _) =>
-      assert(!op.startsWith("tensor"), s"node $node is not yet handled in mergable_dims")
+      assert(!op.startsWith("tensor_"), s"node $node is not yet handled in mergable_dims")
       List()
+  }
+
+  // helper data structure for wrapping hashmap FIXME(feiw): we have to define it here :( for the aircopCollect function
+  case class GradMapWrapper(map: scala.collection.mutable.HashMap[Backend.Sym, Backend.Sym]) {
+    def apply(x: Backend.Exp): TENSOR = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
+      case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _)) =>
+        Adapter.g.globalDefsCache.get(map(op)) match {
+          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => new TENSOR(xs(i))
+          case a => throw new Exception(s"$a is not a tuple view")
+        }
+      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => throw new Exception(s"$x is Tensors, not a Tensor: $n")
+      case _ => new TENSOR(map(x.asInstanceOf[Backend.Sym]))
+    }
+    def getGradsOfOp(x: Backend.Exp): List[TENSOR] = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
+      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])) match {
+          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => xs.map(new TENSOR(_))
+          case a => throw new Exception(s"$a is not a tuple view")
+        }
+      case n => throw new Exception(s"$n is not an operation")
+    }
+    def update(x: Backend.Exp, grad: TENSOR) = { map(x.asInstanceOf[Backend.Sym]) = grad.x.asInstanceOf[Backend.Sym] }
+    def update(x: Backend.Exp, grad: Backend.Exp) = { map(x.asInstanceOf[Backend.Sym]) = grad.asInstanceOf[Backend.Sym] }
   }
 
   def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp): Unit = node match {
 
     case Node(s, "tensor_input", _, _) => forwardNodes += node
     case Node(s, "tensor_weight", _, _) => weightNodes += node
-    case Node(s, op, _, _) => throw new Exception(s"op $op is not yet handled in aircopCollect")
+    case Node(s, "tensor_result", _, _) => forwardNodes += node
+    case Node(s, op, _, _) => throw new Exception(s"op $op is not yet handled in aircopCollect \n$node")
   }
 }
-
 
 trait FixedSizeDistributedTensorOpsBase extends Dsl {
 
@@ -170,8 +223,8 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def input[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = INPUT(tensor_type, anno)
+    def input[T:Manifest](resultType: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = INPUT(resultType, anno)
       Wrap[Tensor[T]](tensor.x)
     }
 
@@ -185,25 +238,25 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def ones[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = ONES(tensor_type, anno)
+    def ones[T:Manifest](resultType: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = ONES(resultType, anno)
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def zeros[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = ZEROS(tensor_type, anno)
+    def zeros[T:Manifest](resultType: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = ZEROS(resultType, anno)
       Wrap[Tensor[T]](tensor.x)
     }
   }
 
-  def tensor_type[T:Numeric:Manifest](shape: Seq[Int]): TensorType =
+  def resultType[T:Numeric:Manifest](shape: Seq[Int]): TensorType =
     TensorType(shape.map(s => Size(dim, s)), manifest[T])
 
   def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))
 
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
-    def shape: Seq[Int] = self.shape_size
+    def shape: Seq[Int] = self.shapeSize
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
   }
 }

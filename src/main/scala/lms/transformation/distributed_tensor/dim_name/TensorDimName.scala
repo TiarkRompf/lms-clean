@@ -33,9 +33,13 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     // Step 1: collect all dim names in this block
     val all_dims = scala.collection.mutable.ArrayBuffer[Dim]()
     ns.foreach(n => n match {
-      case Node(s, op, _, _) if op.startsWith("tensor") =>
-        val tensor_type = (new TENSOR(s, useOldMetadata = true)).tensor_type
-        all_dims ++= tensor_type.shape.map(_.dim)
+      case Node(s, op, _, _) if op.startsWith("tensor_") =>
+        val resultType = (new TENSOR(s, useOldMetadata = true)).resultType
+        all_dims ++= resultType.shape.map(_.dim)
+      case Node(s, op, _, _) if op.startsWith("tensors_") =>
+        val resultTypes = (new TENSORS(s, useOldMetadata = true)).resultTypes
+        for (resultType <- resultTypes)
+          all_dims ++= resultType.shape.map(_.dim)
       case _ => ()
     })
     dim_names = new USets[Dim](all_dims.toList)
@@ -80,6 +84,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     assert (g == null)
     g = new GraphBuilderOpt()
     Adapter.g = g
+
     try {
       super.transform(graph)
     } finally {

@@ -19,7 +19,7 @@ object ArrayTypeLess {
 
   def ARRAY(x: TOP): ARRAY = new ARRAY(x.x)
 
-  class ARRAY(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
+  class ARRAY(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
     def et: Manifest[_] = Adapter.typeMap(x).typeArguments.head
     def size: Int = {
       gc.get(x.asInstanceOf[Backend.Sym]) match {

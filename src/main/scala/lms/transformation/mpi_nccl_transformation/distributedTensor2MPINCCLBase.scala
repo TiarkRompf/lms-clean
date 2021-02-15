@@ -146,7 +146,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
-      val count = numeral(sourceTensor.shape_size)
+      val count = numeral(sourceTensor.shapeSize)
 
       // allocate memory on the give device (see annotation)
       // 1. if the annotation is splitting on a dimension that is not in weight,
@@ -176,7 +176,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
-      val count = numeral(sourceTensor.shape_size)
+      val count = numeral(sourceTensor.shapeSize)
 
       // allocate memory on the give device (see annotation)
       // 1. if the annotation is splitting on a dimension that is not in weight,
@@ -204,7 +204,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
-      val count = numeral(sourceTensor.shape_size)
+      val count = numeral(sourceTensor.shapeSize)
 
       anno match {
         case NAnno => if (myNCCLRank == 0) gpu_fixed_array(count, 0, 0).x else Backend.Const(())
@@ -221,7 +221,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
-      val count = numeral(sourceTensor.shape_size)
+      val count = numeral(sourceTensor.shapeSize)
 
       anno match {
         case NAnno => if (myNCCLRank == 0) gpu_fixed_array(count, 0, 1).x else Backend.Const(())
@@ -238,7 +238,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
 
       val sourceTensor = new TENSOR(tensor, useOldMetadata = true)
       val m = sourceTensor.et
-      val tt = sourceTensor.tensor_type
+      val tt = sourceTensor.resultType
       val anno = sourceTensor.annotation
 
       // here we need to communicate the GPU `tensor` to CPU
@@ -249,7 +249,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
           // collect the tensors from all GPUs in `anno` and concat them as the final result
 
           val root = 0
-          val count = numeral(sourceTensor.shape_size)
+          val count = numeral(sourceTensor.shapeSize)
           val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
 
           // declare recv buffer
@@ -277,18 +277,28 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           // copy the tensor from GPU(0) is enough
           IF (EQUAL(myNCCLRank, INT(0))) {
-            val count = numeral(sourceTensor.shape_size)
+            val count = numeral(sourceTensor.shapeSize)
             gpu_to_cpu_and_print(count, m, transform(tensor))
             UNIT(Backend.Const(()))
           } { UNIT(Backend.Const(())) }
           Backend.Const(())
       }
 
+
+    case Node(s, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _) => // subst(s)
+      Adapter.g.globalDefsCache.get(transform(op).asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => xs(i)
+        case a => throw new Exception(s"$a is not a tuple view")
+      }
+
+    case Node(s, op, _, _) if op.startsWith("tensor_") || op.startsWith("tensors_") =>
+      throw new Exception(s"not yet handling $n in distributedTensor2MPINCCL transformation")
+
     case _ => super.transform(n)
   }
 
   def tensor_shape(tensor: Backend.Exp, useOldMetadata: Boolean = false): Seq[Int] =
-    (new TENSOR(tensor, useOldMetadata)).shape_size
+    (new TENSOR(tensor, useOldMetadata)).shapeSize
 
   def get_operand(operand: Backend.Exp, anno: Anno, assertSame: Boolean = false) = {
     val operand_tensor = new TENSOR(operand, useOldMetadata = true)
@@ -336,6 +346,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     assert (g == null)
     g = new GraphBuilderOpt()
     Adapter.g = g
+
     try {
       super.transform(graph)
     } finally {

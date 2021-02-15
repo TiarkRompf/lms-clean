@@ -13,7 +13,7 @@ import lms.transformation.util.DataStructure
 import Backend._
 
 
-abstract class DistributeTensorAIRCoP extends Transformer {
+abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
   override val name = "DistributeTensorAIRCoP"
 
   import PrimitiveTypeLess._
@@ -26,8 +26,9 @@ abstract class DistributeTensorAIRCoP extends Transformer {
   val backwardNodes = mutable.ArrayBuffer[()=>Unit]()
 
   // this is the gradient map from OLD value tensors to NEW gradient tensors
-  val gradMap = mutable.HashMap[Backend.Sym, TENSOR]()
   val momentumMap = mutable.HashMap[Backend.Sym, TENSOR]()
+  val gradMap_ = mutable.HashMap[Backend.Sym, Backend.Sym]()
+  val gradMap = GradMapWrapper(gradMap_)
 
   def traverseModule(iter: Int)(ns: Seq[Node], res: Block): Backend.Exp = {
     // Step 1: Collection Phase
@@ -36,8 +37,8 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     implicit val pos = Adapter.oldSourceMap(ns.last.n)
     (() => {
       val result = new TENSOR(transform(res.res))
-      val grad = ONES(result.tensor_type, result.annotation)
-      gradMap(res.res.asInstanceOf[Backend.Sym]) = grad
+      val grad = ONES(result.resultType, result.annotation)
+      gradMap(res.res) = grad
     }) +=: backwardNodes
     // collect all weight syms and all forward syms
     val weightSyms = weightNodes.map(s => s.n)
@@ -77,9 +78,16 @@ abstract class DistributeTensorAIRCoP extends Transformer {
   def traverseBackward(backwards: mutable.ArrayBuffer[()=>Unit], forwardSyms: mutable.ArrayBuffer[Backend.Sym])(cont: => Unit) = {
     for (fs <- forwardSyms) {
       implicit val pos = Adapter.oldSourceMap(fs)
-      val node = new TENSOR(transform(fs))
-      val grad = ZEROS(node.tensor_type, node.annotation)
-      gradMap(fs.asInstanceOf[Backend.Sym]) = grad
+
+      if (TENSOR.isTensor(transform(fs))) {
+        val node = new TENSOR(transform(fs))
+        val grad = ZEROS(node.resultType, node.annotation)
+        gradMap(fs) = grad
+      } else if (TENSORS.isTensors(transform(fs))) {
+        val oldOp = new TENSORS(fs, useOldMetadata = true)
+        val grads = oldOp.resultTypes.map(ZEROS(_, oldOp.annotation))
+        gradMap(fs) = Adapter.g.reflect("tuple-view", grads.map(_.x): _*)
+      }
     }
     for (b <- backwards) {
       b()
@@ -96,12 +104,6 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     cont
   }
 
-  // def transformModuleBlock(b: Block): Block = b match {
-  //   case b @ Block(Nil, res, block, eff) => g.reify {
-  //     scheduleBlock(b)(traverseModule)
-  //   }
-  // }
-
   override def transform(n: Node): Backend.Exp = n match {
 
     case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => Backend.Const(())
@@ -117,7 +119,6 @@ abstract class DistributeTensorAIRCoP extends Transformer {
       val new_weight = WEIGHT(tt, anno)
       gradMap(s) = ZEROS(tt, anno)
       momentumMap(s) = ZEROS(tt, anno)
-      // FIXME(feiw) how do we deal with the case where multiple nodes are generated?
       new_weight.x
 
     case _ => super.transform(n)
@@ -127,6 +128,7 @@ abstract class DistributeTensorAIRCoP extends Transformer {
     assert (g == null)
     g = new GraphBuilderOpt()
     Adapter.g = g
+
     try {
       super.transform(graph)
     } finally {
