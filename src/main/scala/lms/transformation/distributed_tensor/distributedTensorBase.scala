@@ -106,22 +106,13 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
     def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
 
-    def tensor_type: TensorType = gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, Backend.Const(tt:TensorType)::_, _)) if s.startsWith("tensor") => tt
-        case a => throw new Exception(s"cannot find node $a")
+    val (resultType: TensorType, annotation: Anno) = gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, s, Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _))
+          if s.startsWith("tensor_") => (tt, anno)
+        case a => throw new Exception(s"Node $a is not a Tensor node")
       }
 
-    def annotation: Anno = gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, tt::Backend.Const(a:Anno)::_, _)) if s.startsWith("tensor") => a
-        case a => throw new Exception(s"cannot find node $a")
-      }
-
-    def opType = gc.get(x.asInstanceOf[Backend.Sym]) match {
-      case Some(Node(_, s, _, _)) if s.startsWith("tensor") => s
-      case a => throw new Exception(s"cannot find node $a")
-    }
-
-    def shapeSize: Seq[Int] = tensor_type.shape.map(_.size)
+    val shapeSize: Seq[Int] = resultType.shape.map(_.size)
 
     def show(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("show_tensor", x)(x)(Adapter.CTRL))
@@ -148,13 +139,13 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
   }
 
-  object OPERATION {
-    def getResult(x: OPERATION, i: Int)(implicit __pos: SourceContext) = {
+  object TENSORS {
+    def getResult(x: TENSORS, i: Int)(implicit __pos: SourceContext) = {
       require(i >= 0 && i < x.numResults, s"parameter must be in Range of ${x.numResults} but got $i")
       (new TENSOR(Adapter.g.reflect("tensor_result", C(x.getResultType(i)), C(x.annotation), x.x, C(i)))).withSrcType(__pos, x.getResultType(i).et)
     }
 
-    def isOperation(x: Backend.Exp, useOldMetadata: Boolean = false) = {
+    def isTensors(x: Backend.Exp, useOldMetadata: Boolean = false) = {
       val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, _, _)) => s.startsWith("op")
@@ -232,8 +223,8 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def input[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = INPUT(tensor_type, anno)
+    def input[T:Manifest](resultType: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = INPUT(resultType, anno)
       Wrap[Tensor[T]](tensor.x)
     }
 
@@ -247,18 +238,18 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def ones[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = ONES(tensor_type, anno)
+    def ones[T:Manifest](resultType: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = ONES(resultType, anno)
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def zeros[T:Manifest](tensor_type: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = ZEROS(tensor_type, anno)
+    def zeros[T:Manifest](resultType: TensorType)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = ZEROS(resultType, anno)
       Wrap[Tensor[T]](tensor.x)
     }
   }
 
-  def tensor_type[T:Numeric:Manifest](shape: Seq[Int]): TensorType =
+  def resultType[T:Numeric:Manifest](shape: Seq[Int]): TensorType =
     TensorType(shape.map(s => Size(dim, s)), manifest[T])
 
   def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))

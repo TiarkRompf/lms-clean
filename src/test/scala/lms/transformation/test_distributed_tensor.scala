@@ -77,7 +77,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         dim_name = 0
-        val inputTensorType = tensor_type[Float](Seq(32,32))
+        val inputTensorType = resultType[Float](Seq(32,32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
         val model = module {
@@ -99,7 +99,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         dim_name = 0
-        val inputTensorType = tensor_type[Float](Seq(32, 32))
+        val inputTensorType = resultType[Float](Seq(32, 32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
         val model = module {
@@ -122,7 +122,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         dim_name = 0
-        val inputTensorType = tensor_type[Float](Seq(32, 32))
+        val inputTensorType = resultType[Float](Seq(32, 32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
         val model = module {
@@ -145,7 +145,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         dim_name = 0
-        val inputTensorType = tensor_type[Float](Seq(32,32))
+        val inputTensorType = resultType[Float](Seq(32,32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
         val model = module {
@@ -167,7 +167,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         dim_name = 0
-        val inputTensorType = tensor_type[Float](Seq(32, 32))
+        val inputTensorType = resultType[Float](Seq(32, 32))
         implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
 
         val model = module {

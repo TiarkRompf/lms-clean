@@ -55,7 +55,7 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
       val sourceTensor = new TENSOR(base, useOldMetadata = true)
 
       implicit val pos = Adapter.oldSourceMap(s)
-      val tt = sourceTensor.tensor_type
+      val tt = sourceTensor.resultType
       val m = sourceTensor.et
 
       // Load the `base` and `addition`, and maybe add communication ops to resolve split annotation conflicts
@@ -80,7 +80,7 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
       val sourceTensor = new TENSOR(weight, useOldMetadata = true)
 
       implicit val pos = Adapter.oldSourceMap(s)
-      val tt = sourceTensor.tensor_type
+      val tt = sourceTensor.resultType
       val m = sourceTensor.et
       val anno = sourceTensor.annotation
 

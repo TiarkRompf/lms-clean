@@ -16,7 +16,7 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
   def ElemWiseNoBroadCasting(x: TENSOR, y: TENSOR, anno: Anno, __pos: SourceContext)(op: String): TENSOR = {
     assert(x.shapeSize == y.shapeSize)
     assert(x.et == y.et)
-    (new TENSOR(Adapter.g.reflectRead(op, C(x.tensor_type), C(anno), x.x, y.x)(x.x, y.x))).withSrcType(__pos, x.et)
+    (new TENSOR(Adapter.g.reflectRead(op, C(x.resultType), C(anno), x.x, y.x)(x.x, y.x))).withSrcType(__pos, x.et)
   }
 
   def Add(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
@@ -36,8 +36,8 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
   override def mergable_dims(node: Node) = node match {
     case Node(s, op, tt::anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _)
         if binaryOps.contains(op) =>
-      val x_type = (new TENSOR(x, useOldMetadata=true)).tensor_type
-      val y_type = (new TENSOR(y, useOldMetadata=true)).tensor_type
+      val x_type = (new TENSOR(x, useOldMetadata=true)).resultType
+      val y_type = (new TENSOR(y, useOldMetadata=true)).resultType
       (x_type.shape zip y_type.shape).toList map { case (a:Size, b:Size) => (a.dim, b.dim) }
     case _ => super.mergable_dims(node)
   }

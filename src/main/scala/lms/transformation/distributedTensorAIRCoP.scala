@@ -37,7 +37,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     implicit val pos = Adapter.oldSourceMap(ns.last.n)
     (() => {
       val result = new TENSOR(transform(res.res))
-      val grad = ONES(result.tensor_type, result.annotation)
+      val grad = ONES(result.resultType, result.annotation)
       gradMap(res.res) = grad
     }) +=: backwardNodes
     // collect all weight syms and all forward syms
@@ -81,10 +81,10 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
 
       if (TENSOR.isTensor(transform(fs))) {
         val node = new TENSOR(transform(fs))
-        val grad = ZEROS(node.tensor_type, node.annotation)
+        val grad = ZEROS(node.resultType, node.annotation)
         gradMap(fs) = grad
-      } else if (OPERATION.isOperation(transform(fs))) {
-        val oldOp = new OPERATION(fs, useOldMetadata = true)
+      } else if (TENSORS.isTensors(transform(fs))) {
+        val oldOp = new TENSORS(fs, useOldMetadata = true)
         val grads = oldOp.resultTypes.map(ZEROS(_, oldOp.annotation))
         gradMap(fs) = Adapter.g.reflect("tuple-view", grads.map(_.x): _*)
       }

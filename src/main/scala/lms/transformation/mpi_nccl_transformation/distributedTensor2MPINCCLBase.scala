@@ -208,7 +208,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
 
       val sourceTensor = new TENSOR(tensor, useOldMetadata = true)
       val m = sourceTensor.et
-      val tt = sourceTensor.tensor_type
+      val tt = sourceTensor.resultType
       val anno = sourceTensor.annotation
 
       // here we need to communicate the GPU `tensor` to CPU

@@ -15,12 +15,12 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
 
   def Transpose(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
     assert(tensor.shapeSize.size == 2, "input of transpose must be 2D")
-    val res_tt = TensorType(Seq(tensor.tensor_type.shape(1), tensor.tensor_type.shape(0)), tensor.et)
+    val res_tt = TensorType(Seq(tensor.resultType.shape(1), tensor.resultType.shape(0)), tensor.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), tensor.x)(tensor.x))).withSrcType(__pos, tensor.et)
   }
 
   def Negate(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-    val res_tt = tensor.tensor_type
+    val res_tt = tensor.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_negate", C(res_tt), C(anno), tensor.x)(tensor.x)).withSrcType(__pos, tensor.et))
   }
 

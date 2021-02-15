@@ -34,8 +34,8 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     val all_dims = scala.collection.mutable.ArrayBuffer[Dim]()
     ns.foreach(n => n match {
       case Node(s, op, _, _) if op.startsWith("tensor") =>
-        val tensor_type = (new TENSOR(s, useOldMetadata = true)).tensor_type
-        all_dims ++= tensor_type.shape.map(_.dim)
+        val resultType = (new TENSOR(s, useOldMetadata = true)).resultType
+        all_dims ++= resultType.shape.map(_.dim)
       case _ => ()
     })
     dim_names = new USets[Dim](all_dims.toList)

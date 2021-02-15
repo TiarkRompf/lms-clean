@@ -14,16 +14,16 @@ import Backend._
 trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
   import BaseTypeLess._
 
-  class SPLIT_OP(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends OPERATION(x, useOldMetadata) {
+  class SPLIT_OP(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TENSORS(x, useOldMetadata) {
     val axis: Int = gc.get(x.asInstanceOf[Backend.Sym]) match {
-      case Some(Node(_, "op_split", tts::anno::o::Backend.Const(axis:Int)::_, _)) => axis
+      case Some(Node(_, "tensors_split", tts::anno::o::Backend.Const(axis:Int)::_, _)) => axis
       case a => throw new Exception(s"Node $a is not a SplitOp")
     }
   }
 
   def SplitOp(x: TENSOR, axis: Int, slices: List[Int], anno: Anno = NAnno)(implicit __pos: SourceContext): SPLIT_OP = {
-    val x_tensor_type = x.tensor_type
-    val x_tensor_shape = x_tensor_type.shape
+    val x_resultType = x.resultType
+    val x_tensor_shape = x_resultType.shape
     assert(slices.sum == x_tensor_shape(axis).size)
     val result_tensor_shapes = slices map { s =>
       // FIXME(feiw) we asked the split result to use the same dim at the split axis. is this correct?
@@ -31,26 +31,26 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
         case(a, i) => if (i == axis) Size(a.dim, s) else a
       }
     }
-    val result_tensor_types = result_tensor_shapes map { s =>
-      TensorType(s, x_tensor_type.et, anno)
+    val result_resultTypes = result_tensor_shapes map { s =>
+      TensorType(s, x_resultType.et, anno)
     }
-    new SPLIT_OP(Adapter.g.reflectRead("op_split", C(result_tensor_types), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
+    new SPLIT_OP(Adapter.g.reflectRead("op_split", C(result_resultTypes), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
   }
 
   def Concat(xs: List[TENSOR], axis: Int, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
     // FIXME(feiw) assert shape and element type
     // need to check that the inputs have the same shape except at the `axis` dimension.
-    val elementTypes = xs.map(_.tensor_type.et)
+    val elementTypes = xs.map(_.resultType.et)
     require(elementTypes.length > 0, "there must be at least one TENSOR to concat")
     require(elementTypes.forall(_ == elementTypes.head), "all TENSORs must have the same type")
-    val tensorShapes = xs.map(_.tensor_type.shapeSize)
+    val tensorShapes = xs.map(_.resultType.shapeSize)
     def sameShapeExceptDim(left: Seq[Int], right: Seq[Int], axis: Int) =
       left.zip(right).zipWithIndex.forall { case ((l, r), i) => i == axis || l == r }
     require(tensorShapes.forall(sameShapeExceptDim(tensorShapes.head, _, axis)),
       s"all TENSORs must have the same shape except dim $axis")
 
-    val concatSize = xs.map(_.tensor_type).map(_.shape).map(s=>s(axis)).map(_.size).sum
-    val concatShape = xs(0).tensor_type.shape.zipWithIndex.map {
+    val concatSize = xs.map(_.resultType).map(_.shape).map(s=>s(axis)).map(_.size).sum
+    val concatShape = xs(0).resultType.shape.zipWithIndex.map {
       case(s, i) => if (i == axis) Size(s.dim, concatSize) else s
     }
     val concatType = TensorType(concatShape, xs(0).et, anno)
@@ -62,7 +62,7 @@ trait FixedSizeDistributedTensorSplitTypeLess extends FixedSizeDistributedTensor
   override def mergable_dims(node: Node) = node match {
     case Node(s, "op_split", _, _) => List()
     case Node(s, "tensor_concat", tt::anno::Backend.Const(axis:Int)::(inputs:List[Backend.Sym]), _) =>
-      val input_types: List[Seq[Dim]] = inputs.map(x => (new TENSOR(x, useOldMetadata=true)).tensor_type.shapeDim)
+      val input_types: List[Seq[Dim]] = inputs.map(x => (new TENSOR(x, useOldMetadata=true)).resultType.shapeDim)
       input_types.transpose.zipWithIndex.flatMap { case (dims: List[Dim], index) =>
         if (index != axis) dims.init zip dims.tail else List()
       }
@@ -102,7 +102,7 @@ trait FixedSizeDistributedTensorOpsSplit extends FixedSizeDistributedTensorOpsBa
 
     def split(axis: Int, slices: List[Int], anno: Anno = NAnno)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = SplitOp(self, axis, slices, anno)
-      ((0 until slices.length): Range).toList.map(i => Wrap[Tensor[T]](OPERATION.getResult(op, i).x))
+      ((0 until slices.length): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
     }
   }
 }
