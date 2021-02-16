@@ -197,6 +197,11 @@ object CUDNNTypeLess extends Dsl with CLibs {
     LIB_FUNCTION(manifest[CUDNN_RESULT],"cudnnDropoutForward", handle.x, dropoutDesc.x, xdesc.x, x.x, yDesc.x, y.x, reserveSpace.x,
       reserveSpaceSizeInBytes.x)(Seq(0,1,2,3,4,7), Seq(5,6), Set[Int]())
 
+  def CUDNN_DROPOUT_BWD(handle: TOP, dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, dyDesc: TOP, dy: TOP,
+                          dxDesc: TOP, dx: TOP, reserveSpace: TOP, reserveSpaceSizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT],"cudnnDropoutBackward", handle.x, dropoutDesc.x, dyDesc.x, dy.x, dxDesc.x, dx.x, reserveSpace.x,
+      reserveSpaceSizeInBytes.x)(Seq(0,1,2,3,4,7), Seq(5,6), Set[Int]())
+
 
 }
 
