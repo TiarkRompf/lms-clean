@@ -73,9 +73,12 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     TensorType(output_shape, input.et, anno)
   }
 
-  def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = input.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_dropout", C(res_tt), C(anno), 
+  def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSORS = {
+    val output_tt = input.resultType
+    val state_tt = TensorType(input.resultType.shape, manifest[Boolean])  // dummy shape
+    val res_tt = List(output_tt, state_tt)
+
+    (new TENSORS(Adapter.g.reflectRead("tensor_dropout", C(res_tt), C(anno), 
       input.x, C(params))(input.x))).withSrcType(__pos, input.et)
   }
 
