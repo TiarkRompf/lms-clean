@@ -142,9 +142,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val ConvParam(alpha, beta, padding, strides, dilation) = params.asInstanceOf[ConvParam]
 
       // TODO: dim checks necessary or not?
-      val doutput_shape = tensor_shape(s, useOldMetadata = true)
-      val weight_shape = tensor_shape(s, useOldMetadata = true)
-      val filter_shape = tensor_shape(s, useOldMetadata = true)
+      val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
+      val weight_shape = tensor_shape(weight, useOldMetadata = true)
+      val filter_shape = tensor_shape(filter, useOldMetadata = true)
 
       val filter_tensor = get_operand(filter, anno)
       val output_tensor = get_operand(doutput, anno)
@@ -185,9 +185,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val ConvParam(alpha, beta, padding, strides, dilation) = params.asInstanceOf[ConvParam]
 
       // TODO: dim checks necessary or not?
-      val doutput_shape = tensor_shape(s, useOldMetadata = true)
-      val weight_shape = tensor_shape(s, useOldMetadata = true)
-      val filter_shape = tensor_shape(s, useOldMetadata = true)
+      val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
+      val weight_shape = tensor_shape(weight, useOldMetadata = true)
+      val filter_shape = tensor_shape(filter, useOldMetadata = true)
 
       val weight_tensor = get_operand(weight, anno)
       val output_tensor = get_operand(doutput, anno)
@@ -259,10 +259,24 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_DROPOUT_FWD(myCUDNNComm, dropout_descriptor, input_descriptor, new ARRAY(input_tensor), 
         output_descriptor, output, d_reservespace, SIZE_T(reserve_bytes))
 
-      // return convolution output
-      output.x
+      // return dropout output
+      Adapter.g.reflect("tuple-view", output.x, d_states.x)
 
+    /*
+    case Node(s, "tensor_dropout_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
 
+      val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
+      val doutput_descriptor = getTensorDescriptor(doutput_shape, "tensor")
+      val dinput_descriptor = doutput_descriptor
+
+      val dinput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
+      val dinput = gpu_array(doutput_shape, manifest[Float], myNCCLRank)
+
+      
+      CUDNN_DROPOUT_BWD(myCUDNNComm, dropout_descriptor, doutput_descriptor, new ARRAY(doutput), dinput_descriptor,
+        new ARRAY(dinput), d_reservespace, SIZE_T(reserve_bytes))
+    */
 
     case _ => super.transform(n)
   }

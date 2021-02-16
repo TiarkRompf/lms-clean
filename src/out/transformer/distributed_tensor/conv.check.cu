@@ -113,25 +113,28 @@ void Snippet(int x0) {
     // end initializing fixed GPU array of size 0 and type Float and device (pre-rename) x39
     cudnnTensorDescriptor_t x40;
     cudnnCreateTensorDescriptor(&x40);
-    cudnnSetTensor4dDescriptor(x40, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 1, 3, 3);
-    cudnnConvolutionDescriptor_t x41;
-    cudnnCreateConvolutionDescriptor(&x41);
-    cudnnSetConvolution2dDescriptor(x41, 1, 1, 1, 1, 1, 1, CUDNN_CONVOLUTION, CUDNN_DATA_FLOAT);
+    cudnnSetTensor4dDescriptor(x40, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 1, 9, 9);
+    cudnnFilterDescriptor_t x41;
+    cudnnCreateFilterDescriptor(&x41);
+    cudnnSetFilter4dDescriptor(x41, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 1, 3, 3);
+    cudnnConvolutionDescriptor_t x42;
+    cudnnCreateConvolutionDescriptor(&x42);
+    cudnnSetConvolution2dDescriptor(x42, 1, 1, 1, 1, 1, 1, CUDNN_CONVOLUTION, CUDNN_DATA_FLOAT);
     CUDA_CALL(cudaSetDevice(x6));
-    float* x42 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x42, (size_t)(9 * sizeof(float))));
-    cudnnConvolutionBwdFilterAlgoPerf_t x43;
-    cudnnFindConvolutionBackwardFilterAlgorithm(x7, x40, x40, x41, x40, 1, &0, &x43);
+    float* x43 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x43, (size_t)(9 * sizeof(float))));
+    cudnnConvolutionBwdFilterAlgoPerf_t x44;
+    cudnnFindConvolutionBackwardFilterAlgorithm(x7, x40, x40, x42, x41, 1, &0, &x44);
     CUDA_CALL(cudaSetDevice(x6));
-    float* x44 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x44, (size_t)0));
-    float x45 = 1.0;
-    float x46 = 0.0;
-    cudnnConvolutionBackwardData(x7, x45, &x40, x38, x40, x39, x41, x43.algo, x44, &(size_t)0, x46, x40, x42);
-    // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x205
+    float* x45 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x45, (size_t)0));
+    float x46 = 1.0;
+    float x47 = 0.0;
+    cudnnConvolutionBackwardData(x7, x46, &x40, x38, x40, x39, x42, x44.algo, x45, &(size_t)0, x47, x41, x43);
+    // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x210
     CUDA_CALL(cudaSetDevice(x6));
-    x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x42, 9);
-    // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x205
+    x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x43, 9);
+    // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x210
     // begin computing SGD on GPU for size 9 and type Float at device (pre-name) x39 with weight x70, grad x93, and momentum x131
     CUDA_CALL(cudaSetDevice(x6));
     x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x11, x18, 9);
@@ -140,12 +143,12 @@ void Snippet(int x0) {
   }
   if (x6 == 0) {
     // begin copying GPU array x70 to CPU and print for size 9 and type Float
-    float* x47 = (float*)malloc(9 * sizeof(float));
-    CUDA_CALL(cudaMemcpy(x47, x10, (size_t)(9 * sizeof(float)), cudaMemcpyDeviceToHost));
-    int x48 = 0;
-    while (x48 != 9) {
-      printf("%f ", x47[x48]);
-      x48 = x48 + 1;
+    float* x48 = (float*)malloc(9 * sizeof(float));
+    CUDA_CALL(cudaMemcpy(x48, x10, (size_t)(9 * sizeof(float)), cudaMemcpyDeviceToHost));
+    int x49 = 0;
+    while (x49 != 9) {
+      printf("%f ", x48[x49]);
+      x49 = x49 + 1;
     }
     printf("\n");
     // end copying GPU array x70 to CPU and print for size 9 and type Float
