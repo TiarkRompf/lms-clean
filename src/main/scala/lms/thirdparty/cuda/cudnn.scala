@@ -124,7 +124,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
 
   def CUDNN_FIND_CONV_FWD_ALG(handle: TOP, xDesc: TOP, wDesc: TOP,
                                convDesc: CUDNN_CONV_DESCRIPTOR, yDesc: TOP, requestedAlgoCount: INT,
-                               returnedAlgoCount: INT, perfResults: TOP)(implicit __pos: SourceContext) =
+                               returnedAlgoCount: VAR, perfResults: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnFindConvolutionForwardAlgorithm", handle.x, xDesc.x, wDesc.x, convDesc.x,
       yDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
 
@@ -143,7 +143,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
       Set[Int](1,10))
 
   def CUDNN_FIND_CONV_BWD_DATA_ALG(handle: TOP, wDesc: TOP, dyDesc: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
-                                  dxDesc: TOP, requestedAlgoCount: INT, returnedAlgoCount: INT, perfResults: TOP)
+                                  dxDesc: TOP, requestedAlgoCount: INT, returnedAlgoCount: VAR, perfResults: TOP)
                                   (implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnFindConvolutionBackwardDataAlgorithm", handle.x, wDesc.x, dyDesc.x, convDesc.x,
       dxDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
@@ -164,7 +164,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
       Set[Int](2,9))
 
   def CUDNN_FIND_CONV_BWD_FILTER_ALG(handle: TOP, xDesc: TOP, dyDesc: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
-                                  dwDesc: TOP, requestedAlgoCount: INT, returnedAlgoCount: INT, perfResults: TOP)
+                                  dwDesc: TOP, requestedAlgoCount: INT, returnedAlgoCount: VAR, perfResults: TOP)
                                   (implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnFindConvolutionBackwardFilterAlgorithm", handle.x, xDesc.x, dyDesc.x, convDesc.x,
       dwDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
