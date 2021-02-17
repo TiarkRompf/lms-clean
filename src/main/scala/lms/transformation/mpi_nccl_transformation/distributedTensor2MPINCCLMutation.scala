@@ -55,7 +55,7 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
       val sourceTensor = new TENSOR(base, useOldMetadata = true)
 
       implicit val pos = Adapter.oldSourceMap(s)
-      val tt = sourceTensor.tensor_type
+      val tt = sourceTensor.resultType
       val m = sourceTensor.et
 
       // Load the `base` and `addition`, and maybe add communication ops to resolve split annotation conflicts
@@ -70,7 +70,7 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
           gpu_accum_array(count2, m, myNCCLRank, base_operand, addition_operand)
           Backend.Const(())
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          val count = numeral(sourceTensor.shape_size)
+          val count = numeral(sourceTensor.shapeSize)
           gpu_accum_array(count, m, myNCCLRank, base_operand, addition_operand)
           Backend.Const(())
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in accum_tensor")
@@ -80,7 +80,7 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
       val sourceTensor = new TENSOR(weight, useOldMetadata = true)
 
       implicit val pos = Adapter.oldSourceMap(s)
-      val tt = sourceTensor.tensor_type
+      val tt = sourceTensor.resultType
       val m = sourceTensor.et
       val anno = sourceTensor.annotation
 
@@ -97,7 +97,7 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
           gpu_sgd_array(count2, m, myNCCLRank, weight_operand, grad_operand, momentum_operand)
           Backend.Const(())
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          val count = numeral(sourceTensor.shape_size)
+          val count = numeral(sourceTensor.shapeSize)
           gpu_sgd_array(count, m, myNCCLRank, weight_operand, grad_operand, momentum_operand)
           Backend.Const(())
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in optimize_tensor")

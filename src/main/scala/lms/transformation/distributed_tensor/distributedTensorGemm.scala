@@ -14,16 +14,16 @@ import Backend._
 trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
 
   def Dot(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-    val res_tt = (x.shape_size.size, y.shape_size.size) match {
+    val res_tt = (x.shapeSize.size, y.shapeSize.size) match {
       case (1,1) => // vector-vector-dot
-        assert(x.shape_size == y.shape_size)
+        assert(x.shapeSize == y.shapeSize)
         TensorType(Seq(Size(Dim(next_dim_name), 1)), x.et)
       case (2,1) => // matrix-vector-dot
-        assert(x.shape_size(1) == y.shape_size(0))
-        TensorType(x.tensor_type.shape.take(1), x.et)
+        assert(x.shapeSize(1) == y.shapeSize(0))
+        TensorType(x.resultType.shape.take(1), x.et)
       case (2,2) => // matrix-matrix-dot
-        assert(x.shape_size(1) == y.shape_size(0))
-        TensorType(Seq(x.tensor_type.shape(0), y.tensor_type.shape(1)), x.et)
+        assert(x.shapeSize(1) == y.shapeSize(0))
+        TensorType(Seq(x.resultType.shape(0), y.resultType.shape(1)), x.et)
       case _ => throw new Exception("not yet supporting high dimension dot")
     }
     assert(x.et == y.et)
@@ -31,20 +31,20 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
   }
 
   def DotWithTranspose(x: TENSOR, y: TENSOR, anno: Anno = NAnno, transL: Boolean = false, transR: Boolean = false)(implicit __pos: SourceContext): TENSOR = {
-    val res_tt = (x.shape_size.size, y.shape_size.size) match {
+    val res_tt = (x.shapeSize.size, y.shapeSize.size) match {
       case (1,1) => // vector-vector-dot
         assert(!transL && !transR, "cannot transpose the operand in vector-vector-dot")
-        assert(x.shape_size == y.shape_size)
+        assert(x.shapeSize == y.shapeSize)
         TensorType(Seq(Size(Dim(next_dim_name), 1)), x.et)
       case (2,1) => // matrix-vector-dot
         assert(!transL && !transR, "cannot transpose the operand in matrix-vector-dot for now")
-        assert(x.shape_size(1) == y.shape_size(0))
-        TensorType(x.tensor_type.shape.take(1), x.et)
+        assert(x.shapeSize(1) == y.shapeSize(0))
+        TensorType(x.resultType.shape.take(1), x.et)
       case (2,2) => // matrix-matrix-dot
-        val left_check = if (transL) x.shape_size(0) else x.shape_size(1)
-        val left_dim = if (transL) x.tensor_type.shape(1) else x.tensor_type.shape(0)
-        val right_check = if (transR) x.shape_size(1) else x.shape_size(0)
-        val right_dim = if (transR) y.tensor_type.shape(0) else y.tensor_type.shape(1)
+        val left_check = if (transL) x.shapeSize(0) else x.shapeSize(1)
+        val left_dim = if (transL) x.resultType.shape(1) else x.resultType.shape(0)
+        val right_check = if (transR) x.shapeSize(1) else x.shapeSize(0)
+        val right_dim = if (transR) y.resultType.shape(0) else y.resultType.shape(1)
         assert(left_check == right_check)
         TensorType(Seq(left_dim, right_dim), x.et)
       case _ => throw new Exception("not yet supporting high dimension dot")
@@ -55,8 +55,8 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_dot", tt::anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      val x_type = (new TENSOR(x, useOldMetadata=true)).tensor_type
-      val y_type = (new TENSOR(y, useOldMetadata=true)).tensor_type
+      val x_type = (new TENSOR(x, useOldMetadata=true)).resultType
+      val y_type = (new TENSOR(y, useOldMetadata=true)).resultType
       (x_type.shape.size, y_type.shape.size) match {
         case (1,1) => List((x_type.shape.head.dim, y_type.shape.head.dim))
         case (2,1) => List((x_type.shape.last.dim, y_type.shape.head.dim))
@@ -64,8 +64,8 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
         case r => throw new Exception(s"not yet handling ranks $r")
       }
     case Node(s, "tensor_dot_with_transpose", tt::anno::Backend.Const(transL)::Backend.Const(transR)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
-      val x_type = (new TENSOR(x, useOldMetadata=true)).tensor_type
-      val y_type = (new TENSOR(y, useOldMetadata=true)).tensor_type
+      val x_type = (new TENSOR(x, useOldMetadata=true)).resultType
+      val y_type = (new TENSOR(y, useOldMetadata=true)).resultType
       (x_type.shape.size, y_type.shape.size, transL, transR) match {
         case (1, 1, false, false) => List((x_type.shape.head.dim, y_type.shape.head.dim))
         case (2, 1, false, false) => List((x_type.shape.last.dim, y_type.shape.head.dim))
@@ -81,7 +81,7 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
       weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
-      gradMap: mutable.HashMap[Backend.Sym, TENSOR],
+      gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 

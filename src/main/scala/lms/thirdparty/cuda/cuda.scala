@@ -60,28 +60,43 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       Seq[Int](), Set[Int](), Backend.UNSAFE)))).withSource(__pos)
 
   def CUDA_KERNEL3(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
-    val kernel = Adapter.g.reflect("λ", Adapter.g.reify { (x1, x2, x3) => f(List(x1, x2, x3)) },
-      Backend.Const(0), Backend.Const("__global__"))
+    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(3, f), Backend.Const(0), Backend.Const("__global__"))
     (a: TOP, b: TOP, c: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
-      require(ms.length == 3, s"should have 3 manifests, but got ${ms.length}")
+      require(ms.toSeq.length == 3, s"should have 3 manifests, but got ${ms.toSeq.length}")
       Seq(a, b, c).zip(ms).zipWithIndex.foreach {
-        case ((arg, man), index) => require(arg.x.isInstanceOf[Backend.Const] || arg.t == man, s"{$index}th parameter has wrong type. Sym: ${arg.x} Type: ${arg.t} Manifest: $man")
+        case ((arg, man), index) => require(arg.x.isInstanceOf[Backend.Const] || arg.t == man,
+          s"mismatched type for ${index}th argument. Provided: ${arg.x} ${arg.t} Required: $man")
       }
       UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, dim1.x, dim2.x))
     }
   }
   def CUDA_KERNEL4(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
-    val kernel = Adapter.g.reflect("λ", Adapter.g.reify { (x1, x2, x3, x4) => f(List(x1, x2, x3, x4)) },
-      Backend.Const(0), Backend.Const("__global__"))
+    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(4, f), Backend.Const(0), Backend.Const("__global__"))
     (a: TOP, b: TOP, c: TOP, d: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
-      Seq(a, b, c, d).zip(ms).foreach {
-        case (arg, man) => assert(arg.x.isInstanceOf[Backend.Const] || arg.t == man)
+      require(ms.toSeq.length == 4, s"should have 4 manifests, but got ${ms.toSeq.length}")
+      Seq(a, b, c, d).zip(ms).zipWithIndex.foreach {
+        case ((arg, man), index) => require(arg.x.isInstanceOf[Backend.Const] || arg.t == man,
+          s"mismatched type for ${index}th argument. Provided: ${arg.x} ${arg.t} Required: $man")
       }
       UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, d.x, dim1.x, dim2.x))
     }
   }
+  def CUDA_KERNEL5(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
+    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(5, f), Backend.Const(0), Backend.Const("__global__"))
+    (a: TOP, b: TOP, c: TOP, d: TOP, e: TOP, dim1: DIM3, dim2: DIM3) => {
+      // type checking
+      require(ms.toSeq.length == 5, s"should have 5 manifests, but got ${ms.toSeq.length}")
+      Seq(a, b, c, d, e).zip(ms).zipWithIndex.foreach {
+        case ((arg, man), index) =>
+          require(arg.x.isInstanceOf[Backend.Const] || arg.t == man,
+            s"mismatched type for ${index}th argument. Provided: ${arg.x} ${arg.t} Required: $man")
+      }
+      UNIT(Adapter.g.reflect("@", kernel, a.x, b.x, c.x, d.x, e.x, dim1.x, dim2.x))
+    }
+  }
+
 
   // When coding kernel functions, we often need some kernel variables
   def gridDimX(implicit __pos: SourceContext): INT = INT(CMACRO("gridDim.x", manifest[Int]))
@@ -260,6 +275,65 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     val kernel = CUDA_DIV_KERNEL(a.et)
     kernel(a, b, res, size, DIM3(gridSize), DIM3(blockSize))
   }
+
+  // This split op kernel has lots of limitations
+  // 1. the input (0th parameter) is split to 2 outputs (1st and 2nd parameter)
+  // 2. the input is 2D, and the split axis is 1
+  // 3. the split is by equal sizes, so the input dim1 size must be even number
+  // 4. the 3rd input is size of dim 0 of input, the 4th input is 1/2 of size of dim 1 of input
+  def CUDA_SPLIT2_2D1_EQUAL_KERNEL(m: Manifest[_], comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL5({xn: List[Backend.Exp] =>
+    withComment(comment) {
+      // type cast
+      val input = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val output0 = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val output1 = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+      val dim0 = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+      val dim1 = (new INT(xn(4))).withSrcType(__pos, manifest[Int])
+
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int]((dim0*dim1).x), Wrap[Int](stride.x))) {
+        val index = INT(Unwrap(i))
+        val size0 = index / dim0
+        val size1 = index % dim0
+        __ifThenElse(Wrap[Boolean]((size1 < dim1).x),
+          { output0(INT(size0 * dim1 + size1)) = input(index); () },
+          { output1(INT(size0 * dim1 + size1 - dim1)) = input(index); () })
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int], manifest[Int])
+
+  // This concat op kernel has lots of limitations
+  // 1. it concats 2 inputs
+  // 2. the inputs are 2D, and the split axis is 1
+  // 3. the inputs is by equal sizes
+  // 4. the 3rd input is size of dim 0 of input0, the 4th input is size of dim 1 of input0
+  def CUDA_CONCAT2_2D1_EQUAL_KERNEL(m: Manifest[_], comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL5({xn: List[Backend.Exp] =>
+    withComment(comment) {
+      // type cast
+      val input0 = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val input1 = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val output = (new ARRAY(xn(2))).withSrcType(__pos, m.arrayManifest)
+      val dim0 = (new INT(xn(3))).withSrcType(__pos, manifest[Int])
+      val dim1 = (new INT(xn(4))).withSrcType(__pos, manifest[Int])
+
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int]((dim0*dim1).x), Wrap[Int](stride.x))) {
+        val index = INT(Unwrap(i))
+        val size0 = index / dim0
+        val size1 = index % dim0
+        __ifThenElse(Wrap[Boolean]((size1 < dim1).x),
+          { output(index) = input0(INT(size0 * dim1 + size1)); () },
+          { output(index) = input1(INT(size0 * dim1 + size1 - dim1)); ()})
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int], manifest[Int])
+
 }
 
 
