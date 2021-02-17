@@ -150,18 +150,18 @@ object CUDNNTypeLess extends Dsl with CLibs {
 
   def CUDNN_GET_CONV_BWD_DATA_WORKSPACE_SZ(handle: TOP, wDesc: TOP, dyDesc: TOP,
                                       convDesc: CUDNN_CONV_DESCRIPTOR, dxDesc: TOP, algo: TOP, 
-                                      sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+                                      sizeInBytes: VAR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionBackwardDataWorkspaceSize", handle.x, wDesc.x, dyDesc.x, convDesc.x,
       dxDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
 
 
   def CUDNN_CONV_BWD_DATA(handle: TOP, alpha: VAR, wDesc: TOP, w: TOP,
                                   dyDesc: TOP, dy: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
-                                  algo: TOP, workspace: TOP, workSpaceSizeInBytes: SIZE_T, 
+                                  algo: TOP, workspace: TOP, workSpaceSizeInBytes: VAR, 
                                   beta: VAR, dxDesc: TOP, dx: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionBackwardData", handle.x, alpha.x, wDesc.x, w.x, dyDesc.x, dy.x, 
       convDesc.x, algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, dxDesc.x, dx.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(12), 
-      Set[Int](2,9))
+      Set[Int](1,10))
 
   def CUDNN_FIND_CONV_BWD_FILTER_ALG(handle: TOP, xDesc: TOP, dyDesc: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
                                   dwDesc: TOP, requestedAlgoCount: INT, returnedAlgoCount: VAR, perfResults: TOP)
@@ -171,18 +171,18 @@ object CUDNNTypeLess extends Dsl with CLibs {
 
   def CUDNN_GET_CONV_BWD_FILTER_WORKSPACE_SZ(handle: TOP, xDesc: TOP, dyDesc: TOP,
                                       convDesc: CUDNN_CONV_DESCRIPTOR, dwDesc: TOP, algo: TOP, 
-                                      sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+                                      sizeInBytes: VAR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionBackwardFilterWorkspaceSize", handle.x, xDesc.x, dyDesc.x, convDesc.x,
       dwDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
 
 
   def CUDNN_CONV_BWD_FILTER(handle: TOP, alpha: VAR, xDesc: TOP, x: TOP,
                                   dyDesc: TOP, dy: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
-                                  algo: TOP, workspace: TOP, workSpaceSizeInBytes: SIZE_T, 
+                                  algo: TOP, workspace: TOP, workSpaceSizeInBytes: VAR, 
                                   beta: VAR, dwDesc: TOP, dw: TOP)(implicit __pos: SourceContext) =
-    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionBackwardData", handle.x, alpha.x, xDesc.x, x.x, dyDesc.x, dy.x, 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionBackwardFilter", handle.x, alpha.x, xDesc.x, x.x, dyDesc.x, dy.x, 
       convDesc.x, algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, dwDesc.x, dw.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(12), 
-      Set[Int](2,9))
+      Set[Int](1,10))
   
 
 
