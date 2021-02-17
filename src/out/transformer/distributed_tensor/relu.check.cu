@@ -36,7 +36,7 @@ __global__ void x27(float* x28, float* x29, int x30) {
   int x32 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x32 < x30) {
     int x33 = x32;
-    x29[x33] = fmax(0.0, x28[x33]);
+    x29[x33] = max(0.0, x28[x33]);
     x32 = x32 + x31;
   }
   // end generating kernel function for RELU of type Float
@@ -170,7 +170,7 @@ void Snippet(int x0) {
     printf("\n");
     // end copying GPU array x308 to CPU and print for size 1024 and type Float
   }
-  printf("compile");
+  printf("compile\n");
   MPICHECK(MPI_Finalize());
   NCCLCHECK(ncclCommDestroy(x5));
 }

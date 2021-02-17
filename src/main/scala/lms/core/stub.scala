@@ -906,7 +906,7 @@ object PrimitiveTypeLess {
     }
 
     def max(y: NUM)(implicit pos: SourceContext): NUM = {
-      NUM(Adapter.g.reflect("fmax", x, y.x), t)
+      NUM(Adapter.g.reflect("max", x, y.x), t)
     }
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =

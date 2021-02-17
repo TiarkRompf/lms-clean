@@ -131,7 +131,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           tensor_input + (tensor_intermediate, batchSplitAnno)
         }
         model(10)
-        printf("compile")
+        printf("compile\n")
       }
     }
     checkWithLogPath("negate", driver.code, "cu", driver.setLogPath)
@@ -154,7 +154,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           tensor_input + (tensor_intermediate, batchSplitAnno)
         }
         model(10)
-        printf("compile")
+        printf("compile\n")
       }
     }
     checkWithLogPath("invert", driver.code, "cu", driver.setLogPath)
@@ -177,7 +177,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           tensor_input + (tensor_intermediate, batchSplitAnno)
         }
         model(10)
-        printf("compile")
+        printf("compile\n")
       }
     }
     checkWithLogPath("tanh", driver.code, "cu", driver.setLogPath)
@@ -200,7 +200,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           tensor_input + (tensor_intermediate, batchSplitAnno)
         }
         model(10)
-        printf("compile")
+        printf("compile\n")
       }
     }
     checkWithLogPath("relu", driver.code, "cu", driver.setLogPath)

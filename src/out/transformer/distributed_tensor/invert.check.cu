@@ -170,7 +170,7 @@ void Snippet(int x0) {
     printf("\n");
     // end copying GPU array x308 to CPU and print for size 1024 and type Float
   }
-  printf("compile");
+  printf("compile\n");
   MPICHECK(MPI_Finalize());
   NCCLCHECK(ncclCommDestroy(x5));
 }
