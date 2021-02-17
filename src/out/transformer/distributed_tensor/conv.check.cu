@@ -125,14 +125,17 @@ void Snippet(int x0) {
     CUDA_CALL(cudaMalloc(&x43, (size_t)(9 * sizeof(float))));
     cudnnConvolutionBwdFilterAlgoPerf_t x44;
     int x45 = 0;
-    cudnnFindConvolutionBackwardFilterAlgorithm(x7, x40, x40, x42, x41, 1, &x45, &x44);
+    CUDNNCHECK(cudnnFindConvolutionBackwardFilterAlgorithm(x7, x40, x40, x42, x41, 1, &x45, &x44));
+    lms.thirdparty.cudnntypeless$cudnn_conv_bwd_filter_algo x46 = x44.algo;
+    size_t x47 = (size_t)0;
+    CUDNNCHECK(cudnnGetConvolutionBackwardFilterWorkspaceSize(x7, x40, x40, x42, x41, x46, &x47));
     CUDA_CALL(cudaSetDevice(x6));
-    float* x46 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x46, (size_t)(100 * sizeof(float))));
-    float x47 = 1.0;
-    size_t x48 = (size_t)0;
-    float x49 = 0.0;
-    cudnnConvolutionBackwardFilter(x7, &x47, x40, x38, x40, x39, x42, x44.algo, x46, x48, &x49, x41, x43);
+    float* x48 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x48, (size_t)0));
+    float x49 = 1.0;
+    size_t x50 = (size_t)0;
+    float x51 = 0.0;
+    CUDNNCHECK(cudnnConvolutionBackwardFilter(x7, &x49, x40, x38, x40, x39, x42, x46, x48, x50, &x51, x41, x43));
     // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x210
     CUDA_CALL(cudaSetDevice(x6));
     x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x43, 9);
@@ -145,12 +148,12 @@ void Snippet(int x0) {
   }
   if (x6 == 0) {
     // begin copying GPU array x70 to CPU and print for size 9 and type Float
-    float* x50 = (float*)malloc(9 * sizeof(float));
-    CUDA_CALL(cudaMemcpy(x50, x10, (size_t)(9 * sizeof(float)), cudaMemcpyDeviceToHost));
-    int x51 = 0;
-    while (x51 != 9) {
-      printf("%f ", x50[x51]);
-      x51 = x51 + 1;
+    float* x52 = (float*)malloc(9 * sizeof(float));
+    CUDA_CALL(cudaMemcpy(x52, x10, (size_t)(9 * sizeof(float)), cudaMemcpyDeviceToHost));
+    int x53 = 0;
+    while (x53 != 9) {
+      printf("%f ", x52[x53]);
+      x53 = x53 + 1;
     }
     printf("\n");
     // end copying GPU array x70 to CPU and print for size 9 and type Float
