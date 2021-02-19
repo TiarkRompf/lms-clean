@@ -55,6 +55,7 @@ object CUDNNTypeLess extends Dsl with CLibs {
   class CUDNN_CONV_BWD_DATA_ALGO(override val x: Backend.Exp) extends TOP(x)
   class CUDNN_CONV_BWD_FILTER_ALG_PERF(override val x: Backend.Exp) extends TOP(x)
   class CUDNN_CONV_BWD_FILTER_ALGO(override val x: Backend.Exp) extends TOP(x)
+  // class cudnnConvolutionBwdFilterAlgoT(override val x: Backend.Exp) extends TOP(x)
   /*
   def cudnnDouble = cmacro[cudnnDataTypeT]("CUDNN_DATA_DOUBLE")  // 64-bit
   def cudnnHalf = cmacro[cudnnDataTypeT]("CUDNN_DATA_HALF")  // 16-bit
@@ -705,9 +706,16 @@ trait CCodeGenCUDNN extends ExtendedCCodeGen {
 
   registerHeader("\"cudnn_header.h\"")
 
+  // add more casess
   override def remap(m: Manifest[_]) = m.runtimeClass.getName match {
     case s: String if s.endsWith("$cudnnConvolutionFwdAlgoPerfT") => "cudnnConvolutionFwdAlgoPerf_t"
     case s: String if s.endsWith("$cudnnConvolutionFwdAlgoT") => "cudnnConvolutionFwdAlgo_t"
-    case _ => super.remap(m)
+    
+    case s: String if s.endsWith("cudnnConvolutionBwdFilterAlgoT") => "cudnnConvolutionBwdAlgo_t"
+    case s: String if s.endsWith("CUDNN_CONV_BWD_FILTER_ALGO") => "cudnnConvolutionBwdAlgo_t"
+    
+    case s => 
+      // System.out.println(s)
+      super.remap(m)
   }
 }
