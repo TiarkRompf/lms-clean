@@ -210,13 +210,15 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       // allocate convolution workspace
       var workspace_bytes = 0
+      val temp = VAR(SIZE_T(workspace_bytes)) // var read
       CUDNN_CHECK(CUDNN_GET_CONV_BWD_FILTER_WORKSPACE_SZ(myCUDNNComm, weight_descriptor, doutput_descriptor, conv_descriptor, dfilter_descriptor,
-        convAlgo, VAR(SIZE_T(workspace_bytes))))
-      val d_workspace = gpu_array(res_count, manifest[Float], myNCCLRank)
+        convAlgo, temp))
+      val d_workspace = gpu_array1(INT(temp(pos)), manifest[Float], myNCCLRank)
+     
 
       // backward data pass
       CUDNN_CHECK(CUDNN_CONV_BWD_FILTER(myCUDNNComm, VAR(FLOAT(alpha)), weight_descriptor, new ARRAY(weight_tensor), doutput_descriptor, new ARRAY(output_tensor),
-        conv_descriptor, convAlgo, d_workspace, VAR(SIZE_T(workspace_bytes)), VAR(FLOAT(beta)), dfilter_descriptor, dfilter))
+        conv_descriptor, convAlgo, d_workspace, temp, VAR(FLOAT(beta)), dfilter_descriptor, dfilter))
 
       dfilter.x
     
