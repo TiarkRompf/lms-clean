@@ -1,0 +1,35 @@
+=================
+x2 = (tensor_weight TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE91 : _ | x0]
+x3 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE92 : _ | x0]
+x4 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE93 : _ | x0]
+x5 = (range_until 0 10)  
+x6 = (var_new 0)  [STORE : _ | x0]
+x8 = (var_get x6)  [x6 : _ | x7]
+x9 = (!= x8 10)  
+x11 = (var_get x6)  [x6 : _ | x10]
+x12 = (tensor_input TensorType(List(Size(Dim(0),32), Size(Dim(1),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE89 : _ | x10]
+x13 = (tensors_split List(TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)), TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true))) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x12 1)  [x12 : _ | x12]
+x14 = (tensor_result TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x13 0)  
+x15 = (tensor_mult TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x14 x2)  [x2 x14 : _ | x10, x14]
+x16 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE94 : _ | x10]
+x17 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE95 : _ | x10]
+x18 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE96 : _ | x10]
+x19 = (tuple-view x17 x18)  
+x20 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE97 : _ | x10]
+x21 = (tensor_ones TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE98 : _ | x10]
+x22 = (tensor_mult TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x2 x21)  [x2 x21 : _ | x10, x21]
+x23 = (accum_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x17 x22)  [x17 x22 x17*: _ | x17, x22]
+x24 = (tensor_mult TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x14 x21)  [x14 x21 : _ | x10]
+x25 = (accum_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x3 x24)  [x3 x24 x3*: _ | x10, x24]
+x26 = (tensor_concat TensorType(List(Size(Dim(0),32), Size(Dim(1),32)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true) 1 x17 x18)  [x17 x18 : _ | x18, x23]
+x27 = (accum_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x16 x26)  [x16 x26 x16*: _ | x16, x26]
+x28 = (optimize_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x2 x3 x4)  [x2 x3 x4 x2*: x15, x22 | x10, x25]
+x29 = (var_get x6)  [x6 : _ | x10]
+x30 = (+ x29 1)  
+x31 = (var_set x6 x30)  [x6*: x11, x29 | x10]
+x32 = (W Block(List(),x9,x7,[x6 : _ | x7]) Block(List(),(),x10,[UNSAFE98 UNSAFE97 UNSAFE96 UNSAFE95 UNSAFE94 UNSAFE89 x2 x3 x4 x6 x2* x3* x6*: _ | x25, x28, x31]))  [UNSAFE98 UNSAFE97 UNSAFE96 UNSAFE95 UNSAFE94 UNSAFE89 x2 x3 x4 x6 x2* x3* x6*: _ | x0, x2, x3, x4, x6]
+x33 = (save x2)  [x2 CTRL*: _ | x0, x32]
+x34 = (printf compile
+)  [CTRL*: _ | x33]
+Block(List(x1),(),x0,[UNSAFE98 UNSAFE97 UNSAFE96 UNSAFE95 UNSAFE94 UNSAFE93 UNSAFE92 UNSAFE91 UNSAFE89 STORE CTRL*: _ | x34])
+=================

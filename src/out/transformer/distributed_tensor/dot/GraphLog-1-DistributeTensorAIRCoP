@@ -1,0 +1,28 @@
+=================
+x2 = (tensor_weight TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE303 : _ | x0]
+x3 = (tensor_zeros TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE304 : _ | x0]
+x4 = (tensor_zeros TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE305 : _ | x0]
+x5 = (range_until 0 10)  
+x6 = (var_new 0)  [STORE : _ | x0]
+x8 = (var_get x6)  [x6 : _ | x7]
+x9 = (!= x8 10)  
+x11 = (var_get x6)  [x6 : _ | x10]
+x12 = (tensor_input TensorType(List(Size(Dim(0),32), Size(Dim(1),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE301 : _ | x10]
+x13 = (tensor_dot TensorType(List(Size(Dim(0),32), Size(Dim(3),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x12 x2)  [x2 x12 : _ | x10, x12]
+x14 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE306 : _ | x10]
+x15 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(3),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE307 : _ | x10]
+x16 = (tensor_ones TensorType(List(Size(Dim(0),32), Size(Dim(3),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE308 : _ | x10]
+x17 = (tensor_dot_with_transpose TensorType(List(Size(Dim(1),32), Size(Dim(3),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true) true false x12 x16)  [x12 x16 : _ | x10, x16]
+x18 = (accum_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x3 x17)  [x3 x17 x3*: _ | x10, x17]
+x19 = (tensor_dot_with_transpose TensorType(List(Size(Dim(0),32), Size(Dim(1),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true) false true x16 x2)  [x2 x16 : _ | x10]
+x20 = (accum_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x14 x19)  [x14 x19 x14*: _ | x14, x19]
+x21 = (optimize_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x2 x3 x4)  [x2 x3 x4 x2*: x13, x19 | x10, x18]
+x22 = (var_get x6)  [x6 : _ | x10]
+x23 = (+ x22 1)  
+x24 = (var_set x6 x23)  [x6*: x11, x22 | x10]
+x25 = (W Block(List(),x9,x7,[x6 : _ | x7]) Block(List(),(),x10,[UNSAFE308 UNSAFE307 UNSAFE306 UNSAFE301 x2 x3 x4 x6 x2* x3* x6*: _ | x18, x21, x24]))  [UNSAFE308 UNSAFE307 UNSAFE306 UNSAFE301 x2 x3 x4 x6 x2* x3* x6*: _ | x0, x2, x3, x4, x6]
+x26 = (save x2)  [x2 CTRL*: _ | x0, x25]
+x27 = (printf compile
+)  [CTRL*: _ | x26]
+Block(List(x1),(),x0,[UNSAFE308 UNSAFE307 UNSAFE306 UNSAFE305 UNSAFE304 UNSAFE303 UNSAFE301 STORE CTRL*: _ | x27])
+=================

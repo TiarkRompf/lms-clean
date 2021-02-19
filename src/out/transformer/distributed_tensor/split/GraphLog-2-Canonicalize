@@ -1,0 +1,23 @@
+=================
+x2 = (tensor_weight TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE91 : _ | x0]
+x3 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE92 : _ | x0]
+x4 = (tensor_zeros TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE93 : _ | x0]
+x5 = (var_new 0)  [STORE : _ | x0]
+x7 = (var_get x5)  [x5 : _ | x6]
+x8 = (!= x7 10)  
+x10 = (tensor_input TensorType(List(Size(Dim(0),32), Size(Dim(1),32)),Float,NAnno) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE89 : _ | x9]
+x11 = (tensors_split List(TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)), TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true))) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x10 1)  [x10 : _ | x10]
+x12 = (tensor_result TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x11 0)  
+x13 = (tensor_ones TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true))  [UNSAFE98 : _ | x9]
+x14 = (tensor_mult TensorType(List(Size(Dim(0),32), Size(Dim(1),16)),Float,SAnno(Dim(0),List(GPU(0), GPU(1)),true)) SAnno(Dim(0),List(GPU(0), GPU(1)),true) x12 x13)  [x12 x13 : _ | x12, x13]
+x15 = (accum_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x3 x14)  [x3 x14 x3*: _ | x9, x14]
+x16 = (optimize_tensor SAnno(Dim(0),List(GPU(0), GPU(1)),true) x2 x3 x4)  [x2 x3 x4 x2*: _ | x9, x15]
+x17 = (var_get x5)  [x5 : _ | x9]
+x18 = (+ x17 1)  
+x19 = (var_set x5 x18)  [x5*: x17 | x9]
+x20 = (W Block(List(),x8,x6,[x5 : _ | x6]) Block(List(),(),x9,[UNSAFE98 UNSAFE89 x2 x3 x4 x5 x2* x3* x5*: _ | x15, x16, x19]))  [UNSAFE98 UNSAFE97 UNSAFE96 UNSAFE95 UNSAFE94 UNSAFE89 x2 x3 x4 x5 x2* x3* x5*: _ | x0, x2, x3, x4, x5]
+x21 = (save x2)  [x2 CTRL*: _ | x0, x20]
+x22 = (printf compile
+)  [CTRL*: _ | x21]
+Block(List(x1),(),x0,[UNSAFE98 UNSAFE97 UNSAFE96 UNSAFE95 UNSAFE94 UNSAFE93 UNSAFE92 UNSAFE91 UNSAFE89 STORE CTRL*: _ | x22])
+=================
