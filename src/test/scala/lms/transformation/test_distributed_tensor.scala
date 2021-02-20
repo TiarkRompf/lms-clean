@@ -210,12 +210,13 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         dim_name = 0
-        val inputTensorType = resultType[Float](Seq(1, 1, 9, 9))
-        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
+        val inputTensorType = resultType[Float](Seq(2, 1, 9, 9))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
 
         val model = module {
           val tensor_input = Tensor.input[Float](inputTensorType)
-          val tensor_filter = Tensor.weight[Float](Seq(1, 1, 3, 3))
+          val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
           
           val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
           tensor_input conv (tensor_filter, batchSplitAnno, params)
