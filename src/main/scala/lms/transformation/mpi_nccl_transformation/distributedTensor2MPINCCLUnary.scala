@@ -68,7 +68,17 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
 		array
   }
 
-  val unaryOps = List("tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu")
+  val CUDA_TRANSPOSE_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_TRANSPOSE_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_TRANSPOSE_KERNEL_MAP.getOrElseUpdate(m, CUDA_TRANSPOSE_KERNEL(m))
+  def gpu_transpose_array(size: Int, m: Manifest[_], device: INT, operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
+	withComment(s"computing TRANSPOSE on GPU for size $size and type $m at device (pre-rename) ${device.x} with operand $operand") {
+		val array = gpu_array(size, m, device)
+		val transpose_fun = CUDA_TRANSPOSE_FUN(m)
+		transpose_fun(new ARRAY(operand), array, size, DIM3(gridSize), DIM3(blockSize))
+		array
+  }
+
+  val unaryOps = List("tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu", "tensor_transpose")
 
   override def transform(n: Node): Backend.Exp = n match {
 
@@ -92,6 +102,7 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
             case "tensor_invert" => gpu_inv_array(count, m, myNCCLRank, loaded_operand).x
             case "tensor_tanh" => gpu_tanh_array(count, m, myNCCLRank, loaded_operand).x
             case "tensor_relu" => gpu_relu_array(count, m, myNCCLRank, loaded_operand).x
+            case "tensor_transpose" => gpu_transpose_array(count, m, myNCCLRank, loaded_operand).x
             case _ => throw new Exception(s"op $op is not unary op")
           }
         case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")

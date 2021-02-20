@@ -54,7 +54,13 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
 
-    case Node(s, "tensor_transpose", _, _) => ???
+    case Node(s, "tensor_transpose", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+
+        (() => {
+          Accumulate(gradMap(a), Transpose(gradMap(s), anno), anno); ()
+        }) +=: backwardNodes
 
     case Node(s, "tensor_negate", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)

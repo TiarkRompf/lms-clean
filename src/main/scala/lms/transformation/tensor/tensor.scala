@@ -108,6 +108,10 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
     def inv()(implicit __pos: SourceContext): TENSOR = {
       (new TENSOR(Adapter.g.reflect("tensor_invert", C(shape), x))).withSrcType(__pos, et)
     }
+
+    def transpose()(implicit __pos: SourceContext): TENSOR = {
+      (new TENSOR(Adapter.g.reflect("tensor_transpose", C(shape), x))).withSrcType(__pos, et)
+    }
   }
 }
 
@@ -171,6 +175,11 @@ trait FixedSizeTensorOps extends Base with PrimitiveOps with ArrayOps {
 
     def inv()(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = self inv()
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def transpose()(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self transpose()
       Wrap[Tensor[T]](t.x)
     }
   }

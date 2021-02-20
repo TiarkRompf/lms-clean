@@ -111,8 +111,12 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   def threadIdxY(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.y", manifest[Int]))
   def threadIdxZ(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.z", manifest[Int]))
 
+  // def tileDim(implicit __pos: SourceContext): INT = INT(CMACRO("TILE_DIM", manifest[INT]))
+  def blockRows(implicit __pos: SourceContext): INT = INT(CMACRO("BLOCK_ROWS", manifest[INT]))
+
   val gridSize = 28
   val blockSize = 512
+  val tileDim = 32
 
   def CUDA_FILL_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
     // type cast
@@ -176,6 +180,26 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       Backend.Const(())
     }
   }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
+
+  def CUDA_TRANSPOSE_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
+    withComment(s"generating kernel function for TRANS of type $m") {
+      // type cast
+      val in = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val out = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val size = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+
+      val x = blockIdxX * tileDim + threadIdxX
+      val y = blockIdxY * tileDim + threadIdxY
+      val width = gridDimX * tileDim
+
+      val start = Backend.Const(0)
+      for (i <- range_until_step(Wrap[Int](start), Wrap[Int](tileDim.x), Wrap[Int](blockSize.x))) {
+        val index = INT((y + INT(Unwrap(i))) * width + x)
+        out(index) = in(index); ()
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, manifest[Int])
 
 
   // Simple SGD Nesterov (https://github.com/pytorch/pytorch/blob/master/torch/optim/sgd.py)
