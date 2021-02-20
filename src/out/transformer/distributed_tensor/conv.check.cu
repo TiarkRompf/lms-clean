@@ -136,7 +136,7 @@ void Snippet(int x0) {
     cudnnConvolutionBwdFilterAlgoPerf_t x44;
     int x45 = 0;
     CUDNNCHECK(cudnnFindConvolutionBackwardFilterAlgorithm(x7, x40, x40, x42, x41, 1, &x45, &x44));
-    cudnnConvolutionBwdAlgo_t x46 = x44.algo;
+    cudnnConvolutionBwdFilterAlgo_t x46 = x44.algo;
     // end finding convolution backward filter algorithm
     // begin finding convolution backward filter workspace size
     size_t x47 = (size_t)0;

@@ -708,14 +708,24 @@ trait CCodeGenCUDNN extends ExtendedCCodeGen {
 
   // add more casess
   override def remap(m: Manifest[_]) = m.runtimeClass.getName match {
-    case s: String if s.endsWith("$cudnnConvolutionFwdAlgoPerfT") => "cudnnConvolutionFwdAlgoPerf_t"
-    case s: String if s.endsWith("$cudnnConvolutionFwdAlgoT") => "cudnnConvolutionFwdAlgo_t"
+    case s: String if s.endsWith("$cudnnConvolutionFwdAlgoPerfT") ||
+      s.endsWith("$CUDNN_CONV_FWD_ALG_PERF")=> "cudnnConvolutionFwdAlgoPerf_t"
     
-    case s: String if s.endsWith("cudnnConvolutionBwdFilterAlgoT") => "cudnnConvolutionBwdAlgo_t"
-    case s: String if s.endsWith("CUDNN_CONV_BWD_FILTER_ALGO") => "cudnnConvolutionBwdAlgo_t"
+    case s: String if s.endsWith("$cudnnConvolutionFwdAlgoT") ||
+      s.endsWith("$CUDNN_CONV_FWD_ALGO") => "cudnnConvolutionFwdAlgo_t"
     
-    case s => 
-      // System.out.println(s)
-      super.remap(m)
+    case s: String if s.endsWith("$cudnnConvolutionBwdDataAlgoPerfT") ||
+      s.endsWith("$CUDNN_CONV_BWD_DATA_ALG_PERF") => "cudnnConvolutionBwdDataAlgoPerf_t"
+    
+    case s: String if s.endsWith("$cudnnConvolutionBwdDataAlgoT") ||
+      s.endsWith("$CUDNN_CONV_BWD_DATA_ALGO") => "cudnnConvolutionBwdDataAlgo_t"
+    
+    case s: String if s.endsWith("$cudnnConvolutionBwdFilterAlgoPerfT") ||
+      s.endsWith("$CUDNN_CONV_BWD_FILTER_ALG_PERF") => "cudnnConvolutionBwdFilterAlgoPerf_t"
+    
+    case s: String if s.endsWith("$cudnnConvolutionBwdFilterAlgoT") ||
+      s.endsWith("$CUDNN_CONV_BWD_FILTER_ALGO") => "cudnnConvolutionBwdFilterAlgo_t"
+    
+    case s => super.remap(m)
   }
 }
