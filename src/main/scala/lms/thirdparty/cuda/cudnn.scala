@@ -131,13 +131,13 @@ object CUDNNTypeLess extends Dsl with CLibs {
 
   def CUDNN_GET_CONV_FWD_WORKSPACE_SZ(handle: TOP, xDesc: TOP, wDesc: TOP,
                                       convDesc: CUDNN_CONV_DESCRIPTOR, yDesc: TOP, algo: TOP, 
-                                      sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+                                      sizeInBytes: VAR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionForwardWorkspaceSize", handle.x, xDesc.x, wDesc.x, convDesc.x,
       yDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
 
   def CUDNN_CONV_FWD(handle: TOP, alpha: VAR, xDesc: TOP, x: TOP,
                               wDesc: TOP, w: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
-                              algo: TOP, workspace: TOP, workSpaceSizeInBytes: SIZE_T,
+                              algo: TOP, workspace: TOP, workSpaceSizeInBytes: VAR,
                               beta: VAR, yDesc: TOP, y: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionForward", handle.x, alpha.x, xDesc.x, x.x, wDesc.x, w.x, convDesc.x,
       algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, yDesc.x, y.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(1,5,12),
