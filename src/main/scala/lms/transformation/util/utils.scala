@@ -82,12 +82,12 @@ trait CudnnUtils {
   */
 
   // NCHW
-  val CUDNN_N       = 0
-  val CUDNN_H       = 2
-  val CUDNN_W       = 3
-  val CUDNN_C       = 1
-  val CUDNN_C_OUT   = CUDNN_N
-  val CUDNN_C_IN    = CUDNN_C
+  val CUDNN_N       = 0           // batch size
+  val CUDNN_H       = 2           // height
+  val CUDNN_W       = 3           // width
+  val CUDNN_C       = 1           // number of channels
+  val CUDNN_C_OUT   = CUDNN_N     // number of input channels (for convolution filters)
+  val CUDNN_C_IN    = CUDNN_C     // number of output channels (for convolution filters)
 
   val CUDNN_TENSOR_DIM  = 4  // input tensor and input kernel should both be 4d
   val CUDNN_PARAM_DIM   = 2  // degree of freedom of padding, strides, and dilation
