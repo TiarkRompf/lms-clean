@@ -41,18 +41,18 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       case "tensor" =>
         generate_comment(s"begin creating and setting tensor descriptor of shape ${shape}")
         val desc = new CUDNN_TENSOR_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_TENSOR_DESCRIPTOR], "cudnnTensorDescriptor_t").x)
-        CUDNN_CREATE_TENSOR_DESCRIPTOR(desc)
-        CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_NCHW, CUDNN_FLOAT,
-          INT(shape(CUDNN_N)), INT(shape(CUDNN_C)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W)))
+        CUDNN_CHECK(CUDNN_CREATE_TENSOR_DESCRIPTOR(desc))
+        CUDNN_CHECK(CUDNN_SET_TENSOR_4D_DESCRIPTOR(desc, CUDNN_NCHW, CUDNN_FLOAT,
+          INT(shape(CUDNN_N)), INT(shape(CUDNN_C)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W))))
         generate_comment(s"end creating and setting tensor descriptor")
         cudnnTensor2Desc += ((shape, (desc, kind)))
         desc
       case "filter" =>
         generate_comment(s"begin creating and setting filter descriptor of shape ${shape}")
         val desc = new CUDNN_FILTER_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_FILTER_DESCRIPTOR], "cudnnFilterDescriptor_t").x)
-        CUDNN_CREATE_FILTER_DESCRIPTOR(desc)
-        CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_FLOAT, CUDNN_NCHW,
-          INT(shape(CUDNN_C_OUT)), INT(shape(CUDNN_C_IN)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W)))
+        CUDNN_CHECK(CUDNN_CREATE_FILTER_DESCRIPTOR(desc))
+        CUDNN_CHECK(CUDNN_SET_FILTER_4D_DESCRIPTOR(desc, CUDNN_FLOAT, CUDNN_NCHW,
+          INT(shape(CUDNN_C_OUT)), INT(shape(CUDNN_C_IN)), INT(shape(CUDNN_H)), INT(shape(CUDNN_W))))
         generate_comment(s"end creating and setting filter descriptor")
         cudnnTensor2Desc += ((shape, (desc, kind)))
         desc
@@ -69,12 +69,12 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       case None =>
         generate_comment(s"begin creating and setting convolution descriptor of padding: ${padding}, strides: ${strides}, dilation: ${dilation}")
         val desc = new CUDNN_CONV_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_CONV_DESCRIPTOR], "cudnnConvolutionDescriptor_t").x)
-        CUDNN_CREATE_CONV_DESCRIPTOR(desc)
-        CUDNN_SET_CONV_2D_DESCRIPTOR(desc,
+        CUDNN_CHECK(CUDNN_CREATE_CONV_DESCRIPTOR(desc))
+        CUDNN_CHECK(CUDNN_SET_CONV_2D_DESCRIPTOR(desc,
           INT(padding(CUDNN_PARAM_H)),  INT(padding(CUDNN_PARAM_W)),
           INT(strides(CUDNN_PARAM_H)),  INT(strides(CUDNN_PARAM_W)),
           INT(dilation(CUDNN_PARAM_H)), INT(dilation(CUDNN_PARAM_W)),
-          CUDNN_CONVOLUTION, CUDNN_FLOAT)
+          CUDNN_CONVOLUTION, CUDNN_FLOAT))
         generate_comment(s"end creating and setting convolution descriptor")
         desc
   }
@@ -104,8 +104,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       var output_height = 0
       var output_width = 0
       var output_channels = 0
-      CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(conv_descriptor, input_descriptor, filter_descriptor,
-        INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width))
+      CUDNN_CHECK(CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(conv_descriptor, input_descriptor, filter_descriptor,
+        INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width)))
       generate_comment("end finding convolution output tensor shape")
 
       val listBuffer1: ListBuffer[Int] = ListBuffer(0, 0, 0, 0)
@@ -124,7 +124,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("begin finding convolution forward algorithm")
       var res_count = 0
       val res = new CUDNN_CONV_FWD_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_FWD_ALG_PERF], "cudnnConvolutionFwdAlgoPerf_t").x)
-      CUDNN_FIND_CONV_FWD_ALG(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor, INT(1), VAR(res_count), res)
+      CUDNN_CHECK(CUDNN_FIND_CONV_FWD_ALG(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor, INT(1), VAR(res_count), res))
       val convAlgoRep = readField[Manifest[CUDNN_CONV_FWD_ALG_PERF], Manifest[CUDNN_CONV_FWD_ALGO]](Wrap[Manifest[CUDNN_CONV_FWD_ALG_PERF]](res.x), "algo")
       val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_FWD_ALGO])
       generate_comment("end finding convolution forward algorithm")
@@ -175,7 +175,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("begin finding convolution backward data algorithm")
       var res_count = 0
       val res = new CUDNN_CONV_BWD_DATA_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], "cudnnConvolutionBwdDataAlgoPerf_t").x)
-      CUDNN_FIND_CONV_BWD_DATA_ALG(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor, INT(1), VAR(res_count), res)
+      CUDNN_CHECK(CUDNN_FIND_CONV_BWD_DATA_ALG(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor, INT(1), VAR(res_count), res))
       val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], Manifest[CUDNN_CONV_BWD_DATA_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF]](res.x), "algo")
       val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_DATA_ALGO])
       generate_comment("end finding convolution backward data algorithm")
@@ -183,8 +183,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("begin finding convolution backward data workspace size")
       var workspace_bytes = 0
       val workspace_bytes_v = VAR(SIZE_T(workspace_bytes)) // var read
-      CUDNN_GET_CONV_BWD_DATA_WORKSPACE_SZ(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor,
-        convAlgo, workspace_bytes_v)
+      CUDNN_CHECK(CUDNN_GET_CONV_BWD_DATA_WORKSPACE_SZ(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor,
+        convAlgo, workspace_bytes_v))
       generate_comment("end finding convolution backward data workspace size")
 
       generate_comment("begin allocating gpu array for onvolution backward data workspace")
@@ -192,8 +192,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end allocating gpu array for onvolution backward data workspace")
 
       generate_comment("begin convolution backward data pass")
-      CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(FLOAT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
-        conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), dweight_descriptor, dweight)
+      CUDNN_CHECK(CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(FLOAT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
+        conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), dweight_descriptor, dweight))
       generate_comment("end convolution backward data pass")
 
       dweight.x

@@ -114,23 +114,23 @@ void Snippet(int x0) {
     // end initializing fixed GPU array of size 162 and type Float and device (pre-rename) x39
     // begin creating and setting tensor descriptor of shape List(2, 1, 9, 9)
     cudnnTensorDescriptor_t x40;
-    cudnnCreateTensorDescriptor(&x40);
-    cudnnSetTensor4dDescriptor(x40, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 1, 9, 9);
+    CUDNNCHECK(cudnnCreateTensorDescriptor(&x40));
+    CUDNNCHECK(cudnnSetTensor4dDescriptor(x40, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 1, 9, 9));
     // end creating and setting tensor descriptor
     // begin creating and setting tensor descriptor of shape List(2, 2, 9, 9)
     cudnnTensorDescriptor_t x41;
-    cudnnCreateTensorDescriptor(&x41);
-    cudnnSetTensor4dDescriptor(x41, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 2, 9, 9);
+    CUDNNCHECK(cudnnCreateTensorDescriptor(&x41));
+    CUDNNCHECK(cudnnSetTensor4dDescriptor(x41, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 2, 9, 9));
     // end creating and setting tensor descriptor
     // begin creating and setting filter descriptor of shape List(2, 1, 3, 3)
     cudnnFilterDescriptor_t x42;
-    cudnnCreateFilterDescriptor(&x42);
-    cudnnSetFilter4dDescriptor(x42, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, 2, 1, 3, 3);
+    CUDNNCHECK(cudnnCreateFilterDescriptor(&x42));
+    CUDNNCHECK(cudnnSetFilter4dDescriptor(x42, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, 2, 1, 3, 3));
     // end creating and setting filter descriptor
     // begin creating and setting convolution descriptor of padding: List(1, 1), strides: List(1, 1), dilation: List(1, 1)
     cudnnConvolutionDescriptor_t x43;
-    cudnnCreateConvolutionDescriptor(&x43);
-    cudnnSetConvolution2dDescriptor(x43, 1, 1, 1, 1, 1, 1, CUDNN_CONVOLUTION, CUDNN_DATA_FLOAT);
+    CUDNNCHECK(cudnnCreateConvolutionDescriptor(&x43));
+    CUDNNCHECK(cudnnSetConvolution2dDescriptor(x43, 1, 1, 1, 1, 1, 1, CUDNN_CONVOLUTION, CUDNN_DATA_FLOAT));
     // end creating and setting convolution descriptor
     // begin allocating gpu array for the gradient of filter of convolution
     CUDA_CALL(cudaSetDevice(x6));
@@ -157,10 +157,10 @@ void Snippet(int x0) {
     float x51 = 0.0;
     CUDNNCHECK(cudnnConvolutionBackwardFilter(x7, &x50, x40, x38, x41, x39, x43, x47, x49, x48, &x51, x42, x44));
     // end convolution backward filter pass
-    // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x227
+    // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x235
     CUDA_CALL(cudaSetDevice(x6));
     x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x44, 18);
-    // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x227
+    // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x235
     // begin computing SGD on GPU for size 18 and type Float at device (pre-name) x39 with weight x70, grad x93, and momentum x131
     CUDA_CALL(cudaSetDevice(x6));
     x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x11, x18, 18);
