@@ -35,6 +35,175 @@ object CUDNNTypeLess extends Dsl with CLibs {
     assert(result.t == manifest[CUDNN_RESULT], "CUDNN_CHECK must take the CUDNN_RESULT type as input")
     UNIT(LIB_FUNCTION(manifest[Unit], "CUDNNCHECK", result.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL))
   }
+
+  class CUDNN_TENSOR_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_FILTER_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_DROPOUT_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+
+  
+  // class CUDNN_TENSOR_FORMAT(override val x: Backend.Exp) extends TOP(x)
+  def CUDNN_NCHW(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_TENSOR_NCHW", manifest[Int]))
+  def CUDNN_NHWC(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_TENSOR_NHWC", manifest[Int]))
+
+  // class CUDNN_TENSOR_DATATYPE(override val x: Backend.Exp) extends TOP(x)
+  def CUDNN_FLOAT(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_DATA_FLOAT", manifest[Int]))
+
+  class CUDNN_CONV_FWD_ALG_PERF(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_FWD_ALGO(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_BWD_DATA_ALG_PERF(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_BWD_DATA_ALGO(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_BWD_FILTER_ALG_PERF(override val x: Backend.Exp) extends TOP(x)
+  class CUDNN_CONV_BWD_FILTER_ALGO(override val x: Backend.Exp) extends TOP(x)
+  // class cudnnConvolutionBwdFilterAlgoT(override val x: Backend.Exp) extends TOP(x)
+  /*
+  def cudnnDouble = cmacro[cudnnDataTypeT]("CUDNN_DATA_DOUBLE")  // 64-bit
+  def cudnnHalf = cmacro[cudnnDataTypeT]("CUDNN_DATA_HALF")  // 16-bit
+  def cudnnInt8 = cmacro[cudnnDataTypeT]("CUDNN_DATA_UINT8")
+  def cudnnInt32 = cmacro[cudnnDataTypeT]("CUDNN_DATA_INT32")
+  def cudnnInt8x4 = cmacro[cudnnDataTypeT]("CUDNN_DATA_INT8x4")
+  def cudnnInt8x32 = cmacro[cudnnDataTypeT]("CUDNN_DATA_INT8x32")
+  def cudnnInt8x64 = cmacro[cudnnDataTypeT]("CUDNN_DATA_UINT8x4")*/
+
+  def CUDNN_CONVOLUTION(implicit __pos: SourceContext) = CMACRO("CUDNN_CONVOLUTION", manifest[Int])
+  def CUDNN_CROSS_CORRELATION(implicit __pos: SourceContext) = CMACRO("CUDNN_CROSS_CORRELATION", manifest[Int])
+
+  def CUDNN_CREATE_TENSOR_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateTensorDescriptor", tensorDesc.x)(Seq(), Seq(0), Set[Int](0))
+
+  def CUDNN_CREATE_FILTER_DESCRIPTOR(filterDesc: CUDNN_FILTER_DESCRIPTOR)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateFilterDescriptor", filterDesc.x)(Seq(), Seq(0), Set[Int](0))
+  
+  def CUDNN_CREATE_CONV_DESCRIPTOR(convDesc: CUDNN_CONV_DESCRIPTOR)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateConvolutionDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int](0))
+
+  def CUDNN_CREATE_DROPOUT_DESCRIPTOR(convDesc: CUDNN_DROPOUT_DESCRIPTOR)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateDropoutDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int](0))
+
+
+
+  def CUDNN_DESTROY_TENSOR_DESCRIPTOR(tensorDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyTensorDescriptor", tensorDesc.x)(Seq(), Seq(0), Set[Int]())
+  
+  def CUDNN_DESTROY_FILTER_DESCRIPTOR(filterDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyFilterDescriptor", filterDesc.x)(Seq(), Seq(0), Set[Int]())
+
+  def CUDNN_DESTROY_CONV_DESCRIPTOR(convDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyConvolutionDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int]())
+
+  def CUDNN_DESTROY_DROPOUT_DESCRIPTOR(convDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyDropoutDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int]())
+   
+
+  
+  def CUDNN_SET_TENSOR_4D_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR, format: TOP, dataType: TOP, n: INT, c: INT, 
+                                     h: INT, w: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetTensor4dDescriptor", tensorDesc.x, format.x, dataType.x,
+      n.x, c.x, h.x, w.x)(Seq(1,2,3,4,5,6), Seq(0), Set[Int]())
+  
+  def CUDNN_SET_FILTER_4D_DESCRIPTOR(filterDesc: CUDNN_FILTER_DESCRIPTOR, format: TOP, dataType: TOP, k: INT, c: INT,
+                                     h: INT, w: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetFilter4dDescriptor", filterDesc.x, format.x, dataType.x,
+      k.x, c.x, h.x, w.x)(Seq(1,2,3,4,5,6), Seq(0), Set[Int]())
+
+  def CUDNN_SET_CONV_2D_DESCRIPTOR(convDesc: CUDNN_CONV_DESCRIPTOR, pad_h: INT, pad_w: INT, u: INT, v: INT, dilation_h: INT, 
+                                   dilation_w: INT, mode: TOP, computeType: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetConvolution2dDescriptor", convDesc.x, pad_h.x, pad_w.x, u.x, v.x,
+      dilation_h.x, dilation_w.x, mode.x, computeType.x)(Seq(1,2,3,4,5,6,7,8), Seq(0), Set[Int]())
+
+  def CUDNN_SET_DROPOUT_DESCRIPTOR(dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, handle: TOP, dropout: FLOAT, states: TOP,
+                              stateSizeInBytes: SIZE_T, seed: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetDropoutDescriptor", dropoutDesc.x, handle.x, dropout.x, states.x, 
+      stateSizeInBytes.x, seed.x)(Seq(0,1,2,3,4,5), Seq(0,1,2,3), Set[Int]())
+
+
+
+  def CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(convDesc: CUDNN_CONV_DESCRIPTOR, inputTensorDesc: TOP, 
+                                      filterDesc: TOP, n: INT, c: INT, h: INT, w: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolution2dForwardOutputDim", convDesc.x, inputTensorDesc.x, 
+      filterDesc.x, n.x, c.x, h.x, w.x)(Seq(0,1,2), Seq(3,4,5,6), Set[Int](3,4,5,6))
+
+  def CUDNN_FIND_CONV_FWD_ALG(handle: TOP, xDesc: TOP, wDesc: TOP,
+                               convDesc: CUDNN_CONV_DESCRIPTOR, yDesc: TOP, requestedAlgoCount: INT,
+                               returnedAlgoCount: VAR, perfResults: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnFindConvolutionForwardAlgorithm", handle.x, xDesc.x, wDesc.x, convDesc.x,
+      yDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
+
+  def CUDNN_GET_CONV_FWD_WORKSPACE_SZ(handle: TOP, xDesc: TOP, wDesc: TOP,
+                                      convDesc: CUDNN_CONV_DESCRIPTOR, yDesc: TOP, algo: TOP, 
+                                      sizeInBytes: VAR)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionForwardWorkspaceSize", handle.x, xDesc.x, wDesc.x, convDesc.x,
+      yDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
+
+  def CUDNN_CONV_FWD(handle: TOP, alpha: VAR, xDesc: TOP, x: TOP,
+                              wDesc: TOP, w: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
+                              algo: TOP, workspace: TOP, workSpaceSizeInBytes: VAR,
+                              beta: VAR, yDesc: TOP, y: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionForward", handle.x, alpha.x, xDesc.x, x.x, wDesc.x, w.x, convDesc.x,
+      algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, yDesc.x, y.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(1,5,12),
+      Set[Int](1,10))
+
+  def CUDNN_FIND_CONV_BWD_DATA_ALG(handle: TOP, wDesc: TOP, dyDesc: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
+                                  dxDesc: TOP, requestedAlgoCount: INT, returnedAlgoCount: VAR, perfResults: TOP)
+                                  (implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnFindConvolutionBackwardDataAlgorithm", handle.x, wDesc.x, dyDesc.x, convDesc.x,
+      dxDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
+
+  def CUDNN_GET_CONV_BWD_DATA_WORKSPACE_SZ(handle: TOP, wDesc: TOP, dyDesc: TOP,
+                                      convDesc: CUDNN_CONV_DESCRIPTOR, dxDesc: TOP, algo: TOP, 
+                                      sizeInBytes: VAR)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionBackwardDataWorkspaceSize", handle.x, wDesc.x, dyDesc.x, convDesc.x,
+      dxDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
+
+
+  def CUDNN_CONV_BWD_DATA(handle: TOP, alpha: VAR, wDesc: TOP, w: TOP,
+                                  dyDesc: TOP, dy: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
+                                  algo: TOP, workspace: TOP, workSpaceSizeInBytes: VAR, 
+                                  beta: VAR, dxDesc: TOP, dx: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionBackwardData", handle.x, alpha.x, wDesc.x, w.x, dyDesc.x, dy.x, 
+      convDesc.x, algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, dxDesc.x, dx.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(12), 
+      Set[Int](1,10))
+
+  def CUDNN_FIND_CONV_BWD_FILTER_ALG(handle: TOP, xDesc: TOP, dyDesc: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
+                                  dwDesc: TOP, requestedAlgoCount: INT, returnedAlgoCount: VAR, perfResults: TOP)
+                                  (implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnFindConvolutionBackwardFilterAlgorithm", handle.x, xDesc.x, dyDesc.x, convDesc.x,
+      dwDesc.x, requestedAlgoCount.x, returnedAlgoCount.x, perfResults.x)(Seq(0,1,2,3,4,5,7), Seq(6,7), Set[Int](6,7))
+
+  def CUDNN_GET_CONV_BWD_FILTER_WORKSPACE_SZ(handle: TOP, xDesc: TOP, dyDesc: TOP,
+                                      convDesc: CUDNN_CONV_DESCRIPTOR, dwDesc: TOP, algo: TOP, 
+                                      sizeInBytes: VAR)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetConvolutionBackwardFilterWorkspaceSize", handle.x, xDesc.x, dyDesc.x, convDesc.x,
+      dwDesc.x, algo.x, sizeInBytes.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](6))
+
+
+  def CUDNN_CONV_BWD_FILTER(handle: TOP, alpha: VAR, xDesc: TOP, x: TOP,
+                                  dyDesc: TOP, dy: TOP, convDesc: CUDNN_CONV_DESCRIPTOR,
+                                  algo: TOP, workspace: TOP, workSpaceSizeInBytes: VAR, 
+                                  beta: VAR, dwDesc: TOP, dw: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnConvolutionBackwardFilter", handle.x, alpha.x, xDesc.x, x.x, dyDesc.x, dy.x, 
+      convDesc.x, algo.x, workspace.x, workSpaceSizeInBytes.x, beta.x, dwDesc.x, dw.x)(Seq(0,1,2,3,4,5,6,7,8,9,10,11), Seq(12), 
+      Set[Int](1,10))
+  
+
+
+  def CUDNN_DROPOUT_GET_RESERVE_SPACE_SZ(xDesc: TOP, sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDropoutGetReserveSpaceSize", xDesc.x, sizeInBytes.x)(Seq(0), Seq(1), Set[Int](1))
+  
+  def CUDNN_DROPOUT_GET_STATES_SZ(handle: TOP, sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDropoutGetStatesSize", handle.x, sizeInBytes.x)(Seq(0), Seq(1), Set[Int](1))
+
+  def CUDNN_DROPOUT_FWD(handle: TOP, dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, xdesc: TOP, x: TOP,
+                          yDesc: TOP, y: TOP, reserveSpace: TOP, reserveSpaceSizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT],"cudnnDropoutForward", handle.x, dropoutDesc.x, xdesc.x, x.x, yDesc.x, y.x, reserveSpace.x,
+      reserveSpaceSizeInBytes.x)(Seq(0,1,2,3,4,7), Seq(5,6), Set[Int]())
+
+  def CUDNN_DROPOUT_BWD(handle: TOP, dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, dyDesc: TOP, dy: TOP,
+                          dxDesc: TOP, dx: TOP, reserveSpace: TOP, reserveSpaceSizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT],"cudnnDropoutBackward", handle.x, dropoutDesc.x, dyDesc.x, dy.x, dxDesc.x, dx.x, reserveSpace.x,
+      reserveSpaceSizeInBytes.x)(Seq(0,1,2,3,4,7), Seq(5,6), Set[Int]())
+
+
 }
 
 
@@ -537,9 +706,26 @@ trait CCodeGenCUDNN extends ExtendedCCodeGen {
 
   registerHeader("\"cudnn_header.h\"")
 
+  // add more casess
   override def remap(m: Manifest[_]) = m.runtimeClass.getName match {
-    case s: String if s.endsWith("$cudnnConvolutionFwdAlgoPerfT") => "cudnnConvolutionFwdAlgoPerf_t"
-    case s: String if s.endsWith("$cudnnConvolutionFwdAlgoT") => "cudnnConvolutionFwdAlgo_t"
-    case _ => super.remap(m)
+    case s: String if s.endsWith("$cudnnConvolutionFwdAlgoPerfT") ||
+      s.endsWith("$CUDNN_CONV_FWD_ALG_PERF")=> "cudnnConvolutionFwdAlgoPerf_t"
+    
+    case s: String if s.endsWith("$cudnnConvolutionFwdAlgoT") ||
+      s.endsWith("$CUDNN_CONV_FWD_ALGO") => "cudnnConvolutionFwdAlgo_t"
+    
+    case s: String if s.endsWith("$cudnnConvolutionBwdDataAlgoPerfT") ||
+      s.endsWith("$CUDNN_CONV_BWD_DATA_ALG_PERF") => "cudnnConvolutionBwdDataAlgoPerf_t"
+    
+    case s: String if s.endsWith("$cudnnConvolutionBwdDataAlgoT") ||
+      s.endsWith("$CUDNN_CONV_BWD_DATA_ALGO") => "cudnnConvolutionBwdDataAlgo_t"
+    
+    case s: String if s.endsWith("$cudnnConvolutionBwdFilterAlgoPerfT") ||
+      s.endsWith("$CUDNN_CONV_BWD_FILTER_ALG_PERF") => "cudnnConvolutionBwdFilterAlgoPerf_t"
+    
+    case s: String if s.endsWith("$cudnnConvolutionBwdFilterAlgoT") ||
+      s.endsWith("$CUDNN_CONV_BWD_FILTER_ALGO") => "cudnnConvolutionBwdFilterAlgo_t"
+    
+    case s => super.remap(m)
   }
 }

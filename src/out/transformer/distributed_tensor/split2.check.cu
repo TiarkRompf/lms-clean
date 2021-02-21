@@ -1,6 +1,7 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
+#include "cudnn_header.h"
 #include "nccl_header.h"
 #include <string.h>
 #include <cblas.h>

@@ -2,6 +2,12 @@ package lms.transformation.util
 
 import scala.collection.immutable._
 
+import lms.core._
+import lms.core.stub._
+import lms.collection.mutable._
+import lms.macros.SourceContext
+import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps,CUDNNTypeLess,CLibTypeLess}
+
 trait DataStructure {
 
   /**
@@ -51,4 +57,43 @@ trait DataStructure {
     }.toMap
 
   }
+}
+
+// encapsulates parameters to a cudnn convolution operation
+// trait ConvParam {
+//   case class ConvParam(val alpha: Float, val beta: Float, val padding: Seq[Int], val strides: Seq[Int], val dilation: Seq[Int])
+// }
+
+trait CudnnUtils {
+  // import CUDNNTypeLess._
+
+  // val CUDNN_LAYOUT = CUDNN_NHWC
+  // val CUDNN_DATATYPE = CUDNN_FLOAT
+  // val CUDNN_MODE = CUDNN_CONVOLUTIONs
+
+
+ /* NHWC
+  val CUDNN_N       = 0
+  val CUDNN_H       = 1
+  val CUDNN_W       = 2
+  val CUDNN_C       = 3
+  val CUDNN_C_OUT   = CUDNN_N
+  val CUDNN_C_IN    = CUDNN_C
+  */
+
+  // NCHW
+  val CUDNN_N       = 0           // batch size
+  val CUDNN_H       = 2           // height
+  val CUDNN_W       = 3           // width
+  val CUDNN_C       = 1           // number of channels
+  val CUDNN_C_OUT   = CUDNN_N     // number of input channels (for convolution filters)
+  val CUDNN_C_IN    = CUDNN_C     // number of output channels (for convolution filters)
+
+  val CUDNN_TENSOR_DIM  = 4  // input tensor and input kernel should both be 4d
+  val CUDNN_PARAM_DIM   = 2  // degree of freedom of padding, strides, and dilation
+
+  val CUDNN_PARAM_H     = 0  // height of padding, strides, and dilation
+  val CUDNN_PARAM_W     = 1  // weight of padding, strides, and dilation
+
+  case class ConvParam(val alpha: Float, val beta: Float, val padding: Seq[Int], val strides: Seq[Int], val dilation: Seq[Int])
 }

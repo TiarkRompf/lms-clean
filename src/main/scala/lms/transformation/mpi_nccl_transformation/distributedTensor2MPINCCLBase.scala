@@ -2,19 +2,20 @@ package lms.transformation.tensor
 
 import scala.annotation.implicitNotFound
 import scala.collection._
+import scala.collection.mutable.HashMap
 
 import lms.core._
 import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
-import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess}
+import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps, CUDNNTypeLess}
 import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess, CUBLASTypeLess, CudaOps}
 import lms.transformation.util.DataStructure
 
 import Backend._
 
 
-abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps with CudaOps with NCCLOps {
+abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps with CudaOps with NCCLOps with CUDNNOps {
   override val name = "DistributeTensor2MPI_NCCL"
 
   import BaseTypeLess._
@@ -28,6 +29,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   import NCCLTypeLess._
   import SIZE_TTypeLess._
   import CUBLASTypeLess._
+  import CUDNNTypeLess._
 
   def numeral(size: Seq[Int]) = size.foldLeft(1)(_ * _)
 
@@ -43,6 +45,12 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   }
   // helper function for declaring a GPU array
   def gpu_array(size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
+    CUDA_SET_DEVICE(device)
+    CUDA_MALLOC(size, m)
+  }
+
+  // TODO: change it to better name, and add INT counterparts to other gpu functions as well
+  def gpu_array1(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
     CUDA_SET_DEVICE(device)
     CUDA_MALLOC(size, m)
   }
@@ -107,6 +115,34 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   def finalize_mpi_nccl(implicit __pos: SourceContext) = {
     MPI_CHECK(mpi_finalize())
     ncclCheck(ncclCommDestroy(myNCCLCommRep))
+  }
+
+  // lazy local function that initializes CUDNN
+  lazy val (myCUDNNCommRep) = withComment("setting up the CUDNN environment") {
+    val cudnn = cudnnHandle
+    cudnnCheck(cudnnCreate(cudnn))
+    cudnn
+  }
+
+  def myCUDNNComm(implicit __pos: SourceContext) = TOP(Unwrap(myCUDNNCommRep), manifest[cudnnHandleT])
+
+  // var cudnnTensor2Desc: HashMap[Backend.Sym, (TOP, String)] = HashMap()
+  var cudnnTensor2Desc: HashMap[Seq[Int], (TOP, String)] = HashMap()
+  var cudnnConv2Desc: HashMap[Seq[Int], CUDNN_CONV_DESCRIPTOR] = HashMap()
+  def set_up_cudnn(implicit __pos: SourceContext) = { 
+    val dummy = myCUDNNComm 
+    // cudnnTensor2Desc = HashMap()  // todo: FIXME
+  }
+  def finalize_cudnn(implicit __pos: SourceContext) = {
+    cudnnCheck(cudnnDestroy(myCUDNNCommRep))
+    cudnnTensor2Desc foreach {
+      case (_, (desc, "tensor")) => CUDNN_DESTROY_TENSOR_DESCRIPTOR(desc)
+      case (_, (desc, "filter")) => CUDNN_DESTROY_FILTER_DESCRIPTOR(desc)
+      case _ => throw new Exception("Unknown kind of cudnn tensor descriptor")
+    }
+    cudnnConv2Desc foreach {
+      case (_, desc) => CUDNN_DESTROY_CONV_DESCRIPTOR(desc)
+    }
   }
 
   override def transform(n: Node): Backend.Exp = n match {
@@ -299,7 +335,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     // 1. maybe set up cublas
     if (analysis.hasCublas) set_up_cublas
     // 2. maybe set up cudnn
-    if (analysis.hasCudnn) ???
+    if (analysis.hasCudnn) set_up_cudnn
 
     super.apply(graph)
 
@@ -307,7 +343,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     // 1. maybe clean up cublas
     if (analysis.hasCublas) finalize_cublas
     // 2. maybe clean up cudnn
-    if (analysis.hasCudnn) ???
+    if (analysis.hasCudnn) finalize_cudnn
     // 0. clean up mpi/nccl
     finalize_mpi_nccl
   }

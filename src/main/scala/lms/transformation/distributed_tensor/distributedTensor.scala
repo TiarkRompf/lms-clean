@@ -26,6 +26,7 @@ object FixedSizeDistributedTensorTypeLess extends FixedSizeDistributedTensorBase
   with FixedSizeDistributedTensorMutationTypeLess
   with FixedSizeDistributedTensorUnaryTypeLess
   with FixedSizeDistributedTensorSplitConcatTypeLess
+  with FixedSizeDistributedTensorConvTypeLess
 
 trait FixedSizeDistributedTensorOps extends FixedSizeDistributedTensorOpsBase
   with FixedSizeDistributedTensorOpsBinary
@@ -33,4 +34,5 @@ trait FixedSizeDistributedTensorOps extends FixedSizeDistributedTensorOpsBase
   with FixedSizeDistributedTensorOpsMutation
   with FixedSizeDistributedTensorOpsUnary
   with FixedSizeDistributedTensorOpsSplitConcat
+  with FixedSizeDistributedTensorOpsConv
 
