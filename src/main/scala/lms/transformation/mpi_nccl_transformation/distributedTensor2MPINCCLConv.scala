@@ -203,8 +203,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       // unpack convolution paratemers
       val ConvParam(alpha, beta, padding, strides, dilation) = params.asInstanceOf[ConvParam]
-
-      // TODO: dim checks necessary or not?
+      
       val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
       val weight_shape = tensor_shape(weight, useOldMetadata = true)
       val filter_shape = tensor_shape(filter, useOldMetadata = true)

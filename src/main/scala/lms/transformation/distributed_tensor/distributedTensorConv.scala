@@ -20,7 +20,6 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
     val ConvParam(alpha, beta, padding, strides, dilation) = params
 
-
     require(input.shapeSize.size == CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D, found: " + input.shapeSize.size)
     require(filter.shapeSize.size == CUDNN_TENSOR_DIM, "input filter of convolution must be 4D, found: " + filter.shapeSize.size)
     require(padding.size == CUDNN_PARAM_DIM, "padding must be sequence of integer of length 2, found: " + padding.size)
@@ -77,7 +76,6 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     // constraints:
     // input.channels = filter.input_channels
     // output.channels = filter.output_channels
-    // NHWC
     case Node(s, "tensor_conv", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
       val input_type    = (new TENSOR(a, useOldMetadata=true)).resultType.shape
       val filter_type   = (new TENSOR(b, useOldMetadata=true)).resultType.shape
@@ -101,7 +99,6 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         // save forward op in forwardNodes
         forwardNodes += node
         // save backward op in backwardNodes
-
         (() => {
           val x = new TENSOR(transform(a))      // weight
           val y = new TENSOR(transform(b))      // filter
