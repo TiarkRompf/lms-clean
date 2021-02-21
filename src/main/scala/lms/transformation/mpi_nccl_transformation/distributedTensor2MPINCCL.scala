@@ -20,6 +20,7 @@ abstract class DistributeTensor2MPI_NCCL extends DistributeTensor2MPI_NCCLBase
     with DistributeTensor2MPI_NCCLMutation
     with DistributeTensor2MPI_NCCLSplitConcat
     with DistributedTensor2MPI_NCCLUnary
+    with DistributeTensor2MPI_NCCLConv
 
 class DistributeTensor2MPI_NCCLAnalysis extends Traverser {
     var hasCublas = false
@@ -28,6 +29,9 @@ class DistributeTensor2MPI_NCCLAnalysis extends Traverser {
     override def traverse(n: Node): Unit = n match {
         case Node(s, op, _, _) if op.startsWith("tensor_dot") =>
             hasCublas = true
+            super.traverse(n)
+        case Node(s, op, _, _) if op.startsWith("tensor_conv") =>
+            hasCudnn = true
             super.traverse(n)
         case _ => super.traverse(n)
     }
