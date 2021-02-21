@@ -74,7 +74,6 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
 
-
         (() => {
           val a_tensor = new TENSOR(transform(a))
           val square = Mul(a_tensor, a_tensor, anno)
@@ -87,7 +86,10 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         forwardNodes += node
 
         (() => {
-          Accumulate(gradMap(a), Tanh(gradMap(s), anno), anno); ()
+          val a_tensor = new TENSOR(transform(a))
+          val tanh2 = Mul(Tanh(a_tensor, anno), Tanh(a_tensor, anno), anno)
+          val grad = Sub(ONES(a_tensor.resultType, anno), tanh2, anno)
+          Accumulate(gradMap(a), tanh2, anno); ()
         }) +=: backwardNodes
     
     case Node(s, "tensor_relu", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
