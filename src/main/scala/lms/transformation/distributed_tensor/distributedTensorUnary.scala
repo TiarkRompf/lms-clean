@@ -11,9 +11,9 @@ import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 
 import Backend._
 
-trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess {
+trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess with FixedSizeDistributedTensorBinaryTypeLess {
 
-  def Transpose(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
+  def Transpose(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos : SourceContext): TENSOR = {
     assert(tensor.shapeSize.size == 2, "input of transpose must be 2D")
     val res_tt = TensorType(Seq(tensor.resultType.shape(1), tensor.resultType.shape(0)), tensor.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), tensor.x)(tensor.x))).withSrcType(__pos, tensor.et)
@@ -74,8 +74,12 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
 
+
         (() => {
-          Accumulate(gradMap(a), Invert(gradMap(s), anno), anno); ()
+          val a_tensor = new TENSOR(transform(a))
+          val square = Mul(a_tensor, a_tensor, anno)
+          val grad = Div(gradMap(a), square, anno)
+          Accumulate(gradMap(a), grad, anno); ()
         }) +=: backwardNodes
     
     case Node(s, "tensor_tanh", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
