@@ -186,9 +186,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         convAlgo, workspace_bytes_v))
       generate_comment("end finding convolution backward data workspace size")
 
-      generate_comment("begin allocating gpu array for onvolution backward data workspace")
+      generate_comment("begin allocating gpu array for convolution backward data workspace")
       val d_workspace = gpu_array1(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for onvolution backward data workspace")
+      generate_comment("end allocating gpu array for convolution backward data workspace")
 
       generate_comment("begin convolution backward data pass")
       CUDNN_CHECK(CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(FLOAT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
@@ -236,9 +236,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         convAlgo, workspace_bytes_v))
       generate_comment("end finding convolution backward filter workspace size")
 
-      generate_comment("begin allocating gpu array for onvolution backward filter workspace")
+      generate_comment("begin allocating gpu array for convolution backward filter workspace")
       val d_workspace = gpu_array1(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for onvolution backward filter workspace")
+      generate_comment("end allocating gpu array for convolution backward filter workspace")
      
       generate_comment("begin convolution backward filter pass")
       CUDNN_CHECK(CUDNN_CONV_BWD_FILTER(myCUDNNComm, VAR(FLOAT(alpha)), weight_descriptor, new ARRAY(weight_tensor), doutput_descriptor, new ARRAY(doutput_tensor),
@@ -263,23 +263,23 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       generate_comment("begin finding dropout forward reserve bytes") 
       var reserve_bytes = 0
-      var reserve_bytes_v = VAR(SIZE_T(reserve_bytes))
+      var reserve_bytes_v = VAR(SIZE_T(reserve_bytes))  // var read
       CUDNN_CHECK(CUDNN_DROPOUT_GET_RESERVE_SPACE_SZ(input_descriptor, reserve_bytes_v))
       generate_comment("end finding dropout forward reserve bytes") 
 
       generate_comment("begin finding dropout forward states bytes")
       var states_bytes = 0
-      var states_bytes_v = VAR(SIZE_T(reserve_bytes))
+      var states_bytes_v = VAR(SIZE_T(reserve_bytes))  // var read
       CUDNN_CHECK(CUDNN_DROPOUT_GET_STATES_SZ(myCUDNNComm, states_bytes_v))
       generate_comment("end finding dropout forward states bytes")
-
-      generate_comment("begin allocating gpu array for the states of dropout forward")
-      val d_states = gpu_array1(INT(states_bytes_v(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the states of dropout forward")
 
       generate_comment("begin allocating gpu array for the reserve space of dropout forward")
       val d_reservespace = gpu_array1(INT(reserve_bytes_v(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the reserve space of dropout forward")
+
+      generate_comment("begin allocating gpu array for the states of dropout forward")
+      val d_states = gpu_array1(INT(states_bytes_v(pos)), manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the states of dropout forward")
 
       generate_comment("begin creating dropout descriptor")
       val dropout_descriptor = new CUDNN_DROPOUT_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_DROPOUT_DESCRIPTOR], "cudnnDropoutDescriptor_t").x)
@@ -319,13 +319,13 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       generate_comment("begin finding dropout backward reserve bytes") 
       var reserve_bytes = 0
-      var reserve_bytes_v = VAR(SIZE_T(reserve_bytes))
+      var reserve_bytes_v = VAR(SIZE_T(reserve_bytes))  // var read
       CUDNN_CHECK(CUDNN_DROPOUT_GET_RESERVE_SPACE_SZ(doutput_descriptor, reserve_bytes_v))
       generate_comment("end finding dropout backward reserve bytes") 
 
       generate_comment("begin finding dropout backward states bytes")
       var states_bytes = 0
-      var states_bytes_v = VAR(SIZE_T(reserve_bytes))
+      var states_bytes_v = VAR(SIZE_T(reserve_bytes))  // var read
       CUDNN_CHECK(CUDNN_DROPOUT_GET_STATES_SZ(myCUDNNComm, states_bytes_v))
       generate_comment("end finding dropout backward states bytes")
 

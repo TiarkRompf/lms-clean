@@ -147,11 +147,11 @@ void Snippet(int x0) {
     size_t x48 = (size_t)0;
     CUDNNCHECK(cudnnGetConvolutionBackwardFilterWorkspaceSize(x7, x40, x41, x43, x42, x47, &x48));
     // end finding convolution backward filter workspace size
-    // begin allocating gpu array for onvolution backward filter workspace
+    // begin allocating gpu array for convolution backward filter workspace
     CUDA_CALL(cudaSetDevice(x6));
     float* x49 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x49, (size_t)(x48 * sizeof(float))));
-    // end allocating gpu array for onvolution backward filter workspace
+    // end allocating gpu array for convolution backward filter workspace
     // begin convolution backward filter pass
     float x50 = 1.0;
     float x51 = 0.0;
