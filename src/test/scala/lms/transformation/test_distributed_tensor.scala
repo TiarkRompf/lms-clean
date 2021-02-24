@@ -217,7 +217,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val model = module {
           val tensor_input = Tensor.input[Float](inputTensorType)
           val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
-          
+
           val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
           tensor_input conv (tensor_filter, batchSplitAnno, params)
         }
@@ -245,10 +245,10 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
 
           val params = DropoutParam(0.5f, 1)
-          val dropouts = tensor_filter dropout (batchSplitAnno, params)
+          val dropouts = tensor_input dropout (batchSplitAnno, params)
 
           // dropouts(0) + (tensor_input, batchSplitAnno)
-          dropouts
+          tensor_filter + (dropouts, batchSplitAnno)
         }
         model(10)
         printf("compile")

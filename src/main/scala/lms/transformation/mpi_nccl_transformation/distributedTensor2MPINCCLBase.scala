@@ -129,8 +129,8 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   // var cudnnTensor2Desc: HashMap[Backend.Sym, (TOP, String)] = HashMap()
   var cudnnTensor2Desc: HashMap[Seq[Int], (TOP, String)] = HashMap()
   var cudnnConv2Desc: HashMap[Seq[Int], CUDNN_CONV_DESCRIPTOR] = HashMap()
-  def set_up_cudnn(implicit __pos: SourceContext) = { 
-    val dummy = myCUDNNComm 
+  def set_up_cudnn(implicit __pos: SourceContext) = {
+    val dummy = myCUDNNComm
     // cudnnTensor2Desc = HashMap()  // todo: FIXME
   }
   def finalize_cudnn(implicit __pos: SourceContext) = {
@@ -312,7 +312,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     if (operand_anno == anno) {
       transform(operand)
     } else if (assertSame) {
-      throw new Exception(s"Assert that the tensor has the same annotation but it does not");
+      throw new Exception(s"Assert that the tensor has the same annotation but it does not: ${operand_anno} v.s. ${anno}");
     } else {
       throw new Exception(s"TODO: not yet handling split annotation conflict $operand_tensor")
     }
