@@ -254,7 +254,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       // unpack dropout paratemers
       val DropoutParam(dropout, seed) = params.asInstanceOf[DropoutParam]
 
-
       // get input info and transform input tensors
       val input_shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
@@ -287,23 +286,41 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         output_descriptor, output, d_reservespace, SIZE_T(reserve_bytes))
 
       // return dropout output
-      Adapter.g.reflect("tuple-view", output.x, d_states.x)
+      // Adapter.g.reflect("tuple-view", output.x, d_states.x, d_reservespace.x)
+      output.x
 
-    /*
-    case Node(s, "tensor_dropout_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::_, _) =>
+    
+    case Node(s, "tensor_dropout_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::
+      (state:Backend.Sym)::(reserveSpace:Backend.Sym)::Backend.Const(params)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack dropout paratemers
+      val DropoutParam(dropout, seed) = params.asInstanceOf[DropoutParam]
 
       val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
       val doutput_descriptor = getTensorDescriptor(doutput_shape, "tensor")
       val dinput_descriptor = doutput_descriptor
 
       val dinput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
-      val dinput = gpu_array(doutput_shape, manifest[Float], myNCCLRank)
+      val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
+
+      // get memory of reserve space and states
+      var reserve_bytes = 0
+      CUDNN_DROPOUT_GET_RESERVE_SPACE_SZ(doutput_descriptor, SIZE_T(reserve_bytes))
+      var states_bytes = 0
+      CUDNN_DROPOUT_GET_STATES_SZ(myCUDNNComm, SIZE_T(reserve_bytes))
+
+      // create dropout descriptor
+      val dropout_descriptor = new CUDNN_DROPOUT_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_DROPOUT_DESCRIPTOR], "cudnnDropoutDescriptor_t").x)
+      CUDNN_CREATE_DROPOUT_DESCRIPTOR(dropout_descriptor)
+      CUDNN_SET_DROPOUT_DESCRIPTOR(dropout_descriptor, myCUDNNComm, dropout, new ARRAY(state), SIZE_T(states_bytes), seed)
 
       
       CUDNN_DROPOUT_BWD(myCUDNNComm, dropout_descriptor, doutput_descriptor, new ARRAY(doutput), dinput_descriptor,
-        new ARRAY(dinput), d_reservespace, SIZE_T(reserve_bytes))
-    */
+        dinput, new ARRAY(reserveSpace), SIZE_T(reserve_bytes))
+      
+      dinput.x
+    
 
     case _ => super.transform(n)
   }
