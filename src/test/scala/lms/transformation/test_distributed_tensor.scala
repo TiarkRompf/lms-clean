@@ -217,7 +217,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val model = module {
           val tensor_input = Tensor.input[Float](inputTensorType)
           val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
-          
+
           val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
           tensor_input conv (tensor_filter, batchSplitAnno, params)
         }
