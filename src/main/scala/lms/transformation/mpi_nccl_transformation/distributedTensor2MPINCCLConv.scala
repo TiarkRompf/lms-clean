@@ -79,6 +79,27 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         desc
   }
 
+  def getActivationDescriptor(mode: String, coef: Float)(implicit __pos: SourceContext): CUDNN_ACTIVATION_DESCRIPTOR = 
+    cudnnActv2Desc.get((mode, coef)) match {
+      case Some(desc) => desc
+      case None =>
+        generate_comment(s"begin creating and setting activation descriptor")
+        val desc = new CUDNN_ACTIVATION_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_ACTIVATION_DESCRIPTOR], "cudnnActivationDescriptor_t").x)
+        CUDNN_CHECK(CUDNN_CREATE_ACTIVATION_DESCRIPTOR(desc))
+        val cudnnMode: TOP = mode match {
+          case "relu"       => CUDNN_ACTIVATION_RELU
+          case "sigmoid"    => CUDNN_ACTIVATION_SIGMOID
+          case "tanh"       => CUDNN_ACTIVATION_TANH
+          case "elu"        => CUDNN_ACTIVATION_ELU
+          case "identity"   => CUDNN_ACTIVATION_IDENTITY
+          case _ => new Exception("not handled")
+        }
+        CUDNN_CHECK(CUDNN_SET_ACTIVATION_DESCRIPTOR(desc, cudnnMode, CUDNN_PROPAGATE_NAN, FLOAT(coef)))
+        generate_comment(s"end creating and setting activation descriptor")
+        cudnnActv2Desc += ((mode, coef), desc)
+        desc
+    }
+
 
   override def transform(n: Node): Backend.Exp = n match {
     // convolution forward operation
@@ -266,7 +287,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("begin softmax forward pass")
       CUDNN_CHECK(CUDNN_SOFTMAX_FWD(myCUDNNComm, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
         VAR(FLOAT(beta)), input_descriptor, output))
-      generate_comment("begin softmax forward pass")
+      generate_comment("end softmax forward pass")
       
       output.x
 
@@ -292,8 +313,33 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_CHECK(CUDNN_SOFTMAX_BWD(myCUDNNComm, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, VAR(FLOAT(alpha)), output_descriptor, new ARRAY(output_tensor),
         output_descriptor, new ARRAY(doutput_tensor), VAR(FLOAT(beta)), output_descriptor, dinput))
       generate_comment("end softmax backward pass")
-      
+
       dinput.x
+    
+    case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
+
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack softmax paratemers
+      val ActivationParam(alpha, beta, coef) = params.asInstanceOf[ActivationParam]
+
+      val input_shape = tensor_shape(a, useOldMetadata = true)
+      val input_tensor = get_operand(a, anno)
+
+      val input_descriptor = getTensorDescriptor(input_shape, "tensor")
+      val activation_descriptor = getActivationDescriptor("sigmoid", coef)
+
+      generate_comment("begin allocating gpu array for the output of softmax")
+      val output_size = input_shape(0) * input_shape(1) * input_shape(2) * input_shape(3)
+      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the output of softmax")
+
+      generate_comment("begin activation forward pass")
+      CUDNN_CHECK(CUDNN_ACTIVATION_FWD(myCUDNNComm, activation_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
+        VAR(FLOAT(beta)), input_descriptor, output))
+      generate_comment("end activation forward pass")
+      
+      output.x
 
     case _ => super.transform(n)
   }

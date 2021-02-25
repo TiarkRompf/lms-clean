@@ -88,6 +88,18 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
   }
 
+  def ActivationForward(input: TENSOR, params: ActivationParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = input.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation", C(res_tt), C(anno), input.x, 
+      C(params))(input.x)).withSrcType(__pos, input.et))
+  }
+
+  def ActivationBackward(output: TENSOR, doutput: TENSOR, params: ActivationParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = doutput.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), output.x, doutput.x, 
+      C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
+  }
+
   override def mergable_dims(node: Node) = node match {
     // constraints:
     // input.channels = filter.input_channels
@@ -103,6 +115,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       List((inputC, filterCin), (outputC, filterCout))
 
     case Node(s, op, _, _) if op == "tensor_softmax" => List()
+    case Node(s, op, _, _) if op == "tensor_activation" => List()
 
     case _ => super.mergable_dims(node)
   }
@@ -136,6 +149,16 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         (() => {
             val x = new TENSOR(transform(a))
             val grad = SoftmaxBackward(x, gradMap(s), params, anno, pos)
+            Accumulate(gradMap(a), grad, anno); ()
+           ()
+        }) +=: backwardNodes
+      
+      case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val x = new TENSOR(transform(a))
+            val grad = ActivationBackward(x, gradMap(s), params, anno, pos)
             Accumulate(gradMap(a), grad, anno); ()
            ()
         }) +=: backwardNodes
