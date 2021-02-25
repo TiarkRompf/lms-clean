@@ -341,6 +341,37 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end activation forward pass")
       
       output.x
+    
+    case Node(s, "tensor_activation_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
+      (output:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
+
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack softmax paratemers
+      val ActivationParam(alpha, beta, coef) = params.asInstanceOf[ActivationParam]
+
+      val input_shape = tensor_shape(input, useOldMetadata = true)
+
+      val input_tensor = get_operand(input, anno)
+      val output_tensor = get_operand(output, anno)
+      val doutput_tensor = get_operand(doutput, anno)
+
+      val input_descriptor = getTensorDescriptor(input_shape, "tensor")
+      val activation_descriptor = getActivationDescriptor("sigmoid", coef)
+
+      generate_comment("begin allocating gpu array for the gradient of input of activation")
+      val dinput_size = input_shape(0) * input_shape(1) * input_shape(2) * input_shape(3)
+      val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the gradient of input of activation")
+
+      generate_comment("begin activation backward pass")
+      CUDNN_CHECK(CUDNN_ACTIVATION_BWD(myCUDNNComm, activation_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(output_tensor),
+        input_descriptor, new ARRAY(doutput_tensor), input_descriptor, new ARRAY(input_tensor), VAR(FLOAT(beta)), input_descriptor,
+        dinput))
+      generate_comment("begin activation backward pass")
+
+      dinput.x
+
 
     case _ => super.transform(n)
   }
