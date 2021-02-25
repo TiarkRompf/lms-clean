@@ -111,7 +111,6 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   def threadIdxY(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.y", manifest[Int]))
   def threadIdxZ(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.z", manifest[Int]))
 
-  // def tileDim(implicit __pos: SourceContext): INT = INT(CMACRO("TILE_DIM", manifest[INT]))
   def blockRows(implicit __pos: SourceContext): INT = INT(CMACRO("BLOCK_ROWS", manifest[INT]))
 
   val gridSize = 28
