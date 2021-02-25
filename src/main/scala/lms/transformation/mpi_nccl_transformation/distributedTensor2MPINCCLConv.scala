@@ -269,7 +269,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       dfilter.x
     
-    case Node(s, "tensor_softmax", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
+    case Node(s, "tensor_softmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
 
       implicit val pos = Adapter.oldSourceMap(s)
 
@@ -292,7 +292,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       
       output.x
 
-    case Node(s, "tensor_softmax_bwd", tt::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
+    case Node(s, "tensor_softmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::
+      Backend.Const(params)::_, _) =>
 
       implicit val pos = Adapter.oldSourceMap(s)
 
@@ -317,7 +318,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       dinput.x
     
-    case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
+    case Node(s, "tensor_activation", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
 
       implicit val pos = Adapter.oldSourceMap(s)
 
