@@ -314,6 +314,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
       val doutput_descriptor = getTensorDescriptor(doutput_shape, "tensor")
       val dinput_descriptor = doutput_descriptor
+
+      val doutput_tensor = get_operand(doutput, anno)
+      val state_tensor = get_operand(state, anno)
+      val reserveSpace_tensor = get_operand(reserveSpace, anno)
       
       generate_comment("begin allocating gpu array for the gradient of input of dropout")
       val dinput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
@@ -335,12 +339,12 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("begin creating dropout descriptor")
       val dropout_descriptor = new CUDNN_DROPOUT_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_DROPOUT_DESCRIPTOR], "cudnnDropoutDescriptor_t").x)
       CUDNN_CHECK(CUDNN_CREATE_DROPOUT_DESCRIPTOR(dropout_descriptor))
-      CUDNN_CHECK(CUDNN_SET_DROPOUT_DESCRIPTOR(dropout_descriptor, myCUDNNComm, dropout, new ARRAY(state), states_bytes_v, seed))
+      CUDNN_CHECK(CUDNN_SET_DROPOUT_DESCRIPTOR(dropout_descriptor, myCUDNNComm, dropout, new ARRAY(state_tensor), states_bytes_v, seed))
       generate_comment("end creating dropout descriptor")
       
       generate_comment("begin dropout backward pass")
-      CUDNN_CHECK(CUDNN_DROPOUT_BWD(myCUDNNComm, dropout_descriptor, doutput_descriptor, new ARRAY(doutput), dinput_descriptor,
-        dinput, new ARRAY(reserveSpace), reserve_bytes_v))
+      CUDNN_CHECK(CUDNN_DROPOUT_BWD(myCUDNNComm, dropout_descriptor, doutput_descriptor, new ARRAY(doutput_tensor), dinput_descriptor,
+        dinput, new ARRAY(reserveSpace_tensor), reserve_bytes_v))
       generate_comment("end dropout backward pass")
       
       dinput.x
