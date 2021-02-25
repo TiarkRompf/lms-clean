@@ -29,10 +29,6 @@ trait CUDNNPoolingOps extends CLibs with CudaOps with CUDNNBaseOps {
   def cudnnPoolingAvgCntExPadding = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING")
   def cudnnPoolingMaxDeterministic = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_MAX_DETERMINISTIC")
 
-  class cudnnNanPropagationT
-  def cudnnPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_PROPAGATE_NAN")
-  def cudnnNotPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_NOT_PROPAGATE_NAN")
-
   // cudnnStatus_t cudnnCreatePoolingDescriptor(cudnnPoolingDescriptor_t    *poolingDesc)
   def cudnnCreatePoolingDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnCreatePoolingDescriptor", Unwrap(poolingDesc))(Seq(), Seq(0), Set(0))

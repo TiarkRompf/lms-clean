@@ -37,8 +37,8 @@ trait CUDNNBaseTypeLess extends Dsl with CLibs {
   def CUDNN_NHWC(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_TENSOR_NHWC", manifest[Int]))
   def CUDNN_FLOAT(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_DATA_FLOAT", manifest[Int]))
 
-
-
+  def CUDNN_PROPAGATE_NAN(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_PROPAGATE_NAN", manifest[Int]))
+  def CUDNN_NOT_PROPAGATE_NAN(implicit __pos: SourceContext): INT = INT(CMACRO("CUDNN_NOT_PROPAGATE_NAN", manifest[Int]))
 
   class CUDNN_TENSOR_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
   class CUDNN_FILTER_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
@@ -95,6 +95,10 @@ trait CUDNNBaseOps extends CLibs with CudaOps {
   def cudnnInt8x4 = cmacro[cudnnDataTypeT]("CUDNN_DATA_INT8x4")
   def cudnnInt8x32 = cmacro[cudnnDataTypeT]("CUDNN_DATA_INT8x32")
   def cudnnInt8x64 = cmacro[cudnnDataTypeT]("CUDNN_DATA_UINT8x4")
+
+  class cudnnNanPropagationT
+  def cudnnPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_PROPAGATE_NAN")
+  def cudnnNotPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_NOT_PROPAGATE_NAN")
 
   
   def cudnnCheck(res: Rep[cudnnStatusT]) =
