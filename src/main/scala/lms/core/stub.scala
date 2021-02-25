@@ -872,7 +872,7 @@ object PrimitiveTypeLess {
     case man if (man == manifest[Double]) => (new NUM(Const(1.toDouble))).withSrcType(__pos, m)
   }
 
-  def NUM_ZERO(m: Manifest[_])(implicit __pos: SourceContext) = m match {
+  def NUM_ZERO(m: Manifest[_])(implicit __pos: SourceContext): NUM = m match {
     case man if (man == manifest[Int]) => (new NUM(Const(0))).withSrcType(__pos, m)
     case man if (man == manifest[Float]) => (new NUM(Const(0.toFloat))).withSrcType(__pos, m)
     case man if (man == manifest[Double]) => (new NUM(Const(0.toDouble))).withSrcType(__pos, m)
@@ -905,12 +905,25 @@ object PrimitiveTypeLess {
       BOOL(Adapter.g.reflect("<", x, y.x))
     }
 
+    def >(y: NUM)(implicit pos: SourceContext): BOOL = {
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
+      BOOL(Adapter.g.reflect(">", x, y.x))
+    }
+
     def tanh()(implicit pos: SourceContext): NUM = {
       NUM(Adapter.g.reflect("tanh", x), t)
     }
 
     def max(y: NUM)(implicit pos: SourceContext): NUM = {
       NUM(Adapter.g.reflect("max", x, y.x), t)
+    }
+
+    def relu_grad(m: Manifest[_])(implicit pos: SourceContext): NUM = {
+      NUM(IF (this > NUM_ZERO(m)) {
+        NUM_ONE(m)
+      } {
+        NUM_ZERO(m)
+      })
     }
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =

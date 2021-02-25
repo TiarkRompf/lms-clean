@@ -39,12 +39,18 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     (new TENSOR(Adapter.g.reflectRead("tensor_relu", C(res_tt), C(anno), tensor.x)(tensor.x)).withSrcType(__pos, tensor.et))
   }
 
+  def ReluGrad(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
+    val res_tt = tensor.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_relu_grad", C(res_tt), C(anno), tensor.x)(tensor.x)).withSrcType(__pos, tensor.et))  
+  }
+
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_transpose", _, _) => List()
     case Node(s, "tensor_negate", _, _) => List()
     case Node(s, "tensor_invert", _, _) => List()
     case Node(s, "tensor_tanh", _, _) => List()
     case Node(s, "tensor_relu", _, _) => List()
+    case Node(s, "tensor_relu_grad", _, _) => List()
     case _ => super.mergable_dims(node)
   }
 
@@ -97,7 +103,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         forwardNodes += node
 
         (() => {
-          Accumulate(gradMap(a), Relu(gradMap(s), anno), anno); ()
+          Accumulate(gradMap(a), ReluGrad(gradMap(s), anno), anno); ()
         }) +=: backwardNodes
 
     case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
