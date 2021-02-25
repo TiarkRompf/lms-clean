@@ -72,16 +72,12 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     TensorType(output_shape, input.et, anno)
   }
 
-  def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSOR = {
+  def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSORS = {
     val output_tt = input.resultType
-    System.out.println(output_tt)
-    // val state_tt = TensorType(input.resultType.shape, manifest[Boolean])  // dummy shape
-    val state_tt = output_tt
-    val reserveSpace_tt = state_tt
-    // val res_tt = List(output_tt, state_tt, reserveSpace_tt)
-    val res_tt = output_tt
+    val dummy_tt = TensorType(input.resultType.shape, manifest[Boolean])  // dummy shape
+    val res_tt = List(output_tt, dummy_tt, dummy_tt)
 
-    (new TENSOR(Adapter.g.reflectRead("tensor_dropout", C(res_tt), C(anno), 
+    (new TENSORS(Adapter.g.reflectRead("tensors_dropout", C(res_tt), C(anno), 
       input.x, C(params))(input.x))).withSrcType(__pos, input.et)
   }
 
@@ -106,7 +102,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       List((inputC, filterCin), (outputC, filterCout))
     
     // dropout operation has no mergable dims
-    case Node(s, "tensor_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
+    case Node(s, "tensors_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
       List()
 
     case _ => super.mergable_dims(node)
@@ -135,19 +131,20 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
           Accumulate(gradMap(b), b_grad, anno); ()
         }) +=: backwardNodes
       
-      case Node(s, "tensor_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
+      case Node(s, "tensors_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes
         forwardNodes += node
         // save backward op in backwardNodes
 
         (() => {
-          val x = new TENSOR(transform(a))
-          // val grads = gradMap.getGradsOfOp(s)
-          // val g = DropoutBackward(gradMap(s), grads(1), grads(2), params, anno, pos)
-          // Accumulate(gradMap(a), g, anno); ()
+          // val x = new TENSOR(transform(a))
+          val grads = gradMap.getGradsOfOp(s)
+          val g = DropoutBackward(grads(0), grads(1), grads(2), params, anno, pos)
+          Accumulate(gradMap(a), g, anno); ()
+          /*
           val grad = DropoutBackward(gradMap(s), gradMap(s), gradMap(s), params, anno, pos)
-          Accumulate(gradMap(a), grad, anno); ()
+          Accumulate(gradMap(a), grad, anno); ()*/
         }) +=: backwardNodes
 
 
@@ -169,14 +166,16 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
       Wrap[Tensor[T]](t.x)
     }
 
-    /*
+    
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = DropoutForward(self, params, anno, __pos)
       ((0 until 2): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
-    }*/
+    }
+
+    /*
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = DropoutForward(self, params, anno, __pos)
       Wrap[Tensor[T]](t.x)
-    }
+    }*/
   }
 }

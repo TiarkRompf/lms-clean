@@ -247,7 +247,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       dfilter.x
     
-    case Node(s, "tensor_dropout", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
+    case Node(s, "tensors_dropout", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
       Backend.Const(params)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
@@ -295,13 +295,13 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end allocating gpu array for the output of dropout")
 
       generate_comment("begin dropout forward pass")
-      CUDNN_DROPOUT_FWD(myCUDNNComm, dropout_descriptor, input_descriptor, new ARRAY(input_tensor), 
-        output_descriptor, output, d_reservespace, reserve_bytes_v)
+      CUDNN_CHECK(CUDNN_DROPOUT_FWD(myCUDNNComm, dropout_descriptor, input_descriptor, new ARRAY(input_tensor), 
+        output_descriptor, output, d_reservespace, reserve_bytes_v))
       generate_comment("end dropout forward pass")
 
       // return dropout output
-      // Adapter.g.reflect("tuple-view", output.x, d_states.x, d_reservespace.x)
-      output.x
+      Adapter.g.reflect("tuple-view", output.x, d_states.x, d_reservespace.x)
+      // output.x
 
     
     case Node(s, "tensor_dropout_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::

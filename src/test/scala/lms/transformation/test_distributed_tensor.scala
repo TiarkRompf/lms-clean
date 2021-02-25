@@ -248,7 +248,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val dropouts = tensor_filter dropout (batchSplitAnno, params)
 
           // dropouts(0) + (tensor_input, batchSplitAnno)
-          dropouts
+          dropouts(0)
         }
         model(10)
         printf("compile")
