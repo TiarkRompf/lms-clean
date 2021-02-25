@@ -71,6 +71,22 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
     TensorType(output_shape, input.et, anno)
   }
+  
+  def SoftmaxForward(input: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    val SoftmaxParam(alpha, beta) = params
+
+    val res_tt = input.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_softmax", C(res_tt), C(anno), input.x, 
+      C(params))(input.x)).withSrcType(__pos, input.et))
+  }
+
+  def SoftmaxBackward(output: TENSOR, doutput: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    val SoftmaxParam(alpha, beta) = params
+
+    val res_tt = doutput.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_softmax_bwd", C(res_tt), C(anno), output.x, doutput.x, 
+      C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
+  }
 
   override def mergable_dims(node: Node) = node match {
     // constraints:
@@ -85,6 +101,8 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       val filterCout  = filter_type(CUDNN_C_OUT).dim
       val filterCin   = filter_type(CUDNN_C_IN).dim
       List((inputC, filterCin), (outputC, filterCout))
+
+    case Node(s, op, _, _) if op == "tensor_softmax" => List()
 
     case _ => super.mergable_dims(node)
   }
@@ -111,6 +129,16 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
           val b_grad = ConvBackwardFilter(x, y, gradMap(s), params, anno, pos)
           Accumulate(gradMap(b), b_grad, anno); ()
         }) +=: backwardNodes
+      
+      case Node(s, "tensor_softmax", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:SoftmaxParam)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val x = new TENSOR(transform(a))
+            val grad = SoftmaxBackward(x, gradMap(s), params, anno, pos)
+            Accumulate(gradMap(a), grad, anno); ()
+           ()
+        }) +=: backwardNodes
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
     }
@@ -125,6 +153,12 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
     val conv_params_def = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))  // default convolution parameter settings
     def conv(y: Rep[Tensor[T]], anno: Anno, params: ConvParam = conv_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = ConvForward(self, tensor(y), params, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    val softmax_params_def = SoftmaxParam(1.0f, 0.0f)
+    def softmax(anno: Anno, params: SoftmaxParam = softmax_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = SoftmaxForward(self, params, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }

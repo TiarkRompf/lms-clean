@@ -10,7 +10,26 @@ import lms.macros.SourceContext
 import lms.thirdparty.array_computation.CudaOps
 
 trait CUDNNSoftmaxTypeLess extends Dsl with CLibs with CUDNNBaseTypeLess {
+  import BaseTypeLess._
+  import PrimitiveTypeLess._
+  import SIZE_TTypeLess._
+  import CLibTypeLess._
 
+  def CUDNN_SOFTMAX_FAST(implicit __pos: SourceContext) = CMACRO("CUDNN_SOFTMAX_FAST", manifest[Int])
+  def CUDNN_SOFTMAX_MODE_INSTANCE(implicit __pos: SourceContext) = CMACRO("CUDNN_SOFTMAX_MODE_INSTANCE", manifest[Int])
+
+  def CUDNN_SOFTMAX_FWD(handle: TOP, algorithm: TOP, mode: TOP, alpha: VAR, xDesc: TOP, 
+                        x: TOP, beta: VAR, yDesc: TOP, y: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSoftmaxForward", handle.x, algorithm.x, mode.x, alpha.x, xDesc.x,
+      x.x, beta.x, yDesc.x, y.x)(Seq(0,1,2,3,4,5,6,7), Seq(8), Set[Int](3,5,6,8))
+  
+  def CUDNN_SOFTMAX_BWD(handle: TOP, algorithm: TOP, mode: TOP, alpha: VAR, yDesc: TOP,
+                        yData: TOP, dyDesc: TOP, dy: TOP, beta: VAR, dxDesc: TOP, dx: TOP) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSoftmaxBackward", handle.x, algorithm.x, mode.x, alpha.x, yDesc.x,
+      yData.x, dyDesc.x, dy.x, beta.x, dxDesc.x, dx.x)(Seq(0,1,2,3,4,5,6,7,8,9), Seq(10), Set(3,4,5,7,8,10))
+                    
+
+  
 }
 
 trait CUDNNSoftmaxOps extends CLibs with CudaOps with CUDNNBaseOps {

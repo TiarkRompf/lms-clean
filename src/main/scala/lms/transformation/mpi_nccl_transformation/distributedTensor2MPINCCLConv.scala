@@ -246,6 +246,54 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end convolution backward filter pass")
 
       dfilter.x
+    
+    case Node(s, "tensor_softmax", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
+
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack softmax paratemers
+      val SoftmaxParam(alpha, beta) = params.asInstanceOf[SoftmaxParam]
+
+      val input_shape = tensor_shape(a, useOldMetadata = true)
+      val input_tensor = get_operand(a, anno)
+      val input_descriptor = getTensorDescriptor(input_shape, "tensor")
+
+      generate_comment("begin allocating gpu array for the output of softmax")
+      val output_size = input_shape(0) * input_shape(1) * input_shape(2) * input_shape(3)
+      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the output of softmax")
+
+      generate_comment("begin softmax forward pass")
+      CUDNN_CHECK(CUDNN_SOFTMAX_FWD(myCUDNNComm, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
+        VAR(FLOAT(beta)), input_descriptor, output))
+      generate_comment("begin softmax forward pass")
+      
+      output.x
+
+    case Node(s, "tensor_softmax_bwd", tt::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
+
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack softmax paratemers
+      val SoftmaxParam(alpha, beta) = params.asInstanceOf[SoftmaxParam]
+
+      val output_shape = tensor_shape(output, useOldMetadata = true)
+      val output_tensor = get_operand(output, anno)
+      val doutput_tensor = get_operand(doutput, anno)
+
+      val output_descriptor = getTensorDescriptor(output_shape, "tensor")
+
+      generate_comment("begin allocating gpu array for the gradient of input of softmax")
+      val doutput_size = output_shape(0) * output_shape(1) * output_shape(2) * output_shape(3)
+      val dinput = gpu_array(doutput_size, manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the gradient of input of softmax")
+
+      generate_comment("begin softmax backward pass")
+      CUDNN_CHECK(CUDNN_SOFTMAX_BWD(myCUDNNComm, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, VAR(FLOAT(alpha)), output_descriptor, new ARRAY(output_tensor),
+        output_descriptor, new ARRAY(doutput_tensor), VAR(FLOAT(beta)), output_descriptor, dinput))
+      generate_comment("end softmax backward pass")
+      
+      dinput.x
 
     case _ => super.transform(n)
   }
