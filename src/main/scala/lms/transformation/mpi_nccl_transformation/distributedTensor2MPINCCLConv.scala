@@ -294,9 +294,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the output of dropout")
 
-      // dropout
+      generate_comment("begin dropout forward pass")
       CUDNN_DROPOUT_FWD(myCUDNNComm, dropout_descriptor, input_descriptor, new ARRAY(input_tensor), 
         output_descriptor, output, d_reservespace, reserve_bytes_v)
+      generate_comment("end dropout forward pass")
 
       // return dropout output
       // Adapter.g.reflect("tuple-view", output.x, d_states.x, d_reservespace.x)
@@ -313,9 +314,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
       val doutput_descriptor = getTensorDescriptor(doutput_shape, "tensor")
       val dinput_descriptor = doutput_descriptor
-
+      
+      generate_comment("begin allocating gpu array for the gradient of input of dropout")
       val dinput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
       val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the gradient of input of dropout")
 
       generate_comment("begin finding dropout backward reserve bytes") 
       var reserve_bytes = 0
@@ -335,8 +338,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_CHECK(CUDNN_SET_DROPOUT_DESCRIPTOR(dropout_descriptor, myCUDNNComm, dropout, new ARRAY(state), states_bytes_v, seed))
       generate_comment("end creating dropout descriptor")
       
+      generate_comment("begin dropout backward pass")
       CUDNN_CHECK(CUDNN_DROPOUT_BWD(myCUDNNComm, dropout_descriptor, doutput_descriptor, new ARRAY(doutput), dinput_descriptor,
         dinput, new ARRAY(reserveSpace), reserve_bytes_v))
+      generate_comment("end dropout backward pass")
       
       dinput.x
     

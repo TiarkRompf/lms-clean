@@ -106,9 +106,11 @@ void Snippet(int x0) {
     CUDNNCHECK(cudnnCreateTensorDescriptor(&x37));
     CUDNNCHECK(cudnnSetTensor4dDescriptor(x37, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 1, 3, 3));
     // end creating and setting tensor descriptor
+    // begin allocating gpu array for the gradient of input of dropout
     CUDA_CALL(cudaSetDevice(x7));
     float* x38 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x38, (size_t)(18 * sizeof(float))));
+    // end allocating gpu array for the gradient of input of dropout
     // begin finding dropout backward reserve bytes
     size_t x39 = (size_t)0;
     CUDNNCHECK(cudnnDropoutGetReserveSpaceSize(x37, &x39));
@@ -122,11 +124,13 @@ void Snippet(int x0) {
     CUDNNCHECK(cudnnCreateDropoutDescriptor(&x41));
     CUDNNCHECK(cudnnSetDropoutDescriptor(x41, x8, 0.5, x3, x40, 1));
     // end creating dropout descriptor
+    // begin dropout backward pass
     CUDNNCHECK(cudnnDropoutBackward(x8, x41, x37, x3, x37, x38, x3, x39));
-    // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x170
+    // end dropout backward pass
+    // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x171
     CUDA_CALL(cudaSetDevice(x7));
     x21<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x12, x38, 18);
-    // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x170
+    // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x171
     // begin computing SGD on GPU for size 18 and type Float at device (pre-name) x39 with weight x70, grad x93, and momentum x131
     CUDA_CALL(cudaSetDevice(x7));
     x28<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x12, x19, 18);
