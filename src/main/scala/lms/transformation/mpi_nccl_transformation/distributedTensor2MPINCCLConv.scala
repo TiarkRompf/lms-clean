@@ -92,11 +92,12 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
           case "tanh"       => CUDNN_ACTIVATION_TANH
           case "elu"        => CUDNN_ACTIVATION_ELU
           case "identity"   => CUDNN_ACTIVATION_IDENTITY
-          case _ => new Exception("not handled")
+          case _            => CUDNN_ACTIVATION_RELU  // default
         }
         CUDNN_CHECK(CUDNN_SET_ACTIVATION_DESCRIPTOR(desc, cudnnMode, CUDNN_PROPAGATE_NAN, FLOAT(coef)))
         generate_comment(s"end creating and setting activation descriptor")
-        cudnnActv2Desc += ((mode, coef), desc)
+        val key = (mode, coef)
+        cudnnActv2Desc += ((key, desc))
         desc
     }
 
