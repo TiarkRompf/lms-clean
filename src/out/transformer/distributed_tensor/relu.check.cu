@@ -37,7 +37,7 @@ __global__ void x27(float* x28, float* x29, int x30) {
   int x32 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x32 < x30) {
     int x33 = x32;
-    x29[x33] = max(0.0, x28[x33]);
+    x29[x33] = x28[x33] > 0.0 ? 1.0 : 0.0;
     x32 = x32 + x31;
   }
   // end generating kernel function for RELU of type Float
@@ -117,12 +117,12 @@ void Snippet(int x0) {
     CUDA_CALL(cudaSetDevice(x7));
     x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x43, x44, 512);
     // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x137 and addition_operand x150
-    // begin computing RELU on GPU for size 512 and type Float at device (pre-rename) x39 with operand x137
+    // begin computing RELU_GRAD on GPU for size 512 and type Float at device (pre-rename) x39 with operand x137
     CUDA_CALL(cudaSetDevice(x7));
     float* x45 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x45, (size_t)(512 * sizeof(float))));
     x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x43, x45, 512);
-    // end computing RELU on GPU for size 512 and type Float at device (pre-rename) x39 with operand x137
+    // end computing RELU_GRAD on GPU for size 512 and type Float at device (pre-rename) x39 with operand x137
     // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x200
     CUDA_CALL(cudaSetDevice(x7));
     x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x45, 512);
@@ -160,7 +160,7 @@ void Snippet(int x0) {
   NCCLCHECK(ncclGroupEnd());
   // print the array only if this is the root
   if (x46) {
-    // begin copying GPU array x308 to CPU and print for size 1024 and type Float
+    // begin copying GPU array x311 to CPU and print for size 1024 and type Float
     float* x54 = (float*)malloc(1024 * sizeof(float));
     CUDA_CALL(cudaMemcpy(x54, x47, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
     int x55 = 0;
@@ -169,7 +169,7 @@ void Snippet(int x0) {
       x55 = x55 + 1;
     }
     printf("\n");
-    // end copying GPU array x308 to CPU and print for size 1024 and type Float
+    // end copying GPU array x311 to CPU and print for size 1024 and type Float
   }
   printf("compile\n");
   MPICHECK(MPI_Finalize());
