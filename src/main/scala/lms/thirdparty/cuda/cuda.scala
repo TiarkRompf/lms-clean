@@ -31,6 +31,12 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     addr
   }
 
+  def CUDA_MALLOC_BYTES(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
+    val addr = ARRAY(0, m)
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, SIZE_T(count).x)(Seq(1), Seq(0), Set(0))))
+    addr
+  }
+
   // a typeless interface for CUDA_FREE
   def CUDA_FREE(devPtr: ARRAY) =
     CUDA_CALL(Unwrap(libFunction[Any]("cudaFree", devPtr.x)(Seq(0), Seq(0), Set[Int]())))
