@@ -923,9 +923,9 @@ object PrimitiveTypeLess {
       NUM(Adapter.g.reflect("max", x, y.x), t)
     }
 
-    def relu_grad(m: Manifest[_])(implicit pos: SourceContext): NUM = {
-      NUM(IF (this > NUM_ZERO(m)) {
-        NUM_ONE(m)
+    def relu_grad(y: NUM, m: Manifest[_])(implicit pos: SourceContext): NUM = {
+      NUM(IF (y > NUM_ZERO(m)) {
+        this
       } {
         NUM_ZERO(m)
       })

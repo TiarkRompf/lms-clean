@@ -68,16 +68,6 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
 		array
   }
 
-  val CUDA_RELU_GRAD_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
-  def CUDA_RELU_GRAD_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_RELU_GRAD_KERNEL_MAP.getOrElseUpdate(m, CUDA_RELU_GRAD_KERNEL(m))
-  def gpu_relu_grad_array(size: Int, m: Manifest[_], device: INT, operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
-	withComment(s"computing RELU_GRAD on GPU for size $size and type $m at device (pre-rename) ${device.x} with operand $operand") {
-		val array = gpu_array(size, m, device)
-		val relu_grad_fun = CUDA_RELU_GRAD_FUN(m)
-		relu_grad_fun(new ARRAY(operand), array, size, DIM3(gridSize), DIM3(blockSize))
-		array
-  }
-
   val CUDA_TRANSPOSE_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_TRANSPOSE_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_TRANSPOSE_KERNEL_MAP.getOrElseUpdate(m, CUDA_TRANSPOSE_KERNEL(m))
   def gpu_transpose_array(size: Int, m: Manifest[_], device: INT, operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
@@ -88,7 +78,7 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
 		array
   }
 
-  val unaryOps = List("tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu", "tensor_relu_grad", "tensor_transpose")
+  val unaryOps = List("tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu", "tensor_transpose")
 
   override def transform(n: Node): Backend.Exp = n match {
 
@@ -112,7 +102,6 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
             case "tensor_invert" => gpu_inv_array(count, m, myNCCLRank, loaded_operand).x
             case "tensor_tanh" => gpu_tanh_array(count, m, myNCCLRank, loaded_operand).x
             case "tensor_relu" => gpu_relu_array(count, m, myNCCLRank, loaded_operand).x
-            case "tensor_relu_grad" => gpu_relu_grad_array(count, m, myNCCLRank, loaded_operand).x 
             case "tensor_transpose" => gpu_transpose_array(count, m, myNCCLRank, loaded_operand).x
             case _ => throw new Exception(s"op $op is not unary op")
           }
