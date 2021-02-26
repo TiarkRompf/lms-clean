@@ -150,7 +150,7 @@ void Snippet(int x0) {
     // begin allocating gpu array for convolution backward filter workspace
     CUDA_CALL(cudaSetDevice(x6));
     float* x49 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x49, (size_t)(x48 * sizeof(float))));
+    CUDA_CALL(cudaMalloc(&x49, (size_t)x48));
     // end allocating gpu array for convolution backward filter workspace
     // begin convolution backward filter pass
     float x50 = 1.0;
