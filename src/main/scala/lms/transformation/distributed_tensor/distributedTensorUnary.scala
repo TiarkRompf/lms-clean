@@ -49,6 +49,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     case Node(s, "tensor_negate", _, _) => List()
     case Node(s, "tensor_invert", _, _) => List()
     case Node(s, "tensor_tanh", _, _) => List()
+    case Node(s, "tenso_tanh_grad", _, _) => List()
     case Node(s, "tensor_relu", _, _) => List()
     case Node(s, "tensor_relu_grad", _, _) => List()
     case _ => super.mergable_dims(node)
@@ -92,10 +93,11 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         forwardNodes += node
 
         (() => {
-          val a_tensor = new TENSOR(transform(a))
-          val tanh2 = Mul(Tanh(a_tensor, anno), Tanh(a_tensor, anno), anno)
-          val grad = Sub(ONES(a_tensor.resultType, anno), tanh2, anno)
-          Accumulate(gradMap(a), tanh2, anno); ()
+          // val a_tensor = new TENSOR(transform(a))
+          // val tanh2 = Mul(Tanh(a_tensor, anno), Tanh(a_tensor, anno), anno)
+          // val grad = Mul(gradMap(s), Sub(ONES(a_tensor.resultType, anno), tanh2, anno), anno)
+          Accumulate(gradMap(a), TanhGrad(gradMap(s), new TENSOR(transform(a)), anno), anno); ()
+          // Accumulate(gradMap(a), grad ,anno); ()
         }) +=: backwardNodes
     
     case Node(s, "tensor_relu", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>

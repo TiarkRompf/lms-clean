@@ -914,6 +914,11 @@ object PrimitiveTypeLess {
       NUM(Adapter.g.reflect("tanh", x), t)
     }
 
+    def tanh_grad(y: NUM, m: Manifest[_])(implicit pos: SourceContext): NUM = {
+      val tangent = y.tanh()
+      this * (NUM_ONE(m) - tangent * tangent)
+    }
+
     def max(y: NUM)(implicit pos: SourceContext): NUM = {
       NUM(Adapter.g.reflect("max", x, y.x), t)
     }
