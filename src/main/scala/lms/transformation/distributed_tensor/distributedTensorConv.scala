@@ -138,13 +138,10 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         // save backward op in backwardNodes
 
         (() => {
-          // val x = new TENSOR(transform(a))
+          val x = new TENSORS(transform(s))
           val grads = gradMap.getGradsOfOp(s)
-          val g = DropoutBackward(grads(0), grads(1), grads(2), params, anno, pos)
+          val g = DropoutBackward(grads(0), TENSORS.getResult(x, 1), TENSORS.getResult(x, 2), params, anno, pos)
           Accumulate(gradMap(a), g, anno); ()
-          /*
-          val grad = DropoutBackward(gradMap(s), gradMap(s), gradMap(s), params, anno, pos)
-          Accumulate(gradMap(a), grad, anno); ()*/
         }) +=: backwardNodes
 
 
