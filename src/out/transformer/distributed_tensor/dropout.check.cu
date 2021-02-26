@@ -130,7 +130,6 @@ void Snippet(int x0) {
     // begin dropout forward pass
     CUDNNCHECK(cudnnDropoutForward(x7, x41, x36, x10, x36, x42, x39, x37));
     // end dropout forward pass
-    tuple-view(x42, x40, x39);
     // begin initializing fixed GPU array of size 18 and type Float and device (pre-rename) x39
     CUDA_CALL(cudaSetDevice(x6));
     float* x43 = (float*)malloc(0 * sizeof(float));

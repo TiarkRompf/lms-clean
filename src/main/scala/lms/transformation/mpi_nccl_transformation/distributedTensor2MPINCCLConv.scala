@@ -300,8 +300,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end dropout forward pass")
 
       // return dropout output
-      Adapter.g.reflectWrite("tuple-view", output.x, d_states.x, d_reservespace.x)(output.x, d_states.x, d_reservespace.x)
-      // output.x
+      Adapter.g.reflect("tuple-view", output.x, d_states.x, d_reservespace.x)
 
     
     case Node(s, "tensor_dropout_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::
