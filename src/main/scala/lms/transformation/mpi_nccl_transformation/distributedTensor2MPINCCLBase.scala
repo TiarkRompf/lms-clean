@@ -54,6 +54,12 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     CUDA_SET_DEVICE(device)
     CUDA_MALLOC(size, m)
   }
+
+  // TODO: change it to better name, and add INT counterparts to other gpu functions as well
+  def gpu_array1_bytes(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
+    CUDA_SET_DEVICE(device)
+    CUDA_MALLOC_BYTES(size, m)
+  }
   // helper function for declaring a GPU array with random initialization
   def gpu_random_array(size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY =
     withComment(s"initializing random GPU array of size $size and type $m at device (pre-rename) ${device.x}") {
