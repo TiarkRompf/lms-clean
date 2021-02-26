@@ -247,7 +247,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       dfilter.x
     
-    case Node(s, "tensors_dropout", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
+    case Node(s, "tensors_dropout", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::
       Backend.Const(params)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
@@ -274,11 +274,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding dropout forward states bytes")
 
       generate_comment("begin allocating gpu array for the reserve space of dropout forward")
-      val d_reservespace = gpu_array1(INT(reserve_bytes_v(pos)), manifest[Float], myNCCLRank)
+      val d_reservespace = gpu_array1_bytes(INT(reserve_bytes_v(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the reserve space of dropout forward")
 
       generate_comment("begin allocating gpu array for the states of dropout forward")
-      val d_states = gpu_array1(INT(states_bytes_v(pos)), manifest[Float], myNCCLRank)
+      val d_states = gpu_array1_bytes(INT(states_bytes_v(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the states of dropout forward")
 
       generate_comment("begin creating dropout descriptor")
@@ -300,7 +300,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end dropout forward pass")
 
       // return dropout output
-      Adapter.g.reflect("tuple-view", output.x, d_states.x, d_reservespace.x)
+      Adapter.g.reflectWrite("tuple-view", output.x, d_states.x, d_reservespace.x)(output.x, d_states.x, d_reservespace.x)
       // output.x
 
     
