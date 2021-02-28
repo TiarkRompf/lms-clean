@@ -88,16 +88,16 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
   }
 
-  def ActivationForward(input: TENSOR, params: ActivationParam, anno: Anno, __pos: SourceContext): TENSOR = {
+  def ActivationForward(input: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = input.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_activation", C(res_tt), C(anno), input.x, 
-      C(params))(input.x)).withSrcType(__pos, input.et))
+      C(params), C(mode))(input.x)).withSrcType(__pos, input.et))
   }
 
-  def ActivationBackward(output: TENSOR, doutput: TENSOR, params: ActivationParam, anno: Anno, __pos: SourceContext): TENSOR = {
+  def ActivationBackward(input: TENSOR, output: TENSOR, doutput: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = doutput.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), output.x, doutput.x, 
-      C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), input.x, output.x, doutput.x, 
+      C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, doutput.et))
   }
 
   override def mergable_dims(node: Node) = node match {
@@ -147,18 +147,19 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
         (() => {
-            val x = new TENSOR(transform(a))
+            val x = new TENSOR(transform(s))
             val grad = SoftmaxBackward(x, gradMap(s), params, anno, pos)
             Accumulate(gradMap(a), grad, anno); ()
            ()
         }) +=: backwardNodes
       
-      case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::_, _) =>
+      case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::Backend.Const(mode:String)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
         (() => {
             val x = new TENSOR(transform(a))
-            val grad = ActivationBackward(x, gradMap(s), params, anno, pos)
+            val y = new TENSOR(transform(s))
+            val grad = ActivationBackward(x, y, gradMap(s), params, mode, anno, pos)
             Accumulate(gradMap(a), grad, anno); ()
            ()
         }) +=: backwardNodes
@@ -182,6 +183,20 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
     val softmax_params_def = SoftmaxParam(1.0f, 0.0f)
     def softmax(anno: Anno, params: SoftmaxParam = softmax_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = SoftmaxForward(self, params, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def sigmoid(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "sigmoid", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+    
+    def tanh(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+       val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "tanh", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }
