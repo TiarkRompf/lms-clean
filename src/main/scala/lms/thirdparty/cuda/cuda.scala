@@ -193,8 +193,9 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
       val start = Backend.Const(0)
       for (i <- range_until_step(Wrap[Int](start), Wrap[Int](tileDim.x), Wrap[Int](blockSize.x))) {
-        val index = INT((y + INT(Unwrap(i))) * width + x)
-        out(index) = in(index); ()
+        val rhead = INT((y + INT(Unwrap(i))) * width + x)
+        val whead = INT(x * width + (y + INT(Unwrap(i))))
+        out(whead) = in(rhead); ()
       }
       Backend.Const(())
     }
