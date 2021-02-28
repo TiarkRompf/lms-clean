@@ -288,7 +288,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       // allocate output tensor
       // output tensor has the same shape as input tensor
       generate_comment("begin allocating gpu array for the output of dropout")
-      val output_size = input_shape(0) * input_shape(1) * input_shape(2) * input_shape(3)
+      val output_size = input_shape.fold(1) { (a, b) => a * b }
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the output of dropout")
 
@@ -316,7 +316,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val reserveSpace_tensor = get_operand(reserveSpace, anno)
       
       generate_comment("begin allocating gpu array for the gradient of input of dropout")
-      val dinput_size = doutput_shape(0) * doutput_shape(1) * doutput_shape(2) * doutput_shape(3)
+      val dinput_size = doutput_shape.fold(1) { (a, b) => a * b }
       val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the gradient of input of dropout")
 
