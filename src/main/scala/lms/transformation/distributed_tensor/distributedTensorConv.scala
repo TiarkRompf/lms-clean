@@ -75,16 +75,16 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
   def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSORS = {
     val output_tt = input.resultType
     val dummy_tt = TensorType(input.resultType.shape, manifest[Boolean])  // dummy shape
-    val res_tt = List(output_tt, dummy_tt, dummy_tt)
+    val res_tt = List(output_tt, dummy_tt)
 
     (new TENSORS(Adapter.g.reflectRead("tensors_dropout", C(res_tt), C(anno), 
       input.x, C(params))(input.x))).withSrcType(__pos, input.et)
   }
 
-  def DropoutBackward(doutput: TENSOR, state: TENSOR, reserveSpace: TENSOR, params: DropoutParam, anno: Anno,  __pos: SourceContext): TENSOR = {
+  def DropoutBackward(doutput: TENSOR, reserveSpace: TENSOR, params: DropoutParam, anno: Anno,  __pos: SourceContext): TENSOR = {
     val res_tt = doutput.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_dropout_bwd", C(res_tt), C(anno),
-      doutput.x, state.x, reserveSpace.x, C(params))(doutput.x, state.x, reserveSpace.x)).withSrcType(__pos, doutput.et))
+      doutput.x, reserveSpace.x, C(params))(doutput.x, reserveSpace.x)).withSrcType(__pos, doutput.et))
   }
 
   override def mergable_dims(node: Node) = node match {
@@ -140,7 +140,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         (() => {
           val x = new TENSORS(transform(s))
           val grads = gradMap.getGradsOfOp(s)
-          val g = DropoutBackward(grads(0), TENSORS.getResult(x, 1), TENSORS.getResult(x, 2), params, anno, pos)
+          val g = DropoutBackward(grads(0), TENSORS.getResult(x, 1), params, anno, pos)
           Accumulate(gradMap(a), g, anno); ()
         }) +=: backwardNodes
 
@@ -166,7 +166,7 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
     
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = DropoutForward(self, params, anno, __pos)
-      ((0 until 2): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
+      ((0 until 1): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
     }
 
     /*

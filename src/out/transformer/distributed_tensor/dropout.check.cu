@@ -99,10 +99,10 @@ void Snippet(int x0) {
     CUDNNCHECK(cudnnCreateTensorDescriptor(&x36));
     CUDNNCHECK(cudnnSetTensor4dDescriptor(x36, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 1, 3, 3));
     // end creating and setting tensor descriptor
-    // begin finding dropout forward reserve bytes
+    // begin finding dropout forward reserve space bytes
     size_t x37 = (size_t)0;
     CUDNNCHECK(cudnnDropoutGetReserveSpaceSize(x36, &x37));
-    // end finding dropout forward reserve bytes
+    // end finding dropout forward reserve space bytes
     // begin finding dropout forward states bytes
     size_t x38 = (size_t)0;
     CUDNNCHECK(cudnnDropoutGetStatesSize(x7, &x38));
@@ -149,13 +149,18 @@ void Snippet(int x0) {
     size_t x46 = (size_t)0;
     CUDNNCHECK(cudnnDropoutGetStatesSize(x7, &x46));
     // end finding dropout backward states bytes
+    // begin allocating gpu array for the states of dropout backward
+    CUDA_CALL(cudaSetDevice(x6));
+    float* x47 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x47, (size_t)x46));
+    // end allocating gpu array for the states of dropout backward
     // begin creating dropout descriptor
-    cudnnDropoutDescriptor_t x47;
-    CUDNNCHECK(cudnnCreateDropoutDescriptor(&x47));
-    CUDNNCHECK(cudnnSetDropoutDescriptor(x47, x7, 0.5, x40, x46, 1));
+    cudnnDropoutDescriptor_t x48;
+    CUDNNCHECK(cudnnCreateDropoutDescriptor(&x48));
+    CUDNNCHECK(cudnnSetDropoutDescriptor(x48, x7, 0.5, x47, x46, 1));
     // end creating dropout descriptor
     // begin dropout backward pass
-    CUDNNCHECK(cudnnDropoutBackward(x7, x47, x36, x43, x36, x44, x39, x45));
+    CUDNNCHECK(cudnnDropoutBackward(x7, x48, x36, x43, x36, x44, x39, x45));
     // end dropout backward pass
     // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x223
     CUDA_CALL(cudaSetDevice(x6));
@@ -169,12 +174,12 @@ void Snippet(int x0) {
   }
   if (x6 == 0) {
     // begin copying GPU array x70 to CPU and print for size 18 and type Float
-    float* x48 = (float*)malloc(18 * sizeof(float));
-    CUDA_CALL(cudaMemcpy(x48, x10, (size_t)(18 * sizeof(float)), cudaMemcpyDeviceToHost));
-    int x49 = 0;
-    while (x49 != 18) {
-      printf("%f ", x48[x49]);
-      x49 = x49 + 1;
+    float* x49 = (float*)malloc(18 * sizeof(float));
+    CUDA_CALL(cudaMemcpy(x49, x10, (size_t)(18 * sizeof(float)), cudaMemcpyDeviceToHost));
+    int x50 = 0;
+    while (x50 != 18) {
+      printf("%f ", x49[x50]);
+      x50 = x50 + 1;
     }
     printf("\n");
     // end copying GPU array x70 to CPU and print for size 18 and type Float
