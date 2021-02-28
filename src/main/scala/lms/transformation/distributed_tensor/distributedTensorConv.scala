@@ -102,8 +102,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       List((inputC, filterCin), (outputC, filterCout))
     
     // dropout operation has no mergable dims
-    case Node(s, "tensors_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
-      List()
+    case Node(s, "tensors_dropout", _, _) => List()
 
     case _ => super.mergable_dims(node)
   }
