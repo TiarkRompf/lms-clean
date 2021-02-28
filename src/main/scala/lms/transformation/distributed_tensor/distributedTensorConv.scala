@@ -73,16 +73,12 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
   }
   
   def SoftmaxForward(input: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    val SoftmaxParam(alpha, beta) = params
-
     val res_tt = input.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_softmax", C(res_tt), C(anno), input.x, 
       C(params))(input.x)).withSrcType(__pos, input.et))
   }
 
   def SoftmaxBackward(output: TENSOR, doutput: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    val SoftmaxParam(alpha, beta) = params
-
     val res_tt = doutput.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_softmax_bwd", C(res_tt), C(anno), output.x, doutput.x, 
       C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
@@ -114,8 +110,8 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       val filterCin   = filter_type(CUDNN_C_IN).dim
       List((inputC, filterCin), (outputC, filterCout))
 
-    case Node(s, op, _, _) if op == "tensor_softmax" => List()
-    case Node(s, op, _, _) if op == "tensor_activation" => List()
+    case Node(s, "tensor_softmax", _, _) => List()
+    case Node(s, "tensor_activation", _, _) => List()
 
     case _ => super.mergable_dims(node)
   }
