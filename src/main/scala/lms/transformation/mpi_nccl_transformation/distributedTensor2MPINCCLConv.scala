@@ -76,6 +76,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
           INT(dilation(CUDNN_PARAM_H)), INT(dilation(CUDNN_PARAM_W)),
           CUDNN_CONVOLUTION, CUDNN_FLOAT))
         generate_comment(s"end creating and setting convolution descriptor")
+        cudnnConv2Desc += ((padding ++ strides ++ dilation, desc))
         desc
   }
 
@@ -281,7 +282,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val input_descriptor = getTensorDescriptor(input_shape, "tensor")
 
       generate_comment("begin allocating gpu array for the output of softmax")
-      val output_size = input_shape(0) * input_shape(1) * input_shape(2) * input_shape(3)
+      val output_size = input_shape.fold(1) { (a, b) => a * b }
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the output of softmax")
 
@@ -307,7 +308,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val output_descriptor = getTensorDescriptor(output_shape, "tensor")
 
       generate_comment("begin allocating gpu array for the gradient of input of softmax")
-      val doutput_size = output_shape(0) * output_shape(1) * output_shape(2) * output_shape(3)
+      val doutput_size = output_shape.fold(1) { (a, b) => a * b }
       val dinput = gpu_array(doutput_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the gradient of input of softmax")
 
@@ -332,7 +333,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val activation_descriptor = getActivationDescriptor("sigmoid", coef)
 
       generate_comment("begin allocating gpu array for the output of softmax")
-      val output_size = input_shape(0) * input_shape(1) * input_shape(2) * input_shape(3)
+      val output_size = input_shape.fold(0) { (a, b) => a * b }
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the output of softmax")
 
@@ -361,7 +362,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val activation_descriptor = getActivationDescriptor("sigmoid", coef)
 
       generate_comment("begin allocating gpu array for the gradient of input of activation")
-      val dinput_size = input_shape(0) * input_shape(1) * input_shape(2) * input_shape(3)
+      val dinput_size = input_shape.fold(0) { (a, b) => a * b }
       val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the gradient of input of activation")
 
