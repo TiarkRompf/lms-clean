@@ -167,7 +167,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
       generate_comment("begin allocating gpu array for the gradient of weight of convolution")
-      val dweight_size = weight_shape(0) * weight_shape(1) * weight_shape(2) * weight_shape(3)
+      val dweight_size = weight_shape.fold(1) { (a, b) => a * b }
       val dweight = gpu_array(dweight_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the gradient of weight of convolution")
 
@@ -217,7 +217,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
       generate_comment("begin allocating gpu array for the gradient of filter of convolution")
-      val dfilter_size = filter_shape(0) * filter_shape(1) * filter_shape(2) * filter_shape(3)
+      val dfilter_size = filter_shape.fold(1) { (a, b) => a * b }
       val dfilter = gpu_array(dfilter_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the gradient of filter of convolution")
 
