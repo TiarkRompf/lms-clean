@@ -168,11 +168,5 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
       val op = DropoutForward(self, params, anno, __pos)
       ((0 until 1): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
     }
-
-    /*
-    def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = DropoutForward(self, params, anno, __pos)
-      Wrap[Tensor[T]](t.x)
-    }*/
   }
 }
