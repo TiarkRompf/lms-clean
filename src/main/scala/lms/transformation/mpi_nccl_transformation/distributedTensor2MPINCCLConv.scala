@@ -319,7 +319,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       dinput.x
     
-    case Node(s, "tensor_activation", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
+    case Node(s, "tensor_activation", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::
+      Backend.Const(mode:String)::_, _) =>
 
       implicit val pos = Adapter.oldSourceMap(s)
 
@@ -330,7 +331,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val input_tensor = get_operand(a, anno)
 
       val input_descriptor = getTensorDescriptor(input_shape, "tensor")
-      val activation_descriptor = getActivationDescriptor("sigmoid", coef)
+      val activation_descriptor = getActivationDescriptor(mode, coef)
 
       generate_comment("begin allocating gpu array for the output of softmax")
       val output_size = input_shape.fold(0) { (a, b) => a * b }
@@ -345,7 +346,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       output.x
     
     case Node(s, "tensor_activation_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
-      (output:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
+      (output:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::Backend.Const(mode:String)::_, _) =>
 
       implicit val pos = Adapter.oldSourceMap(s)
 
@@ -359,7 +360,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val doutput_tensor = get_operand(doutput, anno)
 
       val input_descriptor = getTensorDescriptor(input_shape, "tensor")
-      val activation_descriptor = getActivationDescriptor("sigmoid", coef)
+      val activation_descriptor = getActivationDescriptor(mode, coef)
 
       generate_comment("begin allocating gpu array for the gradient of input of activation")
       val dinput_size = input_shape.fold(0) { (a, b) => a * b }
