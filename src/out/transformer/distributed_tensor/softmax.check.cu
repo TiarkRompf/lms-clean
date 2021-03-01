@@ -107,7 +107,7 @@ void Snippet(int x0) {
     // begin softmax forward pass
     float x39 = 1.0;
     float x40 = 0.0;
-    CUDNNCHECK(cudnnSoftmaxForward(x8, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, &x39, x37, &x11, &x40, x37, &x38));
+    CUDNNCHECK(cudnnSoftmaxForward(x8, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, &x39, x37, x11, &x40, x37, x38));
     // end softmax forward pass
     // begin initializing fixed GPU array of size 9 and type Float and device (pre-rename) x39
     CUDA_CALL(cudaSetDevice(x7));
@@ -133,7 +133,7 @@ void Snippet(int x0) {
     // begin softmax backward pass
     float x44 = 1.0;
     float x45 = 0.0;
-    CUDNNCHECK(cudnnSoftmaxBackward(x8, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, &x44, x37, &x38, x37, &x41, &x45, x37, &x43));
+    CUDNNCHECK(cudnnSoftmaxBackward(x8, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, &x44, x37, x38, x37, x41, &x45, x37, x43));
     // end softmax backward pass
     // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x86 and addition_operand x232
     CUDA_CALL(cudaSetDevice(x7));

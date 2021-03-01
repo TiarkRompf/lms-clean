@@ -21,12 +21,12 @@ trait CUDNNSoftmaxTypeLess extends Dsl with CLibs with CUDNNBaseTypeLess {
   def CUDNN_SOFTMAX_FWD(handle: TOP, algorithm: TOP, mode: TOP, alpha: VAR, xDesc: TOP, 
                         x: TOP, beta: VAR, yDesc: TOP, y: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSoftmaxForward", handle.x, algorithm.x, mode.x, alpha.x, xDesc.x,
-      x.x, beta.x, yDesc.x, y.x)(Seq(0,1,2,3,4,5,6,7), Seq(8), Set[Int](3,5,6,8))
+      x.x, beta.x, yDesc.x, y.x)(Seq(0,1,2,3,4,5,6,7), Seq(8), Set[Int](3,6))
   
   def CUDNN_SOFTMAX_BWD(handle: TOP, algorithm: TOP, mode: TOP, alpha: VAR, yDesc: TOP,
                         yData: TOP, dyDesc: TOP, dy: TOP, beta: VAR, dxDesc: TOP, dx: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSoftmaxBackward", handle.x, algorithm.x, mode.x, alpha.x, yDesc.x,
-      yData.x, dyDesc.x, dy.x, beta.x, dxDesc.x, dx.x)(Seq(0,1,2,3,4,5,6,7,8,9), Seq(10), Set(3,5,7,8,10))
+      yData.x, dyDesc.x, dy.x, beta.x, dxDesc.x, dx.x)(Seq(0,1,2,3,4,5,6,7,8,9), Seq(10), Set[Int](3,8))
                     
 
   
