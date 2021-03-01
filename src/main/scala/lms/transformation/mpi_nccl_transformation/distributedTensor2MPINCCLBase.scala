@@ -54,6 +54,12 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     CUDA_SET_DEVICE(device)
     CUDA_MALLOC(size, m)
   }
+
+  // TODO: change it to better name, and add INT counterparts to other gpu functions as well
+  def gpu_array1_by_byte(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
+    CUDA_SET_DEVICE(device)
+    CUDA_MALLOC_BYTES(size, m)
+  }
   // helper function for declaring a GPU array with random initialization
   def gpu_random_array(size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY =
     withComment(s"initializing random GPU array of size $size and type $m at device (pre-rename) ${device.x}") {
@@ -132,6 +138,8 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   var cudnnActv2Desc: HashMap[(String, Float), CUDNN_ACTIVATION_DESCRIPTOR] = HashMap()
   def set_up_cudnn(implicit __pos: SourceContext) = { 
     val dummy = myCUDNNComm 
+  def set_up_cudnn(implicit __pos: SourceContext) = {
+    val dummy = myCUDNNComm
     // cudnnTensor2Desc = HashMap()  // todo: FIXME
   }
   def finalize_cudnn(implicit __pos: SourceContext) = {
@@ -316,7 +324,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     if (operand_anno == anno) {
       transform(operand)
     } else if (assertSame) {
-      throw new Exception(s"Assert that the tensor has the same annotation but it does not");
+      throw new Exception(s"Assert that the tensor has the same annotation but it does not: ${operand_anno} v.s. ${anno}");
     } else {
       throw new Exception(s"TODO: not yet handling split annotation conflict $operand_tensor")
     }

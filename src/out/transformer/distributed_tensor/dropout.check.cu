@@ -94,73 +94,78 @@ void Snippet(int x0) {
   // end initializing fixed GPU array of size 18 and type Float and device (pre-rename) x39
   int x19 = 0;
   while (x19 != 10) {
-    // begin initializing random GPU array of size 81 and type Float at device (pre-rename) x39
-    float* x36 = (float*)malloc(81 * sizeof(float));
-    int x37 = 0;
-    while (x37 != 81) {
-      x36[x37] = (float)(rand() - RAND_MAX / 2) / (float)RAND_MAX;
-      x37 = x37 + 1;
-    }
-    CUDA_CALL(cudaSetDevice(x6));
-    float* x38 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x38, (size_t)(81 * sizeof(float))));
-    CUDA_CALL(cudaMemcpy(x38, x36, (size_t)(81 * sizeof(float)), cudaMemcpyHostToDevice));
-    // end initializing random GPU array of size 81 and type Float at device (pre-rename) x39
-    // begin initializing fixed GPU array of size 162 and type Float and device (pre-rename) x39
+    // begin creating and setting tensor descriptor of shape List(2, 1, 3, 3)
+    cudnnTensorDescriptor_t x36;
+    CUDNNCHECK(cudnnCreateTensorDescriptor(&x36));
+    CUDNNCHECK(cudnnSetTensor4dDescriptor(x36, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 1, 3, 3));
+    // end creating and setting tensor descriptor
+    // begin finding dropout forward reserve space bytes
+    size_t x37 = (size_t)0;
+    CUDNNCHECK(cudnnDropoutGetReserveSpaceSize(x36, &x37));
+    // end finding dropout forward reserve space bytes
+    // begin finding dropout forward states bytes
+    size_t x38 = (size_t)0;
+    CUDNNCHECK(cudnnDropoutGetStatesSize(x7, &x38));
+    // end finding dropout forward states bytes
+    // begin allocating gpu array for the reserve space of dropout forward
     CUDA_CALL(cudaSetDevice(x6));
     float* x39 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x39, (size_t)(162 * sizeof(float))));
-    x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x39, 1, 162);
-    // end initializing fixed GPU array of size 162 and type Float and device (pre-rename) x39
-    // begin creating and setting tensor descriptor of shape List(2, 1, 9, 9)
-    cudnnTensorDescriptor_t x40;
-    CUDNNCHECK(cudnnCreateTensorDescriptor(&x40));
-    CUDNNCHECK(cudnnSetTensor4dDescriptor(x40, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 1, 9, 9));
-    // end creating and setting tensor descriptor
-    // begin creating and setting tensor descriptor of shape List(2, 2, 9, 9)
-    cudnnTensorDescriptor_t x41;
-    CUDNNCHECK(cudnnCreateTensorDescriptor(&x41));
-    CUDNNCHECK(cudnnSetTensor4dDescriptor(x41, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 2, 9, 9));
-    // end creating and setting tensor descriptor
-    // begin creating and setting filter descriptor of shape List(2, 1, 3, 3)
-    cudnnFilterDescriptor_t x42;
-    CUDNNCHECK(cudnnCreateFilterDescriptor(&x42));
-    CUDNNCHECK(cudnnSetFilter4dDescriptor(x42, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, 2, 1, 3, 3));
-    // end creating and setting filter descriptor
-    // begin creating and setting convolution descriptor of padding: List(1, 1), strides: List(1, 1), dilation: List(1, 1)
-    cudnnConvolutionDescriptor_t x43;
-    CUDNNCHECK(cudnnCreateConvolutionDescriptor(&x43));
-    CUDNNCHECK(cudnnSetConvolution2dDescriptor(x43, 1, 1, 1, 1, 1, 1, CUDNN_CONVOLUTION, CUDNN_DATA_FLOAT));
-    // end creating and setting convolution descriptor
-    // begin allocating gpu array for the gradient of filter of convolution
+    CUDA_CALL(cudaMalloc(&x39, (size_t)x37));
+    // end allocating gpu array for the reserve space of dropout forward
+    // begin allocating gpu array for the states of dropout forward
+    CUDA_CALL(cudaSetDevice(x6));
+    float* x40 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x40, (size_t)x38));
+    // end allocating gpu array for the states of dropout forward
+    // begin creating dropout descriptor
+    cudnnDropoutDescriptor_t x41;
+    CUDNNCHECK(cudnnCreateDropoutDescriptor(&x41));
+    CUDNNCHECK(cudnnSetDropoutDescriptor(x41, x7, 0.5, x40, x38, 1));
+    // end creating dropout descriptor
+    // begin allocating gpu array for the output of dropout
+    CUDA_CALL(cudaSetDevice(x6));
+    float* x42 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x42, (size_t)(18 * sizeof(float))));
+    // end allocating gpu array for the output of dropout
+    // begin dropout forward pass
+    CUDNNCHECK(cudnnDropoutForward(x7, x41, x36, x10, x36, x42, x39, x37));
+    // end dropout forward pass
+    // begin initializing fixed GPU array of size 18 and type Float and device (pre-rename) x39
+    CUDA_CALL(cudaSetDevice(x6));
+    float* x43 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x43, (size_t)(18 * sizeof(float))));
+    x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x43, 0, 18);
+    // end initializing fixed GPU array of size 18 and type Float and device (pre-rename) x39
+    // begin allocating gpu array for the gradient of input of dropout
     CUDA_CALL(cudaSetDevice(x6));
     float* x44 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x44, (size_t)(18 * sizeof(float))));
-    // end allocating gpu array for the gradient of filter of convolution
-    // begin finding convolution backward filter algorithm
-    cudnnConvolutionBwdFilterAlgoPerf_t x45;
-    int x46 = 0;
-    CUDNNCHECK(cudnnFindConvolutionBackwardFilterAlgorithm(x7, x40, x41, x43, x42, 1, &x46, &x45));
-    cudnnConvolutionBwdFilterAlgo_t x47 = x45.algo;
-    // end finding convolution backward filter algorithm
-    // begin finding convolution backward filter workspace size
-    size_t x48 = (size_t)0;
-    CUDNNCHECK(cudnnGetConvolutionBackwardFilterWorkspaceSize(x7, x40, x41, x43, x42, x47, &x48));
-    // end finding convolution backward filter workspace size
-    // begin allocating gpu array for convolution backward filter workspace
+    // end allocating gpu array for the gradient of input of dropout
+    // begin finding dropout backward reserve bytes
+    size_t x45 = (size_t)0;
+    CUDNNCHECK(cudnnDropoutGetReserveSpaceSize(x36, &x45));
+    // end finding dropout backward reserve bytes
+    // begin finding dropout backward states bytes
+    size_t x46 = (size_t)0;
+    CUDNNCHECK(cudnnDropoutGetStatesSize(x7, &x46));
+    // end finding dropout backward states bytes
+    // begin allocating gpu array for the states of dropout backward
     CUDA_CALL(cudaSetDevice(x6));
-    float* x49 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x49, (size_t)x48));
-    // end allocating gpu array for convolution backward filter workspace
-    // begin convolution backward filter pass
-    float x50 = 1.0;
-    float x51 = 0.0;
-    CUDNNCHECK(cudnnConvolutionBackwardFilter(x7, &x50, x40, x38, x41, x39, x43, x47, x49, x48, &x51, x42, x44));
-    // end convolution backward filter pass
-    // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x235
+    float* x47 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x47, (size_t)x46));
+    // end allocating gpu array for the states of dropout backward
+    // begin creating dropout descriptor
+    cudnnDropoutDescriptor_t x48;
+    CUDNNCHECK(cudnnCreateDropoutDescriptor(&x48));
+    CUDNNCHECK(cudnnSetDropoutDescriptor(x48, x7, 0.5, x47, x46, 1));
+    // end creating dropout descriptor
+    // begin dropout backward pass
+    CUDNNCHECK(cudnnDropoutBackward(x7, x48, x36, x43, x36, x44, x39, x45));
+    // end dropout backward pass
+    // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x223
     CUDA_CALL(cudaSetDevice(x6));
     x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x44, 18);
-    // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x235
+    // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x223
     // begin computing SGD on GPU for size 18 and type Float at device (pre-name) x39 with weight x70, grad x93, and momentum x131
     CUDA_CALL(cudaSetDevice(x6));
     x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x11, x18, 18);
@@ -169,12 +174,12 @@ void Snippet(int x0) {
   }
   if (x6 == 0) {
     // begin copying GPU array x70 to CPU and print for size 18 and type Float
-    float* x52 = (float*)malloc(18 * sizeof(float));
-    CUDA_CALL(cudaMemcpy(x52, x10, (size_t)(18 * sizeof(float)), cudaMemcpyDeviceToHost));
-    int x53 = 0;
-    while (x53 != 18) {
-      printf("%f ", x52[x53]);
-      x53 = x53 + 1;
+    float* x49 = (float*)malloc(18 * sizeof(float));
+    CUDA_CALL(cudaMemcpy(x49, x10, (size_t)(18 * sizeof(float)), cudaMemcpyDeviceToHost));
+    int x50 = 0;
+    while (x50 != 18) {
+      printf("%f ", x49[x50]);
+      x50 = x50 + 1;
     }
     printf("\n");
     // end copying GPU array x70 to CPU and print for size 18 and type Float
