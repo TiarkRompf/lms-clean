@@ -161,7 +161,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("begin finding convolution backward workspace size")
 
       generate_comment("begin allocating gpu array for convolution forward workspace")
-      val d_workspace = gpu_array1_by_byte(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+      val d_workspace = GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for convolution forward workspace")
 
       generate_comment("begin convolution forward pass")
@@ -211,7 +211,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding convolution backward data workspace size")
 
       generate_comment("begin allocating gpu array for convolution backward data workspace")
-      val d_workspace = gpu_array1_by_byte(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+      val d_workspace = GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for convolution backward data workspace")
 
       generate_comment("begin convolution backward data pass")
@@ -261,7 +261,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding convolution backward filter workspace size")
 
       generate_comment("begin allocating gpu array for convolution backward filter workspace")
-      val d_workspace = gpu_array1_by_byte(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+      val d_workspace = GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for convolution backward filter workspace")
      
       generate_comment("begin convolution backward filter pass")
@@ -401,11 +401,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding dropout forward states bytes")
 
       generate_comment("begin allocating gpu array for the reserve space of dropout forward")
-      val d_reservespace = gpu_array1_by_byte(INT(reserve_bytes(pos)), manifest[Float], myNCCLRank)
+      val d_reservespace = GPU_ARRAY_BY_BYTE(INT(reserve_bytes(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the reserve space of dropout forward")
 
       generate_comment("begin allocating gpu array for the states of dropout forward")
-      val d_states = gpu_array1_by_byte(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
+      val d_states = GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the states of dropout forward")
 
       generate_comment("begin creating dropout descriptor")
@@ -460,7 +460,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding dropout backward states bytes")
 
       generate_comment("begin allocating gpu array for the states of dropout backward")
-      val d_states = gpu_array1_by_byte(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
+      val d_states = GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the states of dropout backward")
 
       generate_comment("begin creating dropout descriptor")

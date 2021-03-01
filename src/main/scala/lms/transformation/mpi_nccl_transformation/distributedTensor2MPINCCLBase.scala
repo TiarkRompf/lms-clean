@@ -49,14 +49,12 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     CUDA_MALLOC(size, m)
   }
 
-  // TODO: change it to better name, and add INT counterparts to other gpu functions as well
-  def gpu_array1(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
+  def GPU_ARRAY(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
     CUDA_SET_DEVICE(device)
     CUDA_MALLOC(size, m)
   }
 
-  // TODO: change it to better name, and add INT counterparts to other gpu functions as well
-  def gpu_array1_by_byte(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
+  def GPU_ARRAY_BY_BYTE(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
     CUDA_SET_DEVICE(device)
     CUDA_MALLOC_BYTES(size, m)
   }
