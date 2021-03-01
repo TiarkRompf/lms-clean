@@ -89,6 +89,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         CUDNN_CHECK(CUDNN_CREATE_ACTIVATION_DESCRIPTOR(desc))
         val cudnnMode: TOP = mode match {
           case "relu"       => CUDNN_ACTIVATION_RELU
+          case "crelu"      => CUDNN_ACTIVATION_CLIPPED_RELU
           case "sigmoid"    => CUDNN_ACTIVATION_SIGMOID
           case "tanh"       => CUDNN_ACTIVATION_TANH
           case "elu"        => CUDNN_ACTIVATION_ELU

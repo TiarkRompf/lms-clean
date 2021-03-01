@@ -224,9 +224,30 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
     
     def tanh(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val self = tensor(x)
-       val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val p = ActivationParam(1.0f, 0.0f, 0.0f)
       val t = ActivationForward(self, p, "tanh", anno, __pos)
       Wrap[Tensor[T]](t.x)
+    }
+
+    // clipped relu
+    def crelu(threshold: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, threshold)
+      val t = ActivationForward(self, p, "crelu", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def relu(upper_bound: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, upper_bound)
+      val t = ActivationForward(self, p, "relu", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def elu(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "elu", anno, __pos)
     }
     
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
