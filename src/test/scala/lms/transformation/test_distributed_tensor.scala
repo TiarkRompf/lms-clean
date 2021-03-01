@@ -227,7 +227,60 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
     checkWithLogPath("conv", driver.code, "cu", driver.setLogPath)
   }
+  
+  test("softmax") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
 
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
+
+        val inputTensorType = resultType[Float](Seq(2, 1, 3, 3))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
+
+        val model = module {
+          val tensor_input = Tensor.input[Float](inputTensorType)
+          val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
+          
+          val params = SoftmaxParam(1.0f, 0.0f)
+          val x = tensor_filter softmax (batchSplitAnno, params)
+          tensor_input + (x, batchSplitAnno)
+        }
+        model(10)
+        printf("compile")
+      }
+    }
+    checkWithLogPath("softmax", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("activation") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
+
+        val inputTensorType = resultType[Float](Seq(2, 1, 3, 3))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
+
+        val model = module {
+          val tensor_input = Tensor.input[Float](inputTensorType)
+          val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
+          
+          val x = tensor_filter sigmoid (batchSplitAnno)
+          tensor_input + (x, batchSplitAnno)
+        }
+        model(10)
+        printf("compile")
+      }
+    }
+    checkWithLogPath("activation", driver.code, "cu", driver.setLogPath)
+  }
+  
   test("dropout") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
@@ -256,6 +309,5 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
     checkWithLogPath("dropout", driver.code, "cu", driver.setLogPath)
   }
-
 }
 

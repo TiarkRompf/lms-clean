@@ -71,6 +71,30 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
     TensorType(output_shape, input.et, anno)
   }
+  
+  def SoftmaxForward(input: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = input.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_softmax", C(res_tt), C(anno), input.x, 
+      C(params))(input.x)).withSrcType(__pos, input.et))
+  }
+
+  def SoftmaxBackward(output: TENSOR, doutput: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = doutput.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_softmax_bwd", C(res_tt), C(anno), output.x, doutput.x, 
+      C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
+  }
+
+  def ActivationForward(input: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = input.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation", C(res_tt), C(anno), input.x, 
+      C(params), C(mode))(input.x)).withSrcType(__pos, input.et))
+  }
+
+  def ActivationBackward(input: TENSOR, output: TENSOR, doutput: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = doutput.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), input.x, output.x, doutput.x, 
+      C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, doutput.et))
+  }
 
   def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSORS = {
     val output_tt = input.resultType
@@ -104,6 +128,9 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     // dropout operation has no mergable dims
     case Node(s, "tensors_dropout", _, _) => List()
 
+    case Node(s, "tensor_softmax", _, _) => List()
+    case Node(s, "tensor_activation", _, _) => List()
+
     case _ => super.mergable_dims(node)
   }
 
@@ -130,6 +157,27 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
           Accumulate(gradMap(b), b_grad, anno); ()
         }) +=: backwardNodes
       
+      case Node(s, "tensor_softmax", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:SoftmaxParam)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val x = new TENSOR(transform(s))
+            val grad = SoftmaxBackward(x, gradMap(s), params, anno, pos)
+            Accumulate(gradMap(a), grad, anno); ()
+           ()
+        }) +=: backwardNodes
+      
+      case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::Backend.Const(mode:String)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val x = new TENSOR(transform(a))
+            val y = new TENSOR(transform(s))
+            val grad = ActivationBackward(x, y, gradMap(s), params, mode, anno, pos)
+            Accumulate(gradMap(a), grad, anno); ()
+           ()
+        }) +=: backwardNodes
+    
       case Node(s, "tensors_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes
@@ -142,7 +190,6 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
           val g = DropoutBackward(grads(0), TENSORS.getResult(x, 1), params, anno, pos)
           Accumulate(gradMap(a), g, anno); ()
         }) +=: backwardNodes
-
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
     }
@@ -162,6 +209,25 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
       Wrap[Tensor[T]](t.x)
     }
 
+    val softmax_params_def = SoftmaxParam(1.0f, 0.0f)
+    def softmax(anno: Anno, params: SoftmaxParam = softmax_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = SoftmaxForward(self, params, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def sigmoid(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "sigmoid", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+    
+    def tanh(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+       val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "tanh", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
     
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = DropoutForward(self, params, anno, __pos)

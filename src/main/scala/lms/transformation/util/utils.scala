@@ -96,5 +96,7 @@ trait CudnnUtils {
   val CUDNN_PARAM_W     = 1  // weight of padding, strides, and dilation
 
   case class ConvParam(val alpha: Float, val beta: Float, val padding: Seq[Int], val strides: Seq[Int], val dilation: Seq[Int])
+  case class SoftmaxParam(val alpha: Float, val beta: Float)
+  case class ActivationParam(val alpha: Float, val beta: Float, val coef: Float)
   case class DropoutParam(val dropout: Float, val seed: Int)
 }
