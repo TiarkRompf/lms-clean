@@ -107,7 +107,7 @@ void Snippet(int x0) {
     // begin allocating gpu array for the output of softmax
     CUDA_CALL(cudaSetDevice(x7));
     float* x39 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x39, (size_t)0));
+    CUDA_CALL(cudaMalloc(&x39, (size_t)(18 * sizeof(float))));
     // end allocating gpu array for the output of softmax
     // begin activation forward pass
     float x40 = 1.0;
@@ -126,24 +126,24 @@ void Snippet(int x0) {
     CUDA_CALL(cudaMalloc(&x43, (size_t)(9 * sizeof(float))));
     x13<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x43, 1, 9);
     // end initializing fixed GPU array of size 9 and type Float and device (pre-rename) x39
-    // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x175 and addition_operand x188
+    // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x176 and addition_operand x189
     CUDA_CALL(cudaSetDevice(x7));
     x21<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x42, x43, 9);
-    // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x175 and addition_operand x188
+    // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x176 and addition_operand x189
     // begin allocating gpu array for the gradient of input of activation
     CUDA_CALL(cudaSetDevice(x7));
     float* x44 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x44, (size_t)0));
+    CUDA_CALL(cudaMalloc(&x44, (size_t)(18 * sizeof(float))));
     // end allocating gpu array for the gradient of input of activation
     // begin activation backward pass
     float x45 = 1.0;
     float x46 = 0.0;
     CUDNNCHECK(cudnnActivationBackward(x8, x38, &x45, x37, x39, x37, x42, x37, x11, &x46, x37, x44));
     // begin activation backward pass
-    // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x86 and addition_operand x238
+    // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x86 and addition_operand x239
     CUDA_CALL(cudaSetDevice(x7));
     x21<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x12, x44, 9);
-    // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x86 and addition_operand x238
+    // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x86 and addition_operand x239
     // begin computing SGD on GPU for size 9 and type Float at device (pre-name) x39 with weight x70, grad x86, and momentum x124
     CUDA_CALL(cudaSetDevice(x7));
     x28<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x12, x19, 9);
@@ -177,7 +177,7 @@ void Snippet(int x0) {
   NCCLCHECK(ncclGroupEnd());
   // print the array only if this is the root
   if (x47) {
-    // begin copying GPU array x319 to CPU and print for size 18 and type Float
+    // begin copying GPU array x321 to CPU and print for size 18 and type Float
     float* x55 = (float*)malloc(18 * sizeof(float));
     CUDA_CALL(cudaMemcpy(x55, x48, (size_t)(18 * sizeof(float)), cudaMemcpyDeviceToHost));
     int x56 = 0;
@@ -186,7 +186,7 @@ void Snippet(int x0) {
       x56 = x56 + 1;
     }
     printf("\n");
-    // end copying GPU array x319 to CPU and print for size 18 and type Float
+    // end copying GPU array x321 to CPU and print for size 18 and type Float
   }
   printf("compile");
   CUDNNCHECK(cudnnDestroy(x8));
