@@ -227,6 +227,7 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
        val p = ActivationParam(1.0f, 0.0f, 0.0f)
       val t = ActivationForward(self, p, "tanh", anno, __pos)
       Wrap[Tensor[T]](t.x)
+    }
     
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = DropoutForward(self, params, anno, __pos)
