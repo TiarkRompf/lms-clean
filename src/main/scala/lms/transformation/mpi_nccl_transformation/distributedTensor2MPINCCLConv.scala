@@ -63,8 +63,9 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
   // given the padding, strides and dilation parameters of a convolution operation, return its descriptor.
   // if cudnnTensor2Desc contains a descriptor matching the required parameters, return that descriptor
   // otherwise, create a new descriptor, store it in the hashmap and return it.
-  def getConvDescriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): CUDNN_CONV_DESCRIPTOR =
-    cudnnConv2Desc.get(padding ++ strides ++ dilation) match {
+  def getConvDescriptor(padding: Seq[Int], strides: Seq[Int], dilation: Seq[Int])(implicit __pos: SourceContext): CUDNN_CONV_DESCRIPTOR = {
+    val key = padding ++ strides ++ dilation
+    cudnnConv2Desc.get(key) match {
       case Some(desc) => desc
       case None =>
         generate_comment(s"begin creating and setting convolution descriptor of padding: ${padding}, strides: ${strides}, dilation: ${dilation}")
@@ -76,12 +77,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
           INT(dilation(CUDNN_PARAM_H)), INT(dilation(CUDNN_PARAM_W)),
           CUDNN_CONVOLUTION, CUDNN_FLOAT))
         generate_comment(s"end creating and setting convolution descriptor")
-        cudnnConv2Desc += ((padding ++ strides ++ dilation, desc))
+        cudnnConv2Desc += ((key, desc))
         desc
+    }
   }
 
-  def getActivationDescriptor(mode: String, coef: Float)(implicit __pos: SourceContext): CUDNN_ACTIVATION_DESCRIPTOR = 
-    cudnnActv2Desc.get((mode, coef)) match {
+  def getActivationDescriptor(mode: String, coef: Float)(implicit __pos: SourceContext): CUDNN_ACTIVATION_DESCRIPTOR = {
+    val key = (mode, coef)
+    cudnnActv2Desc.get(key) match {
       case Some(desc) => desc
       case None =>
         generate_comment(s"begin creating and setting activation descriptor")
@@ -98,13 +101,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         }
         CUDNN_CHECK(CUDNN_SET_ACTIVATION_DESCRIPTOR(desc, cudnnMode, CUDNN_PROPAGATE_NAN, FLOAT(coef)))
         generate_comment(s"end creating and setting activation descriptor")
-        val key = (mode, coef)
         cudnnActv2Desc += ((key, desc))
         desc
     }
+  }
   
-  def getPoolingDescriptor(mode: String, window: Seq[Int], padding: Seq[Int], strides: Seq[Int])(implicit __pos: SourceContext): CUDNN_POOLING_DESCRIPTOR = 
-    cudnnPool2Desc.get((mode, window ++ padding ++ strides)) match {
+  def getPoolingDescriptor(mode: String, window: Seq[Int], padding: Seq[Int], strides: Seq[Int])(implicit __pos: SourceContext): CUDNN_POOLING_DESCRIPTOR = {
+    val key = (mode, window ++ padding ++ strides)
+    cudnnPool2Desc.get(key) match {
       case Some(desc) => desc
       case None =>
         generate_comment(s"begin creating and setting pooling descriptor")
@@ -122,10 +126,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
           INT(padding(CUDNN_PARAM_H)),  INT(padding(CUDNN_PARAM_W)),
           INT(strides(CUDNN_PARAM_H)),  INT(strides(CUDNN_PARAM_W))))
         generate_comment(s"end creating and setting pooling descriptor")
-        val key = (mode, window ++ padding ++ strides)
         cudnnPool2Desc += ((key, desc))
         desc
     }
+  }
 
 
   override def transform(n: Node): Backend.Exp = n match {
