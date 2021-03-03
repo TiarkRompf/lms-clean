@@ -99,4 +99,5 @@ trait CudnnUtils {
   case class SoftmaxParam(val alpha: Float, val beta: Float)
   case class ActivationParam(val alpha: Float, val beta: Float, val coef: Float)
   case class DropoutParam(val dropout: Float, val seed: Int)
+  case class PoolingParam(val alpha: Float, val beta: Float, val window: Seq[Int], val padding: Seq[Int], val strides: Seq[Int])
 }

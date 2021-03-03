@@ -102,6 +102,30 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         cudnnActv2Desc += ((key, desc))
         desc
     }
+  
+  def getPoolingDescriptor(mode: String, window: Seq[Int], padding: Seq[Int], strides: Seq[Int])(implicit __pos: SourceContext): CUDNN_POOLING_DESCRIPTOR = 
+    cudnnPool2Desc.get((mode, window ++ padding ++ strides)) match {
+      case Some(desc) => desc
+      case None =>
+        generate_comment(s"begin creating and setting pooling descriptor")
+        val desc = new CUDNN_POOLING_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_POOLING_DESCRIPTOR], "cudnnPoolingDescriptor_t").x)
+        CUDNN_CHECK(CUDNN_CREATE_POOLING_DESCRIPTOR(desc))
+        val cudnnMode: TOP = mode match {
+          case "max"          => CUDNN_POOLING_MAX
+          case "avg"          => CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING
+          case "avg_no_pad"   => CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING
+          case "max_dtm"      => CUDNN_POOLING_MAX_DETERMINISTIC
+          case _              => CUDNN_POOLING_MAX
+        }
+        CUDNN_CHECK(CUDNN_SET_POOLING_2D_DESCRIPTOR(desc, cudnnMode, CUDNN_PROPAGATE_NAN, 
+          INT(window(CUDNN_PARAM_H)),   INT(window(CUDNN_PARAM_W)),
+          INT(padding(CUDNN_PARAM_H)),  INT(padding(CUDNN_PARAM_W)),
+          INT(strides(CUDNN_PARAM_H)),  INT(strides(CUDNN_PARAM_W))))
+        generate_comment(s"end creating and setting pooling descriptor")
+        val key = (mode, window ++ padding ++ strides)
+        cudnnPool2Desc += ((key, desc))
+        desc
+    }
 
 
   override def transform(n: Node): Backend.Exp = n match {
@@ -473,6 +497,65 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_CHECK(CUDNN_DROPOUT_BWD(myCUDNNComm, dropout_descriptor, doutput_descriptor, new ARRAY(doutput_tensor), dinput_descriptor,
         dinput, new ARRAY(reserveSpace_tensor), reserve_bytes))
       generate_comment("end dropout backward pass")
+      
+      dinput.x
+    
+    case Node(s, "tensor_pooling", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
+      Backend.Const(params)::Backend.Const(mode:String)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack pooling paratemers
+      val PoolingParam(alpha, beta, window, padding, strides) = params.asInstanceOf[PoolingParam]
+      
+      val input_shape = tensor_shape(input, useOldMetadata = true)
+      val output_shape = tensor_shape(s, useOldMetadata = true)
+
+      val input_tensor = get_operand(input, anno)
+
+      val input_descriptor = getTensorDescriptor(input_shape, "tensor")
+      val output_descriptor = getTensorDescriptor(output_shape, "tensor")
+      val pooling_descriptor = getPoolingDescriptor(mode, window, padding, strides)
+
+      // allocate output tensor
+      generate_comment("begin allocating gpu array for the output of pooling")
+      val output_size = output_shape.fold(1) { (a, b) => a * b }
+      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the output of pooling")
+
+      CUDNN_CHECK(CUDNN_POOLING_FWD(myCUDNNComm, pooling_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
+        VAR(FLOAT(beta)), output_descriptor, output))
+      
+      output.x
+    
+    case Node(s, "tensor_pooling_bwd",Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::(output:Backend.Sym)::
+      (doutput:Backend.Sym)::Backend.Const(params)::Backend.Const(mode:String)::_, _) =>
+
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // unpack pooling paratemers
+      val PoolingParam(alpha, beta, window, padding, strides) = params.asInstanceOf[PoolingParam]
+
+      val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
+      val input_shape = tensor_shape(input, useOldMetadata = true)
+
+      val output_tensor = get_operand(output, anno)
+      val doutput_tensor = get_operand(doutput, anno)
+      val input_tensor = get_operand(input, anno)
+
+      val doutput_descriptor = getTensorDescriptor(doutput_shape, "tensor")
+      val output_descriptor = doutput_descriptor
+      val input_descriptor = getTensorDescriptor(input_shape, "tensor")
+
+      val pooling_descriptor = getPoolingDescriptor(mode, window, padding, strides)
+      
+      generate_comment("begin allocating gpu array for the gradient of input of pooling")
+      val dinput_size = input_shape.fold(1) { (a, b) => a * b }
+      val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the gradient of input of pooling")
+      
+      CUDNN_CHECK(CUDNN_POOLING_BWD(myCUDNNComm, pooling_descriptor, VAR(FLOAT(alpha)), output_descriptor, new ARRAY(output_tensor),
+        doutput_descriptor, new ARRAY(doutput_tensor), input_descriptor, new ARRAY(input_tensor), VAR(FLOAT(beta)), input_descriptor,
+        dinput))
       
       dinput.x
 

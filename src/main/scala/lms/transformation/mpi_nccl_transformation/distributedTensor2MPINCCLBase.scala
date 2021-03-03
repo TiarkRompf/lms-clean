@@ -134,6 +134,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   var cudnnTensor2Desc: HashMap[Seq[Int], (TOP, String)] = HashMap()
   var cudnnConv2Desc: HashMap[Seq[Int], CUDNN_CONV_DESCRIPTOR] = HashMap()
   var cudnnActv2Desc: HashMap[(String, Float), CUDNN_ACTIVATION_DESCRIPTOR] = HashMap()
+  var cudnnPool2Desc: HashMap[(String, Seq[Int]), CUDNN_POOLING_DESCRIPTOR] = HashMap()
   def set_up_cudnn(implicit __pos: SourceContext) = {
     val dummy = myCUDNNComm
     // cudnnTensor2Desc = HashMap()  // todo: FIXME
@@ -150,6 +151,9 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     }
     cudnnActv2Desc foreach {
       case (_, desc) => CUDNN_DESTROY_ACTIVATION_DESCRIPTOR(desc)
+    }
+    cudnnPool2Desc foreach {
+      case (_, desc) => CUDNN_DESTROY_POOLING_DESCRIPTOR(desc)
     }
   }
 

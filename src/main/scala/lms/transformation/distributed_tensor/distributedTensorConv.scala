@@ -110,6 +110,46 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     (new TENSOR(Adapter.g.reflectRead("tensor_dropout_bwd", C(res_tt), C(anno),
       doutput.x, reserveSpace.x, C(params))(doutput.x, reserveSpace.x)).withSrcType(__pos, doutput.et))
   }
+  
+  def PoolingForward(input: TENSOR, params: PoolingParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = PoolingForwardOutTensorType(input, params, anno)
+    (new TENSOR(Adapter.g.reflectRead("tensor_pooling", C(res_tt), C(anno),
+      input.x, C(params), C(mode))(input.x)).withSrcType(__pos, input.et))
+  }
+
+  def PoolingBackward(input: TENSOR, output: TENSOR, doutput: TENSOR, params: PoolingParam, mode: String,  anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = input.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_pooling_bwd", C(res_tt), C(anno),
+      input.x, output.x, doutput.x, C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, input.et))
+  }
+
+  def PoolingForwardOutTensorType(input: TENSOR, params: PoolingParam, anno: Anno): TensorType = {
+    // add assertions / requires
+    val input_shape = input.resultType.shape
+
+    val PoolingParam(alpha, beta, window, padding, strides) = params
+
+    val output_N = input_shape(CUDNN_N).size
+    val output_C = input_shape(CUDNN_C).size
+
+    def outputDim(inputDim: Int, pad: Int, windowDim: Int, str: Int) =
+      1 + (inputDim + 2*pad - windowDim) / str
+    
+    val output_H = outputDim(input_shape(CUDNN_H).size, padding(CUDNN_PARAM_H),
+      window(CUDNN_PARAM_H), strides(CUDNN_PARAM_H))
+    
+    val output_W = outputDim(input_shape(CUDNN_W).size, padding(CUDNN_PARAM_W),
+      window(CUDNN_PARAM_W), strides(CUDNN_PARAM_W))
+
+    val output_shape = Seq(
+      Size(Dim(CUDNN_N), output_N),
+      Size(Dim(CUDNN_C), output_C),
+      Size(Dim(CUDNN_H), output_H),
+      Size(Dim(CUDNN_W), output_W))
+
+    TensorType(output_shape, input.et, anno)
+  }
+
 
   override def mergable_dims(node: Node) = node match {
     // constraints:
@@ -127,9 +167,9 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     
     // dropout operation has no mergable dims
     case Node(s, "tensors_dropout", _, _) => List()
-
     case Node(s, "tensor_softmax", _, _) => List()
     case Node(s, "tensor_activation", _, _) => List()
+    case Node(s, "tensor_pooling", _, _) => List()
 
     case _ => super.mergable_dims(node)
   }
@@ -164,7 +204,6 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
             val x = new TENSOR(transform(s))
             val grad = SoftmaxBackward(x, gradMap(s), params, anno, pos)
             Accumulate(gradMap(a), grad, anno); ()
-           ()
         }) +=: backwardNodes
       
       case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::Backend.Const(mode:String)::_, _) =>
@@ -175,7 +214,6 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
             val y = new TENSOR(transform(s))
             val grad = ActivationBackward(x, y, gradMap(s), params, mode, anno, pos)
             Accumulate(gradMap(a), grad, anno); ()
-           ()
         }) +=: backwardNodes
     
       case Node(s, "tensors_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
@@ -189,6 +227,17 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
           val grads = gradMap.getGradsOfOp(s)
           val g = DropoutBackward(grads(0), TENSORS.getResult(x, 1), params, anno, pos)
           Accumulate(gradMap(a), g, anno); ()
+        }) +=: backwardNodes
+      
+      case Node(s, "tensor_pooling", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:PoolingParam)::Backend.Const(mode:String)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+
+        (() => {
+            val x = new TENSOR(transform(a))
+            val y = new TENSOR(transform(s))
+            val grad = PoolingBackward(x, y, gradMap(s), params, mode, anno, pos)
+            Accumulate(gradMap(a), grad, anno); ()
         }) +=: backwardNodes
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
@@ -247,6 +296,12 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = DropoutForward(self, params, anno, __pos)
       ((0 until 1): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
+    }
+
+    def pooling(anno: Anno, params: PoolingParam)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val t = PoolingForward(self, params, "max", anno, __pos)
+      Wrap[Tensor[T]](t.x)
     }
   }
 }

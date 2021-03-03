@@ -308,5 +308,31 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
     checkWithLogPath("dropout", driver.code, "cu", driver.setLogPath)
   }
+  
+  test("pooling") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        dim_name = 0
+
+        val inputTensorType = resultType[Float](Seq(2, 1, 3, 3))
+        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
+        val params = PoolingParam(1.0f, 0.0f, Seq(2, 2), Seq(1, 1), Seq(1, 1))
+
+        val model = module {
+          // val tensor_input = Tensor.input[Float](inputTensorType)
+          val tensor_filter = Tensor.weight[Float](Seq(2, 1, 9, 9))
+          
+          tensor_filter pooling (batchSplitAnno, params)
+        }
+        model(10)
+        printf("compile")
+      }
+    }
+    checkWithLogPath("pooling", driver.code, "cu", driver.setLogPath)
+  }
 }
 
