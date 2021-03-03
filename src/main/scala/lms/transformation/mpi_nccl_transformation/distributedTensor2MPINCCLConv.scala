@@ -116,8 +116,8 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         CUDNN_CHECK(CUDNN_CREATE_POOLING_DESCRIPTOR(desc))
         val cudnnMode: TOP = mode match {
           case "max"          => CUDNN_POOLING_MAX
-          case "avg"          => CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING
-          case "avg_no_pad"   => CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING
+          case "avg_in_pad"   => CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING
+          case "avg_ex_pad"   => CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING
           case "max_dtm"      => CUDNN_POOLING_MAX_DETERMINISTIC
           case _              => CUDNN_POOLING_MAX
         }

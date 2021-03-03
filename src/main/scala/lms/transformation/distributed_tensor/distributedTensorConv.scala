@@ -297,9 +297,15 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
       ((0 until 1): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
     }
 
-    def pooling(anno: Anno, params: PoolingParam)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def maxpool(anno: Anno, params: PoolingParam, deterministic: Boolean = false)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val self = tensor(x)
-      val t = PoolingForward(self, params, "max", anno, __pos)
+      val t = PoolingForward(self, params, if (deterministic) "max_dtm" else "max", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def avgpool(anno: Anno, params: PoolingParam, include_pad: Boolean = false)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val t = PoolingForward(self, params, if (include_pad) "avg_in_pad" else "avg_ex_pad", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }

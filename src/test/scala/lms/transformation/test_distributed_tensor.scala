@@ -323,10 +323,9 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val params = PoolingParam(1.0f, 0.0f, Seq(2, 2), Seq(1, 1), Seq(1, 1))
 
         val model = module {
-          // val tensor_input = Tensor.input[Float](inputTensorType)
           val tensor_filter = Tensor.weight[Float](Seq(2, 1, 9, 9))
           
-          tensor_filter pooling (batchSplitAnno, params)
+          tensor_filter maxpool (batchSplitAnno, params)
         }
         model(10)
         printf("compile")
