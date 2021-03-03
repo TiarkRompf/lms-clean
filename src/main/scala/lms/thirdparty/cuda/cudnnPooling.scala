@@ -44,7 +44,7 @@ trait CUDNNPoolingTypeLess extends Dsl with CLibs with CUDNNBaseTypeLess {
 
     def CUDNN_POOLING_BWD(handle: TOP, poolingDesc: CUDNN_POOLING_DESCRIPTOR, alpha: VAR, yDesc: TOP,
                           y: TOP, dyDesc: TOP, dy: TOP, xDesc: TOP, xData: TOP,
-                          beta: VAR, dxDesc: TOP, dx: TOP) =
+                          beta: VAR, dxDesc: TOP, dx: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnPoolingBackward", handle.x, poolingDesc.x, alpha.x, yDesc.x, y.x, dyDesc.x, dy.x,
       xDesc.x, xData.x, beta.x, dxDesc.x, dx.x)(Seq(0,1,2,3,4,5,6,7,8,9,10), Seq(11), Set[Int](2,9))
   
