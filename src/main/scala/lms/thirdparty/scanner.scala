@@ -12,7 +12,7 @@ import lms.collection.mutable.ArrayOps
 import lms.collection._
 
 // Examples of using lib-function for simple file scanning
-trait ScannerOps extends Equal with ArrayOps with CLibs {
+trait ScannerOps extends Equal with ArrayOps with RangeOps with CLibs {
 
   // FIXME(feiw): should the open and close function have CTRL effects??
   // open function returns a file discriptor
@@ -46,6 +46,21 @@ trait ScannerOps extends Equal with ArrayOps with CLibs {
     checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%d"), UnwrapV(target))(Seq[Int](0), Seq[Int](2), Set[Int](2)))
   def getInt(fp: Rep[FilePointer], target: Rep[Array[Int]], target_offset: Rep[Int])(implicit pos: SourceContext) =
     checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const("%d"), Unwrap(target(target_offset)))(Seq[Int](0), Seq[Int](), Set[Int](2), Unwrap(target)))
+  def getElement[T:Manifest](fp: Rep[FilePointer], target: Rep[Array[T]], target_offset: Rep[Int])(implicit pos: SourceContext) = {
+    val format = manifest[T] match {
+      case m if m == manifest[Float] => "%f"
+      case m if m == manifest[Int] => "%d"
+      case m => throw new Exception(s"not yet supporting manifest ${m}")
+    }
+    checkStatus(libFunction[Int]("fscanf", Unwrap(fp), lms.core.Backend.Const(format), Unwrap(target(target_offset)))(Seq[Int](0), Seq[Int](), Set[Int](2), Unwrap(target)))
+  }
+
+  def readFileToArray[T:Manifest](name:Rep[String], mode:Rep[String], array: Rep[Array[T]], size:Rep[Int])(implicit pos: SourceContext) = {
+    val fp = fopen(name, mode)
+    for (i <- (0 until size): Rep[Range])
+      getElement[T](fp, array, i)
+    fclose(fp)
+  }
 
   // writing to file in C
   def fprintf(fp: Rep[FilePointer], format: Rep[String], contents: Rep[Any]*) = {
@@ -56,7 +71,7 @@ trait ScannerOps extends Equal with ArrayOps with CLibs {
 
 trait CCodeGenScannerOps extends ExtendedCCodeGen with CCodeGenLibs {
   // need to register the headers
-  registerHeader("<scanner_header.h>")
+  registerHeader("\"scanner_header.h\"")
   registerDefine("_GNU_SOURCE")
 
   // type remap

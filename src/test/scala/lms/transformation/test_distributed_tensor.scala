@@ -7,7 +7,7 @@ import macros.SourceContext
 
 import lms.core._
 import lms.core.stub._
-import lms.thirdparty.{CCodeGenLibs, CCodeGenMPI, CCodeGenNCCLOps, CCodeGenCUDNN}
+import lms.thirdparty.{CCodeGenLibs, CCodeGenMPI, CCodeGenNCCLOps, CCodeGenCUDNN, CCodeGenScannerOps}
 import lms.thirdparty.array_computation.{CCodeGenCBLASOps, CCodeGenCudaOps}
 
 import Backend._
@@ -19,7 +19,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   abstract class CompilerCDistributedTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeDistributedTensorOps { q =>
 
     override val codegen = new DslGenCPP with CCodeGenLibs with CCodeGenCBLASOps with
-        CCodeGenCudaOps with CCodeGenNCCLOps with CCodeGenMPI with CCodeGenCUDNN {
+        CCodeGenCudaOps with CCodeGenNCCLOps with CCodeGenMPI with CCodeGenCUDNN with CCodeGenScannerOps {
       val IR: q.type = q
 
       override def mayInline(n: Node): Boolean = n match {
@@ -50,183 +50,157 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
   }
 
-  // test("AD") {
+  test("mult") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          // this is still hacky :(
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(32, 32), tensorName=Some("weight"))
+          input * (weight, anno)
+        }
+        model(1)
+        printf("compile\n")
+      }
+    }
+    checkWithLogPath("mult", driver.code, "cu", driver.setLogPath)
+  }
+
+  // test("split") {
   //   val driver = new CompilerCDistributedTensor[Int, Unit] {
   //     import FixedSizeDistributedTensorTypeLess._
 
   //     @virtualize
   //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       dim_name = 0
-  //       implicit val anno = NAnno
+  //       val inputTensorType = resultType[Float](Seq(32, 32))
+  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
   //       val model = module {
-  //         val tensor_input = Tensor.input[Float](Seq(3, 3))
-  //         val tensor_weight = Tensor.weight[Float](Seq(3, 3))
-  //         tensor_input * tensor_weight
+  //         val tensor_input = Tensor.input[Float](inputTensorType)
+  //         val tensor_weight = Tensor.weight[Float](Seq(32, 16))
+  //         val splits = tensor_input.split(1, List(16, 16), batchSplitAnno)
+  //         splits(0) * (tensor_weight, batchSplitAnno)
   //       }
-  //       model()
+  //       model(10)
+  //       printf("compile\n")
+  //     }
+  //   }
+  //   checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
+  // }
+
+  // test("split2") {
+  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
+  //     import FixedSizeDistributedTensorTypeLess._
+
+  //     @virtualize
+  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
+  //       val inputTensorType = resultType[Float](Seq(32, 32))
+  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
+  //       val model = module {
+  //         val tensor_input = Tensor.input[Float](inputTensorType)
+  //         val tensor_weight = Tensor.weight[Float](Seq(32, 64))
+  //         val splits = tensor_weight.split(1, List(32, 32), batchSplitAnno)
+  //         tensor_input * (splits(0), batchSplitAnno)
+  //       }
+  //       model(10)
+  //       printf("compile\n")
+  //     }
+  //   }
+  //   checkWithLogPath("split2", driver.code, "cu", driver.setLogPath)
+  // }
+
+  // test("dot") {
+  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
+  //     import FixedSizeDistributedTensorTypeLess._
+
+  //     @virtualize
+  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
+  //       val inputTensorType = resultType[Float](Seq(32,32))
+  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
+  //       val model = module {
+  //         val tensor_input = Tensor.input[Float](inputTensorType)
+  //         val tensor_weight = Tensor.weight[Float](Seq(32, 32))
+  //         tensor_input gemm (tensor_weight, batchSplitAnno)
+  //       }
+  //       model(10)
+  //       printf("compile\n")
+  //     }
+  //   }
+  //   checkWithLogPath("dot", driver.code, "cu", driver.setLogPath)
+  // }
+
+  // test("negate") {
+  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
+  //     import FixedSizeDistributedTensorTypeLess._
+
+  //     @virtualize
+  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
+  //       val inputTensorType = resultType[Float](Seq(32, 32))
+  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+
+  //       val model = module {
+  //         val tensor_input = Tensor.input[Float](inputTensorType)
+  //         val tensor_weight = Tensor.weight[Float](Seq(32, 32))
+  //         val tensor_intermediate = tensor_weight neg (batchSplitAnno)
+  //         tensor_input + (tensor_intermediate, batchSplitAnno)
+  //       }
+  //       model(10)
   //       printf("compile")
   //     }
   //   }
-  //   check("AD", driver.code, "cu")
+  //   checkWithLogPath("negate", driver.code, "cu", driver.setLogPath)
   // }
 
-  test("Annotation") {
-    val driver = new CompilerCDistributedTensor[Int, Unit] {
-      import FixedSizeDistributedTensorTypeLess._
+  // // test("show") {
+  // //   val driver = new CompilerCDistributedTensor[Int, Unit] {
+  // //     import FixedSizeDistributedTensorTypeLess._
 
-      @virtualize
-      def snippet(arg: Rep[Int]): Rep[Unit] = {
-        dim_name = 0
-        val inputTensorType = resultType[Float](Seq(32,32))
-        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
+  // //     @virtualize
+  // //     def snippet(arg: Rep[Int]): Rep[Unit] = {
+  // //       dim_name = 0
+  // //       val gpus = List(GPU(0), GPU(1))
+  // //       val a = INPUT(Seq(32,64), manifest[Float], 1, gpus)
+  // //       val b = INPUT(Seq(32,64), manifest[Float], 1, gpus)
+  // //       val c = Add(a, b, a.annotation)
+  // //       c.show
+  // //       ()
+  // //     }
+  // //   }
+  // //   System.out.println(indent(driver.code))
+  // // }
 
-        val model = module {
-          val tensor_input = Tensor.input[Float](inputTensorType)
-          val tensor_weight = Tensor.weight[Float](Seq(32, 32))
-          tensor_input * (tensor_weight, batchSplitAnno)
-        }
-        model(10)
-        printf("compile\n")
-      }
-    }
-    checkWithLogPath("Annotation", driver.code, "cu", driver.setLogPath)
-  }
 
-  test("split") {
-    val driver = new CompilerCDistributedTensor[Int, Unit] {
-      import FixedSizeDistributedTensorTypeLess._
-
-      @virtualize
-      def snippet(arg: Rep[Int]): Rep[Unit] = {
-        dim_name = 0
-        val inputTensorType = resultType[Float](Seq(32, 32))
-        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-
-        val model = module {
-          val tensor_input = Tensor.input[Float](inputTensorType)
-          val tensor_weight = Tensor.weight[Float](Seq(32, 16))
-          val splits = tensor_input.split(1, List(16, 16), batchSplitAnno)
-          splits(0) * (tensor_weight, batchSplitAnno)
-        }
-        model(10)
-        printf("compile\n")
-      }
-    }
-    checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
-  }
-
-  test("split2") {
-    val driver = new CompilerCDistributedTensor[Int, Unit] {
-      import FixedSizeDistributedTensorTypeLess._
-
-      @virtualize
-      def snippet(arg: Rep[Int]): Rep[Unit] = {
-        dim_name = 0
-        val inputTensorType = resultType[Float](Seq(32, 32))
-        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-
-        val model = module {
-          val tensor_input = Tensor.input[Float](inputTensorType)
-          val tensor_weight = Tensor.weight[Float](Seq(32, 64))
-          val splits = tensor_weight.split(1, List(32, 32), batchSplitAnno)
-          tensor_input * (splits(0), batchSplitAnno)
-        }
-        model(10)
-        printf("compile\n")
-      }
-    }
-    checkWithLogPath("split2", driver.code, "cu", driver.setLogPath)
-  }
-
-  test("dot") {
-    val driver = new CompilerCDistributedTensor[Int, Unit] {
-      import FixedSizeDistributedTensorTypeLess._
-
-      @virtualize
-      def snippet(arg: Rep[Int]): Rep[Unit] = {
-        dim_name = 0
-        val inputTensorType = resultType[Float](Seq(32,32))
-        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-
-        val model = module {
-          val tensor_input = Tensor.input[Float](inputTensorType)
-          val tensor_weight = Tensor.weight[Float](Seq(32, 32))
-          tensor_input gemm (tensor_weight, batchSplitAnno)
-        }
-        model(10)
-        printf("compile\n")
-      }
-    }
-    checkWithLogPath("dot", driver.code, "cu", driver.setLogPath)
-  }
-
-  test("negate") {
-    val driver = new CompilerCDistributedTensor[Int, Unit] {
-      import FixedSizeDistributedTensorTypeLess._
-
-      @virtualize
-      def snippet(arg: Rep[Int]): Rep[Unit] = {
-        dim_name = 0
-        val inputTensorType = resultType[Float](Seq(32, 32))
-        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-
-        val model = module {
-          val tensor_input = Tensor.input[Float](inputTensorType)
-          val tensor_weight = Tensor.weight[Float](Seq(32, 32))
-          val tensor_intermediate = tensor_weight neg (batchSplitAnno)
-          tensor_input + (tensor_intermediate, batchSplitAnno)
-        }
-        model(10)
-        printf("compile")
-      }
-    }
-    checkWithLogPath("negate", driver.code, "cu", driver.setLogPath)
-  }
-
-  // test("show") {
+  // test("conv") {
   //   val driver = new CompilerCDistributedTensor[Int, Unit] {
   //     import FixedSizeDistributedTensorTypeLess._
+  //     import scala.collection.immutable.Seq
 
   //     @virtualize
   //     def snippet(arg: Rep[Int]): Rep[Unit] = {
   //       dim_name = 0
-  //       val gpus = List(GPU(0), GPU(1))
-  //       val a = INPUT(Seq(32,64), manifest[Float], 1, gpus)
-  //       val b = INPUT(Seq(32,64), manifest[Float], 1, gpus)
-  //       val c = Add(a, b, a.annotation)
-  //       c.show
-  //       ()
+
+  //       val inputTensorType = resultType[Float](Seq(2, 1, 9, 9))
+  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
+
+  //       val model = module {
+  //         val tensor_input = Tensor.input[Float](inputTensorType)
+  //         val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
+
+  //         val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
+  //         tensor_input conv (tensor_filter, batchSplitAnno, params)
+  //       }
+  //       model(10)
+  //       printf("compile")
   //     }
   //   }
-  //   System.out.println(indent(driver.code))
+  //   checkWithLogPath("conv", driver.code, "cu", driver.setLogPath)
   // }
-
-
-  test("conv") {
-    val driver = new CompilerCDistributedTensor[Int, Unit] {
-      import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
-
-      @virtualize
-      def snippet(arg: Rep[Int]): Rep[Unit] = {
-        dim_name = 0
-
-        val inputTensorType = resultType[Float](Seq(2, 1, 9, 9))
-        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
-
-        val model = module {
-          val tensor_input = Tensor.input[Float](inputTensorType)
-          val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
-          
-          val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
-          tensor_input conv (tensor_filter, batchSplitAnno, params)
-        }
-        model(10)
-        printf("compile")
-      }
-    }
-    checkWithLogPath("conv", driver.code, "cu", driver.setLogPath)
-  }
 
 }
 

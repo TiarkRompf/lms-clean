@@ -29,11 +29,13 @@ trait TutorialFunSuite extends LibSuite {
     }
   }
   def writeFile(name: String, content: String) {
+    new File(java.nio.file.Paths.get(name).getParent().toString).mkdirs()
     val out = new java.io.PrintWriter(new File(name))
     out.write(content)
     out.close()
   }
   def writeFileIndented(name: String, content: String) {
+    new File(java.nio.file.Paths.get(name).getParent().toString).mkdirs()
     val out = new java.io.PrintWriter(new File(name))
     printIndented(content)(out)
     out.close()
@@ -61,7 +63,7 @@ trait TutorialFunSuite extends LibSuite {
     }
   }
   def log_path(label: String, suffix: String = "scala") = {
-    val fileprefix = prefix+under+label + "/"
+    val fileprefix = prefix+under+label + "/graphs/"
     val directory = new File(fileprefix);
     if (!directory.exists()) {
       directory.mkdir()
@@ -74,7 +76,7 @@ trait TutorialFunSuite extends LibSuite {
     writeFile(s"$logPath/GraphLog${if (index == -1) "--InitialGraph.txt" else s"-$index-$passName"}", graph)
   def checkWithLogPath(label: String, raw_code: => String, suffix: String = "scala", setPath: String => Unit) = {
     setPath(log_path(label, suffix))
-    check(label, raw_code, suffix)
+    check(label + "/" + label, raw_code, suffix)
   }
   def indent(str: String) = {
     val s = new StringWriter

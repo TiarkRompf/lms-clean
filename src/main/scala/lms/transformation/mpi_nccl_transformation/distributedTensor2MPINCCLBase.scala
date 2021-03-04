@@ -3,12 +3,13 @@ package lms.transformation.tensor
 import scala.annotation.implicitNotFound
 import scala.collection._
 import scala.collection.mutable.HashMap
+import scala.collection.immutable.Set
 
 import lms.core._
 import lms.core.stub._
 import lms.collection.mutable._
 import lms.macros.SourceContext
-import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps, CUDNNTypeLess}
+import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps, CUDNNTypeLess, CLibTypeLess}
 import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess, CUBLASTypeLess, CudaOps}
 import lms.transformation.util.DataStructure
 
@@ -30,6 +31,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   import SIZE_TTypeLess._
   import CUBLASTypeLess._
   import CUDNNTypeLess._
+  import CLibTypeLess._
 
   def numeral(size: Seq[Int]) = size.foldLeft(1)(_ * _)
 
@@ -61,6 +63,40 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       val gpuArray = gpu_array(size, m, device)
       CUDA_MEMCPY(gpuArray, cpuArray, size, HOST2DEVICE, m)
       gpuArray
+    }
+
+  def ScanFileRank(fileName: Rep[String], rank: INT, array: ARRAY, count: Int)(implicit pos: SourceContext) = array.et match {
+    case m if m == manifest[Float] =>
+      LIB_FUNCTION(manifest[Unit], "scan_float_rank", Unwrap(fileName), rank.x, array.x, lms.core.Backend.Const(count))(Seq[Int](), Seq[Int](1), Set[Int]())
+    case m if m == manifest[Int] =>
+      LIB_FUNCTION(manifest[Unit], "scan_int_rank", Unwrap(fileName), rank.x, array.x, lms.core.Backend.Const(count))(Seq[Int](), Seq[Int](1), Set[Int]())
+    case m => throw new Exception(s"not yet supporting manifest ${m}")
+  }
+
+  def CheckFileRank(fileName: Rep[String], rank: INT, gold: ARRAY, check: ARRAY, count: Int)(implicit pos: SourceContext) = check.et match {
+    case m if m == manifest[Float] =>
+      LIB_FUNCTION(manifest[Unit], "check_float_array_rank", Unwrap(fileName), rank.x, gold.x, check.x, lms.core.Backend.Const(count))(Seq[Int](1, 2), Seq[Int](), Set[Int](), Adapter.CTRL)
+    case m if m == manifest[Int] =>
+      LIB_FUNCTION(manifest[Unit], "check_int_array_rank", Unwrap(fileName), rank.x, gold.x, check.x, lms.core.Backend.Const(count))(Seq[Int](1, 2), Seq[Int](), Set[Int](), Adapter.CTRL)
+    case m => throw new Exception(s"not yet supporting manifest ${m}")
+  }
+
+  // helper function for initializing a GPU array from binary file
+  def gpu_scanner_array(name: String, size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"initializing GPU array of size $size and type $m at device (pre-rename) ${device.x} from binary file ${name}") {
+      val cpuArray = cpu_array(size, m)
+      val gpuArray = gpu_array(size, m, myNCCLRank)
+      ScanFileRank(unit("golden/" + name), device, cpuArray, size)
+      CUDA_MEMCPY(gpuArray, cpuArray, size, HOST2DEVICE, m)
+      gpuArray
+    }
+  // helper function for checking a GPU array against golden values
+  def check_gpu_array(array: ARRAY, name: String, size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext) =
+    withComment(s"checking GPU array of size $size and type $m at device (pre-name) ${device.x} again binary file ${name}") {
+      val goldenArray = cpu_array(size, m)
+      val checkArray = cpu_array(size, m)
+      CUDA_MEMCPY(checkArray, array, size, DEVICE2HOST, m)
+      CheckFileRank(unit("golden/" + name), device, goldenArray, checkArray, size)
     }
   // helper function for declaring a GPU array with fixed value
   val CUDA_FILL_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
@@ -129,8 +165,8 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   // var cudnnTensor2Desc: HashMap[Backend.Sym, (TOP, String)] = HashMap()
   var cudnnTensor2Desc: HashMap[Seq[Int], (TOP, String)] = HashMap()
   var cudnnConv2Desc: HashMap[Seq[Int], CUDNN_CONV_DESCRIPTOR] = HashMap()
-  def set_up_cudnn(implicit __pos: SourceContext) = { 
-    val dummy = myCUDNNComm 
+  def set_up_cudnn(implicit __pos: SourceContext) = {
+    val dummy = myCUDNNComm
     // cudnnTensor2Desc = HashMap()  // todo: FIXME
   }
   def finalize_cudnn(implicit __pos: SourceContext) = {
@@ -166,8 +202,11 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       anno match {
         case NAnno => if (myNCCLRank == 0) gpu_random_array(count, m, 0).x else Backend.Const(())
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          gpu_random_array(count2, m, myNCCLRank).x
+          val count = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
+          tt.tensorName match {
+            case Some(name) => gpu_scanner_array(name, count, m, myNCCLRank).x
+            case None => gpu_random_array(count, m, myNCCLRank).x
+          }
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           val array = gpu_random_array(count, m, myNCCLRank)
           NCCL_CHECK(NCCL_ALLREDUCE(m, array, array, INT(count) * SIZE_OF(m), NCCL_SUM, myNCCLComm, myNCCLStream))
@@ -196,8 +235,12 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       anno match {
         case NAnno => if (myNCCLRank == 0) gpu_random_array(count, m, 0).x else Backend.Const(())
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          gpu_random_array(count2, m, myNCCLRank).x
+          val count = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
+          tt.tensorName match {
+            case Some(name) => // read input from a file called `name`
+              gpu_scanner_array(name, count, m, myNCCLRank).x
+            case None => gpu_random_array(count, m, myNCCLRank).x
+          }
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           val array = gpu_random_array(count, m, myNCCLRank)
           NCCL_CHECK(NCCL_ALLREDUCE(m, array, array, INT(count) * SIZE_OF(m), NCCL_SUM, myNCCLComm, myNCCLStream))
@@ -290,6 +333,28 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
           Backend.Const(())
       }
 
+    case Node(s, "check_tensor", (tensor:Backend.Exp)::Backend.Const(name:String)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      val sourceTensor = new TENSOR(tensor, useOldMetadata = true)
+      val m = sourceTensor.et
+      val tt = sourceTensor.resultType
+      val anno = sourceTensor.annotation
+
+      anno match {
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in check_tensor")
+        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
+          val count = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
+          check_gpu_array(new ARRAY(transform(tensor)), name, count, m, myNCCLRank)
+          Backend.Const(())
+        case SAnno(dim: Dim, devices: Seq[Device], _) =>
+          IF (EQUAL(myNCCLRank, INT(0))) {
+            val count = numeral(sourceTensor.shapeSize)
+            check_gpu_array(new ARRAY(transform(tensor)), name, count, m, myNCCLRank)
+            UNIT(Backend.Const(()))
+          } { UNIT(Backend.Const(())) }
+          Backend.Const(())
+      }
 
     case Node(s, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _) => // subst(s)
       Adapter.g.globalDefsCache.get(transform(op).asInstanceOf[Backend.Sym]) match {

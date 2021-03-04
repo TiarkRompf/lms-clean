@@ -43,7 +43,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   case class Dim(x: Int) // named dimension
   def dim = Dim(next_dim_name) // fresh dim
   case class Size(dim: Dim, size: Int) // dim and length
-  case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno) { // tensor type
+  case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno, tensorName: Option[String] = None) { // tensor type
     def namedDim(x: Int) = shape(x).dim
     def contains(d: Dim) = shape.map(_.dim).contains(d)
     def shapeSize = shape.map(_.size)
@@ -121,6 +121,10 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     // FIXME(feiw) save to where?
     def save(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("save", x)(x)(Adapter.CTRL))
+    }
+
+    def check(filename: String)(implicit __pos: SourceContext): UNIT = {
+      UNIT(Adapter.g.reflectEffect("check_tensor", x, lms.core.Backend.Const(filename))(x)(Adapter.CTRL))
     }
   }
 
@@ -228,13 +232,20 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
       Wrap[Tensor[T]](tensor.x)
     }
 
+    def input[T:Manifest](shape: Seq[Int], name: String, splitDim: Int, splitTo: List[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensorType = resultType[Float](shape, tensorName=Some(name))
+      val sAnno = SAnno(tensorType.shape(splitDim).dim, splitTo)
+      val tensor = INPUT(tensorType, sAnno)
+      Wrap[Tensor[T]](tensor.x)
+    }
+
     def weight[T:Manifest](shape: Seq[Int], index: Int, devices: Seq[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val tensor = WEIGHT(shape, manifest[T], index, devices)
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def weight[T:Manifest](shape: Seq[Int])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = WEIGHT(TensorType(shape.map(s => Size(dim, s)), manifest[T]), anno)
+    def weight[T:Manifest](shape: Seq[Int], tensorName: Option[String] = None)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = WEIGHT(TensorType(shape.map(s => Size(dim, s)), manifest[T], tensorName = tensorName), anno)
       Wrap[Tensor[T]](tensor.x)
     }
 
@@ -249,14 +260,15 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
     }
   }
 
-  def resultType[T:Numeric:Manifest](shape: Seq[Int]): TensorType =
-    TensorType(shape.map(s => Size(dim, s)), manifest[T])
+  def resultType[T:Numeric:Manifest](shape: Seq[Int], tensorName: Option[String] = None): TensorType =
+    TensorType(shape.map(s => Size(dim, s)), manifest[T], tensorName=tensorName)
 
   def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))
 
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
     def shape: Seq[Int] = self.shapeSize
+    def anno: Anno = self.annotation
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
   }
 }

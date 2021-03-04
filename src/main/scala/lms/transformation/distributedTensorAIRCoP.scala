@@ -37,6 +37,8 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     implicit val pos = Adapter.oldSourceMap(ns.last.n)
     (() => {
       val result = new TENSOR(transform(res.res))
+      // FIXME(feiw) this is hard coded
+      result.check("loss")
       val grad = ONES(result.resultType, result.annotation)
       gradMap(res.res) = grad
     }) +=: backwardNodes
