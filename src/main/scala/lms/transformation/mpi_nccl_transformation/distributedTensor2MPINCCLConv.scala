@@ -131,7 +131,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
     }
   }
 
-  def getDropoutDescriptor(states: ARRAY, states_bytes: VAR, params: DropoutParam): CUDNN_DROPOUT_DESCRIPTOR = {
+  def getDropoutDescriptor(states: ARRAY, states_bytes: VAR, params: DropoutParam)(implicit __pos: SourceContext): CUDNN_DROPOUT_DESCRIPTOR = {
     val DropoutParam(dropout, seed) = params
     generate_comment("begin creating dropout descriptor")
     val desc = new CUDNN_DROPOUT_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_DROPOUT_DESCRIPTOR], "cudnnDropoutDescriptor_t").x)
