@@ -114,7 +114,9 @@ void Snippet(int x0) {
     CUDA_CALL(cudaSetDevice(x6));
     float* x40 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x40, (size_t)(1024 * sizeof(float))));
-    CUBLAS_CALL(cublasSgemm(x7, CUBLAS_OP_N, CUBLAS_OP_T, 32, 32, 32, &1.0, x38, 32, x39, 32, &0.0, x40, 32));
+    float x41 = 1.0;
+    float x42 = 0.0;
+    CUBLAS_CALL(cublasSgemm(x7, CUBLAS_OP_N, CUBLAS_OP_T, 32, 32, 32, &x41, x38, 32, x39, 32, &x42, x40, 32));
     // end computing DOT on GPU for size 1024 and type Float at device (pre-rename) x39 with left_operand x168 and right_operand x184 with transpose options
     ncclAllReduce(x40, x40, (size_t)1024, ncclFloat32, ncclSum, x4, x5);
     // begin computing ACCUM on GPU for size 1024 and type Float at device (pre-rename) x39 with base_operand x91 and addition_operand x197
@@ -129,12 +131,12 @@ void Snippet(int x0) {
   }
   if (x6 == 0) {
     // begin copying GPU array x68 to CPU and print for size 1024 and type Float
-    float* x41 = (float*)malloc(1024 * sizeof(float));
-    CUDA_CALL(cudaMemcpy(x41, x10, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
-    int x42 = 0;
-    while (x42 != 1024) {
-      printf("%f ", x41[x42]);
-      x42 = x42 + 1;
+    float* x43 = (float*)malloc(1024 * sizeof(float));
+    CUDA_CALL(cudaMemcpy(x43, x10, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
+    int x44 = 0;
+    while (x44 != 1024) {
+      printf("%f ", x43[x44]);
+      x44 = x44 + 1;
     }
     printf("\n");
     // end copying GPU array x68 to CPU and print for size 1024 and type Float
