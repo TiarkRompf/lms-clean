@@ -150,6 +150,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val filter_descriptor = getTensorDescriptor(filter_shape, "filter")
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
+      /*
       generate_comment("begin finding convolution output tensor shape")
       var output_batchsize = 0
       var output_height = 0
@@ -168,6 +169,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       generate_comment("begin allocating gpu array for the output of convolution")
       val output_size = output_batchsize * output_height * output_width * output_channels
+      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
+      generate_comment("end allocating gpu array for the output of convolution")
+      */
+      val output_shape = tensor_shape(s, useOldMetadata = true)
+      val output_descriptor = getTensorDescriptor(output_shape, "tensor")
+
+      generate_comment("begin allocating gpu array for the output of convolution")
+      val output_size = output_shape.fold(1) { (a, b) => a * b }
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the output of convolution")
 
