@@ -114,9 +114,11 @@ void Snippet(int x0) {
     float* x39 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x39, (size_t)(200 * sizeof(float))));
     // end allocating gpu array for the output of pooling
+    // begin pooling forward pass
     float x40 = 1.0;
     float x41 = 0.0;
     CUDNNCHECK(cudnnPoolingForward(x7, x38, &x40, x36, x10, &x41, x37, x39));
+    // end pooling forward pass
     // begin initializing fixed GPU array of size 100 and type Float and device (pre-rename) x39
     CUDA_CALL(cudaSetDevice(x6));
     float* x42 = (float*)malloc(0 * sizeof(float));
@@ -128,13 +130,15 @@ void Snippet(int x0) {
     float* x43 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x43, (size_t)(162 * sizeof(float))));
     // end allocating gpu array for the gradient of input of pooling
+    // begin pooling backward pass
     float x44 = 1.0;
     float x45 = 0.0;
     CUDNNCHECK(cudnnPoolingBackward(x7, x38, &x44, x37, x39, x37, x42, x36, x10, &x45, x36, x43));
-    // begin computing ACCUM on GPU for size 162 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x203
+    // end pooling backward pass
+    // begin computing ACCUM on GPU for size 162 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x205
     CUDA_CALL(cudaSetDevice(x6));
     x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x43, 162);
-    // end computing ACCUM on GPU for size 162 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x203
+    // end computing ACCUM on GPU for size 162 and type Float at device (pre-rename) x39 with base_operand x93 and addition_operand x205
     // begin computing SGD on GPU for size 162 and type Float at device (pre-name) x39 with weight x70, grad x93, and momentum x131
     CUDA_CALL(cudaSetDevice(x6));
     x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x11, x18, 162);

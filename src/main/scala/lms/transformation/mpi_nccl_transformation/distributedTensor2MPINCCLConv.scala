@@ -133,7 +133,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
 
   override def transform(n: Node): Backend.Exp = n match {
-    // convolution forward operation
     case Node(s, "tensor_conv", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::
       Backend.Const(params)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
@@ -167,7 +166,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       output_shape(CUDNN_W) = output_width
       val output_descriptor = getTensorDescriptor(output_shape.toList, "tensor")
 
-      // allocate output tensor
       generate_comment("begin allocating gpu array for the output of convolution")
       val output_size = output_batchsize * output_height * output_width * output_channels
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
@@ -526,8 +524,10 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the output of pooling")
 
+      generate_comment("begin pooling forward pass")
       CUDNN_CHECK(CUDNN_POOLING_FWD(myCUDNNComm, pooling_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
         VAR(FLOAT(beta)), output_descriptor, output))
+      generate_comment("end pooling forward pass")
       
       output.x
     
@@ -557,9 +557,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the gradient of input of pooling")
       
+      generate_comment("begin pooling backward pass")
       CUDNN_CHECK(CUDNN_POOLING_BWD(myCUDNNComm, pooling_descriptor, VAR(FLOAT(alpha)), output_descriptor, new ARRAY(output_tensor),
         doutput_descriptor, new ARRAY(doutput_tensor), input_descriptor, new ARRAY(input_tensor), VAR(FLOAT(beta)), input_descriptor,
         dinput))
+      generate_comment("end pooling backward pass")
       
       dinput.x
 
