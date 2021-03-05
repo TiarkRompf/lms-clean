@@ -24,24 +24,24 @@ trait CUDNNDropoutTypeLess extends Dsl with CLibs with CUDNNBaseTypeLess {
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyDropoutDescriptor", convDesc.x)(Seq(), Seq(0), Set[Int]())
    
   def CUDNN_SET_DROPOUT_DESCRIPTOR(dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, handle: TOP, dropout: FLOAT, states: TOP,
-                              stateSizeInBytes: SIZE_T, seed: INT)(implicit __pos: SourceContext) =
+                              stateSizeInBytes: VAR, seed: INT)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetDropoutDescriptor", dropoutDesc.x, handle.x, dropout.x, states.x, 
       stateSizeInBytes.x, seed.x)(Seq(0,1,2,3,4,5), Seq(0,1,2,3), Set[Int]())
 
   
-  def CUDNN_DROPOUT_GET_RESERVE_SPACE_SZ(xDesc: TOP, sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+  def CUDNN_DROPOUT_GET_RESERVE_SPACE_SZ(xDesc: TOP, sizeInBytes: VAR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDropoutGetReserveSpaceSize", xDesc.x, sizeInBytes.x)(Seq(0), Seq(1), Set[Int](1))
   
-  def CUDNN_DROPOUT_GET_STATES_SZ(handle: TOP, sizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+  def CUDNN_DROPOUT_GET_STATES_SZ(handle: TOP, sizeInBytes: VAR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDropoutGetStatesSize", handle.x, sizeInBytes.x)(Seq(0), Seq(1), Set[Int](1))
 
   def CUDNN_DROPOUT_FWD(handle: TOP, dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, xdesc: TOP, x: TOP,
-                          yDesc: TOP, y: TOP, reserveSpace: TOP, reserveSpaceSizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+                          yDesc: TOP, y: TOP, reserveSpace: TOP, reserveSpaceSizeInBytes: VAR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT],"cudnnDropoutForward", handle.x, dropoutDesc.x, xdesc.x, x.x, yDesc.x, y.x, reserveSpace.x,
       reserveSpaceSizeInBytes.x)(Seq(0,1,2,3,4,7), Seq(5,6), Set[Int]())
 
   def CUDNN_DROPOUT_BWD(handle: TOP, dropoutDesc: CUDNN_DROPOUT_DESCRIPTOR, dyDesc: TOP, dy: TOP,
-                          dxDesc: TOP, dx: TOP, reserveSpace: TOP, reserveSpaceSizeInBytes: SIZE_T)(implicit __pos: SourceContext) =
+                          dxDesc: TOP, dx: TOP, reserveSpace: TOP, reserveSpaceSizeInBytes: VAR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT],"cudnnDropoutBackward", handle.x, dropoutDesc.x, dyDesc.x, dy.x, dxDesc.x, dx.x, reserveSpace.x,
       reserveSpaceSizeInBytes.x)(Seq(0,1,2,3,4,7), Seq(5,6), Set[Int]())
 }

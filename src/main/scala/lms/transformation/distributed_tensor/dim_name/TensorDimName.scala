@@ -53,9 +53,9 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
   }
 
   def update_dim_name(tt: TensorType): TensorType = TensorType(tt.shape.map{case Size(d, s) =>
-        Size(dim_names.union_map(d), s)}, tt.et, update_dim_name(tt.anno))
+        Size(dim_names.union_map.getOrElse(d, d), s)}, tt.et, update_dim_name(tt.anno))
   def update_dim_name(anno: Anno): Anno = anno match {
-    case SAnno(dim: Dim, devices, _) => SAnno(dim_names.union_map(dim), devices)
+    case SAnno(dim: Dim, devices, _) => SAnno(dim_names.union_map.getOrElse(dim, dim), devices)
     case a => a
   }
 
