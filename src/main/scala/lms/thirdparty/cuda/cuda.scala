@@ -265,6 +265,8 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
   def CUDA_RELU_GRAD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ relu_grad(_, m), s"generating kernel function for RELU_GRAD of type $m")
 
+  def CUDA_INVERT_GRAD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ invert_grad(_, m), s"generating kernel function for INVERT_GRAD of type $m")
+
   // Element-wise Add
   def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
     CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ + _, s"generating kernel function for ADD of type $m")

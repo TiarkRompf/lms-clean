@@ -90,7 +90,18 @@ trait DistributeTensor2MPI_NCCLBinary extends DistributeTensor2MPI_NCCLBase {
       array
     }
 
-  val binaryOps = List("tensor_add", "tensor_sub", "tensor_mult", "tensor_div", "tensor_tanh_grad", "tensor_relu_grad")
+  // helper function for computing element-wise invert gradient in GPUs
+  val CUDA_INVERT_GRAD_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
+  def CUDA_INVERT_GRAD_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_INVERT_GRAD_KERNEL_MAP.getOrElseUpdate(m, CUDA_INVERT_GRAD_KERNEL(m))
+  def gpu_invert_grad_array(size: Int, m: Manifest[_], device: INT, left_operand: Backend.Exp, right_operand: Backend.Exp)(implicit __pos: SourceContext): ARRAY =
+    withComment(s"computing INVERT_GRAD on GPU for size $size and type $m at device (pre-rename) ${device.x} with left_operand $left_operand and right_operand $right_operand") {
+      val array = gpu_array(size, m, device)
+      val invert_grad_fun = CUDA_INVERT_GRAD_FUN(m)
+      invert_grad_fun(new ARRAY(left_operand), new ARRAY(right_operand), array, size, DIM3(gridSize), DIM3(blockSize))
+      array
+    }
+
+  val binaryOps = List("tensor_add", "tensor_sub", "tensor_mult", "tensor_div", "tensor_tanh_grad", "tensor_relu_grad", "tensor_invert_grad")
 
   override def transform(n: Node): Backend.Exp = n match {
 
@@ -118,6 +129,7 @@ trait DistributeTensor2MPI_NCCLBinary extends DistributeTensor2MPI_NCCLBase {
             case "tensor_div" => gpu_div_array(count2, m, myNCCLRank, left_operand, right_operand).x
             case "tensor_tanh_grad" => gpu_tanh_grad_array(count2, m, myNCCLRank, left_operand, right_operand).x
             case "tensor_relu_grad" => gpu_relu_grad_array(count2, m, myNCCLRank, left_operand, right_operand).x
+            case "tensor_invert_grad" => gpu_invert_grad_array(count2, m, myNCCLRank, left_operand, right_operand).x
             case _ => throw new Exception(s"op $op is not binary op")
           }
         case SAnno(dim: Dim, devices: Seq[Device], _) =>

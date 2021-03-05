@@ -75,10 +75,10 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         forwardNodes += node
 
         (() => {
-          val a_tensor = new TENSOR(transform(a))
-          val square = Mul(a_tensor, a_tensor, anno)
-          val grad = Div(gradMap(a), square, anno)
-          Accumulate(gradMap(a), grad, anno); ()
+          // val a_tensor = new TENSOR(transform(a))
+          // val square = Mul(a_tensor, a_tensor, anno)
+          // val grad = Negate(Div(gradMap(s), square, anno), anno)
+          Accumulate(gradMap(a), InvertGrad(new TENSOR(transform(a)), gradMap(s), anno), anno); ()
         }) +=: backwardNodes
     
     case Node(s, "tensor_tanh", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>

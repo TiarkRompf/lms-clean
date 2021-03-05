@@ -917,7 +917,6 @@ object PrimitiveTypeLess {
     def tanh_grad(y: NUM, m: Manifest[_])(implicit pos: SourceContext): NUM = {
       this * (NUM_ONE(m) - y * y)
     }
-
     def max(y: NUM)(implicit pos: SourceContext): NUM = {
       NUM(Adapter.g.reflect("max", x, y.x), t)
     }
@@ -928,6 +927,10 @@ object PrimitiveTypeLess {
       } {
         NUM_ZERO(m)
       })
+    }
+
+    def invert_grad(agrad: NUM, m: Manifest[_]): NUM = {
+      NUM_ZERO(m) - (agrad / (this * this))
     }
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =
