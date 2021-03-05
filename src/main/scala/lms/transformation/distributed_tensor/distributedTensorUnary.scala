@@ -86,7 +86,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         forwardNodes += node
 
         (() => {
-          Accumulate(gradMap(a), TanhGrad(gradMap(s), new TENSOR(transform(a)), anno), anno); ()
+          Accumulate(gradMap(a), TanhGrad(gradMap(s), new TENSOR(transform(s)), anno), anno); ()
         }) +=: backwardNodes
     
     case Node(s, "tensor_relu", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>

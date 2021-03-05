@@ -915,8 +915,7 @@ object PrimitiveTypeLess {
     }
 
     def tanh_grad(y: NUM, m: Manifest[_])(implicit pos: SourceContext): NUM = {
-      val tangent = y.tanh()
-      this * (NUM_ONE(m) - tangent * tangent)
+      this * (NUM_ONE(m) - y * y)
     }
 
     def max(y: NUM)(implicit pos: SourceContext): NUM = {
