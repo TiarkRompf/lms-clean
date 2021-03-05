@@ -158,9 +158,19 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
   }
 
-  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): Int => UNIT = {
+  abstract class myModule {
+    def train(iter: Int): UNIT
+    // def inference: TENSOR
+    def test(lossName: String): UNIT
+  }
+
+  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): myModule = {
     val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f.x))(Adapter.CTRL)
-    (iter: Int) => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
+    new myModule {
+      def train(iter: Int) = UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
+      // def inference:
+      def test(lossName: String = "loss") = UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(lossName))(Adapter.CTRL))
+    }
   }
 
   def mergable_dims(node: Node): List[(Dim, Dim)] = node match {

@@ -63,7 +63,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val weight = Tensor.weight[Float](Seq(32, 32), tensorName=Some("weight"))
           input * (weight, anno)
         }
-        model(1)
+        model.test("loss")
         printf("compile\n")
       }
     }

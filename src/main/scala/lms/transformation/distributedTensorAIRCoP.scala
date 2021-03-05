@@ -37,7 +37,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     implicit val pos = Adapter.oldSourceMap(ns.last.n)
     (() => {
       val result = new TENSOR(transform(res.res))
-      // FIXME(feiw) this is hard coded
+      // FIXME(feiw) this should not be check, but be log.
       result.check("loss")
       val grad = ONES(result.resultType, result.annotation)
       gradMap(res.res) = grad
@@ -60,6 +60,32 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     // FIXME(feiw) change res to updated weights
     val updated_weights = weightSyms.map(w => subst(w)).toList
     updated_weights.foreach(w => (new TENSOR(w)).save)
+    Backend.Const(())
+  }
+
+  def traverseModule(loss: String)(ns: Seq[Node], res: Block): Backend.Exp = {
+    // Step 1: Collection Phase
+    ns.foreach { n => aircopCollect(n, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform) }
+    // result of the block
+    implicit val pos = Adapter.oldSourceMap(ns.last.n)
+    (() => {
+      val result = new TENSOR(transform(res.res))
+      result.check(loss)
+      val grad = ONES(result.resultType, result.annotation)
+      gradMap(res.res) = grad
+    }) +=: backwardNodes
+    // collect all weight syms and all forward syms
+    val weightSyms = weightNodes.map(s => s.n)
+    val forwardSyms = forwardNodes.map(s => s.n)
+
+    // Step 2: Generation Phase
+    traverseWeights(weightNodes) { // FIXME(feiw) maybe remove optimizer?
+      traverseForward(forwardNodes) {
+        traverseBackward(backwardNodes, forwardSyms) {
+          checkGradients(weightSyms) { () => () } // FIXME(feiw) check input gradients too?
+        }
+      }
+    }
     Backend.Const(())
   }
 
@@ -106,13 +132,31 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     cont
   }
 
+  def checkGradients(weightSyms: => mutable.ArrayBuffer[Backend.Sym])(cont: => Unit) = {
+    for (w <- weightSyms) {
+      val weight = new TENSOR(transform(w))
+      weight.resultType.tensorName match {
+        case Some(name) => gradMap(w).check(name + "_grad") // FIXME(feiw) unfortunately hard-coded
+        case None => throw new Exception("Missing checked file names for tensor")
+      }
+    }
+  }
+
   override def transform(n: Node): Backend.Exp = n match {
 
     case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => Backend.Const(())
 
     case Node(s, "@", List(a: Backend.Sym, Backend.Const(iter: Int)), _) =>
+      // the `iter: Int` means that it is the training call with `iter` iterations
       Adapter.oldDefsCache(a) match {
         case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => scheduleBlock(b)(traverseModule(iter))
+        case _ => super.transform(n)
+      }
+
+    case Node(s, "@", List(a: Backend.Sym, Backend.Const(loss: String)), _) =>
+      // the `loss: String` means that it is the test call with `loss` being the filename of the expect loss values
+      Adapter.oldDefsCache(a) match {
+        case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => scheduleBlock(b)(traverseModule(loss))
         case _ => super.transform(n)
       }
 

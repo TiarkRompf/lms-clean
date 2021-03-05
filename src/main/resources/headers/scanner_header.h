@@ -102,6 +102,7 @@ void check_float_array_rank(const char *filename, int rank, float *gold, float *
   char buf[2000];
   snprintf(buf, 2000, "%s_rank_%d.data", filename, rank);
   check_float_array(buf, gold, check, size);
+  fprintf(stdout, "Checking value of %s passed!\n", buf);
 }
 
 void check_int_array_rank(const char *filename, int rank, int *gold, int *check, int size) {
@@ -109,6 +110,7 @@ void check_int_array_rank(const char *filename, int rank, int *gold, int *check,
   char buf[2000];
   snprintf(buf, 2000, "%s_rank_%d.data", filename, rank);
   check_int_array(buf, gold, check, size);
+  fprintf(stdout, "Checking value of %s passed!\n", buf);
 }
 
 #endif
