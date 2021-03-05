@@ -77,12 +77,16 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     // collect all weight syms and all forward syms
     val weightSyms = weightNodes.map(s => s.n)
     val forwardSyms = forwardNodes.map(s => s.n)
+    val inputSyms = forwardNodes.filter {
+      case Node(s, "tensor_input", _, _) => true
+      case _ => false
+    }.map(s => s.n)
 
     // Step 2: Generation Phase
     traverseWeights(weightNodes) { // FIXME(feiw) maybe remove optimizer?
       traverseForward(forwardNodes) {
         traverseBackward(backwardNodes, forwardSyms) {
-          checkGradients(weightSyms) { () => () } // FIXME(feiw) check input gradients too?
+          checkGradients(weightSyms ++ inputSyms)
         }
       }
     }
@@ -132,7 +136,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     cont
   }
 
-  def checkGradients(weightSyms: => mutable.ArrayBuffer[Backend.Sym])(cont: => Unit) = {
+  def checkGradients(weightSyms: => mutable.ArrayBuffer[Backend.Sym]) = {
     for (w <- weightSyms) {
       val weight = new TENSOR(transform(w))
       weight.resultType.tensorName match {

@@ -124,14 +124,14 @@ trait FixedSizeDistributedTensorOpsBinary extends FixedSizeDistributedTensorOpsB
       Wrap[Tensor[T]](t.x)
     }
 
-    // def * (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-    //   val t = Mul(self, tensor(y), anno)
-    //   Wrap[Tensor[T]](t.x)
-    // }
-    def * (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def * (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Mul(self, tensor(y), anno)
       Wrap[Tensor[T]](t.x)
     }
+    // def * (y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    //   val t = Mul(self, tensor(y), anno)
+    //   Wrap[Tensor[T]](t.x)
+    // }
 
     // def / (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this./(y, anno)
     def / (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
