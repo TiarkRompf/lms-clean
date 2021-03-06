@@ -35,7 +35,7 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
       assert(man == manifest[Float], s"Using cublas for dot operation, which only support float element type, but got: ${man}")
       val array = gpu_array(size, man, device)
       // we use transpose option because the cublas function assume column-major
-      CUBLAS_SGEMM(CUBLAS_HANDLE, CUBLAS_OP_T, CUBLAS_OP_T, m, n, k, ONE, new ARRAY(left_operand), m, new ARRAY(right_operand), k, ZERO, array, m)
+      CUBLAS_SGEMM(CUBLAS_HANDLE, CUBLAS_OP_T, CUBLAS_OP_T, m, n, k, VAR(ONE), new ARRAY(left_operand), m, new ARRAY(right_operand), k, VAR(ZERO), array, m)
       array
     }
   // helper function for computing dot product in GPUs
@@ -46,7 +46,7 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
       val array = gpu_array(size, man, device)
       // the transpose options should also take account into the column-major assumption of the cublas function
       CUBLAS_SGEMM(CUBLAS_HANDLE, if (transL) CUBLAS_OP_N else CUBLAS_OP_T, if (transR) CUBLAS_OP_N else CUBLAS_OP_T,
-        m, n, k, ONE, new ARRAY(left_operand), m, new ARRAY(right_operand), k, ZERO, array, m)
+        m, n, k, VAR(ONE), new ARRAY(left_operand), m, new ARRAY(right_operand), k, VAR(ZERO), array, m)
       array
     }
 

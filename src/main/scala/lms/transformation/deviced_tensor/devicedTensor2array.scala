@@ -16,6 +16,7 @@ import Backend._
 // respect device allocation (simple distinction of GPU and CPU)
 abstract class DevicedTensorLowering extends Transformer {
 
+  import BaseTypeLess._
   import PrimitiveTypeLess._
   import ArrayTypeLess._
   import ArrayCPUTypeLess._
@@ -163,8 +164,8 @@ abstract class DevicedTensorLowering extends Transformer {
           val m = INT(x_shape(0))
           val n = INT(y_shape(1))
           val k = INT(x_shape(1))
-          CUBLAS_SGEMM(CUBLAS_HANDLE, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, ONE, new ARRAY(transform(y)), n, new ARRAY(transform(x)),
-            k, ZERO, res, n)
+          CUBLAS_SGEMM(CUBLAS_HANDLE, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, VAR(ONE), new ARRAY(transform(y)), n, new ARRAY(transform(x)),
+            k, VAR(ZERO), res, n)
         } else {
           throw new Exception("dot for higher than 2D is not yet supported")
         }

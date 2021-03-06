@@ -26,20 +26,13 @@ class DistributeTensor2MPI_NCCLAnalysis extends Traverser {
     var hasCublas = false
     var hasCudnn = false
 
+    val cudnn_ops = List("tensor_conv", "tensor_softmax", "tensor_activation", "tensors_dropout", "tensor_pooling")
+
     override def traverse(n: Node): Unit = n match {
         case Node(s, op, _, _) if op.startsWith("tensor_dot") =>
             hasCublas = true
             super.traverse(n)
-        case Node(s, op, _, _) if op.startsWith("tensor_conv") =>
-            hasCudnn = true
-            super.traverse(n)
-        case Node(s, op, _, _) if op.startsWith("tensor_softmax") =>
-            hasCudnn = true
-            super.traverse(n)
-        case Node(s, op, _, _) if op.startsWith("tensor_activation") =>
-            hasCudnn = true
-            super.traverse(n)
-        case Node(s, op, _, _) if op.startsWith("tensors_dropout") =>
+        case Node(s, op, _, _) if cudnn_ops.exists(op.startsWith) =>
             hasCudnn = true
             super.traverse(n)
         case _ => super.traverse(n)
