@@ -222,7 +222,7 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
       Wrap[Tensor[T]](t.x)
     }
     
-    def tanh(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def cudnn_tanh(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val self = tensor(x)
        val p = ActivationParam(1.0f, 0.0f, 0.0f)
       val t = ActivationForward(self, p, "tanh", anno, __pos)
