@@ -11,6 +11,7 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 #include "mpi_header.h"
+#include <math.h>
 /************* Functions **************/
 __global__ void x12(float* x13, float x14, int x15) {
   int x16 = gridDim.x * blockDim.x;
@@ -21,37 +22,49 @@ __global__ void x12(float* x13, float x14, int x15) {
   }
 }
 __global__ void x20(float* x21, float* x22, int x23) {
-  // begin generating kernel function for ACCUM of type Float
+  // begin generating kernel function for TANH of type Float
   int x24 = gridDim.x * blockDim.x;
   int x25 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x25 < x23) {
     int x26 = x25;
-    x21[x26] = x21[x26] + x22[x26];
+    x22[x26] = tanh(x21[x26]);
     x25 = x25 + x24;
   }
-  // end generating kernel function for ACCUM of type Float
+  // end generating kernel function for TANH of type Float
 }
 __global__ void x27(float* x28, float* x29, int x30) {
-  // begin generating kernel function for NEGATE of type Float
+  // begin generating kernel function for ACCUM of type Float
   int x31 = gridDim.x * blockDim.x;
   int x32 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x32 < x30) {
     int x33 = x32;
-    x29[x33] = 0.0 - x28[x33];
+    x28[x33] = x28[x33] + x29[x33];
     x32 = x32 + x31;
   }
-  // end generating kernel function for NEGATE of type Float
+  // end generating kernel function for ACCUM of type Float
 }
 __global__ void x34(float* x35, float* x36, float* x37, int x38) {
-  // begin generating kernel function for SGD of type Float
+  // begin generating kernel function for TANH_GRAD of type Float
   int x39 = gridDim.x * blockDim.x;
   int x40 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x40 < x38) {
     int x41 = x40;
-    float x42 = x37[x41] * 0.5 + x36[x41];
-    x35[x41] = x35[x41] - x42 * 1.0E-4;
-    x37[x41] = x42;
+    float x42 = x36[x41];
+    x37[x41] = x35[x41] * (1.0 - x42 * x42);
     x40 = x40 + x39;
+  }
+  // end generating kernel function for TANH_GRAD of type Float
+}
+__global__ void x43(float* x44, float* x45, float* x46, int x47) {
+  // begin generating kernel function for SGD of type Float
+  int x48 = gridDim.x * blockDim.x;
+  int x49 = threadIdx.x + blockIdx.x * blockDim.x;
+  while (x49 < x47) {
+    int x50 = x49;
+    float x51 = x46[x50] * 0.5 + x45[x50];
+    x44[x50] = x44[x50] - x51 * 1.0E-4;
+    x46[x50] = x51;
+    x49 = x49 + x48;
   }
   // end generating kernel function for SGD of type Float
 }
@@ -101,75 +114,81 @@ void Snippet(int x0) {
   // end initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
   int x19 = 0;
   while (x19 != 10) {
+    // begin computing TANH on GPU for size 512 and type Float at device (pre-rename) x39 with operand x65
+    CUDA_CALL(cudaSetDevice(x7));
+    float* x52 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x52, (size_t)(512 * sizeof(float))));
+    x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x52, 512);
+    // end computing TANH on GPU for size 512 and type Float at device (pre-rename) x39 with operand x65
     // begin initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
     CUDA_CALL(cudaSetDevice(x7));
-    float* x43 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x43, (size_t)(512 * sizeof(float))));
-    x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x43, 0, 512);
+    float* x53 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x53, (size_t)(512 * sizeof(float))));
+    x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x53, 0, 512);
     // end initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
     // begin initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
     CUDA_CALL(cudaSetDevice(x7));
-    float* x44 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x44, (size_t)(512 * sizeof(float))));
-    x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x44, 1, 512);
+    float* x54 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x54, (size_t)(512 * sizeof(float))));
+    x12<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x54, 1, 512);
     // end initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
-    // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x137 and addition_operand x150
+    // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x179 and addition_operand x192
     CUDA_CALL(cudaSetDevice(x7));
-    x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x43, x44, 512);
-    // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x137 and addition_operand x150
-    // begin computing NEG on GPU for size 512 and type Float at device (pre-rename) x39 with operand x137
+    x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x53, x54, 512);
+    // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x179 and addition_operand x192
+    // begin computing TANH_GRAD on GPU for size 512 and type Float at device (pre-rename) x39 with left_operand x179 and right_operand x137
     CUDA_CALL(cudaSetDevice(x7));
-    float* x45 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x45, (size_t)(512 * sizeof(float))));
-    x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x43, x45, 512);
-    // end computing NEG on GPU for size 512 and type Float at device (pre-rename) x39 with operand x137
-    // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x200
+    float* x55 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x55, (size_t)(512 * sizeof(float))));
+    x34<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x53, x52, x55, 512);
+    // end computing TANH_GRAD on GPU for size 512 and type Float at device (pre-rename) x39 with left_operand x179 and right_operand x137
+    // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x242
     CUDA_CALL(cudaSetDevice(x7));
-    x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x45, 512);
-    // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x200
+    x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x11, x55, 512);
+    // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x81 and addition_operand x242
     // begin computing SGD on GPU for size 512 and type Float at device (pre-name) x39 with weight x65, grad x81, and momentum x119
     CUDA_CALL(cudaSetDevice(x7));
-    x34<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x11, x18, 512);
+    x43<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x11, x18, 512);
     // end computing SGD on GPU for size 512 and type Float at device (pre-name) x39 with weight x65, grad x81, and momentum x119
     x19 = x19 + 1;
   }
   // Only declare recv buffer if this is the root
-  bool x46 = x7 == 0;
-  float* x47 = x46 ? ({
-    float* x48 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x48, (size_t)(1024 * sizeof(float))));
-    x48;
+  bool x56 = x7 == 0;
+  float* x57 = x56 ? ({
+    float* x58 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x58, (size_t)(1024 * sizeof(float))));
+    x58;
   }) : ({
-    float* x49 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x49, (size_t)0));
-    x49;
+    float* x59 = (float*)malloc(0 * sizeof(float));
+    CUDA_CALL(cudaMalloc(&x59, (size_t)0));
+    x59;
   });
   // Gather by groups of NCCL send/recv
   NCCLCHECK(ncclGroupStart());
-  ncclResult_t x50 = ncclSend(x10, (size_t)1024, ncclFloat32, 0, x5, x6);
-  NCCLCHECK(x50);
-  if (x46) {
-    int x51 = x1;
-    int x52 = 0;
-    while (x52 != x51) {
-      int x53 = x52;
-      NCCLCHECK(ncclRecv(x47 + x53 * 512, (size_t)1024, ncclFloat32, x53, x5, x6));
-      x52 = x52 + 1;
+  ncclResult_t x60 = ncclSend(x10, (size_t)1024, ncclFloat32, 0, x5, x6);
+  NCCLCHECK(x60);
+  if (x56) {
+    int x61 = x1;
+    int x62 = 0;
+    while (x62 != x61) {
+      int x63 = x62;
+      NCCLCHECK(ncclRecv(x57 + x63 * 512, (size_t)1024, ncclFloat32, x63, x5, x6));
+      x62 = x62 + 1;
     }
   }
   NCCLCHECK(ncclGroupEnd());
   // print the array only if this is the root
-  if (x46) {
-    // begin copying GPU array x308 to CPU and print for size 1024 and type Float
-    float* x54 = (float*)malloc(1024 * sizeof(float));
-    CUDA_CALL(cudaMemcpy(x54, x47, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
-    int x55 = 0;
-    while (x55 != 1024) {
-      printf("%f ", x54[x55]);
-      x55 = x55 + 1;
+  if (x56) {
+    // begin copying GPU array x354 to CPU and print for size 1024 and type Float
+    float* x64 = (float*)malloc(1024 * sizeof(float));
+    CUDA_CALL(cudaMemcpy(x64, x57, (size_t)(1024 * sizeof(float)), cudaMemcpyDeviceToHost));
+    int x65 = 0;
+    while (x65 != 1024) {
+      printf("%f ", x64[x65]);
+      x65 = x65 + 1;
     }
     printf("\n");
-    // end copying GPU array x308 to CPU and print for size 1024 and type Float
+    // end copying GPU array x354 to CPU and print for size 1024 and type Float
   }
   printf("compile\n");
   MPICHECK(MPI_Finalize());

@@ -872,7 +872,7 @@ object PrimitiveTypeLess {
     case man if (man == manifest[Double]) => (new NUM(Const(1.toDouble))).withSrcType(__pos, m)
   }
 
-  def NUM_ZERO(m: Manifest[_])(implicit __pos: SourceContext) = m match {
+  def NUM_ZERO(m: Manifest[_])(implicit __pos: SourceContext): NUM = m match {
     case man if (man == manifest[Int]) => (new NUM(Const(0))).withSrcType(__pos, m)
     case man if (man == manifest[Float]) => (new NUM(Const(0.toFloat))).withSrcType(__pos, m)
     case man if (man == manifest[Double]) => (new NUM(Const(0.toDouble))).withSrcType(__pos, m)
@@ -903,6 +903,34 @@ object PrimitiveTypeLess {
     def <(y: NUM)(implicit pos: SourceContext): BOOL = {
       assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       BOOL(Adapter.g.reflect("<", x, y.x))
+    }
+
+    def >(y: NUM)(implicit pos: SourceContext): BOOL = {
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
+      BOOL(Adapter.g.reflect(">", x, y.x))
+    }
+
+    def tanh()(implicit pos: SourceContext): NUM = {
+      NUM(Adapter.g.reflect("tanh", x), t)
+    }
+
+    def tanh_grad(y: NUM)(implicit pos: SourceContext): NUM = {
+      this * (NUM_ONE(y.t) - y * y)
+    }
+    def max(y: NUM)(implicit pos: SourceContext): NUM = {
+      NUM(Adapter.g.reflect("max", x, y.x), t)
+    }
+
+    def relu_grad(y: NUM)(implicit pos: SourceContext): NUM = {
+      NUM(IF (y > NUM_ZERO(y.t)) {
+        this
+      } {
+        NUM_ZERO(y.t)
+      })
+    }
+
+    def invert_grad(y: NUM)(implicit pos: SourceContext): NUM = {
+      NUM_ZERO(y.t) - (y / (this * this))
     }
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =

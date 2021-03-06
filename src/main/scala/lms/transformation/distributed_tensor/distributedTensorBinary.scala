@@ -30,8 +30,17 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
 
   def Div(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
     ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_div")
+  
+  def TanhGrad(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
+    ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_tanh_grad")
 
-  val binaryOps = List("tensor_add", "tensor_minus", "tensor_mult", "tensor_div")
+  def ReluGrad(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
+    ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_relu_grad")
+
+  def InvertGrad(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
+    ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_invert_grad")
+
+  val binaryOps = List("tensor_add", "tensor_minus", "tensor_mult", "tensor_div", "tensor_tanh_grad", "tensor_relu_grad", "tensor_invert_grad")
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, op, tt::anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _)

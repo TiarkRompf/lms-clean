@@ -60,6 +60,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
   }
 
   override def transform(n: Node): Backend.Exp = n match {
+
     case Node(s, op, rs, es) if (op.startsWith("tensor_") || op.startsWith("tensors_")) =>
       val (effects, pure) = (es.deps, rs)
       val args = pure.map {
