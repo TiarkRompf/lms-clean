@@ -914,23 +914,23 @@ object PrimitiveTypeLess {
       NUM(Adapter.g.reflect("tanh", x), t)
     }
 
-    def tanh_grad(y: NUM, m: Manifest[_])(implicit pos: SourceContext): NUM = {
-      this * (NUM_ONE(m) - y * y)
+    def tanh_grad(y: NUM)(implicit pos: SourceContext): NUM = {
+      this * (NUM_ONE(y.t) - y * y)
     }
     def max(y: NUM)(implicit pos: SourceContext): NUM = {
       NUM(Adapter.g.reflect("max", x, y.x), t)
     }
 
-    def relu_grad(y: NUM, m: Manifest[_])(implicit pos: SourceContext): NUM = {
-      NUM(IF (y > NUM_ZERO(m)) {
+    def relu_grad(y: NUM)(implicit pos: SourceContext): NUM = {
+      NUM(IF (y > NUM_ZERO(y.t)) {
         this
       } {
-        NUM_ZERO(m)
+        NUM_ZERO(y.t)
       })
     }
 
-    def invert_grad(agrad: NUM, m: Manifest[_])(implicit pos: SourceContext): NUM = {
-      NUM_ZERO(m) - (agrad / (this * this))
+    def invert_grad(y: NUM)(implicit pos: SourceContext): NUM = {
+      NUM_ZERO(y.t) - (y / (this * this))
     }
   }
   def NUM(x: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): NUM =

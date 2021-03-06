@@ -39,12 +39,10 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     (new TENSOR(Adapter.g.reflectRead("tensor_relu", C(res_tt), C(anno), tensor.x)(tensor.x)).withSrcType(__pos, tensor.et))
   }
 
+  val unaryops = List("tensor_transpose", "tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu")
+
   override def mergable_dims(node: Node) = node match {
-    case Node(s, "tensor_transpose", _, _) => List()
-    case Node(s, "tensor_negate", _, _) => List()
-    case Node(s, "tensor_invert", _, _) => List()
-    case Node(s, "tensor_tanh", _, _) => List()
-    case Node(s, "tensor_relu", _, _) => List()
+    case Node(s, op, _, _) if (unaryops.contains(op))=> List()
     case _ => super.mergable_dims(node)
   }
 
