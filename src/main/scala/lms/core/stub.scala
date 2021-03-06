@@ -929,7 +929,7 @@ object PrimitiveTypeLess {
       })
     }
 
-    def invert_grad(agrad: NUM, m: Manifest[_]): NUM = {
+    def invert_grad(agrad: NUM, m: Manifest[_])(implicit pos: SourceContext): NUM = {
       NUM_ZERO(m) - (agrad / (this * this))
     }
   }
