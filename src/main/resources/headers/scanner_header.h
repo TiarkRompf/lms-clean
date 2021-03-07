@@ -53,32 +53,36 @@ void scan_int(const char *filename, int *array, int size) {
   fclose(pFile);
 }
 
-void check_floats(float *gold, float *check, int size, float eta) {
+bool check_floats(float *gold, float *check, int size, float eta) {
+  bool passed = true;
   for (int i = 0; i < size; i++) {
     if (gold[i] - check[i] < -eta || gold[i] - check[i] > eta) {
-      fprintf(stderr, "check failed at index %d: gold: %f check: %f", i, gold[i], check[i]);
-      perror("Mismatch!");
+      fprintf(stderr, "check failed at index %d: gold: %f check: %f\n", i, gold[i], check[i]);
+      passed = false;
     }
   }
+  return passed;
 }
 
-void check_float_array(const char *filename, float *gold, float *check, int size) {
+bool check_float_array(const char *filename, float *gold, float *check, int size) {
   scan_float(filename, gold, size);
-  check_floats(gold, check, size, 0.0005);
+  return check_floats(gold, check, size, 0.0005);
 }
 
-void check_ints(int *gold, int *check, int size) {
+bool check_ints(int *gold, int *check, int size) {
+  bool passed = true;
   for (int i = 0; i < size; i++) {
     if (gold[i] != check[i]) {
-      fprintf(stderr, "check failed at index %d: gold %d check %d", i, gold[i], check[i]);
-      perror("Mismatch!");
+      fprintf(stderr, "check failed at index %d: gold %d check %d\n", i, gold[i], check[i]);
+      passed = false;
     }
   }
+  return passed;
 }
 
-void check_int_array(const char *filename, int *gold, int *check, int size) {
+bool check_int_array(const char *filename, int *gold, int *check, int size) {
   scan_int(filename, gold, size);
-  check_ints(gold, check, size);
+  return check_ints(gold, check, size);
 }
 
 // hacky helper functions that should be handled by codegen instead
@@ -101,16 +105,20 @@ void check_float_array_rank(const char *filename, int rank, float *gold, float *
   // need to build new filename based on rank and some hacky conventions
   char buf[2000];
   snprintf(buf, 2000, "%s_rank_%d.data", filename, rank);
-  check_float_array(buf, gold, check, size);
-  fprintf(stdout, "Checking value of %s passed!\n", buf);
+  if (check_float_array(buf, gold, check, size))
+    fprintf(stdout, "Checking value of %s passed!\n", buf);
+  else
+    fprintf(stderr, "Checking value of %s failed!\n", buf);
 }
 
 void check_int_array_rank(const char *filename, int rank, int *gold, int *check, int size) {
   // need to build new filename based on rank and some hacky conventions
   char buf[2000];
   snprintf(buf, 2000, "%s_rank_%d.data", filename, rank);
-  check_int_array(buf, gold, check, size);
-  fprintf(stdout, "Checking value of %s passed!\n", buf);
+  if (check_int_array(buf, gold, check, size))
+    fprintf(stdout, "Checking value of %s passed!\n", buf);
+  else
+    fprintf(stderr, "Checking value of %s failed!\n", buf);
 }
 
 #endif

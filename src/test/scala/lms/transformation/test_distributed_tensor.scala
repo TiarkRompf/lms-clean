@@ -8,7 +8,7 @@ import macros.SourceContext
 import lms.core._
 import lms.core.stub._
 import lms.thirdparty.{CCodeGenLibs, CCodeGenMPI, CCodeGenNCCLOps, CCodeGenCUDNN, CCodeGenScannerOps}
-import lms.thirdparty.array_computation.{CCodeGenCBLASOps, CCodeGenCudaOps}
+import lms.thirdparty.array_computation.{CCodeGenCBLASOps, CCodeGenCudaOps, CCodeGenCuBLAS}
 
 import Backend._
 
@@ -19,7 +19,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   abstract class CompilerCDistributedTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FixedSizeDistributedTensorOps { q =>
 
     override val codegen = new DslGenCPP with CCodeGenLibs with CCodeGenCBLASOps with
-        CCodeGenCudaOps with CCodeGenNCCLOps with CCodeGenMPI with CCodeGenCUDNN with CCodeGenScannerOps {
+        CCodeGenCudaOps with CCodeGenNCCLOps with CCodeGenMPI with CCodeGenCuBLAS with CCodeGenCUDNN with CCodeGenScannerOps {
       val IR: q.type = q
 
       override def mayInline(n: Node): Boolean = n match {
@@ -50,26 +50,23 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
   }
 
-  test("negate") {
+  test("dot") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-        val inputTensorType = resultType[Float](Seq(32, 32))
-        implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-
         val model = module {
           val input = Tensor.input[Float](shape=Seq(32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
           val weight = Tensor.weight[Float](Seq(32, 32), tensorName=Some("weight"))
-          input + (weight neg (anno), anno)
+          input gemm weight
         }
         model.test("loss")
-        printf("compile")
+        printf("compile\n")
       }
     }
-    checkWithLogPath("negate", driver.code, "cu", driver.setLogPath)
+    checkWithLogPath("dot", driver.code, "cu", driver.setLogPath)
   }
 
   test("mult") {
@@ -90,6 +87,25 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("mult", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("negate") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(32, 32), tensorName=Some("weight"))
+          input + weight.neg
+        }
+        model.test("loss")
+        printf("compile")
+      }
+    }
+    checkWithLogPath("negate", driver.code, "cu", driver.setLogPath)
   }
 
   // test("split") {
@@ -136,26 +152,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   //   checkWithLogPath("split2", driver.code, "cu", driver.setLogPath)
   // }
 
-  // test("dot") {
-  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
-  //     import FixedSizeDistributedTensorTypeLess._
 
-  //     @virtualize
-  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       val inputTensorType = resultType[Float](Seq(32,32))
-  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-
-  //       val model = module {
-  //         val tensor_input = Tensor.input[Float](inputTensorType)
-  //         val tensor_weight = Tensor.weight[Float](Seq(32, 32))
-  //         tensor_input gemm (tensor_weight, batchSplitAnno)
-  //       }
-  //       model(10)
-  //       printf("compile\n")
-  //     }
-  //   }
-  //   checkWithLogPath("dot", driver.code, "cu", driver.setLogPath)
-  // }
 
 
 

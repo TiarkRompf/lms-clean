@@ -139,6 +139,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
   def checkGradients(weightSyms: => mutable.ArrayBuffer[Backend.Sym]) = {
     for (w <- weightSyms) {
       val weight = new TENSOR(transform(w))
+      implicit val __pos = weight.pos
       weight.resultType.tensorName match {
         case Some(name) => gradMap(w).check(name + "_grad") // FIXME(feiw) unfortunately hard-coded
         case None => throw new Exception("Missing checked file names for tensor")

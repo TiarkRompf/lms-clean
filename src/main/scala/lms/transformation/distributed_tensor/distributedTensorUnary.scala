@@ -62,6 +62,10 @@ trait FixedSizeDistributedTensorOpsUnary extends FixedSizeDistributedTensorOpsBa
       Wrap[Tensor[T]](t.x)
     }
 
+    def neg(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Negate(self, anno)
+      Wrap[Tensor[T]](t.x)
+    }
     def neg(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Negate(self, anno)
       Wrap[Tensor[T]](t.x)

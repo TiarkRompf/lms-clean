@@ -12,7 +12,7 @@ import lms.thirdparty.array_computation.CudaOps
 object CUDNNTypeLess extends CUDNNBaseTypeLess
   with CUDNNConvTypeLess
   with CUDNNDropoutTypeLess
-  with CUDNNPoolingTypeLess 
+  with CUDNNPoolingTypeLess
   with CUDNNActivationTypeLess
   with CUDNNSoftmaxTypeLess
 
