@@ -141,7 +141,7 @@ object CUBLASTypeLess extends Dsl with CLibs {
     ldc: leading dimension of two-dimensional array used to store matrix C
     */
     def CUBLAS_SGEMM(handle: CUBLAS_HANDLE, transa: CUBLAS_OPERATION, transb: CUBLAS_OPERATION,
-                    m: INT, n: INT, k: INT, alpha: FLOAT, A: ARRAY, lda: INT, B: ARRAY, ldb: INT, beta: FLOAT, C: ARRAY, ldc: INT)(implicit __pos: SourceContext) = {
+                    m: INT, n: INT, k: INT, alpha: VAR, A: ARRAY, lda: INT, B: ARRAY, ldb: INT, beta: VAR, C: ARRAY, ldc: INT)(implicit __pos: SourceContext) = {
       assert(A.et == manifest[Float] && B.et == manifest[Float] && C.et == manifest[Float])
       CUBLAS_CALL(Unwrap(libFunction[Any]("cublasSgemm", handle.x, transa.x, transb.x, m.x, n.x, k.x, alpha.x,
         A.x, lda.x, B.x, ldb.x, beta.x, C.x, ldc.x)(Seq(0,7,9,12), Seq(12), Set(6, 11))))

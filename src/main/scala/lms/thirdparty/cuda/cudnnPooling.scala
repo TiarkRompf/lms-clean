@@ -16,6 +16,38 @@ trait CUDNNPoolingTypeLess extends Dsl with CLibs with CUDNNBaseTypeLess {
   import CLibTypeLess._
 
   class CUDNN_POOLING_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
+
+  def CUDNN_POOLING_MAX(implicit __pos: SourceContext) = CMACRO("CUDNN_POOLING_MAX", manifest[Int])
+  def CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING(implicit __pos: SourceContext) = CMACRO("CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING", manifest[Int])
+  def CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING(implicit __pos: SourceContext) = CMACRO("CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING", manifest[Int])
+  def CUDNN_POOLING_MAX_DETERMINISTIC(implicit __pos: SourceContext) = CMACRO("CUDNN_POOLING_MAX_DETERMINISTIC", manifest[Int])
+
+  def CUDNN_CREATE_POOLING_DESCRIPTOR(poolingDesc: CUDNN_POOLING_DESCRIPTOR)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreatePoolingDescriptor", poolingDesc.x)(Seq(), Seq(0), Set[Int](0))
+
+  def CUDNN_DESTROY_POOLING_DESCRIPTOR(poolingDesc: TOP)(implicit __pos: SourceContext) = 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyPoolingDescriptor", poolingDesc.x)(Seq(), Seq(0), Set[Int]())
+   
+  def CUDNN_SET_POOLING_2D_DESCRIPTOR(poolingDesc: CUDNN_POOLING_DESCRIPTOR, mode: TOP, maxpoolingNanOpt: TOP, windowHeight: INT, windowWidth: INT,
+                                      verticalPadding: INT, horizontalPadding: INT, verticalStride: INT, horizontalStride: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetPooling2dDescriptor", poolingDesc.x, mode.x, maxpoolingNanOpt.x, windowHeight.x, windowWidth.x,
+      verticalPadding.x, horizontalPadding.x, verticalStride.x, horizontalStride.x)(Seq(1,2,3,4,5,6,7,8), Seq(0), Set[Int]())
+
+  def CUDNN_GET_POOLING_2D_FWD_OUTPUT_DIM(poolingDesc: CUDNN_POOLING_DESCRIPTOR, inputDesc: TOP, n: INT, c: INT, h: INT, w: INT)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnGetPooling2dForwardOutputDim", poolingDesc.x, inputDesc.x, n.x, c.x, h.x, w.x)(Seq(0,1), Seq(2,3,4,5),
+      Set[Int](2,3,4,5))
+  
+  def CUDNN_POOLING_FWD(handle: TOP, poolingDesc: CUDNN_POOLING_DESCRIPTOR, alpha: VAR, xDesc: TOP,
+                          x: TOP, beta: VAR, yDesc: TOP, y: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnPoolingForward", handle.x, poolingDesc.x, alpha.x, xDesc.x, x.x, beta.x, yDesc.x,
+      y.x)(Seq(0,1,2,3,4,5,6), Seq(2,5,7), Set[Int](2,5))
+
+    def CUDNN_POOLING_BWD(handle: TOP, poolingDesc: CUDNN_POOLING_DESCRIPTOR, alpha: VAR, yDesc: TOP,
+                          y: TOP, dyDesc: TOP, dy: TOP, xDesc: TOP, xData: TOP,
+                          beta: VAR, dxDesc: TOP, dx: TOP)(implicit __pos: SourceContext) =
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnPoolingBackward", handle.x, poolingDesc.x, alpha.x, yDesc.x, y.x, dyDesc.x, dy.x,
+      xDesc.x, xData.x, beta.x, dxDesc.x, dx.x)(Seq(0,1,2,3,4,5,6,7,8,9,10), Seq(11), Set[Int](2,9))
+  
 }
 
 trait CUDNNPoolingOps extends CLibs with CudaOps with CUDNNBaseOps {
@@ -28,10 +60,6 @@ trait CUDNNPoolingOps extends CLibs with CudaOps with CUDNNBaseOps {
   def cudnnPoolingAvgCntInPadding = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING")
   def cudnnPoolingAvgCntExPadding = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_AVERAGE_COUNT_EXCLUDE_PADDING")
   def cudnnPoolingMaxDeterministic = cmacro[cudnnPoolingModeT]("CUDNN_POOLING_MAX_DETERMINISTIC")
-
-  class cudnnNanPropagationT
-  def cudnnPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_PROPAGATE_NAN")
-  def cudnnNotPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_NOT_PROPAGATE_NAN")
 
   // cudnnStatus_t cudnnCreatePoolingDescriptor(cudnnPoolingDescriptor_t    *poolingDesc)
   def cudnnCreatePoolingDescriptor(poolingDesc: Rep[cudnnPoolingDescriptorT]) =

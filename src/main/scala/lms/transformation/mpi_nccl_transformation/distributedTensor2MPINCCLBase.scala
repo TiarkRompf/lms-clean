@@ -51,10 +51,14 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     CUDA_MALLOC(size, m)
   }
 
-  // TODO: change it to better name, and add INT counterparts to other gpu functions as well
-  def gpu_array1(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
+  def GPU_ARRAY(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
     CUDA_SET_DEVICE(device)
     CUDA_MALLOC(size, m)
+  }
+
+  def GPU_ARRAY_BY_BYTE(size: INT, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY = {
+    CUDA_SET_DEVICE(device)
+    CUDA_MALLOC_BYTES(size, m)
   }
   // helper function for declaring a GPU array with random initialization
   def gpu_random_array(size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY =
@@ -165,6 +169,8 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   // var cudnnTensor2Desc: HashMap[Backend.Sym, (TOP, String)] = HashMap()
   var cudnnTensor2Desc: HashMap[Seq[Int], (TOP, String)] = HashMap()
   var cudnnConv2Desc: HashMap[Seq[Int], CUDNN_CONV_DESCRIPTOR] = HashMap()
+  var cudnnActv2Desc: HashMap[(String, Float), CUDNN_ACTIVATION_DESCRIPTOR] = HashMap()
+  var cudnnPool2Desc: HashMap[(String, Seq[Int]), CUDNN_POOLING_DESCRIPTOR] = HashMap()
   def set_up_cudnn(implicit __pos: SourceContext) = {
     val dummy = myCUDNNComm
     // cudnnTensor2Desc = HashMap()  // todo: FIXME
@@ -178,6 +184,12 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     }
     cudnnConv2Desc foreach {
       case (_, desc) => CUDNN_DESTROY_CONV_DESCRIPTOR(desc)
+    }
+    cudnnActv2Desc foreach {
+      case (_, desc) => CUDNN_DESTROY_ACTIVATION_DESCRIPTOR(desc)
+    }
+    cudnnPool2Desc foreach {
+      case (_, desc) => CUDNN_DESTROY_POOLING_DESCRIPTOR(desc)
     }
   }
 
@@ -377,7 +389,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     if (operand_anno == anno) {
       transform(operand)
     } else if (assertSame) {
-      throw new Exception(s"Assert that the tensor has the same annotation but it does not");
+      throw new Exception(s"Assert that the tensor has the same annotation but it does not: ${operand_anno} v.s. ${anno}");
     } else {
       throw new Exception(s"TODO: not yet handling split annotation conflict $operand_tensor")
     }

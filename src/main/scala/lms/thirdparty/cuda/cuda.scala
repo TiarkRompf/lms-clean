@@ -31,6 +31,12 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     addr
   }
 
+  def CUDA_MALLOC_BYTES(count: INT, m: Manifest[_])(implicit __pos: SourceContext): ARRAY = {
+    val addr = ARRAY(0, m)
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaMalloc", addr.x, SIZE_T(count).x)(Seq(1), Seq(0), Set(0))))
+    addr
+  }
+
   // a typeless interface for CUDA_FREE
   def CUDA_FREE(devPtr: ARRAY) =
     CUDA_CALL(Unwrap(libFunction[Any]("cudaFree", devPtr.x)(Seq(0), Seq(0), Set[Int]())))
@@ -111,8 +117,11 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   def threadIdxY(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.y", manifest[Int]))
   def threadIdxZ(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.z", manifest[Int]))
 
+  def blockRows(implicit __pos: SourceContext): INT = INT(CMACRO("BLOCK_ROWS", manifest[INT]))
+
   val gridSize = 28
   val blockSize = 512
+  val tileDim = 32
 
   def CUDA_FILL_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
     // type cast
@@ -177,6 +186,27 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     }
   }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int])
 
+  def CUDA_TRANSPOSE_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
+    withComment(s"generating kernel function for TRANS of type $m") {
+      // type cast
+      val in = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val out = (new ARRAY(xn(1))).withSrcType(__pos, m.arrayManifest)
+      val size = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+
+      val x = blockIdxX * tileDim + threadIdxX
+      val y = blockIdxY * tileDim + threadIdxY
+      val width = gridDimX * tileDim
+
+      val start = Backend.Const(0)
+      for (i <- range_until_step(Wrap[Int](start), Wrap[Int](tileDim.x), Wrap[Int](blockSize.x))) {
+        val rhead = INT((y + INT(Unwrap(i))) * width + x)
+        val whead = INT(x * width + (y + INT(Unwrap(i))))
+        out(whead) = in(rhead); ()
+      }
+      Backend.Const(())
+    }
+  }, m.arrayManifest, m.arrayManifest, manifest[Int])
+
 
   // Simple SGD Nesterov (https://github.com/pytorch/pytorch/blob/master/torch/optim/sgd.py)
   def CUDA_SGD_Nesterov_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
@@ -230,6 +260,18 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   }, m.arrayManifest, m.arrayManifest, manifest[Int])
 
   def CUDA_NEGATE_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ZERO(m) - _, s"generating kernel function for NEGATE of type $m")
+
+  def CUDA_INVERT_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ONE(m) / _, s"generating kernel function for INVERT of type $m")
+
+  def CUDA_TANH_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, _ tanh, s"generating kernel function for TANH of type $m")
+
+  def CUDA_TANH_GRAD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ tanh_grad _, s"generating kernel function for TANH_GRAD of type $m")
+
+  def CUDA_RELU_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_UNARY_KERNEL(m, NUM_ZERO(m) max _, s"generating kernel function for RELU of type $m")
+
+  def CUDA_RELU_GRAD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ relu_grad _, s"generating kernel function for RELU_GRAD of type $m")
+
+  def CUDA_INVERT_GRAD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_ELEMENTWISE_BINARY_KERNEL(m, _ invert_grad _, s"generating kernel function for INVERT_GRAD of type $m")
 
   // Element-wise Add
   def CUDA_ADD_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) =
