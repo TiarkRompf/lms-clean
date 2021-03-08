@@ -40,10 +40,23 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     (new TENSOR(Adapter.g.reflectRead("tensor_relu", C(res_tt), C(anno), tensor.x)(tensor.x)).withSrcType(__pos, tensor.et))
   }
 
+  def ActivationForward(input: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = input.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation", C(res_tt), C(anno), input.x, 
+      C(params), C(mode))(input.x)).withSrcType(__pos, input.et))
+  }
+
+  def ActivationBackward(input: TENSOR, output: TENSOR, doutput: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = doutput.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), input.x, output.x, doutput.x, 
+      C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, doutput.et))
+  }
+
   val unaryops = List("tensor_transpose", "tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu")
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, op, _, _) if (unaryops.contains(op))=> List()
+    case Node(s, "tensor_activation", _, _) => List()
     case _ => super.mergable_dims(node)
   }
 
@@ -94,6 +107,16 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
 
         (() => {
           Accumulate(gradMap(a), ReluGrad(gradMap(s), new TENSOR(transform(a)), anno), anno); ()
+        }) +=: backwardNodes
+    
+    case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::Backend.Const(mode:String)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val x = new TENSOR(transform(a))
+            val y = new TENSOR(transform(s))
+            val grad = ActivationBackward(x, y, gradMap(s), params, mode, anno, pos)
+            Accumulate(gradMap(a), grad, anno); ()
         }) +=: backwardNodes
 
     case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)

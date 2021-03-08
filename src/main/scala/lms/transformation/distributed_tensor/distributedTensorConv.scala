@@ -81,6 +81,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
   }*/
 
+  /*
   def ActivationForward(input: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = input.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_activation", C(res_tt), C(anno), input.x, 
@@ -91,7 +92,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     val res_tt = doutput.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), input.x, output.x, doutput.x, 
       C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, doutput.et))
-  }
+  }*/
 
   def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSORS = {
     val output_tt = input.resultType
@@ -166,8 +167,8 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       List((inputC, filterCin), (outputC, filterCout))
     
     case Node(s, "tensors_dropout", _, _) => List()
-    case Node(s, "tensor_softmax", _, _) => List()
-    case Node(s, "tensor_activation", _, _) => List()
+    // case Node(s, "tensor_softmax", _, _) => List()
+    // case Node(s, "tensor_activation", _, _) => List()
     case Node(s, "tensor_pooling", _, _) => List()
 
     case _ => super.mergable_dims(node)
@@ -205,6 +206,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
             Accumulate(gradMap(a), grad, anno); ()
         }) +=: backwardNodes
       */
+      /*
       case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::Backend.Const(mode:String)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
@@ -214,7 +216,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
             val grad = ActivationBackward(x, y, gradMap(s), params, mode, anno, pos)
             Accumulate(gradMap(a), grad, anno); ()
         }) +=: backwardNodes
-    
+      */
       case Node(s, "tensors_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes
