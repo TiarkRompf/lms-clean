@@ -68,31 +68,6 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
     TensorType(output_shape, input.et, anno)
   }
-  /*
-  def SoftmaxForward(input: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = input.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_softmax", C(res_tt), C(anno), input.x, 
-      C(params))(input.x)).withSrcType(__pos, input.et))
-  }
-
-  def SoftmaxBackward(output: TENSOR, doutput: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = doutput.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_softmax_bwd", C(res_tt), C(anno), output.x, doutput.x, 
-      C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
-  }*/
-
-  /*
-  def ActivationForward(input: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = input.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_activation", C(res_tt), C(anno), input.x, 
-      C(params), C(mode))(input.x)).withSrcType(__pos, input.et))
-  }
-
-  def ActivationBackward(input: TENSOR, output: TENSOR, doutput: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = doutput.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), input.x, output.x, doutput.x, 
-      C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, doutput.et))
-  }*/
 
   def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSORS = {
     val output_tt = input.resultType
@@ -167,8 +142,6 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       List((inputC, filterCin), (outputC, filterCout))
     
     case Node(s, "tensors_dropout", _, _) => List()
-    // case Node(s, "tensor_softmax", _, _) => List()
-    // case Node(s, "tensor_activation", _, _) => List()
     case Node(s, "tensor_pooling", _, _) => List()
 
     case _ => super.mergable_dims(node)
@@ -196,27 +169,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
           val b_grad = ConvBackwardFilter(x, y, gradMap(s), params, anno, pos)
           Accumulate(gradMap(b), b_grad, anno); ()
         }) +=: backwardNodes
-      /*
-      case Node(s, "tensor_softmax", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:SoftmaxParam)::_, _) =>
-        implicit val pos = Adapter.oldSourceMap(s)
-        forwardNodes += node
-        (() => {
-            val x = new TENSOR(transform(s))
-            val grad = SoftmaxBackward(x, gradMap(s), params, anno, pos)
-            Accumulate(gradMap(a), grad, anno); ()
-        }) +=: backwardNodes
-      */
-      /*
-      case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::Backend.Const(mode:String)::_, _) =>
-        implicit val pos = Adapter.oldSourceMap(s)
-        forwardNodes += node
-        (() => {
-            val x = new TENSOR(transform(a))
-            val y = new TENSOR(transform(s))
-            val grad = ActivationBackward(x, y, gradMap(s), params, mode, anno, pos)
-            Accumulate(gradMap(a), grad, anno); ()
-        }) +=: backwardNodes
-      */
+
       case Node(s, "tensors_dropout", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:DropoutParam)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes

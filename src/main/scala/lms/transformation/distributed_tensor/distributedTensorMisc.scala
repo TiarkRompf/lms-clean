@@ -51,14 +51,13 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
     }
 }
 
-
 trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBase {
   import FixedSizeDistributedTensorTypeLess._
   import scala.collection.immutable.Seq
 
   implicit class TensorOpsMisc[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
-    
+
     val softmax_params_def = SoftmaxParam(1.0f, 0.0f)
     def softmax(anno: Anno, params: SoftmaxParam = softmax_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = SoftmaxForward(self, params, anno, __pos)
