@@ -113,11 +113,11 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
 
       if (TENSOR.isTensor(transform(fs))) {
         val node = new TENSOR(transform(fs))
-        val grad = ZEROS(node.resultType, node.annotation)
+        val grad = ZEROS(node.resultType.map(_+"_grad"), node.annotation)
         gradMap(fs) = grad
       } else if (TENSORS.isTensors(transform(fs))) {
         val oldOp = new TENSORS(fs, useOldMetadata = true)
-        val grads = oldOp.resultTypes.map(ZEROS(_, oldOp.annotation))
+        val grads = oldOp.resultTypes.map(t=>ZEROS(t.map(_+"_grad"), oldOp.annotation))
         gradMap(fs) = Adapter.g.reflect("tuple-view", grads.map(_.x): _*)
       }
     }
@@ -168,8 +168,8 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val new_weight = WEIGHT(tt, anno)
-      gradMap(s) = ZEROS(tt, anno)
-      momentumMap(s) = ZEROS(tt, anno)
+      gradMap(s) = ZEROS(tt.map(_+"_grad"), anno)
+      momentumMap(s) = ZEROS(tt.map(_+"_momentum"), anno)
       new_weight.x
 
     case _ => super.transform(n)

@@ -59,6 +59,8 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   def CUDA_SET_DEVICE(device: INT) =
     CUDA_CALL(Unwrap(libFunction[Any]("cudaSetDevice", device.x)(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)))
 
+  def CUDA_STREAM_SYNCHRONIZE(stream: TOP) =
+    CUDA_CALL(Unwrap(libFunction[Any]("cudaStreamSynchronize", stream.x)(Seq(0), Seq(0), Set[Int]())))
 
   class DIM3(override val x: Backend.Exp) extends TOP(x)
   def DIM3(a: Int, b: Int = 1, c: Int = 1)(implicit __pos: SourceContext): DIM3 =
@@ -124,18 +126,20 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   val tileDim = 32
 
   def CUDA_FILL_KERNEL(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
-    // type cast
-    val array = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
-    val value = (new NUM(xn(1))).withSrcType(__pos, m)
-    val size  = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+    withComment(s"generating kernel function for FILL of type $m") {
+      // type cast
+      val array = (new ARRAY(xn(0))).withSrcType(__pos, m.arrayManifest)
+      val value = (new NUM(xn(1))).withSrcType(__pos, m)
+      val size  = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
 
-    // actual computation
-    val stride = gridDimX * blockDimX
-    val tid = threadIdxX + blockIdxX * blockDimX
-    for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
-      array(INT(Unwrap(i))) = value; ()
+      // actual computation
+      val stride = gridDimX * blockDimX
+      val tid = threadIdxX + blockIdxX * blockDimX
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int](size.x), Wrap[Int](stride.x))) {
+        array(INT(Unwrap(i))) = value; ()
+      }
+      Backend.Const(())
     }
-    Backend.Const(())
   }, m.arrayManifest, m, manifest[Int])
 
 

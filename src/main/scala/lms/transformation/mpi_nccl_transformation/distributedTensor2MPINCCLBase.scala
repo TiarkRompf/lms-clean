@@ -219,10 +219,13 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
             case Some(name) => gpu_scanner_array(name, count, m, myNCCLRank).x
             case None => gpu_random_array(count, m, myNCCLRank).x
           }
-        case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          val array = gpu_random_array(count, m, myNCCLRank)
-          NCCL_CHECK(NCCL_ALLREDUCE(m, array, array, INT(count) * SIZE_OF(m), NCCL_SUM, myNCCLComm, myNCCLStream))
-          array.x
+        case SAnno(dim: Dim, devices: Seq[Device], _) => tt.tensorName match {
+          case Some(name) => gpu_scanner_array(name, count, m, myNCCLRank).x
+          case None =>
+            val array = gpu_random_array(count, m, myNCCLRank)
+            NCCL_CHECK(NCCL_ALLREDUCE(m, array, array, INT(count) * SIZE_OF(m), NCCL_SUM, myNCCLComm, myNCCLStream))
+            array.x
+        }
         case a => throw new Exception(s"annotation $a is not yet handled in tensor_weight")
       }
 

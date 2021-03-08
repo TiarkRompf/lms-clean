@@ -35,7 +35,8 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
       assert(man == manifest[Float], s"Using cublas for dot operation, which only support float element type, but got: ${man}")
       val array = gpu_array(size, man, device)
       // we use transpose option because the cublas function assume column-major
-      CUBLAS_SGEMM(CUBLAS_HANDLE, CUBLAS_OP_T, CUBLAS_OP_T, m, n, k, VAR(ONE), new ARRAY(left_operand), m, new ARRAY(right_operand), k, VAR(ZERO), array, m)
+      // CUBLAS_SGEMM(CUBLAS_HANDLE, CUBLAS_OP_T, CUBLAS_OP_T, m, n, k, VAR(ONE), new ARRAY(left_operand), k, new ARRAY(right_operand), n, VAR(ZERO), array, m)
+      CUBLAS_SGEMM(CUBLAS_HANDLE, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, VAR(ONE), new ARRAY(right_operand), n, new ARRAY(left_operand), k, VAR(ZERO), array, n)
       array
     }
   // helper function for computing dot product in GPUs
@@ -45,8 +46,10 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
       assert(man == manifest[Float], s"Using cublas for dot operation, which only support float element type, but got: ${man}")
       val array = gpu_array(size, man, device)
       // the transpose options should also take account into the column-major assumption of the cublas function
-      CUBLAS_SGEMM(CUBLAS_HANDLE, if (transL) CUBLAS_OP_N else CUBLAS_OP_T, if (transR) CUBLAS_OP_N else CUBLAS_OP_T,
-        m, n, k, VAR(ONE), new ARRAY(left_operand), m, new ARRAY(right_operand), k, VAR(ZERO), array, m)
+      // CUBLAS_SGEMM(CUBLAS_HANDLE, if (transL) CUBLAS_OP_N else CUBLAS_OP_T, if (transR) CUBLAS_OP_N else CUBLAS_OP_T,
+      //   m, n, k, VAR(ONE), new ARRAY(left_operand), if (transL) m else k, new ARRAY(right_operand), if (transR) k else n, VAR(ZERO), array, m)
+      CUBLAS_SGEMM(CUBLAS_HANDLE, if (transR) CUBLAS_OP_T else CUBLAS_OP_N, if (transL) CUBLAS_OP_T else CUBLAS_OP_N,
+        n, m, k, VAR(ONE), new ARRAY(right_operand), if (transR) k else n, new ARRAY(left_operand), if (transL) m else k, VAR(ZERO), array, n)
       array
     }
 
@@ -54,13 +57,15 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
 
     case Node(s, "tensor_dot", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(left:Backend.Sym)::(right:Backend.Sym)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
-
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
 
       // get the shape of `left` and `right` tensor
+      val leftTensorType = (new TENSOR(left, useOldMetadata = true)).resultType
+      val rightTensorType = (new TENSOR(right, useOldMetadata = true)).resultType
       val left_shape = tensor_shape(left, useOldMetadata = true)
       val right_shape = tensor_shape(right, useOldMetadata = true)
+
       assert(left_shape.size == 2 && right_shape.size == 2 && left_shape(1) == right_shape(0),
           s"shapes of tensor_dot are invalid left operand shape: $left_shape x right operand shape: $right_shape")
 
@@ -73,10 +78,15 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in dot op")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          gpu_dot_array(count2, m, myNCCLRank, left_operand, right_operand, left_shape(0), right_shape(1), left_shape(1)).x
+          val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
+          val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
+          gpu_dot_array(count2, m, myNCCLRank, left_operand, right_operand, leftShape(0), rightShape(1), leftShape(1)).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
+          // FIXME(Feiw)
           val count = numeral(tt.shapeSize)
-          val dot_res = gpu_dot_array(count, m, myNCCLRank, left_operand, right_operand, left_shape(0), right_shape(1), left_shape(1))
+          val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
+          val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
+          val dot_res = gpu_dot_array(count, m, myNCCLRank, left_operand, right_operand, leftShape(0), rightShape(1), leftShape(1))
           NCCL_ALLREDUCE(m, dot_res, dot_res, SIZE_T(count), NCCL_SUM, myNCCLComm, myNCCLStream)
           dot_res.x
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_dot")
@@ -89,6 +99,8 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
       val m = sourceTensor.et
 
       // get the shape of `left` and `right` tensor
+      val leftTensorType = (new TENSOR(left, useOldMetadata = true)).resultType
+      val rightTensorType = (new TENSOR(right, useOldMetadata = true)).resultType
       val left_shape = tensor_shape(left, useOldMetadata = true)
       val right_shape = tensor_shape(right, useOldMetadata = true)
       assert(left_shape.size == 2 && right_shape.size == 2, s"For now, only handles matrix matrix dot")
@@ -102,13 +114,18 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in dot op")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
+          val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
+          val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
           gpu_dot_array_with_transpose(count2, m, myNCCLRank, left_operand, transL, right_operand, transR,
-            if (transL) left_shape(1) else left_shape(0), if (transR) right_shape(0) else right_shape(1), if (transL) left_shape(0) else left_shape(1)).x
+            if (transL) leftShape(1) else leftShape(0), if (transR) rightShape(0) else rightShape(1), if (transL) leftShape(0) else leftShape(1)).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           val count = numeral(tt.shapeSize)
+          val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
+          val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
           val dot_res = gpu_dot_array_with_transpose(count, m, myNCCLRank, left_operand, transL, right_operand, transR,
-            if (transL) left_shape(1) else left_shape(0), if (transR) right_shape(0) else right_shape(1), if (transL) left_shape(0) else left_shape(1))
+            if (transL) leftShape(1) else leftShape(0), if (transR) rightShape(0) else rightShape(1), if (transL) leftShape(0) else leftShape(1))
           NCCL_ALLREDUCE(m, dot_res, dot_res, SIZE_T(count), NCCL_SUM, myNCCLComm, myNCCLStream)
+          CUDA_STREAM_SYNCHRONIZE(myNCCLStream)
           dot_res.x
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_dot_with_transpose")
       }

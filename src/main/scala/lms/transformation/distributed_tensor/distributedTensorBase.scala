@@ -49,6 +49,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def shapeSize = shape.map(_.size)
     def shapeDim = shape.map(_.dim)
     def shapeSizeAfterSplit(d: Dim, degree: Int) = shape.map(s => if (s.dim == d) s.size / degree else s.size)
+    def map(f: String => String) = TensorType(shape, et, anno, tensorName.map(f))
   }
 
   abstract class Anno extends Serializable // Annotation class
