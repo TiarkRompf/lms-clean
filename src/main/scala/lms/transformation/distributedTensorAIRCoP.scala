@@ -30,6 +30,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
   val gradMap_ = mutable.HashMap[Backend.Sym, Backend.Sym]()
   val gradMap = GradMapWrapper(gradMap_)
 
+  // This function is for training
   def traverseModule(iter: Int)(ns: Seq[Node], res: Block): Backend.Exp = {
     // Step 1: Collection Phase
     ns.foreach { n => aircopCollect(n, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform) }
@@ -63,6 +64,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     Backend.Const(())
   }
 
+  // this function is for testing
   def traverseModule(loss: String)(ns: Seq[Node], res: Block): Backend.Exp = {
     // Step 1: Collection Phase
     ns.foreach { n => aircopCollect(n, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform) }
@@ -83,7 +85,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     }.map(s => s.n)
 
     // Step 2: Generation Phase
-    traverseWeights(weightNodes) { // FIXME(feiw) maybe remove optimizer?
+    traverseWeights(weightNodes) {
       traverseForward(forwardNodes) {
         traverseBackward(backwardNodes, forwardSyms) {
           checkGradients(weightSyms ++ inputSyms)

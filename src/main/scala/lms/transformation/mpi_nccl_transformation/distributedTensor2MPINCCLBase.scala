@@ -224,6 +224,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
           case None =>
             val array = gpu_random_array(count, m, myNCCLRank)
             NCCL_CHECK(NCCL_ALLREDUCE(m, array, array, INT(count) * SIZE_OF(m), NCCL_SUM, myNCCLComm, myNCCLStream))
+            CUDA_STREAM_SYNCHRONIZE(myNCCLStream)
             array.x
         }
         case a => throw new Exception(s"annotation $a is not yet handled in tensor_weight")

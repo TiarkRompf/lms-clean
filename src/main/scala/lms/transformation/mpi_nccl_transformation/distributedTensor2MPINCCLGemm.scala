@@ -82,7 +82,6 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
           val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
           gpu_dot_array(count2, m, myNCCLRank, left_operand, right_operand, leftShape(0), rightShape(1), leftShape(1)).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          // FIXME(Feiw)
           val count = numeral(tt.shapeSize)
           val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
           val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
