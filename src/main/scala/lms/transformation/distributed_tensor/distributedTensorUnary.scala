@@ -11,7 +11,8 @@ import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 
 import Backend._
 
-trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess with FixedSizeDistributedTensorBinaryTypeLess {
+trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess 
+  with FixedSizeDistributedTensorBinaryTypeLess with FixedSizeDistributedTensorConvTypeLess {
 
   def Transpose(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
     assert(tensor.shapeSize.size == 2, "input of transpose must be 2D")
@@ -130,5 +131,35 @@ trait FixedSizeDistributedTensorOpsUnary extends FixedSizeDistributedTensorOpsBa
       val t = Relu(self, anno)
       Wrap[Tensor[T]](t.x)
     }
+
+    // clipped relu
+    def relu(threshold: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, threshold)
+      val t = ActivationForward(self, p, "crelu", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def elu(alpha: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, alpha)
+      val t = ActivationForward(self, p, "elu", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def sigmoid(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "sigmoid", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+    
+    def cudnn_tanh(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val self = tensor(x)
+      val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "tanh", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
   }
 }

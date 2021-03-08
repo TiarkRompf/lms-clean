@@ -263,7 +263,7 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
       val t = SoftmaxForward(self, params, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
-
+    /*
     def sigmoid(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val self = tensor(x)
       val p = ActivationParam(1.0f, 0.0f, 0.0f)
@@ -279,6 +279,7 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
     }
 
     // clipped relu
+    
     def relu(threshold: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val self = tensor(x)
       val p = ActivationParam(1.0f, 0.0f, threshold)
@@ -291,7 +292,7 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
       val p = ActivationParam(1.0f, 0.0f, alpha)
       val t = ActivationForward(self, p, "elu", anno, __pos)
       Wrap[Tensor[T]](t.x)
-    }
+    }*/
     
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = DropoutForward(self, params, anno, __pos)
