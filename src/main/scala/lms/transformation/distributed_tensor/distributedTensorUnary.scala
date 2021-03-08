@@ -160,6 +160,5 @@ trait FixedSizeDistributedTensorOpsUnary extends FixedSizeDistributedTensorOpsBa
       val t = ActivationForward(self, p, "tanh", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
-
   }
 }
