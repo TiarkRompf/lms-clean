@@ -157,6 +157,8 @@ trait FixedSizeDistributedTensorBaseTypeLess {
         case a => false
       }
     }
+
+    def tupleView(xs: List[Backend.Exp])(implicit __pos: SourceContext): Backend.Exp = Adapter.g.reflect("tuple-view", xs: _*)
   }
 
   abstract class myModule {
@@ -199,8 +201,17 @@ trait FixedSizeDistributedTensorBaseTypeLess {
         }
       case n => throw new Exception(s"$n is not an operation")
     }
-    def update(x: Backend.Exp, grad: TENSOR) = { map(x.asInstanceOf[Backend.Sym]) = grad.x.asInstanceOf[Backend.Sym] }
-    def update(x: Backend.Exp, grad: Backend.Exp) = { map(x.asInstanceOf[Backend.Sym]) = grad.asInstanceOf[Backend.Sym] }
+    def update(x: Backend.Exp, grad: Backend.Exp): Unit = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
+      case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _)) =>
+        Adapter.g.globalDefsCache.get(map(op)) match {
+          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) =>
+            map(op) = TENSORS.tupleView(xs.updated(i, grad)).asInstanceOf[Backend.Sym]
+          case a => throw new Exception(s"$a is not a tuple view")
+        }
+      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => throw new Exception(s"$x is Tensors, not a Tensor: $n")
+      case _ => map(x.asInstanceOf[Backend.Sym]) = grad.asInstanceOf[Backend.Sym]
+    }
+    def update(x: Backend.Exp, grad: TENSOR): Unit = update(x, grad.x)
   }
 
   def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],

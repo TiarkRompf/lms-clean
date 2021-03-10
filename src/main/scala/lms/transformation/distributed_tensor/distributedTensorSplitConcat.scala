@@ -93,7 +93,11 @@ trait FixedSizeDistributedTensorOpsSplitConcat extends FixedSizeDistributedTenso
   implicit class TensorOpsSplit[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
 
-    def split(axis: Int, slices: List[Int], anno: Anno = NAnno)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
+    def split(axis: Int, slices: List[Int])(implicit __pos: SourceContext, anno: Anno): List[Rep[Tensor[T]]] = {
+      val op = Split(self, axis, slices, anno)
+      ((0 until slices.length): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
+    }
+    def split(axis: Int, slices: List[Int], anno: Anno)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = Split(self, axis, slices, anno)
       ((0 until slices.length): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
     }

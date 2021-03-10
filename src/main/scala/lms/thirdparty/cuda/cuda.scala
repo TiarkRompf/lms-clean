@@ -335,8 +335,8 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       val tid = threadIdxX + blockIdxX * blockDimX
       for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int]((dim0*dim1).x), Wrap[Int](stride.x))) {
         val index = INT(Unwrap(i))
-        val size0 = index / dim0
-        val size1 = index % dim0
+        val size0 = index / (dim1 * 2)
+        val size1 = index % (dim1 * 2)
         __ifThenElse(Wrap[Boolean]((size1 < dim1).x),
           { output0(INT(size0 * dim1 + size1)) = input(index); () },
           { output1(INT(size0 * dim1 + size1 - dim1)) = input(index); () })

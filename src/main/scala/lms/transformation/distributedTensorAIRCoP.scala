@@ -120,7 +120,7 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
       } else if (TENSORS.isTensors(transform(fs))) {
         val oldOp = new TENSORS(fs, useOldMetadata = true)
         val grads = oldOp.resultTypes.map(t=>ZEROS(t.map(_+"_grad"), oldOp.annotation))
-        gradMap(fs) = Adapter.g.reflect("tuple-view", grads.map(_.x): _*)
+        gradMap(fs) = TENSORS.tupleView(grads.map(_.x))
       }
     }
     for (b <- backwards) {

@@ -67,7 +67,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         (() => {
           Accumulate(gradMap(a), Negate(gradMap(s), anno), anno); ()
         }) +=: backwardNodes
-     
+
     case Node(s, "tensor_invert", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
@@ -78,7 +78,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
           // val grad = Negate(Div(gradMap(s), square, anno), anno)
           Accumulate(gradMap(a), InvertGrad(new TENSOR(transform(a)), gradMap(s), anno), anno); ()
         }) +=: backwardNodes
-    
+
     case Node(s, "tensor_tanh", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
@@ -86,7 +86,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         (() => {
           Accumulate(gradMap(a), TanhGrad(gradMap(s), new TENSOR(transform(s)), anno), anno); ()
         }) +=: backwardNodes
-    
+
     case Node(s, "tensor_relu", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
@@ -106,6 +106,10 @@ trait FixedSizeDistributedTensorOpsUnary extends FixedSizeDistributedTensorOpsBa
   implicit class TensorOpsUnary[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
 
+    def trans(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Transpose(self, anno)
+      Wrap[Tensor[T]](t.x)
+    }
     def trans(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Transpose(self, anno)
       Wrap[Tensor[T]](t.x)
@@ -120,16 +124,28 @@ trait FixedSizeDistributedTensorOpsUnary extends FixedSizeDistributedTensorOpsBa
       Wrap[Tensor[T]](t.x)
     }
 
+    def inv(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Invert(self, anno)
+      Wrap[Tensor[T]](t.x)
+    }
     def inv(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Invert(self, anno)
       Wrap[Tensor[T]](t.x)
     }
 
+    def tanh(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Tanh(self, anno)
+      Wrap[Tensor[T]](t.x)
+    }
     def tanh(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Tanh(self, anno)
       Wrap[Tensor[T]](t.x)
     }
 
+    def relu(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Relu(self, anno)
+      Wrap[Tensor[T]](t.x)
+    }
     def relu(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Relu(self, anno)
       Wrap[Tensor[T]](t.x)

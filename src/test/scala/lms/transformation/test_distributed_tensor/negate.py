@@ -8,9 +8,10 @@ def generate_data(lms_clean_root: str):
     torch.manual_seed(0)
 
     # model
-    input = torch.randn(32, 32)
+    size = 32
+    input = torch.randn(size, size)
     input.requires_grad = True
-    weight = torch.randn(32, 32)
+    weight = torch.randn(size, size)
     weight.requires_grad = True
     loss = input - weight
     loss.sum().backward()
