@@ -24,3 +24,11 @@ project/plugins/project/
 
 # test specific
 *.actual.*
+*.actual
+**/golden
+**/graphs
+*.check
+
+# python specific
+**/__pycache__
+

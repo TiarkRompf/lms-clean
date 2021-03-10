@@ -130,9 +130,9 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val model = module {
-          val input = Tensor.input[Float](shape=Seq(2,4), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          val input = Tensor.input[Float](shape=Seq(32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
-          val splits = input.split(1, List(2,2))
+          val splits = input.split(1, List(16,16))
           splits(0)
         }
         model.test("loss"); ()
@@ -148,10 +148,10 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val model = module {
-          val input = Tensor.input[Float](shape=Seq(2,4), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          val input = Tensor.input[Float](shape=Seq(32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
-          val weight = Tensor.weight[Float](Seq(2,2), tensorName=Some("weight"))
-          val splits = input.split(1, List(2,2))
+          val weight = Tensor.weight[Float](Seq(32,16), tensorName=Some("weight"))
+          val splits = input.split(1, List(16,16))
           splits(0) * weight
         }
         model.test("loss"); ()

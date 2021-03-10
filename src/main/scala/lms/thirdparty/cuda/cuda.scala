@@ -333,7 +333,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       // actual computation
       val stride = gridDimX * blockDimX
       val tid = threadIdxX + blockIdxX * blockDimX
-      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int]((dim0*dim1).x), Wrap[Int](stride.x))) {
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int]((dim0*dim1*2).x), Wrap[Int](stride.x))) {
         val index = INT(Unwrap(i))
         val size0 = index / (dim1 * 2)
         val size1 = index % (dim1 * 2)
