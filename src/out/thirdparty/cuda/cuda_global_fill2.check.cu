@@ -9,12 +9,14 @@ Emitting C Generated Code
 #include <stdbool.h>
 /************* Functions **************/
 __global__ void x2(float* x3, float x4, int x5) {
+  // begin generating kernel function for FILL of type Float
   int x6 = gridDim.x * blockDim.x;
   int x7 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x7 < x5) {
     x3[x7] = x4;
     x7 = x7 + x6;
   }
+  // end generating kernel function for FILL of type Float
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {

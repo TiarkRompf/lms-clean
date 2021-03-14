@@ -111,7 +111,7 @@ class CudaTest extends TutorialFunSuite {
         unit(())
       }
     }
-    check("cuda_global_fill", driver.code, "cu")
+    check("cuda_global_fill2", driver.code, "cu")
   }
 
   test("cap_gen_kernel") {
