@@ -160,6 +160,25 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
   }
 
+  test("split2") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(32,16), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(32,32), tensorName=Some("weight"))
+          val splits = weight.split(1, List(16,16))
+          input * splits(0)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("split2", driver.code, "cu", driver.setLogPath)
+  }
+
   // test("tanh") {
   //   val driver = new CompilerCDistributedTensor[Int, Unit] {
   //     import FixedSizeDistributedTensorTypeLess._
@@ -251,27 +270,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   //   checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
   // }
 
-  // test("split2") {
-  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
-  //     import FixedSizeDistributedTensorTypeLess._
 
-  //     @virtualize
-  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       val inputTensorType = resultType[Float](Seq(32, 32))
-  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-
-  //       val model = module {
-  //         val tensor_input = Tensor.input[Float](inputTensorType)
-  //         val tensor_weight = Tensor.weight[Float](Seq(32, 64))
-  //         val splits = tensor_weight.split(1, List(32, 32), batchSplitAnno)
-  //         tensor_input * (splits(0), batchSplitAnno)
-  //       }
-  //       model(10)
-  //       printf("compile\n")
-  //     }
-  //   }
-  //   checkWithLogPath("split2", driver.code, "cu", driver.setLogPath)
-  // }
 
   // test("softmax") {
   //   val driver = new CompilerCDistributedTensor[Int, Unit] {
