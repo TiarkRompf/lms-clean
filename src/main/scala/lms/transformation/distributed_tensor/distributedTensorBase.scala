@@ -158,7 +158,11 @@ trait FixedSizeDistributedTensorBaseTypeLess {
       }
     }
 
-    def tupleView(xs: List[Backend.Exp])(implicit __pos: SourceContext): Backend.Exp = Adapter.g.reflect("tuple-view", xs: _*)
+    def tupleView(xs: List[Backend.Exp]): Backend.Exp = Adapter.g.reflect("tuple-view", xs: _*)
+    def handleTupleView[T](n: Option[Backend.Node])(func: (List[Backend.Sym]) => T): T = n match {
+      case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => func(xs)
+      case _ => throw new Exception(s"$n is not a tuple view")
+    }
   }
 
   abstract class myModule {
@@ -187,26 +191,19 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   case class GradMapWrapper(map: scala.collection.mutable.HashMap[Backend.Sym, Backend.Sym]) {
     def apply(x: Backend.Exp): TENSOR = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
       case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _)) =>
-        Adapter.g.globalDefsCache.get(map(op)) match {
-          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => new TENSOR(xs(i))
-          case a => throw new Exception(s"$a is not a tuple view")
-        }
+        TENSORS.handleTupleView(Adapter.g.globalDefsCache.get(map(op)))(xs => new TENSOR(xs(i)))
       case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => throw new Exception(s"$x is Tensors, not a Tensor: $n")
       case _ => new TENSOR(map(x.asInstanceOf[Backend.Sym]))
     }
     def getGradsOfOp(x: Backend.Exp): List[TENSOR] = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
-      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])) match {
-          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => xs.map(new TENSOR(_))
-          case a => throw new Exception(s"$a is not a tuple view")
-        }
+      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") =>
+        TENSORS.handleTupleView(Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])))(xs => xs.map(new TENSOR(_)))
       case n => throw new Exception(s"$n is not an operation")
     }
     def update(x: Backend.Exp, grad: Backend.Exp): Unit = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
       case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _)) =>
-        Adapter.g.globalDefsCache.get(map(op)) match {
-          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) =>
-            map(op) = TENSORS.tupleView(xs.updated(i, grad)).asInstanceOf[Backend.Sym]
-          case a => throw new Exception(s"$a is not a tuple view")
+        TENSORS.handleTupleView(Adapter.g.globalDefsCache.get(map(op))){ xs =>
+          map(op) = TENSORS.tupleView(xs.updated(i, grad)).asInstanceOf[Backend.Sym]
         }
       case _ => map(x.asInstanceOf[Backend.Sym]) = grad.asInstanceOf[Backend.Sym]
     }
