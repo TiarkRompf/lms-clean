@@ -237,110 +237,152 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   //   checkWithLogPath("transpose", driver.code, "cu", driver.setLogPath)
   // }
 
-  // test("softmax") {
-  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
-  //     import FixedSizeDistributedTensorTypeLess._
-  //     import scala.collection.immutable.Seq
+  test("softmax") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
 
-  //     @virtualize
-  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       dim_name = 0
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
 
-  //       val inputTensorType = resultType[Float](Seq(2, 1, 3, 3))
-  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
+          val params = SoftmaxParam(1.0f, 0.0f)
+          input + weight.softmax(anno, params)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("softmax", driver.code, "cu", driver.setLogPath)
+  }
 
-  //       val model = module {
-  //         val tensor_input = Tensor.input[Float](inputTensorType)
-  //         val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
+  test("sigmoid") { // passed
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
 
-  //         val params = SoftmaxParam(1.0f, 0.0f)
-  //         val x = tensor_filter softmax (batchSplitAnno, params)
-  //         tensor_input + (x, batchSplitAnno)
-  //       }
-  //       model(10)
-  //       printf("compile")
-  //     }
-  //   }
-  //   checkWithLogPath("softmax", driver.code, "cu", driver.setLogPath)
-  // }
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
+          input + weight.sigmoid(anno)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("sigmoid", driver.code, "cu", driver.setLogPath)
+  }
 
-  // test("activation") {
-  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
-  //     import FixedSizeDistributedTensorTypeLess._
-  //     import scala.collection.immutable.Seq
+  test("elu") { // passed
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
 
-  //     @virtualize
-  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       dim_name = 0
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
+          input + weight.elu(1.0f, anno)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("elu", driver.code, "cu", driver.setLogPath)
+  }
 
-  //       val inputTensorType = resultType[Float](Seq(2, 1, 3, 3))
-  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
+  test("dropout") { // passed
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
 
-  //       val model = module {
-  //         val tensor_input = Tensor.input[Float](inputTensorType)
-  //         val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
 
-  //         val x = tensor_filter sigmoid (batchSplitAnno)
-  //         tensor_input + (x, batchSplitAnno)
-  //       }
-  //       model(10)
-  //       printf("compile")
-  //     }
-  //   }
-  //   checkWithLogPath("activation", driver.code, "cu", driver.setLogPath)
-  // }
+          val params = DropoutParam(0.0f, 1)
+          val dropouts = weight.dropout(anno, params)
+          input + dropouts(0)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("dropout", driver.code, "cu", driver.setLogPath)
+  }
 
-  // test("dropout") {
-  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
-  //     import FixedSizeDistributedTensorTypeLess._
-  //     import scala.collection.immutable.Seq
+  test("maxpool") { // passed
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
 
-  //     @virtualize
-  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       dim_name = 0
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,9,9), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,9,9), tensorName=Some("weight"))
+                                                // window  padding   stride
+          val params = PoolingParam(1.0f, 0.0f, Seq(3, 3), Seq(1, 1), Seq(1, 1))
+          input + weight.maxpool(anno, params)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("maxpool", driver.code, "cu", driver.setLogPath)
+  }
 
-  //       val inputTensorType = resultType[Float](Seq(2, 1, 3, 3))
-  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
+  test("avgpool") { // passed
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
 
-  //       val model = module {
-  //         val tensor_input = Tensor.input[Float](inputTensorType)
-  //         val tensor_filter = Tensor.weight[Float](Seq(2, 1, 3, 3))
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,9,9), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,9,9), tensorName=Some("weight"))
+                                                // window  padding   stride
+          val params = PoolingParam(1.0f, 0.0f, Seq(3, 3), Seq(1, 1), Seq(1, 1))
+          input + weight.avgpool(anno, params, include_pad=true)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("avgpool", driver.code, "cu", driver.setLogPath)
+  }
 
-  //         val params = DropoutParam(0.5f, 1)
-  //         val dropouts = tensor_filter dropout (batchSplitAnno, params)
+  test("conv") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
 
-  //         dropouts(0)
-  //       }
-  //       model(10)
-  //       printf("compile")
-  //     }
-  //   }
-  //   checkWithLogPath("dropout", driver.code, "cu", driver.setLogPath)
-  // }
-
-  // test("pooling") {
-  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
-  //     import FixedSizeDistributedTensorTypeLess._
-  //     import scala.collection.immutable.Seq
-
-  //     @virtualize
-  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       dim_name = 0
-
-  //       val inputTensorType = resultType[Float](Seq(2, 1, 3, 3))
-  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1))) // split the channel dimension
-  //       val params = PoolingParam(1.0f, 0.0f, Seq(2, 2), Seq(1, 1), Seq(1, 1))
-
-  //       val model = module {
-  //         val tensor_filter = Tensor.weight[Float](Seq(2, 1, 9, 9))
-
-  //         tensor_filter maxpool (batchSplitAnno, params)
-  //       }
-  //       model(10)
-  //       printf("compile")
-  //     }
-  //   }
-  //   checkWithLogPath("pooling", driver.code, "cu", driver.setLogPath)
-  // }
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,9,9), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
+                                            // padding   stride    dilation
+          val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
+          input.conv(weight, anno, params)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("conv", driver.code, "cu", driver.setLogPath)
+  }
 }
 
