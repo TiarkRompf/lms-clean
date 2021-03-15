@@ -61,10 +61,10 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       filter_shape(CUDNN_W).size, dilation(CUDNN_PARAM_W), strides(CUDNN_PARAM_W))
 
     val output_shape = Seq(
-      Size(Dim(CUDNN_N), output_N),
-      Size(Dim(CUDNN_C), output_C),
-      Size(Dim(CUDNN_H), output_H),
-      Size(Dim(CUDNN_W), output_W))
+      Size(input.resultType.namedDim(CUDNN_N), output_N),
+      Size(filter.resultType.namedDim(CUDNN_C_OUT), output_C),
+      Size(dim, output_H),
+      Size(dim, output_W))
 
     TensorType(output_shape, input.et, anno)
   }
@@ -118,10 +118,10 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       window(CUDNN_PARAM_W), strides(CUDNN_PARAM_W))
 
     val output_shape = Seq(
-      Size(Dim(CUDNN_N), output_N),
-      Size(Dim(CUDNN_C), output_C),
-      Size(Dim(CUDNN_H), output_H),
-      Size(Dim(CUDNN_W), output_W))
+      Size(input.resultType.namedDim(CUDNN_N), output_N),
+      Size(input.resultType.namedDim(CUDNN_C), output_C),
+      Size(dim, output_H),          // new dim (fresh)
+      Size(dim, output_W))          // new dim (fresh)
 
     TensorType(output_shape, input.et, anno)
   }
@@ -130,16 +130,19 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
   override def mergable_dims(node: Node) = node match {
     // constraints:
     // input.channels = filter.input_channels
-    // output.channels = filter.output_channels
+    // output.channels = filter.output_channels // not required TODO: remove
     case Node(s, "tensor_conv", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(params:ConvParam)::_, _) =>
-      val input_type    = (new TENSOR(a, useOldMetadata=true)).resultType.shape
-      val filter_type   = (new TENSOR(b, useOldMetadata=true)).resultType.shape
-      val output_type   = (new TENSOR(s, useOldMetadata=true)).resultType.shape
-      val inputC      = input_type(CUDNN_C).dim
-      val outputC     = output_type(CUDNN_C).dim
-      val filterCout  = filter_type(CUDNN_C_OUT).dim
-      val filterCin   = filter_type(CUDNN_C_IN).dim
-      List((inputC, filterCin), (outputC, filterCout))
+      val input_type    = (new TENSOR(a, useOldMetadata=true)).resultType
+      val filter_type   = (new TENSOR(b, useOldMetadata=true)).resultType
+      val output_type   = (new TENSOR(s, useOldMetadata=true)).resultType
+      val inputC      = input_type.namedDim(CUDNN_C)
+      val outputC     = output_type.namedDim(CUDNN_C)
+      val filterCout  = filter_type.namedDim(CUDNN_C_OUT)
+      val filterCin   = filter_type.namedDim(CUDNN_C_IN)
+      // val res = List((inputC, filterCin), (outputC, filterCout))
+      val res = List((inputC, filterCin))
+      System.out.println(res)
+      res
     
     case Node(s, "tensors_dropout", _, _) => List()
     case Node(s, "tensor_pooling", _, _) => List()
@@ -211,7 +214,7 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
       val t = ConvForward(self, tensor(y), params, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
-    
+
     def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
       val op = DropoutForward(self, params, anno, __pos)
       ((0 until 1): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
