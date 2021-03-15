@@ -251,7 +251,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
 
           val params = SoftmaxParam(1.0f, 0.0f)
-          input + weight.softmax(anno, params)
+          input + weight.softmax(params)
         }
         model.test("loss"); ()
       }
@@ -271,7 +271,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
           val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
-          input + weight.sigmoid(anno)
+          input + weight.sigmoid()
         }
         model.test("loss"); ()
       }
@@ -291,7 +291,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
           val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
-          input + weight.elu(1.0f, anno)
+          input + weight.elu(1.0f)
         }
         model.test("loss"); ()
       }
@@ -313,7 +313,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
 
           val params = DropoutParam(0.0f, 1)
-          val dropouts = weight.dropout(anno, params)
+          val dropouts = weight.dropout(params)
           input + dropouts(0)
         }
         model.test("loss"); ()
@@ -335,7 +335,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val weight = Tensor.weight[Float](Seq(2,1,9,9), tensorName=Some("weight"))
                                                 // window  padding   stride
           val params = PoolingParam(1.0f, 0.0f, Seq(3, 3), Seq(1, 1), Seq(1, 1))
-          input + weight.maxpool(anno, params)
+          input + weight.maxpool(params)
         }
         model.test("loss"); ()
       }
@@ -356,7 +356,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val weight = Tensor.weight[Float](Seq(2,1,9,9), tensorName=Some("weight"))
                                                 // window  padding   stride
           val params = PoolingParam(1.0f, 0.0f, Seq(3, 3), Seq(1, 1), Seq(1, 1))
-          input + weight.avgpool(anno, params, include_pad=true)
+          input + weight.avgpool(params)
         }
         model.test("loss"); ()
       }
@@ -377,7 +377,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
                                             // padding   stride    dilation
           val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
-          input.conv(weight, anno, params)
+          input.conv(weight, params)
         }
         model.test("loss"); ()
       }

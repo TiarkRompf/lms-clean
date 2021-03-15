@@ -207,27 +207,44 @@ trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBas
 
   implicit class TensorOpsConv[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
-    val conv_params_def = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))  // default convolution parameter settings
-    val dropout_params_def = DropoutParam(0.5f, 1)
+    // val conv_params_def = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))  // default convolution parameter settings
 
-    def conv(y: Rep[Tensor[T]], anno: Anno, params: ConvParam = conv_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def conv(y: Rep[Tensor[T]], params: ConvParam)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
       val t = ConvForward(self, tensor(y), params, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
 
-    def dropout(anno: Anno, params: DropoutParam = dropout_params_def)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
+    def conv(y: Rep[Tensor[T]], params: ConvParam, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = ConvForward(self, tensor(y), params, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def dropout(params: DropoutParam)(implicit __pos: SourceContext, anno: Anno): List[Rep[Tensor[T]]] = {
       val op = DropoutForward(self, params, anno, __pos)
       ((0 until 1): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
     }
 
-    def maxpool(anno: Anno, params: PoolingParam, deterministic: Boolean = false)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val self = tensor(x)
+    def dropout(params: DropoutParam, anno: Anno)(implicit __pos: SourceContext): List[Rep[Tensor[T]]] = {
+      val op = DropoutForward(self, params, anno, __pos)
+      ((0 until 1): Range).toList.map(i => Wrap[Tensor[T]](TENSORS.getResult(op, i).x))
+    }
+
+    def maxpool(params: PoolingParam, deterministic: Boolean = false)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
       val t = PoolingForward(self, params, if (deterministic) "max_dtm" else "max", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
 
-    def avgpool(anno: Anno, params: PoolingParam, include_pad: Boolean = false)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val self = tensor(x)
+    def maxpool(params: PoolingParam, deterministic: Boolean, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = PoolingForward(self, params, if (deterministic) "max_dtm" else "max", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def avgpool(params: PoolingParam, include_pad: Boolean = true)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = PoolingForward(self, params, if (include_pad) "avg_in_pad" else "avg_ex_pad", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def avgpool(params: PoolingParam, include_pad: Boolean, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = PoolingForward(self, params, if (include_pad) "avg_in_pad" else "avg_ex_pad", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
