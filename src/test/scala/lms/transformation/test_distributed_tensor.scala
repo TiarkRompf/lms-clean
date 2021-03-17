@@ -213,25 +213,18 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("tanh", driver.code, "cu", driver.setLogPath)
   }
 
-
   // test("transpose") {
   //   val driver = new CompilerCDistributedTensor[Int, Unit] {
   //     import FixedSizeDistributedTensorTypeLess._
 
   //     @virtualize
   //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       dim_name = 0
-  //       val inputTensorType = resultType[Float](Seq(32, 32))
-  //       implicit val batchSplitAnno = SAnno(inputTensorType.shape(0).dim, List(GPU(0), GPU(1)))
-
   //       val model = module {
-  //         val tensor_input = Tensor.input[Float](inputTensorType)
-  //         val tensor_weight = Tensor.weight[Float](Seq(32, 32))
-  //         val tensor_intermediate = tensor_weight trans (batchSplitAnno)
-  //         tensor_input + (tensor_intermediate, batchSplitAnno)
+  //         val input = Tensor.input[Float](shape=Seq(32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+  //         implicit val anno = input.anno
+  //         input.trans
   //       }
-  //       model(10)
-  //       printf("compile\n")
+  //       model.test("loss"); ()
   //     }
   //   }
   //   checkWithLogPath("transpose", driver.code, "cu", driver.setLogPath)

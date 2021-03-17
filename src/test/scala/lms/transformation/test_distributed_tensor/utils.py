@@ -33,6 +33,14 @@ def get_printer(lms_clean_root: str, test_name: str):
         elif dim == -1:
             for i in range(degree):
                 print_flatten_array(name+"_rank_"+str(i)+".data", tensor)
+        elif dim == 1:
+            shape = list(tensor.size())
+            assert len(shape) > 1, "should be at least 2D"
+            size = shape[1]
+            assert size % degree == 0, "should be divisible"
+            slice = size // degree
+            for i in range(degree):
+                print_flatten_array(name+"_rank_"+str(i)+".data", tensor[:, slice * i : slice * (i + 1)])
         else:
             assert False, "TODO"
 
