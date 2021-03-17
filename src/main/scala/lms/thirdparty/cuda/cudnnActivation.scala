@@ -27,20 +27,22 @@ trait CUDNNActivationTypeLess extends Dsl with CLibs with CUDNNBaseTypeLess {
 
   def CUDNN_CREATE_ACTIVATION_DESCRIPTOR(activationDesc: CUDNN_ACTIVATION_DESCRIPTOR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateActivationDescriptor", activationDesc.x)(Seq(), Seq(0), Set[Int](0))
-  
-  def CUDNN_DESTROY_ACTIVATION_DESCRIPTOR(activationDesc: CUDNN_ACTIVATION_DESCRIPTOR)(implicit __pos: SourceContext) = 
-    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyActivationDescriptor", activationDesc.x)(Seq(), Seq(0), Set[Int]())
 
-  def CUDNN_SET_ACTIVATION_DESCRIPTOR(activationDesc: CUDNN_ACTIVATION_DESCRIPTOR, mode: TOP, reluNanOpt: TOP, 
+  def CUDNN_DESTROY_ACTIVATION_DESCRIPTOR(activationDesc: CUDNN_ACTIVATION_DESCRIPTOR) = {
+    implicit val pos: SourceContext = Adapter.sourceMap.getOrElse(activationDesc.x, Adapter.oldSourceMap(activationDesc.x))
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyActivationDescriptor", activationDesc.x)(Seq(), Seq(0), Set[Int](), Adapter.CTRL)
+  }
+
+  def CUDNN_SET_ACTIVATION_DESCRIPTOR(activationDesc: CUDNN_ACTIVATION_DESCRIPTOR, mode: TOP, reluNanOpt: TOP,
                                       coef: FLOAT)(implicit __pos: SourceContext) =
-    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetActivationDescriptor", activationDesc.x, mode.x, reluNanOpt.x, 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetActivationDescriptor", activationDesc.x, mode.x, reluNanOpt.x,
       coef.x)(Seq(1,2,3), Seq(0), Set[Int]())
 
   def CUDNN_ACTIVATION_FWD(handle: TOP, activationDesc: CUDNN_ACTIVATION_DESCRIPTOR, alpha: VAR, xDesc: TOP, x: TOP,
                           beta: VAR, yDesc: TOP, y: TOP)(implicit __pos: SourceContext) =
-    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnActivationForward", handle.x, activationDesc.x, alpha.x, xDesc.x, x.x, 
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnActivationForward", handle.x, activationDesc.x, alpha.x, xDesc.x, x.x,
       beta.x, yDesc.x, y.x)(Seq(0,1,2,3,4,5), Seq(6), Set[Int](2,5))
-  
+
   def CUDNN_ACTIVATION_BWD(handle: TOP, activationDesc: CUDNN_ACTIVATION_DESCRIPTOR, alpha: VAR, yDesc: TOP, y: TOP,
                           dyDesc: TOP, dy: TOP, xDesc: TOP, x: TOP, beta: VAR, dxDesc: TOP, dx: TOP)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnActivationBackward", handle.x, activationDesc.x, alpha.x, yDesc.x, y.x,

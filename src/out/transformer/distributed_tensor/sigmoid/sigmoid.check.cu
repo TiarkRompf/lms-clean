@@ -175,6 +175,8 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMemcpy(x48, x33, (size_t)(9 * sizeof(float)), cudaMemcpyDeviceToHost));
   check_float_array_rank("golden/input_grad", x6, (float*)malloc(9 * sizeof(float)), x48, 9);
   // end checking GPU array of size 9 and type Float at device (pre-name) x39 again binary file input_grad
+  cudnnDestroyTensorDescriptor(x19);
+  cudnnDestroyActivationDescriptor(x20);
   CUDNNCHECK(cudnnDestroy(x7));
   MPICHECK(MPI_Finalize());
   NCCLCHECK(ncclCommDestroy(x4));

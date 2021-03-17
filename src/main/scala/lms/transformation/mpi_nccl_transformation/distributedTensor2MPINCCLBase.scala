@@ -173,17 +173,32 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   var cudnnPool2Desc: HashMap[(String, Seq[Int]), CUDNN_POOLING_DESCRIPTOR] = HashMap()
   def set_up_cudnn(implicit __pos: SourceContext) = {
     val dummy = myCUDNNComm
-    // cudnnTensor2Desc = HashMap()  // todo: FIXME
   }
   def finalize_cudnn(implicit __pos: SourceContext) = {
     cudnnCheck(cudnnDestroy(myCUDNNCommRep))
+  }
+
+  override def traverse(ns: Seq[Node], res: Block): Unit = {
+    // set hashmaps for cudnn descriptors
+    val savedCudnnTensor2Desc = cudnnTensor2Desc
+    val savedCudnnConv2Desc = cudnnConv2Desc
+    val savedCudnnActv2Desc = cudnnActv2Desc
+    val savedCudnnPool2Desc = cudnnPool2Desc
+    cudnnTensor2Desc = HashMap[Seq[Int], (TOP, String)]()
+    cudnnConv2Desc = HashMap[Seq[Int], CUDNN_CONV_DESCRIPTOR]()
+    cudnnActv2Desc = HashMap[(String, Float), CUDNN_ACTIVATION_DESCRIPTOR]()
+    cudnnPool2Desc = HashMap[(String, Seq[Int]), CUDNN_POOLING_DESCRIPTOR]()
+
+    super.traverse(ns, res)
+
+    // clean up hashmaps for cudnn descriptors
     cudnnTensor2Desc foreach {
-      case (_, (desc, "tensor")) => CUDNN_DESTROY_TENSOR_DESCRIPTOR(desc)
-      case (_, (desc, "filter")) => CUDNN_DESTROY_FILTER_DESCRIPTOR(desc)
+      case n@(_, (desc, "tensor")) => CUDNN_DESTROY_TENSOR_DESCRIPTOR(desc)
+      case n@(_, (desc, "filter")) => CUDNN_DESTROY_FILTER_DESCRIPTOR(desc)
       case _ => throw new Exception("Unknown kind of cudnn tensor descriptor")
     }
     cudnnConv2Desc foreach {
-      case (_, desc) => CUDNN_DESTROY_CONV_DESCRIPTOR(desc)
+      case n@(_, desc) => CUDNN_DESTROY_CONV_DESCRIPTOR(desc)
     }
     cudnnActv2Desc foreach {
       case (_, desc) => CUDNN_DESTROY_ACTIVATION_DESCRIPTOR(desc)
@@ -191,6 +206,10 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     cudnnPool2Desc foreach {
       case (_, desc) => CUDNN_DESTROY_POOLING_DESCRIPTOR(desc)
     }
+    cudnnTensor2Desc = savedCudnnTensor2Desc
+    cudnnConv2Desc = savedCudnnConv2Desc
+    cudnnActv2Desc = savedCudnnActv2Desc
+    cudnnPool2Desc = savedCudnnPool2Desc
   }
 
   override def transform(n: Node): Backend.Exp = n match {

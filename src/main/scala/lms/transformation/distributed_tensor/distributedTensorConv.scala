@@ -74,7 +74,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     val dummy_tt = TensorType(input.resultType.shape, manifest[Boolean])  // dummy shape
     val res_tt = List(output_tt, dummy_tt)
 
-    (new TENSORS(Adapter.g.reflectRead("tensors_dropout", C(res_tt), C(anno), 
+    (new TENSORS(Adapter.g.reflectRead("tensors_dropout", C(res_tt), C(anno),
       input.x, C(params))(input.x))).withSrcType(__pos, input.et)
   }
 
@@ -83,7 +83,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
     (new TENSOR(Adapter.g.reflectRead("tensor_dropout_bwd", C(res_tt), C(anno),
       doutput.x, reserveSpace.x, C(params))(doutput.x, reserveSpace.x)).withSrcType(__pos, doutput.et))
   }
-  
+
   def PoolingForward(input: TENSOR, params: PoolingParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = PoolingForwardOutTensorType(input, params, anno)
     (new TENSOR(Adapter.g.reflectRead("tensor_pooling", C(res_tt), C(anno),
@@ -110,10 +110,10 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
     def outputDim(inputDim: Int, pad: Int, windowDim: Int, str: Int) =
       1 + (inputDim + 2*pad - windowDim) / str
-    
+
     val output_H = outputDim(input_shape(CUDNN_H).size, padding(CUDNN_PARAM_H),
       window(CUDNN_PARAM_H), strides(CUDNN_PARAM_H))
-    
+
     val output_W = outputDim(input_shape(CUDNN_W).size, padding(CUDNN_PARAM_W),
       window(CUDNN_PARAM_W), strides(CUDNN_PARAM_W))
 
@@ -141,9 +141,8 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       val filterCin   = filter_type.namedDim(CUDNN_C_IN)
       // val res = List((inputC, filterCin), (outputC, filterCout))
       val res = List((inputC, filterCin))
-      System.out.println(res)
       res
-    
+
     case Node(s, "tensors_dropout", _, _) => List()
     case Node(s, "tensor_pooling", _, _) => List()
 
@@ -184,7 +183,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
           val g = DropoutBackward(grads(0), TENSORS.getResult(x, 1), params, anno, pos)
           Accumulate(gradMap(a), g, anno); ()
         }) +=: backwardNodes
-      
+
       case Node(s, "tensor_pooling", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:PoolingParam)::Backend.Const(mode:String)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes

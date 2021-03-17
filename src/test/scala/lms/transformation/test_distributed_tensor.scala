@@ -237,7 +237,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-        
+
         val model = module {
           val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
@@ -259,7 +259,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-        
+
         val model = module {
           val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
@@ -279,7 +279,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-        
+
         val model = module {
           val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
@@ -299,7 +299,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
-        
+
         val model = module {
           val input = Tensor.input[Float](shape=Seq(2,1,3,3), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
@@ -376,6 +376,27 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("conv", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("conv_train") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+      import scala.collection.immutable.Seq
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,9,9), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,3,3), tensorName=Some("weight"))
+                                            // padding   stride    dilation
+          val params = ConvParam(1.0f, 0.0f, Seq(1, 1), Seq(1, 1), Seq(1, 1))
+          input.conv(weight, params)
+        }
+        model.train(10); ()
+      }
+    }
+    checkWithLogPath("conv_train", driver.code, "cu", driver.setLogPath)
   }
 }
 

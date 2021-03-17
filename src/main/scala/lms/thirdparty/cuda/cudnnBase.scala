@@ -43,23 +43,27 @@ trait CUDNNBaseTypeLess extends Dsl with CLibs {
   class CUDNN_TENSOR_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
   class CUDNN_FILTER_DESCRIPTOR(override val x: Backend.Exp) extends TOP(x)
 
-  def CUDNN_CREATE_TENSOR_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR)(implicit __pos: SourceContext) = 
+  def CUDNN_CREATE_TENSOR_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateTensorDescriptor", tensorDesc.x)(Seq(), Seq(0), Set[Int](0))
 
-  def CUDNN_DESTROY_TENSOR_DESCRIPTOR(tensorDesc: TOP)(implicit __pos: SourceContext) = 
-  LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyTensorDescriptor", tensorDesc.x)(Seq(), Seq(0), Set[Int]())
-  
-  def CUDNN_SET_TENSOR_4D_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR, format: TOP, dataType: TOP, n: INT, c: INT, 
+  def CUDNN_DESTROY_TENSOR_DESCRIPTOR(tensorDesc: TOP) = {
+    implicit val pos: SourceContext = Adapter.sourceMap.getOrElse(tensorDesc.x, Adapter.oldSourceMap(tensorDesc.x))
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyTensorDescriptor", tensorDesc.x)(Seq(), Seq(0), Set[Int](), Adapter.CTRL)
+  }
+
+  def CUDNN_SET_TENSOR_4D_DESCRIPTOR(tensorDesc: CUDNN_TENSOR_DESCRIPTOR, format: TOP, dataType: TOP, n: INT, c: INT,
                                      h: INT, w: INT)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetTensor4dDescriptor", tensorDesc.x, format.x, dataType.x,
       n.x, c.x, h.x, w.x)(Seq(1,2,3,4,5,6), Seq(0), Set[Int]())
-  
+
   def CUDNN_CREATE_FILTER_DESCRIPTOR(filterDesc: CUDNN_FILTER_DESCRIPTOR)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnCreateFilterDescriptor", filterDesc.x)(Seq(), Seq(0), Set[Int](0))
-  
-  def CUDNN_DESTROY_FILTER_DESCRIPTOR(filterDesc: TOP)(implicit __pos: SourceContext) = 
-    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyFilterDescriptor", filterDesc.x)(Seq(), Seq(0), Set[Int]())
-  
+
+  def CUDNN_DESTROY_FILTER_DESCRIPTOR(filterDesc: TOP) = {
+    implicit val pos: SourceContext = Adapter.sourceMap.getOrElse(filterDesc.x, Adapter.oldSourceMap(filterDesc.x))
+    LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnDestroyFilterDescriptor", filterDesc.x)(Seq(), Seq(0), Set[Int](), Adapter.CTRL)
+  }
+
   def CUDNN_SET_FILTER_4D_DESCRIPTOR(filterDesc: CUDNN_FILTER_DESCRIPTOR, format: TOP, dataType: TOP, k: INT, c: INT,
                                      h: INT, w: INT)(implicit __pos: SourceContext) =
     LIB_FUNCTION(manifest[CUDNN_RESULT], "cudnnSetFilter4dDescriptor", filterDesc.x, format.x, dataType.x,
@@ -100,15 +104,15 @@ trait CUDNNBaseOps extends CLibs with CudaOps {
   def cudnnPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_PROPAGATE_NAN")
   def cudnnNotPropagateNan = cmacro[cudnnNanPropagationT]("CUDNN_NOT_PROPAGATE_NAN")
 
-  
+
   def cudnnCheck(res: Rep[cudnnStatusT]) =
     libFunction[Unit]("CUDNNCHECK", Unwrap(res))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
-  
+
   // cudnnStatus_t cudnnCreate(cudnnHandle_t *handle)
   def cudnnCreate(handle: Rep[cudnnHandleT]): Rep[cudnnStatusT] =
     libFunction[cudnnStatusT]("cudnnCreate", Unwrap(handle))(Seq(), Seq(0), Set(0))
-  
+
   // cudnnStatus_t cudnnDestroy(cudnnHandle_t handle)
   def cudnnDestroy(handle: Rep[cudnnHandleT]): Rep[cudnnStatusT] =
     libFunction[cudnnStatusT]("cudnnDestroy", Unwrap(handle))(Seq(), Seq(0), Set())
@@ -121,7 +125,7 @@ trait CUDNNBaseOps extends CLibs with CudaOps {
   // cudnnStatus_t cudnnDestroyTensorDescriptor(cudnnTensorDescriptor_t tensorDesc)
   def cudnnDestroyTensorDescriptor(tensorDesc: Rep[cudnnTensorDescriptorT]) =
     libFunction[cudnnStatusT]("cudnnDestroyTensorDescriptor", Unwrap(tensorDesc))(Seq(), Seq(0), Set())
-  
+
   /*
   cudnnStatus_t cudnnSetTensor4dDescriptor(
                                 cudnnTensorDescriptor_t tensorDesc,
@@ -136,7 +140,7 @@ trait CUDNNBaseOps extends CLibs with CudaOps {
                                 dataType: Rep[cudnnDataTypeT], n: Rep[Int], c: Rep[Int], h: Rep[Int], w: Rep[Int]) =
     libFunction[cudnnStatusT]("cudnnSetTensor4dDescriptor", Unwrap(tensorDesc), Unwrap(format), Unwrap(dataType),
       Unwrap(n), Unwrap(c), Unwrap(h), Unwrap(w))(Seq(1,2,3,4,5,6), Seq(0), Set())
-  
+
 
   // cudnnStatus_t cudnnCreateFilterDescriptor(cudnnFilterDescriptor_t *filterDesc)
   def cudnnCreateFilterDescriptor(filterDesc: Rep[cudnnFilterDescriptorT]) =
@@ -160,14 +164,14 @@ trait CUDNNBaseOps extends CLibs with CudaOps {
                                  k: Rep[Int], c: Rep[Int], h: Rep[Int], w: Rep[Int]) =
     libFunction[cudnnStatusT]("cudnnSetFilter4dDescriptor", Unwrap(filterDesc), Unwrap(dataType), Unwrap(format),
       Unwrap(k), Unwrap(c), Unwrap(h), Unwrap(w))(Seq(1,2,3,4,5,6), Seq(0), Set())
-  
+
 }
 
 trait CCodeGenCUDNNBase extends ExtendedCCodeGen {
   override def remap(m: Manifest[_]) = m.runtimeClass.getName match {
     case s: String if s.endsWith("$cudnn_result") ||
       s.endsWith("$CUDNN_RESULT")=> "cudnnStatus_t"
-    
+
     case s => super.remap(m)
   }
 }
