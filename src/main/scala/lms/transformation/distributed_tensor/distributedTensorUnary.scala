@@ -176,29 +176,49 @@ trait FixedSizeDistributedTensorOpsUnary extends FixedSizeDistributedTensorOpsBa
     }
 
     // clipped relu
-    def relu(threshold: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val self = tensor(x)
+    def relu(threshold: Float)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
       val p = ActivationParam(1.0f, 0.0f, threshold)
       val t = ActivationForward(self, p, "crelu", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
 
-    def elu(alpha: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val self = tensor(x)
+    def relu(threshold: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val p = ActivationParam(1.0f, 0.0f, threshold)
+      val t = ActivationForward(self, p, "crelu", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def elu(alpha: Float)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
       val p = ActivationParam(1.0f, 0.0f, alpha)
       val t = ActivationForward(self, p, "elu", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
 
+    def elu(alpha: Float, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val p = ActivationParam(1.0f, 0.0f, alpha)
+      val t = ActivationForward(self, p, "elu", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def sigmoid()(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "sigmoid", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
     def sigmoid(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val self = tensor(x)
       val p = ActivationParam(1.0f, 0.0f, 0.0f)
       val t = ActivationForward(self, p, "sigmoid", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
     
+    def cudnn_tanh()(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val p = ActivationParam(1.0f, 0.0f, 0.0f)
+      val t = ActivationForward(self, p, "tanh", anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
     def cudnn_tanh(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val self = tensor(x)
       val p = ActivationParam(1.0f, 0.0f, 0.0f)
       val t = ActivationForward(self, p, "tanh", anno, __pos)
       Wrap[Tensor[T]](t.x)

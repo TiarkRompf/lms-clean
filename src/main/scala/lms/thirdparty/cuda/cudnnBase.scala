@@ -162,3 +162,12 @@ trait CUDNNBaseOps extends CLibs with CudaOps {
       Unwrap(k), Unwrap(c), Unwrap(h), Unwrap(w))(Seq(1,2,3,4,5,6), Seq(0), Set())
   
 }
+
+trait CCodeGenCUDNNBase extends ExtendedCCodeGen {
+  override def remap(m: Manifest[_]) = m.runtimeClass.getName match {
+    case s: String if s.endsWith("$cudnn_result") ||
+      s.endsWith("$CUDNN_RESULT")=> "cudnnStatus_t"
+    
+    case s => super.remap(m)
+  }
+}

@@ -59,7 +59,12 @@ trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBas
     val self = tensor(x)
 
     val softmax_params_def = SoftmaxParam(1.0f, 0.0f)
-    def softmax(anno: Anno, params: SoftmaxParam = softmax_params_def)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def softmax(params: SoftmaxParam = softmax_params_def)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = SoftmaxForward(self, params, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def softmax(params: SoftmaxParam, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = SoftmaxForward(self, params, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }

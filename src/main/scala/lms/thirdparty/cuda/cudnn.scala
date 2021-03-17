@@ -23,6 +23,6 @@ trait CUDNNOps extends CUDNNBaseOps
   with CUDNNActivationOps
   with CUDNNSoftmaxOps
 
-trait CCodeGenCUDNN extends CCodeGenCUDNNConv {
+trait CCodeGenCUDNN extends CCodeGenCUDNNBase with CCodeGenCUDNNConv {
   registerHeader("\"cudnn_header.h\"")
 }
