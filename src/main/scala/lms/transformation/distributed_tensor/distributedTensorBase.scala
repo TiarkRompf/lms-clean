@@ -43,12 +43,13 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   case class Dim(x: Int) // named dimension
   def dim = Dim(next_dim_name) // fresh dim
   case class Size(dim: Dim, size: Int) // dim and length
-  case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno) { // tensor type
+  case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno, tensorName: Option[String] = None) { // tensor type
     def namedDim(x: Int) = shape(x).dim
     def contains(d: Dim) = shape.map(_.dim).contains(d)
     def shapeSize = shape.map(_.size)
     def shapeDim = shape.map(_.dim)
     def shapeSizeAfterSplit(d: Dim, degree: Int) = shape.map(s => if (s.dim == d) s.size / degree else s.size)
+    def map(f: String => String) = TensorType(shape, et, anno, tensorName.map(f))
   }
 
   abstract class Anno extends Serializable // Annotation class
@@ -122,6 +123,10 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def save(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("save", x)(x)(Adapter.CTRL))
     }
+
+    def check(filename: String)(implicit __pos: SourceContext): UNIT = {
+      UNIT(Adapter.g.reflectEffect("check_tensor", x, lms.core.Backend.Const(filename))(x)(Adapter.CTRL))
+    }
   }
 
   class TENSORS(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
@@ -152,11 +157,27 @@ trait FixedSizeDistributedTensorBaseTypeLess {
         case a => false
       }
     }
+
+    def tupleView(xs: List[Backend.Exp]): Backend.Exp = Adapter.g.reflect("tuple-view", xs: _*)
+    def handleTupleView[T](n: Option[Backend.Node])(func: (List[Backend.Sym]) => T): T = n match {
+      case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => func(xs)
+      case _ => throw new Exception(s"$n is not a tuple view")
+    }
   }
 
-  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): Int => UNIT = {
+  abstract class myModule {
+    def train(iter: Int): UNIT
+    // def inference: TENSOR
+    def test(lossName: String): UNIT
+  }
+
+  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): myModule = {
     val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f.x))(Adapter.CTRL)
-    (iter: Int) => UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
+    new myModule {
+      def train(iter: Int) = UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
+      // def inference:
+      def test(lossName: String = "loss") = UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(lossName))(Adapter.CTRL))
+    }
   }
 
   def mergable_dims(node: Node): List[(Dim, Dim)] = node match {
@@ -170,22 +191,23 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   case class GradMapWrapper(map: scala.collection.mutable.HashMap[Backend.Sym, Backend.Sym]) {
     def apply(x: Backend.Exp): TENSOR = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
       case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _)) =>
-        Adapter.g.globalDefsCache.get(map(op)) match {
-          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => new TENSOR(xs(i))
-          case a => throw new Exception(s"$a is not a tuple view")
-        }
+        TENSORS.handleTupleView(Adapter.g.globalDefsCache.get(map(op)))(xs => new TENSOR(xs(i)))
       case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => throw new Exception(s"$x is Tensors, not a Tensor: $n")
       case _ => new TENSOR(map(x.asInstanceOf[Backend.Sym]))
     }
     def getGradsOfOp(x: Backend.Exp): List[TENSOR] = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
-      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") => Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])) match {
-          case Some(Node(_, "tuple-view", xs: List[Backend.Sym], _)) => xs.map(new TENSOR(_))
-          case a => throw new Exception(s"$a is not a tuple view")
-        }
+      case n@Some(Node(_, op, _, _)) if op.startsWith("tensors_") =>
+        TENSORS.handleTupleView(Adapter.g.globalDefsCache.get(map(x.asInstanceOf[Backend.Sym])))(xs => xs.map(new TENSOR(_)))
       case n => throw new Exception(s"$n is not an operation")
     }
-    def update(x: Backend.Exp, grad: TENSOR) = { map(x.asInstanceOf[Backend.Sym]) = grad.x.asInstanceOf[Backend.Sym] }
-    def update(x: Backend.Exp, grad: Backend.Exp) = { map(x.asInstanceOf[Backend.Sym]) = grad.asInstanceOf[Backend.Sym] }
+    def update(x: Backend.Exp, grad: Backend.Exp): Unit = Adapter.oldDefsCache.get(x.asInstanceOf[Backend.Sym]) match {
+      case Some(Node(_, "tensor_result", tt::anno::(op:Backend.Sym)::Backend.Const(i:Int)::_, _)) =>
+        TENSORS.handleTupleView(Adapter.g.globalDefsCache.get(map(op))){ xs =>
+          map(op) = TENSORS.tupleView(xs.updated(i, grad)).asInstanceOf[Backend.Sym]
+        }
+      case _ => map(x.asInstanceOf[Backend.Sym]) = grad.asInstanceOf[Backend.Sym]
+    }
+    def update(x: Backend.Exp, grad: TENSOR): Unit = update(x, grad.x)
   }
 
   def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
@@ -228,13 +250,20 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
       Wrap[Tensor[T]](tensor.x)
     }
 
+    def input[T:Manifest](shape: Seq[Int], name: String, splitDim: Int, splitTo: List[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensorType = resultType[Float](shape, tensorName=Some(name))
+      val sAnno = SAnno(tensorType.shape(splitDim).dim, splitTo)
+      val tensor = INPUT(tensorType, sAnno)
+      Wrap[Tensor[T]](tensor.x)
+    }
+
     def weight[T:Manifest](shape: Seq[Int], index: Int, devices: Seq[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val tensor = WEIGHT(shape, manifest[T], index, devices)
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def weight[T:Manifest](shape: Seq[Int])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = WEIGHT(TensorType(shape.map(s => Size(dim, s)), manifest[T]), anno)
+    def weight[T:Manifest](shape: Seq[Int], tensorName: Option[String] = None)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = WEIGHT(TensorType(shape.map(s => Size(dim, s)), manifest[T], tensorName = tensorName), anno)
       Wrap[Tensor[T]](tensor.x)
     }
 
@@ -249,14 +278,15 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
     }
   }
 
-  def resultType[T:Numeric:Manifest](shape: Seq[Int]): TensorType =
-    TensorType(shape.map(s => Size(dim, s)), manifest[T])
+  def resultType[T:Numeric:Manifest](shape: Seq[Int], tensorName: Option[String] = None): TensorType =
+    TensorType(shape.map(s => Size(dim, s)), manifest[T], tensorName=tensorName)
 
   def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))
 
   implicit class TensorOps[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
     def shape: Seq[Int] = self.shapeSize
+    def anno: Anno = self.annotation
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
   }
 }

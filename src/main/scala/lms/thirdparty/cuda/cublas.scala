@@ -236,6 +236,6 @@ trait CuBLASOps extends Base with CLibs with CudaFunction with StackArrayOps wit
 }
 
 
-trait CCodeGenCuBLASOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
+trait CCodeGenCuBLAS extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
   registerHeader("\"cublas_header.h\"")
 }

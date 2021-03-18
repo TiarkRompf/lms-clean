@@ -11,7 +11,7 @@ class CuBLASTest extends TutorialFunSuite {
   val under = "thirdparty/cuda/"
 
   abstract class DslDriverCCuBLAS[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaOps with CuBLASOps{ q =>
-    override val codegen = new DslGenC with CCodeGenCudaOps with CCodeGenCuBLASOps {
+    override val codegen = new DslGenC with CCodeGenCudaOps with CCodeGenCuBLAS {
       val IR: q.type = q
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"
@@ -29,7 +29,7 @@ class CuBLASTest extends TutorialFunSuite {
         val M = 2
         val K = 2
         val N = 2
-        
+
         // a MxK matrix whose values are 2.0f
         val mat2 = NewArray[Float](M * K)
         for (i <- (0 until M * K): Rep[Range]) {
@@ -58,7 +58,7 @@ class CuBLASTest extends TutorialFunSuite {
         var alpha = 1.0f
         var beta = 0.0f
         cublasCall(cublasSgemm(handle, cublasOpN, cublasOpN, M, N, K, alpha, devPtrA, M, devPtrB, K, beta, devPtrC, M))
-        
+
         cudaCall(cudaMemcpyOfT[Float](res, devPtrC, M * N, device2host))
         printf("Test GEMM:\n")
         for (i <- (0 until M): Rep[Range]) {
@@ -173,13 +173,13 @@ class CuBLASTest extends TutorialFunSuite {
         val devPtrB = cudaMalloc2[Float](M)
         cudaCall(cudaMemcpyOfT[Float](devPtrB, arr1, M, host2device))
         val devPtrC = cudaMalloc2[Float](1)
-        
+
         val handle = cublasHandle
         cublasCall(cublasCreate(handle))
 
         // test DOT
         cublasCall(cublasSdot(handle, 10, devPtrA, 1, devPtrB, 1, devPtrC))
-        
+
         val res = NewArray[Float](M)
         cudaCall(cudaMemcpyOfT[Float](res, devPtrC, 1, device2host))
         printf("Test DOT:\n")

@@ -75,7 +75,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
           INT(padding(CUDNN_PARAM_H)),  INT(padding(CUDNN_PARAM_W)),
           INT(strides(CUDNN_PARAM_H)),  INT(strides(CUDNN_PARAM_W)),
           INT(dilation(CUDNN_PARAM_H)), INT(dilation(CUDNN_PARAM_W)),
-          CUDNN_CONVOLUTION, CUDNN_FLOAT))
+          CUDNN_CROSS_CORRELATION, CUDNN_FLOAT))
         generate_comment(s"end creating and setting convolution descriptor")
         cudnnConv2Desc += ((key, desc))
         desc
@@ -160,28 +160,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val filter_descriptor = getTensorDescriptor(filter_shape, "filter")
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
-      /*
-      generate_comment("begin finding convolution output tensor shape")
-      var output_batchsize = 0
-      var output_height = 0
-      var output_width = 0
-      var output_channels = 0
-      CUDNN_CHECK(CUDNN_GET_CONV_2D_FWD_OUTPUT_DIM(conv_descriptor, input_descriptor, filter_descriptor,
-        INT(output_batchsize), INT(output_channels), INT(output_height), INT(output_width)))
-      generate_comment("end finding convolution output tensor shape")
-
-      val output_shape: ListBuffer[Int] = ListBuffer(0, 0, 0, 0)
-      output_shape(CUDNN_N) = output_batchsize
-      output_shape(CUDNN_C) = output_channels
-      output_shape(CUDNN_H) = output_height
-      output_shape(CUDNN_W) = output_width
-      val output_descriptor = getTensorDescriptor(output_shape.toList, "tensor")
-
-      generate_comment("begin allocating gpu array for the output of convolution")
-      val output_size = output_batchsize * output_height * output_width * output_channels
-      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the output of convolution")
-      */
       val output_shape = tensor_shape(s, useOldMetadata = true)
       val output_descriptor = getTensorDescriptor(output_shape, "tensor")
 
@@ -212,7 +190,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("begin convolution forward pass")
       CUDNN_CHECK(CUDNN_CONV_FWD(myCUDNNComm, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(weight_tensor), filter_descriptor, new ARRAY(filter_tensor),
         conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), output_descriptor, output))
-      generate_comment("begin convolution forward pass")
+      generate_comment("end convolution forward pass")
 
       output.x
 
@@ -313,6 +291,18 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_CHECK(CUDNN_CONV_BWD_FILTER(myCUDNNComm, VAR(FLOAT(alpha)), weight_descriptor, new ARRAY(weight_tensor), doutput_descriptor, new ARRAY(doutput_tensor),
         conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), dfilter_descriptor, dfilter))
       generate_comment("end convolution backward filter pass")
+
+      anno match {
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in dot op")
+        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) => ()
+        case SAnno(dim: Dim, devices: Seq[Device], _) =>
+          val sourceTensor = new TENSOR(s, useOldMetadata = true)
+          val m = sourceTensor.et
+          val count = numeral(tt.shapeSize)
+          NCCL_ALLREDUCE(m, dfilter, dfilter, SIZE_T(count), NCCL_SUM, myNCCLComm, myNCCLStream)
+          CUDA_STREAM_SYNCHRONIZE(myNCCLStream)
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_conv")
+      }
 
       dfilter.x
     
@@ -453,13 +443,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val d_states = GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the states of dropout forward")
 
-      /*
-      generate_comment("begin creating dropout descriptor")
-      val dropout_descriptor = new CUDNN_DROPOUT_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_DROPOUT_DESCRIPTOR], "cudnnDropoutDescriptor_t").x)
-      CUDNN_CHECK(CUDNN_CREATE_DROPOUT_DESCRIPTOR(dropout_descriptor))
-      CUDNN_CHECK(CUDNN_SET_DROPOUT_DESCRIPTOR(dropout_descriptor, myCUDNNComm, dropout, d_states, states_bytes, seed))
-      generate_comment("end creating dropout descriptor")
-      */
       val dropout_descriptor = getDropoutDescriptor(d_states, states_bytes, params.asInstanceOf[DropoutParam])
 
       // allocate output tensor
@@ -511,13 +494,6 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val d_states = GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
       generate_comment("end allocating gpu array for the states of dropout backward")
 
-      /*
-      generate_comment("begin creating dropout descriptor")
-      val dropout_descriptor = new CUDNN_DROPOUT_DESCRIPTOR(NEW_STRUCT(manifest[CUDNN_DROPOUT_DESCRIPTOR], "cudnnDropoutDescriptor_t").x)
-      CUDNN_CHECK(CUDNN_CREATE_DROPOUT_DESCRIPTOR(dropout_descriptor))
-      CUDNN_CHECK(CUDNN_SET_DROPOUT_DESCRIPTOR(dropout_descriptor, myCUDNNComm, dropout, d_states, states_bytes, seed))
-      generate_comment("end creating dropout descriptor")
-      */
       val dropout_descriptor = getDropoutDescriptor(d_states, states_bytes, params.asInstanceOf[DropoutParam])
       
       generate_comment("begin dropout backward pass")

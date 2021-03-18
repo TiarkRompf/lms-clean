@@ -121,26 +121,38 @@ trait FixedSizeDistributedTensorOpsBinary extends FixedSizeDistributedTensorOpsB
   implicit class TensorOpsBinary[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
 
-    // def + (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.+(y, anno)
-    def + (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def + (y: Rep[Tensor[T]])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Add(self, tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+    def + (y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Add(self, tensor(y), anno)
       Wrap[Tensor[T]](t.x)
     }
 
-    // def - (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.-(y, anno)
-    def - (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def - (y: Rep[Tensor[T]])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Sub(self, tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+    def - (y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Sub(self, tensor(y), anno)
       Wrap[Tensor[T]](t.x)
     }
 
-    // def * (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this.*(y, anno)
-    def * (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def * (y: Rep[Tensor[T]])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Mul(self, tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+    def * (y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Mul(self, tensor(y), anno)
       Wrap[Tensor[T]](t.x)
     }
 
-    // def / (y: Rep[Tensor[T]])(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = this./(y, anno)
-    def / (y: Rep[Tensor[T]], anno: Anno = NAnno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+    def / (y: Rep[Tensor[T]])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Div(self, tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
+    def / (y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Div(self, tensor(y), anno)
       Wrap[Tensor[T]](t.x)
     }

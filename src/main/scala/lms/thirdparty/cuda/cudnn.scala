@@ -12,7 +12,7 @@ import lms.thirdparty.array_computation.CudaOps
 object CUDNNTypeLess extends CUDNNBaseTypeLess
   with CUDNNConvTypeLess
   with CUDNNDropoutTypeLess
-  with CUDNNPoolingTypeLess 
+  with CUDNNPoolingTypeLess
   with CUDNNActivationTypeLess
   with CUDNNSoftmaxTypeLess
 
@@ -23,6 +23,6 @@ trait CUDNNOps extends CUDNNBaseOps
   with CUDNNActivationOps
   with CUDNNSoftmaxOps
 
-trait CCodeGenCUDNN extends CCodeGenCUDNNConv {
+trait CCodeGenCUDNN extends CCodeGenCUDNNBase with CCodeGenCUDNNConv {
   registerHeader("\"cudnn_header.h\"")
 }

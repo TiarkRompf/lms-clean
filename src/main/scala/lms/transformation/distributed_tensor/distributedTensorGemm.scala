@@ -114,6 +114,10 @@ trait FixedSizeDistributedTensorOpsGemm extends FixedSizeDistributedTensorOpsBas
   implicit class TensorOpsGemm[T:Numeric:Manifest](x: Rep[Tensor[T]]) {
     val self = tensor(x)
 
+    def gemm(y: Rep[Tensor[T]])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Dot(self, tensor(y), anno)
+      Wrap[Tensor[T]](t.x)
+    }
     def gemm(y: Rep[Tensor[T]], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = Dot(self, tensor(y), anno)
       Wrap[Tensor[T]](t.x)

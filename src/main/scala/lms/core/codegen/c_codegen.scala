@@ -239,6 +239,13 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   }
   def unregisterHeader(nHeaders: String*): Unit = headers --= nHeaders.toSet
 
+  def cleanFlatDir(dir: java.nio.file.Path): Unit = {
+    import java.nio.file._
+    import java.nio.file.StandardCopyOption._
+    Files.walk(dir).forEach {f => if (!Files.isDirectory(f)) Files.delete(f) }
+    Files.deleteIfExists(dir)
+  }
+
   def prepareHeaders: Unit = {
     import java.nio.file._
     import java.nio.file.StandardCopyOption._
@@ -246,6 +253,9 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     val classLoader = getClass.getClassLoader
     val src = Paths.get(classLoader.getResource("headers").getFile)
     val dst = Paths.get(System.getProperty("user.dir")).resolve("headers")
+    var srcSum = 0; Files.walk(src).forEach {f => srcSum += 1};
+    var dstSum = 0; if (Files.exists(dst)) Files.walk(dst).forEach {f => dstSum += 1};
+    if (dstSum < srcSum && Files.exists(dst)) cleanFlatDir(dst)
     if (!Files.exists(dst)) {
       Files.walk(src).forEach { f =>
         Files.copy(f, dst.resolve(src.relativize(f)), REPLACE_EXISTING)
