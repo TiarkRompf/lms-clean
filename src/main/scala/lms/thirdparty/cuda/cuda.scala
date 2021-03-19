@@ -412,6 +412,10 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
   }
 
+   def NewDynSharedArray[T:Manifest]: Rep[Array[T]] = {
+    Wrap[Array[T]](Adapter.g.reflectMutable("NewDynSharedArray"))
+  }
+
   // cudaError_t cudaFree ( void* devPtr )
   def cudaFree[T:Manifest](devPtr: Rep[Array[T]]) =
     libFunction[CudaErrorT]("cudaFree", Unwrap(devPtr))(Seq(0), Seq(0), Set[Int]())
@@ -761,6 +765,10 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
     case n @ Node(s, "NewSharedArray", List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("__shared__ "); emit(s"$tpe "); shallow(s); emit("["); shallow(x); emitln("];")
+
+    case n @ Node(s, "NewDynSharedArray", List(), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
     case _ => super.traverse(n)
   }
 

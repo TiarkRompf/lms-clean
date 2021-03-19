@@ -179,6 +179,15 @@ class CudaTest extends TutorialFunSuite {
           d(t) = s(tr)
         })
 
+        val dynamicReverse = cudaGlobalFun[Array[Int], Int, Unit]((d, n) => {
+          val s = NewDynSharedArray[Int]
+          val t = threadIdxX
+          val tr = n - t - 1
+          s(t) = d(t)
+          cudaSyncThreads
+          d(t) = s(tr)
+        })
+
         val n = 64
         val a = NewArray[Int](n)
         val r = NewArray[Int](n)
@@ -194,6 +203,16 @@ class CudaTest extends TutorialFunSuite {
 
         cudaMemcpyOfT[Int](d_d, a, n, host2device)
         staticReverse(d_d, n, dim3(1), dim3(n))
+        cudaMemcpyOfT[Int](d, d_d, n, device2host)
+
+        for (i <- (0 until n): Rep[Range]) {
+          if (d(i) != r(i)) {
+            printf("Error!")
+          }
+        }
+
+        cudaMemcpyOfT[Int](d_d, a, n, host2device)
+        dynamicReverse(d_d, n, dim3(1), dim3(n), dim3(n * sizeOf[Int]))
         cudaMemcpyOfT[Int](d, d_d, n, device2host)
 
         for (i <- (0 until n): Rep[Range]) {
