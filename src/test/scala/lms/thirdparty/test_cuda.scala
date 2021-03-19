@@ -164,5 +164,49 @@ class CudaTest extends TutorialFunSuite {
     System.out.println(indent(driver.code))
   }
 
+  test("static_reverse") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+
+        val staticReverse = cudaGlobalFun[Array[Int], Int, Unit]((d, n) => {
+          val s = NewSharedArray[Int](64)
+          val t = threadIdxX
+          val tr = n - t - 1
+          s(t) = d(t)
+          cudaSyncThreads
+          d(t) = s(tr)
+        })
+
+        val n = 64
+        val a = NewArray[Int](n)
+        val r = NewArray[Int](n)
+        val d = NewArray[Int](n)
+
+        for (i <- (0 until n): Rep[Range]) {
+          a(i) = i
+          r(i) = n - i - 1
+          d(i) = 0
+        }
+
+        val d_d = cudaMalloc2[Int](n)
+
+        cudaMemcpyOfT[Int](d_d, a, n, host2device)
+        staticReverse(d_d, n, dim3(1), dim3(n))
+        cudaMemcpyOfT[Int](d, d_d, n, device2host)
+
+        for (i <- (0 until n): Rep[Range]) {
+          if (d(i) != r(i)) {
+            printf("Error!")
+          }
+        }
+
+      }
+    }
+    // check("threads_basic", driver.code, "cu")
+    System.out.println(indent(driver.code))
+  }
+
 }
 

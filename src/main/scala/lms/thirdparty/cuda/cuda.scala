@@ -387,6 +387,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // Using a manual function in header file to handle CudaErrorT
   def cudaCall(status: Rep[CudaErrorT]) =
     libFunction[Unit]("CUDA_CALL", Unwrap(status))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+  
+  def cudaSyncThreads =
+    libFunction[Unit]("__syncthreads")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
   // cudaError_t cudaMalloc ( void** devPtr, size_t size )
   def cudaMalloc[T:Manifest](devPtr: Rep[Array[T]], size: Rep[SizeT]) =
@@ -403,6 +406,10 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     val addr: Rep[Array[T]] = NewArray[T](0) // FIXME(feiw) just need an uninitialized pointer
     cudaCall(cudaMalloc(addr, size))
     addr
+  }
+
+  def NewSharedArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
+    Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
   }
 
   // cudaError_t cudaFree ( void* devPtr )
@@ -748,6 +755,13 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
       emit("("); other_args.headOption.foreach(h => { shallowP(h, 0); other_args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
 
     case _ => super.shallow(n)
+  }
+
+  override def traverse(n: Node): Unit = n match {
+    case n @ Node(s, "NewSharedArray", List(x), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit("__shared__ "); emit(s"$tpe "); shallow(s); emit("["); shallow(x); emitln("];")
+    case _ => super.traverse(n)
   }
 
 }
