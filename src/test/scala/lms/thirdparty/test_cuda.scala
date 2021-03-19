@@ -188,6 +188,9 @@ class CudaTest extends TutorialFunSuite {
           d(t) = s(tr)
         })
 
+        val tmp = NewShared2dArray[Int](2,2)
+        printf("%d", tmp(0)(1))
+
         val n = 64
         val a = NewArray[Int](n)
         val r = NewArray[Int](n)
@@ -212,7 +215,7 @@ class CudaTest extends TutorialFunSuite {
         }
 
         cudaMemcpyOfT[Int](d_d, a, n, host2device)
-        dynamicReverse(d_d, n, dim3(1), dim3(n), dim3(n * sizeOf[Int]))
+        // dynamicReverse(d_d, n, dim3(1), dim3(n), dim3(n * sizeOf[Int]))
         cudaMemcpyOfT[Int](d, d_d, n, device2host)
 
         for (i <- (0 until n): Rep[Range]) {

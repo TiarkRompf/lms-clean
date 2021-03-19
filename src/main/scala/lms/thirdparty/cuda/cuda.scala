@@ -412,6 +412,10 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
   }
 
+  def NewShared2dArray[T:Manifest](x: Rep[Int], y: Rep[Int]): Rep[Array[Array[T]]] = {
+    Wrap[Array[Array[T]]](Adapter.g.reflectMutable("NewShared2dArray", Unwrap(x), Unwrap(y)))
+  }
+
    def NewDynSharedArray[T:Manifest]: Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewDynSharedArray"))
   }
@@ -765,11 +769,19 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
     case n @ Node(s, "NewSharedArray", List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("__shared__ "); emit(s"$tpe "); shallow(s); emit("["); shallow(x); emitln("];")
+    
+    case n @ Node(s, "NewShared2dArray", xs, _) =>
+      System.out.println("hello")
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit("__shared__ "); emit(s"$tpe "); shallow(s); emit("["); shallow(xs.head); emit("]["); shallow(xs.head); emitln("];")
 
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
-    case _ => super.traverse(n)
+    case _ => 
+      // System.out.println("hello1 " + n.op + n.rhs)
+      
+      super.traverse(n)
   }
 
 }
