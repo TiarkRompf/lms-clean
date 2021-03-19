@@ -387,7 +387,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // Using a manual function in header file to handle CudaErrorT
   def cudaCall(status: Rep[CudaErrorT]) =
     libFunction[Unit]("CUDA_CALL", Unwrap(status))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
-  
+
   def cudaSyncThreads =
     libFunction[Unit]("__syncthreads")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
@@ -744,6 +744,11 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   // need to register the headers
   registerHeader("\"cuda_header.h\"")
 
+  override def mayInline(n: Node): Boolean = n match {
+    case Node(s, "NewShared2dArray", _, _) => false
+    case _ => super.mayInline(n)
+  }
+
   override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
     case s: String if s.endsWith("Dim3") => "dim3"
     case s: String if s.endsWith("CudaErrorT") => "cudaError_t"
@@ -769,7 +774,7 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
     case n @ Node(s, "NewSharedArray", List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("__shared__ "); emit(s"$tpe "); shallow(s); emit("["); shallow(x); emitln("];")
-    
+
     case n @ Node(s, "NewShared2dArray", xs, _) =>
       System.out.println("hello")
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
@@ -778,9 +783,9 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
-    case _ => 
+    case _ =>
       // System.out.println("hello1 " + n.op + n.rhs)
-      
+
       super.traverse(n)
   }
 
