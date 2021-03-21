@@ -188,9 +188,6 @@ class CudaTest extends TutorialFunSuite {
           d(t) = s(tr)
         })
 
-        // val tmp = NewShared2dArray[Int](2,2)
-        // printf("%d", tmp(0)(1))
-
         val n = 64
         val a = NewArray[Int](n)
         val r = NewArray[Int](n)
