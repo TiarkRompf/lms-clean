@@ -161,7 +161,7 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaFree(cuda_inG))
       }
     }
-    System.out.println(indent(driver.code))
+    check("remove_conditional", driver.code, "cu")
   }
 
 }
