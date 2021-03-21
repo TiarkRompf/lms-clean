@@ -316,9 +316,21 @@ abstract class CompactCodeGen extends CompactTraverser {
       quoteBlock(traverse(b))
 
     case n @ Node(s,"@",x::y,_) =>
-      shallowP(x); emit("("); y.headOption.foreach(h => { shallowP(h, 0); y.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
+      shallowP(x)
+      emit("(")
+      y.headOption.foreach(h => {
+        shallowP(h, 0)
+        y.tail.foreach(a => { emit(", "); shallowP(a, 0) })
+      })
+      emit(")")
 
     case n @ Node(_,op,args,_) =>
-      emit(op); emit("("); args.headOption.foreach(h => { shallowP(h, 0); args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
+      emit(op)
+      emit("(")
+      args.headOption.foreach(h => {
+        shallowP(h, 0)
+        args.tail.foreach(a => { emit(", "); shallowP(a, 0) })
+      })
+      emit(")")
   }
 }
