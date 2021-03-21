@@ -421,7 +421,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
 
     case n @ Node(s,"P",List(x),_) =>
       es"""printf("%s\n", $x)"""
-    case n @ Node(s, "λ", (block: Block)::Const(0)::Nil, _) =>
+    case n @ Node(s, "λ", (block: Block)::Const(arity:Int)::Nil, _) =>
       registerTopLevelFunctionDecl(quote(s)) {
         emitFunctionSignature(quote(s), block, argNames = false, ending = ";\n")
       }
@@ -429,7 +429,7 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
         emitFunction(quote(s), block)
       }
       emit(quote(s))
-    case n @ Node(s, "λ", (block: Block)::Const(0)::Const(decorator: String)::Nil, _) =>
+    case n @ Node(s, "λ", (block: Block)::Const(arity:Int)::Const(decorator: String)::Nil, _) =>
       registerTopLevelFunctionDecl(quote(s)) {
         emitFunctionSignature(quote(s), block, argNames = false, ending = ";\n")
       }
@@ -597,14 +597,14 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
       // for this case, adding (f, y) in forwardMap is all we need
       // XXX: this is most likely not enough in the general case
       rename(s) = quote(y)
-    case n @ Node(s, "λ", (block: Block)::Const(0)::Nil, _) => // FIXME: check free var?
+    case n @ Node(s, "λ", (block: Block)::Const(arity:Int)::Nil, _) => // FIXME: check free var?
       registerTopLevelFunctionDecl(quote(s)) {
         emitFunctionSignature(quote(s), block, argNames = false, ending = ";\n")
       }
       registerTopLevelFunction(quote(s)) {
         emitFunction(quote(s), block)
       }
-    case n @ Node(s, "λ", (block: Block)::Const(0)::Const(decorator: String)::Nil, _) =>
+    case n @ Node(s, "λ", (block: Block)::Const(arity:Int)::Const(decorator: String)::Nil, _) =>
       registerTopLevelFunctionDecl(quote(s)) {
         emitFunctionSignature(quote(s), block, argNames = false, ending = ";\n")
       }
