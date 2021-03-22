@@ -213,6 +213,7 @@ class CudaTest extends TutorialFunSuite {
 
         cudaMemcpyOfT[Int](d_d, a, n, host2device)
         // dynamicReverse(d_d, n, dim3(1), dim3(n), n * sizeOf[Int])
+        // FunOps5(dynamicReverse).apply(d_d, n, dim3(1), dim3(n), dim1(1))
         dynamicReverse(d_d, n, dim3(1), dim3(n), dim1(1))
         cudaMemcpyOfT[Int](d, d_d, n, device2host)
 

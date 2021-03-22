@@ -628,7 +628,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   
   def cudaGlobalFun1[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]) =
     Wrap[(A,B,Dim3,Dim3,Dim1)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
-
+  
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]) =
     Wrap[(A,B,C,Dim3,Dim3)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
 
@@ -765,7 +765,6 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   override def shallow(n: Node): Unit = n match {
     case n @ Node(s,"@", (f:Backend.Exp)::args, _) => graphCache(f.asInstanceOf[Sym]) match {
       case Node(_, "λ", (b: Block)::Backend.Const(arity:Int)::Backend.Const("__global__")::Nil, _) =>
-        System.out.println(arity)
         shallowP(f);
         assert(args.size > arity + 1, "size of args should be at least arity + 2")
         val dims = args.drop(arity)
@@ -774,19 +773,6 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
         emit("("); other_args.headOption.foreach(h => { shallowP(h, 0); other_args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
       case _ => super.shallow(n)
     }
-
-    case n @ Node(s,"@", (f:Backend.Exp)::args, _) if ((graphCache(f.asInstanceOf[Sym]) match {
-      case Node(_, "λ", (b: Block)::Backend.Const(0)::Backend.Const("t__global__")::Nil, _) => true
-      case _ => false
-    })) =>
-      System.out.println("hello")
-      shallowP(f);
-      assert(args.size > 1, "size of args should be at least 2")
-      val dims = args.drop(args.length - 3)
-      val other_args = args.dropRight(3)
-      emit("<<<"); shallow(dims(0)); emit(", "); shallow(dims(1)); emit(", "); shallow(dims(2)); emit(">>>");
-      emit("("); other_args.headOption.foreach(h => { shallowP(h, 0); other_args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
-    
     case _ => super.shallow(n)
   }
 
