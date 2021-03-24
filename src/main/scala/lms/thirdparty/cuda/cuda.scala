@@ -388,6 +388,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaCall(status: Rep[CudaErrorT]) =
     libFunction[Unit]("CUDA_CALL", Unwrap(status))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
+  def cudaSyncThreads =
+    libFunction[Unit]("__syncthreads")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+
   // cudaError_t cudaMalloc ( void** devPtr, size_t size )
   def cudaMalloc[T:Manifest](devPtr: Rep[Array[T]], size: Rep[SizeT]) =
     libFunction[CudaErrorT]("cudaMalloc", Unwrap(devPtr), Unwrap(size))(Seq(1), Seq(0), Set(0))
@@ -403,6 +406,22 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     val addr: Rep[Array[T]] = NewArray[T](0) // FIXME(feiw) just need an uninitialized pointer
     cudaCall(cudaMalloc(addr, size))
     addr
+  }
+
+  def NewSharedArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
+    Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
+  }
+
+  def NewSharedArray[T:Manifest](x: Rep[Int], y: Rep[Int]): Rep[Array[Array[T]]] = {
+    Wrap[Array[Array[T]]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x), Unwrap(y)))
+  }
+
+  def NewSharedArray[T:Manifest](x: Rep[Int], y: Rep[Int], z: Rep[Int]): Rep[Array[Array[Array[T]]]] = {
+    Wrap[Array[Array[Array[T]]]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x), Unwrap(y), Unwrap(z)))
+  }
+
+  def NewDynSharedArray[T:Manifest]: Rep[Array[T]] = {
+    Wrap[Array[T]](Adapter.g.reflectMutable("NewDynSharedArray"))
   }
 
   // cudaError_t cudaFree ( void* devPtr )
@@ -597,6 +616,10 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   abstract class Dim3
   def dim3(a: Rep[Int], b: Rep[Int] = unit(1), c: Rep[Int] = unit(1)): Rep[Dim3] =
     libFunction("dim3", Unwrap(a), Unwrap(b), Unwrap(c))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
+  
+  abstract class Dim1
+  def dim1(a: Rep[Int] = unit(1)): Rep[Dim1] =
+    libFunction("dim1", Unwrap(a))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
 
 
   // How do we generate the kernels (instead of manually writing them)
@@ -604,9 +627,12 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaGlobalFun[A:Manifest, B:Manifest](f: Rep[A] => Rep[B]) =
     Wrap[(A,Dim3,Dim3)=>B](__topFun(f, 1, xn => Unwrap(f(Wrap[A](xn(0)))), "__global__"))
 
-  def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C])=
+  def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]) =
     Wrap[(A,B,Dim3,Dim3)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
-
+  
+  def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]) =
+    Wrap[(A,B,Dim3,Dim3,Dim1)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
+  
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]) =
     Wrap[(A,B,C,Dim3,Dim3)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
 
@@ -729,6 +755,11 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   // need to register the headers
   registerHeader("\"cuda_header.h\"")
 
+  override def mayInline(n: Node): Boolean = n match {
+    case Node(s, "NewSharedArray", _, _) => false
+    case _ => super.mayInline(n)
+  }
+
   override def remap(m: Manifest[_]): String = m.runtimeClass.getName match {
     case s: String if s.endsWith("Dim3") => "dim3"
     case s: String if s.endsWith("CudaErrorT") => "cudaError_t"
@@ -747,5 +778,16 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
       case _ => super.shallow(n)
     }
     case _ => super.shallow(n)
+  }
+
+  override def traverse(n: Node): Unit = n match {
+    case n @ Node(s, "NewSharedArray", xs, _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit("__shared__ "); emit(s"$tpe "); shallow(s); 
+      xs.foreach {x => emit("["); shallow(x); emit("]") }; emitln(";")
+    case n @ Node(s, "NewDynSharedArray", List(), _) =>
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
+    case _ => super.traverse(n)
   }
 }
