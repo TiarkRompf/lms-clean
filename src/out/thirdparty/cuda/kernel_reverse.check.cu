@@ -47,7 +47,7 @@ void Snippet(int x0) {
     x12 = x12 + 1;
   }
   cudaMemcpy(x6, x1, (size_t)(64 * sizeof(int)), cudaMemcpyHostToDevice);
-  x14<<<dim3(1, 1, 1), dim3(64, 1, 1), dim1(1)>>>(x6, 64);
+  x14<<<dim3(1, 1, 1), dim3(64, 1, 1), dim1(64 * sizeof(int))>>>(x6, 64);
   cudaMemcpy(x3, x6, (size_t)(64 * sizeof(int)), cudaMemcpyDeviceToHost);
   int x19 = 0;
   while (x19 != 64) {
