@@ -179,7 +179,7 @@ class CudaTest extends TutorialFunSuite {
           d(t) = s(tr)
         })
 
-        val dynamicReverse = cudaGlobalFun1[Array[Int], Int, Unit]((d, n) => {
+        val dynamicReverse = cudaGlobalDynamicFun[Array[Int], Int, Unit]((d, n) => {
           val s = NewDynSharedArray[Int]
           val t = threadIdxX
           val tr = n - t - 1
