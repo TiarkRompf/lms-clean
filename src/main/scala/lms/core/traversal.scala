@@ -505,7 +505,7 @@ abstract class Transformer extends Traverser {
     case _ => ???
   }
 
-    def transformRHS(rhs: List[Def]) = rhs.map {
+  def transformRHS(rhs: List[Def]) = rhs.map {
     case b @ Block(_,_,_,_) => transform(b)
     case s : Exp => transform(s)
     case a => a
