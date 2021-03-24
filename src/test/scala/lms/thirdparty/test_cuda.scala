@@ -212,8 +212,6 @@ class CudaTest extends TutorialFunSuite {
         }
 
         cudaMemcpyOfT[Int](d_d, a, n, host2device)
-        // dynamicReverse(d_d, n, dim3(1), dim3(n), n * sizeOf[Int])
-        // FunOps5(dynamicReverse).apply(d_d, n, dim3(1), dim3(n), dim1(1))
         dynamicReverse(d_d, n, dim3(1), dim3(n), dim1(1))
         cudaMemcpyOfT[Int](d, d_d, n, device2host)
 
@@ -222,10 +220,25 @@ class CudaTest extends TutorialFunSuite {
             printf("Error!")
           }
         }
-
       }
     }
-    // check("threads_basic", driver.code, "cu")
+    check("kernel_reverse", driver.code, "cu")
+  }
+
+  test("kernel_2d_array") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewSharedArray[Int](1, 2)
+        x(0)(0) = 0
+        printf("%d", (x(0)(1)))
+        val y = NewSharedArray[Int](1, 2, 3)
+        y(0)(0)(0) = 0
+        printf("%d", (y(0)(1)(0)))
+        
+      }
+    }
     System.out.println(indent(driver.code))
   }
 

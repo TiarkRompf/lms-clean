@@ -412,11 +412,15 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
   }
 
-  def NewShared2dArray[T:Manifest](x: Rep[Int], y: Rep[Int]): Rep[Array[Array[T]]] = {
-    Wrap[Array[Array[T]]](Adapter.g.reflectMutable("NewShared2dArray", Unwrap(x), Unwrap(y)))
+  def NewSharedArray[T:Manifest](x: Rep[Int], y: Rep[Int]): Rep[Array[Array[T]]] = {
+    Wrap[Array[Array[T]]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x), Unwrap(y)))
   }
 
-   def NewDynSharedArray[T:Manifest]: Rep[Array[T]] = {
+  def NewSharedArray[T:Manifest](x: Rep[Int], y: Rep[Int], z: Rep[Int]): Rep[Array[Array[Array[T]]]] = {
+    Wrap[Array[Array[Array[T]]]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x), Unwrap(y), Unwrap(z)))
+  }
+
+  def NewDynSharedArray[T:Manifest]: Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewDynSharedArray"))
   }
 
@@ -752,7 +756,7 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   registerHeader("\"cuda_header.h\"")
 
   override def mayInline(n: Node): Boolean = n match {
-    case Node(s, "NewShared2dArray", _, _) => false
+    case Node(s, "NewSharedArray", _, _) => false
     case _ => super.mayInline(n)
   }
 
@@ -777,22 +781,14 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   }
 
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(s, "NewSharedArray", List(x), _) =>
+    case n @ Node(s, "NewSharedArray", xs, _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit("__shared__ "); emit(s"$tpe "); shallow(s); emit("["); shallow(x); emitln("];")
-
-    case n @ Node(s, "NewShared2dArray", xs, _) =>
-      System.out.println("hello")
-      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit("__shared__ "); emit(s"$tpe "); shallow(s); emit("["); shallow(xs.head); emit("]["); shallow(xs.head); emitln("];")
-
+      emit("__shared__ "); emit(s"$tpe "); shallow(s); 
+      xs.foreach {x => emit("["); shallow(x); emit("]") }; emitln(";")
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
-    case _ =>
-      // System.out.println("hello1 " + n.op + n.rhs)
-
-      super.traverse(n)
+    case _ => super.traverse(n)
   }
 
 }
