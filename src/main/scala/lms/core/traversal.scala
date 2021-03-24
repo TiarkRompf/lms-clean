@@ -505,24 +505,23 @@ abstract class Transformer extends Traverser {
     case _ => ???
   }
 
+  def transformRHS(rhs: List[Def]) = rhs.map {
+    case b @ Block(_,_,_,_) => transform(b)
+    case s : Exp => transform(s)
+    case a => a
+  }
+
   def transform(n: Node): Exp = n match {
-    case Node(s, "λ", (b @ Block(in, y, ein, eff))::_, _) =>
+    case Node(s, "λ", (b @ Block(in, y, ein, eff))::rest, _) =>
       // need to deal with recursive binding!
       val s1 = Sym(g.fresh)
       subst(s) = s1
-      g.reflect(s1, "λ", transform(b))()
+      g.reflect(s1, "λ", (transform(b)+:transformRHS(rest)):_*)()
     case Node(s,op,rs,es) =>
       // effect dependencies in target graph are managed by
       // graph builder, so we drop all effects here
       val (effects,pure) = (es.deps,rs)
-      val args = pure.map {
-        case b @ Block(_,_,_,_) =>
-          transform(b)
-        case s : Exp =>
-          transform(s)
-        case a =>
-          a
-      }
+      val args = transformRHS(pure)
       // NOTE: we're not transforming 'effects' here (just the keys)
       if (effects.nonEmpty)
         g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)

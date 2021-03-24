@@ -68,7 +68,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       Seq[Int](), Set[Int](), Backend.UNSAFE)))).withSource(__pos)
 
   def CUDA_KERNEL3(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
-    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(3, f), Backend.Const(0), Backend.Const("__global__"))
+    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(3, f), Backend.Const(3), Backend.Const("__global__"))
     (a: TOP, b: TOP, c: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
       require(ms.toSeq.length == 3, s"should have 3 manifests, but got ${ms.toSeq.length}")
@@ -80,7 +80,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     }
   }
   def CUDA_KERNEL4(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
-    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(4, f), Backend.Const(0), Backend.Const("__global__"))
+    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(4, f), Backend.Const(4), Backend.Const("__global__"))
     (a: TOP, b: TOP, c: TOP, d: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
       require(ms.toSeq.length == 4, s"should have 4 manifests, but got ${ms.toSeq.length}")
@@ -92,7 +92,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     }
   }
   def CUDA_KERNEL5(f: List[Backend.Exp] => Backend.Exp, ms: Manifest[_]*)(implicit __pos: SourceContext) = {
-    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(5, f), Backend.Const(0), Backend.Const("__global__"))
+    val kernel = Adapter.g.reflect("λ", Adapter.g.reify(5, f), Backend.Const(5), Backend.Const("__global__"))
     (a: TOP, b: TOP, c: TOP, d: TOP, e: TOP, dim1: DIM3, dim2: DIM3) => {
       // type checking
       require(ms.toSeq.length == 5, s"should have 5 manifests, but got ${ms.toSeq.length}")
@@ -736,18 +736,16 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   }
 
   override def shallow(n: Node): Unit = n match {
-    case n @ Node(s,"@", (f:Backend.Exp)::args, _) if ((graphCache(f.asInstanceOf[Sym]) match {
-      case Node(_, "λ", (b: Block)::Backend.Const(0)::Backend.Const("__global__")::Nil, _) => true
-      case _ => false
-    })) =>
-      shallowP(f);
-      assert(args.size > 1, "size of args should be at least 2")
-      val dims = args.drop(args.length - 2)
-      val other_args = args.dropRight(2)
-      emit("<<<"); shallow(dims(0)); emit(", "); shallow(dims(1)); emit(">>>");
-      emit("("); other_args.headOption.foreach(h => { shallowP(h, 0); other_args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
-
+    case n @ Node(s,"@", (f:Backend.Exp)::args, _) => graphCache(f.asInstanceOf[Sym]) match {
+      case Node(_, "λ", (b: Block)::Backend.Const(arity:Int)::Backend.Const("__global__")::Nil, _) =>
+        shallowP(f);
+        assert(args.size > arity + 1, "size of args should be at least arity + 2")
+        val dims = args.drop(arity)
+        val other_args = args.take(arity)
+        emit("<<<"); shallow(dims.head); dims.tail.foreach(d => {emit(", "); shallow(d)}); emit(">>>");
+        emit("("); other_args.headOption.foreach(h => { shallowP(h, 0); other_args.tail.foreach(a => { emit(", "); shallowP(a, 0) }) }); emit(")")
+      case _ => super.shallow(n)
+    }
     case _ => super.shallow(n)
   }
-
 }

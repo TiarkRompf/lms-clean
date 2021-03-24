@@ -372,7 +372,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
         val fn = Backend.Sym(Adapter.g.fresh)
         Adapter.funTable = (fn, can)::Adapter.funTable
         val block = Adapter.g.reify(arity, gf)
-        val res = Adapter.g.reflect(fn, "λ", block, Backend.Const(0), Backend.Const(decorator))()
+        val n_arity = if (decorator == "__global__") arity else 0 // we save arity in the node for cuda kernels
+        val res = Adapter.g.reflect(fn, "λ", block, Backend.Const(n_arity), Backend.Const(decorator))()
         topLevelFunctions.getOrElseUpdate(can, fn)
         fn
     }
