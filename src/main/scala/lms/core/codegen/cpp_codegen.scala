@@ -85,16 +85,16 @@ trait ExtendedCPPCodeGen extends ExtendedCCodeGen {
     val args = argMod match {
       case Some(mods) =>
         assert(mods.length == b.in.length, s"argMod length (${mods.length}) should equal to the block argument length (${b.in.length})")
-        b.in.zipWithIndex.map{
-          case (s, i) =>
-            val mod = mods(i)
-            if (autoArgType) s"auto$mod ${quote(s)}"
-            else s"${remap(typeMap(s))}$mod ${quote(s)}"
+        b.in.zipWithIndex.map { case (s, i) =>
+          val mod = mods(i)
+          if (autoArgType) s"auto$mod ${quote(s)}"
+          else s"${remap(typeMap(s))}$mod ${quote(s)}"
         }.mkString(", ")
-      case None => b.in.map{s =>
+      case None =>
+        b.in.map { s =>
           if (autoArgType) s"auto ${quote(s)}"
           else s"${remap(typeMap(s))} ${quote(s)}"
-      }.mkString(", ")
+        }.mkString(", ")
     }
     val mod = retMod.getOrElse("")
     val ret: String = if (retType) "->"+remap(typeBlockRes(b.res))+mod else ""

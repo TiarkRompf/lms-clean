@@ -790,5 +790,4 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
       emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
     case _ => super.traverse(n)
   }
-
 }

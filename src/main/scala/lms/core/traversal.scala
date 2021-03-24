@@ -392,13 +392,13 @@ class CompactTraverser extends Traverser {
 
     // should a definition be inlined or let-inserted?
     shouldInline = { (n: Sym) =>
-      if ((df contains n) &&              // locally defined
-          (hm.getOrElse(n, 0) == 1) &&    // locally used exactly once
-          (!hmi(n)))                      // not used in nested scopes
-          Some(df(n))
-      else None }
+      if (df.contains(n) &&             // locally defined
+          hm.getOrElse(n, 0) == 1 &&    // locally used exactly once
+          !hmi(n))                      // not used in nested scopes
+        Some(df(n))
+      else None
+    }
     // (shouldInline is protected by withScope)
-
 
     // ----- backward pass -----
 

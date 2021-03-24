@@ -163,7 +163,10 @@ class GraphBuilder {
     }
   }
 
-  def findDefinition(s: Exp): Option[Node] = s match { case s: Sym => globalDefsCache.get(s) case _ => None }
+  def findDefinition(s: Exp): Option[Node] = s match {
+    case s: Sym => globalDefsCache.get(s)
+    case _ => None
+  }
   def findDefinition(op: String, as: Seq[Def]): Option[Node] = globalDefsReverseCache.get((op,as))
 
   def rewrite(s: String, as: List[Def]): Option[Exp] = None
