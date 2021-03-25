@@ -242,5 +242,41 @@ class CudaTest extends TutorialFunSuite {
     System.out.println(indent(driver.code))
   }
 
+  test("softmax_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val dataSize = 2*2*3
+        val data = Seq[Rep[Float]](1, 2, 3, 4, 6, 8, 1, 5, 9, 1, 9, 12)
+        val hostInput = Array[Float](data:_*)
+        val devInput = cudaMalloc2[Float](dataSize)
+
+        val hostOutput = NewArray[Float](dataSize)
+        val devOutput = cudaMalloc2[Float](dataSize)
+
+        val expectedOutput =
+          Array[Float](Seq[Rep[Float]](0.09f, 0.2447f, 0.6652f, 0.0158f, 0.1173f, 0.8668f,
+                            0.0003f, 0.01798f, 0.9817f, 0.000015f, 0.0474f, 0.9525f):_*)
+
+        cudaCall(cudaMemcpyOfT(devInput, hostInput, dataSize, host2device))
+        val softmaxKernel = softmax[Float](false)
+        softmaxKernel(devInput, devOutput, dataSize, dim3(3, 1, 1), dim3(1024, 1, 1), dim1(1024 * 4))
+
+        cudaCall(cudaMemcpyOfT(hostOutput, devOutput, dataSize, device2host))
+
+        // validate the output
+        for(i <- (0 until dataSize): Rep[Range]) {
+          if (hostOutput(i) - expectedOutput(i) > 0.0001f) {
+            printf("Error! Expected: %.3f got %.3f", hostOutput(i), expectedOutput(i))
+          }
+        }
+      }
+    }
+//    check("softmax", driver.code, "cu")
+    System.out.println(indent(driver.code))
+
+  }
+
 }
 
