@@ -648,7 +648,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Wrap[(A,B,C,Dim3,Dim3)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
 
   def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest, D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]) =
-    Wrap[(A,B,C,Dim3,Dim3,Dim1)=>C](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
+    Wrap[(A,B,C,Dim3,Dim3,Int)=>C](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]) =
     Wrap[(A,B,C,D,Dim3,Dim3)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), "__global__"))
@@ -773,31 +773,35 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     val end = size
     val stride = blockDimX
 
-    var localVal = z
+    generate_comment("thread local reduce")
+    val threadVal = var_new[N](z)
 
     for(i <- start.until(end, stride): Rep[Range]) {
-      localVal = op(localVal, input(i))
+      // TODO(Supun): What is the correct way of doing this?
+      __assign(threadVal, op(threadVal, input(i)))
     }
-
-    buffer(threadIdxX) = localVal
+    buffer(threadIdxX) = threadVal
     cudaSyncThreads
 
-    localVal = z
-    __ifThenElse(threadIdxX < blockDimX / warpSize,
-      {
+    generate_comment("reduce to the first warp")
+    val warpVal = var_new[N](z)
+    __ifThenElse(threadIdxX < blockDimX / warpSize, {
         val lane = threadIdxX
-        // TODO: need #pragma unroll here
-        for(i <- (0 until warpSize): Rep[Range]) {
-          localVal = op(localVal, buffer(lane * warpSize + i))
+        // TODO(Supun): need #pragma unroll here
+        for(i <- 0 until warpSize: Rep[Range]) {
+          // FixMe(Supun): do this the correct way
+          __assign(warpVal, op(warpVal, buffer(lane * warpSize + i)))
         }
-        buffer(lane) = localVal},
-      {})
+        buffer(lane) = warpVal
+      }, {})
 
     cudaSyncThreads
 
-    __ifThenElse(threadIdxX == 0, {
+    generate_comment("reduce to the first thread")
+    // FixMe(Supun): correctly write the condition
+    __ifThenElse(ordering_equiv(threadIdxX, 0), {
       var localVal = z
-      for(i <- (0 until blockDimX / warpSize): Rep[Range]) {
+      for(i <- 0 until blockDimX / warpSize: Rep[Range]) {
         localVal = op(localVal, buffer(i))
       }
       buffer(0) = localVal
@@ -806,30 +810,33 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaSyncThreads
   }
 
-  // TODO(supun): handle case when log = true (i.e., log softmax)
+  // TODO(Supun): handle case when log = true (i.e., log softmax)
   def softmax[N:Numeric:Manifest](log: Boolean)(implicit  __pos: SourceContext) = cudaGlobalDynamicFun {
-    (input: Rep[Array[N]], output: Rep[Array[N]], size: Rep[Int]) =>
+    (input: Rep[Array[N]], output: Rep[Array[N]], lastDimSize: Rep[Int]) =>
       assert(!log, "log softmax not implemented yet")
       val buffer = NewDynSharedArray[N]
 
-      // find the max
-      reduceHelper[N](input, size, buffer, -infinity[N], (a: Rep[N], b: Rep[N]) => __ifThenElse(a < b, b, a))
+      val input_t = input.slice(lastDimSize * blockIdxX, lastDimSize * blockIdxX + lastDimSize)
+      val output_t = output.slice(lastDimSize * blockIdxX, lastDimSize * blockIdxX + lastDimSize)
 
-      var localVal: Rep[N] = implicitly[Numeric[N]].zero
-      for(i <- threadIdxX.until(size, blockDimX)) {
-        val expVal = expf[N](input(i) - buffer(0))
+      // find the max
+      reduceHelper[N](input_t, lastDimSize, buffer, -infinity[N], (a: Rep[N], b: Rep[N]) => __ifThenElse(a < b, b, a))
+
+      val localVal = var_new[N](implicitly[Numeric[N]].zero)
+      for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
+        val expVal = expf[N](input_t(i) - buffer(0))
         localVal += expVal
-        output(i) = expVal
+        output_t(i) = expVal
       }
 
       buffer(threadIdxX) = localVal
       cudaSyncThreads
 
       // find the sum
-      reduceHelper[N](input, size, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b)
+      reduceHelper[N](input_t, lastDimSize, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b)
 
-      for(i <- threadIdxX.until(size, blockDimX)) {
-        output(i) = output(i) / buffer(0)
+      for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
+        output_t(i) = output_t(i) / buffer(0)
       }
   }
 }

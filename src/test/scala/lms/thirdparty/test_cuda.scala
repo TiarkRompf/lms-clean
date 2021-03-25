@@ -261,14 +261,14 @@ class CudaTest extends TutorialFunSuite {
 
         cudaCall(cudaMemcpyOfT(devInput, hostInput, dataSize, host2device))
         val softmaxKernel = softmax[Float](false)
-        softmaxKernel(devInput, devOutput, dataSize, dim3(3, 1, 1), dim3(1024, 1, 1), dim1(1024 * 4))
+        softmaxKernel(devInput, devOutput, 3, dim3(2*2, 1, 1), dim3(3, 1, 1), 3 * 4)
 
         cudaCall(cudaMemcpyOfT(hostOutput, devOutput, dataSize, device2host))
 
         // validate the output
         for(i <- (0 until dataSize): Rep[Range]) {
           if (hostOutput(i) - expectedOutput(i) > 0.0001f) {
-            printf("Error! Expected: %.3f got %.3f", hostOutput(i), expectedOutput(i))
+            printf("Error! Expected: %.3f got %.3f\n", expectedOutput(i), hostOutput(i))
           }
         }
       }
