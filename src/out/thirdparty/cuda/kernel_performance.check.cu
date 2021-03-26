@@ -47,9 +47,9 @@ void Snippet(int x0) {
     if (x18 > x16) x16 = x18;
     x17 = x17 + 1;
   }
-  printf("Max error: %fn\n", x16);
-  printf("Time: %fn\n", x15);
-  printf("Effective Bandwidth (GB/s): %fn\n", (double)(49152.0 / x15) / 1000000.0);
+  printf("Max error: %f\n", x16);
+  printf("Time: %f\n", x15);
+  printf("Effective Bandwidth (GB/s): %f\n", (double)(49152.0 / x15) / 1000000.0);
 }
 /*****************************************
 End of C Generated Code

@@ -295,9 +295,9 @@ class CudaTest extends TutorialFunSuite {
           }
         }
 
-        printf("Max error: %fn\n", maxError)
-        printf("Time: %fn\n", time)
-        printf("Effective Bandwidth (GB/s): %fn\n", n*4*3/time/1e6);
+        printf("Max error: %f\n", maxError)
+        printf("Time: %f\n", time)
+        printf("Effective Bandwidth (GB/s): %f\n", n*4*3/time/1e6);
       }
     }
     check("kernel_performance", driver.code, "cu")
