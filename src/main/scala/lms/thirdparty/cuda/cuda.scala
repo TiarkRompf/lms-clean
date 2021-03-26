@@ -502,7 +502,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   
   // __host__​cudaError_t cudaEventElapsedTime ( float* ms, cudaEvent_t start, cudaEvent_t end )
   def cudaEventElapsedTime(ms: Var[Float], start: Rep[cudaEventT], end: Rep[cudaEventT]) = {
-    libFunction[CudaErrorT]("cudaEventSynchronize", UnwrapV(ms), Unwrap(start), Unwrap(end))(Seq(1,2), Seq(0), Set(0))
+    libFunction[CudaErrorT]("cudaEventElapsedTime", UnwrapV(ms), Unwrap(start), Unwrap(end))(Seq(1,2), Seq(0), Set(0))
   }
 
   // CUDA Kernel Basics:

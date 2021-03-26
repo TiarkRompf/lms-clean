@@ -39,7 +39,7 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMemcpy(x2, x4, (size_t)(4096 * sizeof(float)), cudaMemcpyDeviceToHost));
   CUDA_CALL(cudaEventSynchronize(x8));
   float x15 = 0.0;
-  CUDA_CALL(cudaEventSynchronize(&x15, x7, x8));
+  CUDA_CALL(cudaEventElapsedTime(&x15, x7, x8));
   float x16 = 0.0;
   int x17 = 0;
   while (x17 != 4096) {
@@ -47,9 +47,9 @@ void Snippet(int x0) {
     if (x18 > x16) x16 = x18;
     x17 = x17 + 1;
   }
-  printf("Max error: %fn", x16);
-  printf("Time: %fn", x15);
-  printf("Effective Bandwidth (GB/s): %fn", (double)(49152.0 / x15) / 1000000.0);
+  printf("Max error: %fn\n", x16);
+  printf("Time: %fn\n", x15);
+  printf("Effective Bandwidth (GB/s): %fn\n", (double)(49152.0 / x15) / 1000000.0);
 }
 /*****************************************
 End of C Generated Code
