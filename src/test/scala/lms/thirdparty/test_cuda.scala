@@ -13,7 +13,7 @@ class CudaTest extends TutorialFunSuite {
 
   // first: get a driver :)
   abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaOps { q =>
-    override val codegen = new DslGenC with CCodeGenCudaOps {
+    override val codegen = new DslGenC with CCodeGenCudaOps with PrimitiveOps {
       val IR: q.type = q
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"
@@ -242,5 +242,66 @@ class CudaTest extends TutorialFunSuite {
     System.out.println(indent(driver.code))
   }
 
+  test("kernel_performance") {
+    // Based on example shown in:
+    // https://developer.nvidia.com/blog/how-implement-performance-metrics-cuda-cc/
+    val driver = new DslDriverCCuda[Int, Unit] {
+      
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        
+        val saxpy = cudaGlobalFun[Int, Float, Array[Float], Array[Float], Unit]((n, a, x, y) => {
+          val i = blockIdxX * blockDimX * threadIdxX
+          if (i < n) {
+            y(i) = a * x(i) + y(i)
+          }
+        })
+
+        val n = 4096
+        val x = NewArray[Float](n)
+        val y = NewArray[Float](n)
+        val d_x = cudaMalloc2[Float](n)
+        val d_y = cudaMalloc2[Float](n)
+
+        for (i <- (0 until n): Rep[Range]) {
+          x(i) = 1.0f
+          y(i) = 2.0f
+        }
+
+        val start = cudaEvent
+        val stop = cudaEvent
+        cudaCall(cudaEventCreate(start))
+        cudaCall(cudaEventCreate(stop))
+
+        cudaCall(cudaMemcpyOfT[Float](d_x, x, n, host2device))
+        cudaCall(cudaMemcpyOfT[Float](d_y, y, n, host2device))
+
+        cudaCall(cudaEventRecord(start))
+        saxpy(n, 2.0f, d_x, d_y, dim3((n + 511)/512), dim3(512))
+        cudaCall(cudaEventRecord(stop))
+
+        cudaCall(cudaMemcpyOfT[Float](y, d_y, n, device2host))
+
+        cudaCall(cudaEventSynchronize(stop))
+        
+        var time = 0.0f
+        cudaCall(cudaEventElapsedTime(time, start, stop))
+
+        var maxError = 0.0f
+        for (i <- (0 until n): Rep[Range]) {
+          val error = Math.abs(y(i) - 4.0f)
+          if (error > maxError) {
+            maxError = error
+          }
+        }
+
+        printf("Max error: %fn", maxError)
+        printf("Time: %fn", time)
+        printf("Effective Bandwidth (GB/s): %fn", n*4*3/time/1e6);
+
+      }
+    }
+    check("kernel_performance", driver.code, "cu")
+  }
 }
 

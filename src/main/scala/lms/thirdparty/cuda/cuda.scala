@@ -476,6 +476,34 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaMemset[T](devPtr, value, SizeT(count * sizeOf[T]))
   }
 
+  class cudaEventT
+  def cudaEvent: Rep[cudaEventT] = newStruct[cudaEventT]("cudaEvent_t")
+
+  // __host__​cudaError_t cudaEventCreate( cudaEvent_t* event )
+  def cudaEventCreate(event: Rep[cudaEventT]) = 
+    libFunction[CudaErrorT]("cudaEventCreate", Unwrap(event))(Seq(0), Seq(0), Set(0))
+  
+  // __host__​cudaError_t cudaEventDestroy( cudaEvent_t* event )
+  def cudaEventDestroy(event: Rep[cudaEventT]) = 
+    libFunction[CudaErrorT]("cudaEventDestroy", Unwrap(event))(Seq(0), Seq(0), Set())
+  
+  // __host__​__device__​cudaError_t 	cudaEventRecord ( cudaEvent_t event, cudaStream_t stream = 0 )
+  def cudaEventRecord(event: Rep[cudaEventT], stream: Rep[cudaStreamT]) = 
+    libFunction[CudaErrorT]("cudaEventRecord", Unwrap(event), Unwrap(stream))(Seq(0, 1), Seq(0, 1), Set())
+  
+  // __host__​__device__​cudaError_t 	cudaEventRecord ( cudaEvent_t event, cudaStream_t stream = 0 )
+  def cudaEventRecord(event: Rep[cudaEventT]) = {
+    libFunction[CudaErrorT]("cudaEventRecord", Unwrap(event))(Seq(0), Seq(0), Set())
+  }
+
+  // __host__​__device__cudaError_t cudaEventSynchronize ( cudaEvent_t event )
+  def cudaEventSynchronize(event: Rep[cudaEventT]) = 
+    libFunction[CudaErrorT]("cudaEventSynchronize", Unwrap(event))(Seq(0), Seq(0), Set())
+  
+  // __host__​cudaError_t cudaEventElapsedTime ( float* ms, cudaEvent_t start, cudaEvent_t end )
+  def cudaEventElapsedTime(ms: Var[Float], start: Rep[cudaEventT], end: Rep[cudaEventT]) = {
+    libFunction[CudaErrorT]("cudaEventSynchronize", UnwrapV(ms), Unwrap(start), Unwrap(end))(Seq(1,2), Seq(0), Set(0))
+  }
 
   // CUDA Kernel Basics:
 
