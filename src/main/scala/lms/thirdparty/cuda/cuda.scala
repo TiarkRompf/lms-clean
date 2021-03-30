@@ -375,20 +375,6 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
     }
   }, m.arrayManifest, m.arrayManifest, m.arrayManifest, manifest[Int], manifest[Int])
 
-  /*
-  def SHARED_ARRAY(size: Backend.Exp, m: Manifest[_])(implicit __pos: SourceContext): ARRAY =
-    (new ARRAY(Adapter.g.reflectMutable("NewSharedArray", size))).withSrcType(__pos, m.arrayManifest)
-
-  
-  def CUDA_TRANSPOSE_KERNEL1(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_KERNEL3({xn: List[Backend.Exp] =>
-    withComment(s"generating kernel function for TRANS of type $m") {
-      // val in = new SHARED_ARRAY(xn(0)).withSrcType(__pos, m.arrayManifest)
-      // val out = new SHARED_ARRAY(xn(1)).withSrcType(__pos, m.arrayManifest)
-      val temp = SHARED_ARRAY(xn(0), manifest[ARRAY])
-      Backend.Const(())
-    }
-  }, m.arrayManifest, m.arrayManifest, manifest[Int])
-  */
 }
 
 
@@ -520,6 +506,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     libFunction[CudaErrorT]("cudaEventElapsedTime", UnwrapV(ms), Unwrap(start), Unwrap(end))(Seq(1,2), Seq(0), Set(0))
   }
 
+  // perform time measurement using cudaEvent functions, returns measured execution time
   def measurement_cuda(clo: => Unit)(implicit __pos: SourceContext): Rep[Float] = {
     val start = cudaEvent
     val stop = cudaEvent
