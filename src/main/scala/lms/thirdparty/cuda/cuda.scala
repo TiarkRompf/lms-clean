@@ -520,6 +520,21 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     libFunction[CudaErrorT]("cudaEventElapsedTime", UnwrapV(ms), Unwrap(start), Unwrap(end))(Seq(1,2), Seq(0), Set(0))
   }
 
+  def measurement_cuda(clo: => Unit): Rep[Float] = {
+    val start = cudaEvent
+    val stop = cudaEvent
+    cudaCall(cudaEventCreate(start))
+    cudaCall(cudaEventCreate(stop))
+    cudaCall(cudaEventRecord(start))
+    val exec = clo
+    cudaCall(cudaEventRecord(stop))
+    cudaCall(cudaEventSynchronize(stop))
+    val time = var_new[Float](0.0f)
+    cudaCall(cudaEventElapsedTime(time, start, stop))
+    val res = time
+    res
+  }
+
 
 
   // CUDA Kernel Basics:

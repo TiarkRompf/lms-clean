@@ -267,7 +267,7 @@ class CudaTest extends TutorialFunSuite {
           x(i) = 1.0f
           y(i) = 2.0f
         }
-
+        /*
         val start = cudaEvent
         val stop = cudaEvent
         cudaCall(cudaEventCreate(start))
@@ -287,6 +287,16 @@ class CudaTest extends TutorialFunSuite {
         
         var time = 0.0f
         cudaCall(cudaEventElapsedTime(time, start, stop))
+        */
+        cudaCall(cudaMemcpyOfT[Float](d_x, x, n, host2device))
+        cudaCall(cudaMemcpyOfT[Float](d_y, y, n, host2device))
+        
+        val time = measurement_cuda {
+          val saxpyFloat = saxpy[Float]
+          saxpyFloat(n, 2.0f, d_x, d_y, dim3((n + 511)/512), dim3(512))
+        }
+
+        cudaCall(cudaMemcpyOfT[Float](y, d_y, n, device2host))
 
         var maxError = 0.0f
         for (i <- (0 until n): Rep[Range]) {
