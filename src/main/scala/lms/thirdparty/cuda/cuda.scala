@@ -687,6 +687,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]) =
     Wrap[(A,B,C,D,E,F,Dim3,Dim3)=>G](__topFun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), "__global__"))
+  
+  def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]) =
+    Wrap[(A,B,C,D,E,F,G,H,Dim3,Dim3)=>I](__topFun(f, 8, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)))), "__global__"))
 
   // When coding kernel functions, we often need some kernel variables
   def gridDimX: Rep[Int] = cmacro[Int]("gridDim.x")
@@ -798,6 +801,27 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     (size: Rep[Int], a: Rep[N], x: Rep[Array[N]], y: Rep[Array[N]]) =>
       val i = blockIdxX * blockDimX * threadIdxX
       __ifThenElse(i < size, {y(i) = a * x(i) + y(i)}, {})
+  }
+
+  def maskedFill[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N], 
+    dim_shape: Rep[List[Int]], dim_stride: Rep[List[Int]], 
+    offset_size: Rep[Int], input_size: Rep[Int]) => {
+      val dim0_shape = dim_shape(0)
+      val dim1_shape = dim_shape(1)
+      val dim0_stride = dim_stride(0)
+      val dim1_stride = dim_stride(1)
+
+      val tid = blockIdxX * blockIdxY + threadIdxX
+      val stride = blockDimX * gridDimX
+
+      val i = tid / dim0_stride
+      val j = (tid - i * dim0_stride) / dim1_stride
+      val inner_idx = tid - i * dim0_stride - j * dim1_stride
+      val idx = i * dim0_stride + j * dim1_stride + inner_idx
+
+      0
+    }
   }
 }
 
