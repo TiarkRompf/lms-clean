@@ -282,5 +282,21 @@ class CudaTest extends TutorialFunSuite {
 
   }
 
+  // TODO(Supun): Remove. Added just to observe and manually test the kernel
+  // Tested by replacing the generated kernel in cublas_header and running lantern(old) test
+  test("softmaxGrad_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val dummy = NewArray[Float](1)
+
+        val softmaxGradKernel = softmaxGrad[Float](false)
+        softmaxGradKernel(dummy, dummy, dummy, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
 }
 
