@@ -768,20 +768,22 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     reduce the data input array (from 0 to size) using the given op.
     buffer(0) will contain the output of the reduction
    */
-  def reduceHelper[N:Numeric:Manifest](input: Rep[Array[N]], size: Rep[Int], buffer: Rep[Array[N]], z: Rep[N], op: (Rep[N], Rep[N]) => Rep[N]) = {
+  def reduceHelper[N:Numeric:Manifest](input: Rep[Array[N]], size: Rep[Int], buffer: Rep[Array[N]], z: Rep[N], op: (Rep[N], Rep[N]) => Rep[N], skipFirstReduce:Boolean = false) = {
     val start = threadIdxX
     val end = size
     val stride = blockDimX
 
-    generate_comment("thread local reduce")
-    val threadVal = var_new[N](z)
+    if (!skipFirstReduce) {
+      generate_comment("thread local reduce")
+      val threadVal = var_new[N](z)
 
-    for(i <- start.until(end, stride): Rep[Range]) {
-      // TODO(Supun): What is the correct way of doing this?
-      __assign(threadVal, op(threadVal, input(i)))
+      for(i <- start.until(end, stride): Rep[Range]) {
+        // TODO(Supun): What is the correct way of doing this?
+        __assign(threadVal, op(threadVal, input(i)))
+      }
+      buffer(threadIdxX) = threadVal
+      cudaSyncThreads
     }
-    buffer(threadIdxX) = threadVal
-    cudaSyncThreads
 
     generate_comment("reduce to the first warp")
     val warpVal = var_new[N](z)
@@ -800,9 +802,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     generate_comment("reduce to the first thread")
     // FixMe(Supun): correctly write the condition
     __ifThenElse(ordering_equiv(threadIdxX, 0), {
-      var localVal = z
+      val localVal = var_new[N](z)
       for(i <- 0 until blockDimX / warpSize: Rep[Range]) {
-        localVal = op(localVal, buffer(i))
+        __assign(localVal, op(localVal, buffer(i)))
       }
       buffer(0) = localVal
     }, {})
@@ -833,7 +835,8 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       cudaSyncThreads
 
       // find the sum
-      reduceHelper[N](input_t, lastDimSize, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b)
+      // thread level reduce is already done, skip the first reduce
+      reduceHelper[N](input_t, lastDimSize, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b, skipFirstReduce = true)
 
       for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
         output_t(i) = output_t(i) / buffer(0)
