@@ -242,6 +242,8 @@ class CudaTest extends TutorialFunSuite {
     System.out.println(indent(driver.code))
   }
 
+  // TODO(Supun): Currently, this just emits the generated code (always passes the test)
+  //  and we need to manually run the generated code to test
   test("softmax_kernel") {
     val driver = new DslDriverCCuda[Int, Unit] {
 
