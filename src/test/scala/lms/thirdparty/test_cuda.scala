@@ -249,13 +249,13 @@ class CudaTest extends TutorialFunSuite {
       
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        
+        /*
         val saxpy = cudaGlobalFun[Int, Float, Array[Float], Array[Float], Unit]((n, a, x, y) => {
           val i = blockIdxX * blockDimX * threadIdxX
           if (i < n) {
             y(i) = a * x(i) + y(i)
           }
-        })
+        })*/
 
         val n = 4096
         val x = NewArray[Float](n)
@@ -277,7 +277,8 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT[Float](d_y, y, n, host2device))
 
         cudaCall(cudaEventRecord(start))
-        saxpy(n, 2.0f, d_x, d_y, dim3((n + 511)/512), dim3(512))
+        val saxpyFloat = saxpy[Float]
+        saxpyFloat(n, 2.0f, d_x, d_y, dim3((n + 511)/512), dim3(512))
         cudaCall(cudaEventRecord(stop))
 
         cudaCall(cudaMemcpyOfT[Float](y, d_y, n, device2host))
