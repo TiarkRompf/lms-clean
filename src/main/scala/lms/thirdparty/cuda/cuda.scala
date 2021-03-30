@@ -19,6 +19,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   import FixedSizeTensorDeviceTypeLess._
   import CLibTypeLess._
   import SIZE_TTypeLess._
+  import RangeTypeLess._
 
   // FIXME(feiw) hacky temp status type (used to be CudaErrorT)
   def CUDA_CALL(status: Backend.Exp) =
@@ -476,6 +477,52 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaMemset[T](devPtr, value, SizeT(count * sizeOf[T]))
   }
 
+  class cudaEventT
+  def cudaEvent: Rep[cudaEventT] = newStruct[cudaEventT]("cudaEvent_t")
+
+  // __host__​cudaError_t cudaEventCreate( cudaEvent_t* event )
+  def cudaEventCreate(event: Rep[cudaEventT]) = 
+    libFunction[CudaErrorT]("cudaEventCreate", Unwrap(event))(Seq(0), Seq(0), Set(0))
+  
+  // __host__​cudaError_t cudaEventDestroy( cudaEvent_t* event )
+  def cudaEventDestroy(event: Rep[cudaEventT]) = 
+    libFunction[CudaErrorT]("cudaEventDestroy", Unwrap(event))(Seq(0), Seq(0), Set())
+  
+  // __host__​__device__​cudaError_t 	cudaEventRecord ( cudaEvent_t event, cudaStream_t stream = 0 )
+  def cudaEventRecord(event: Rep[cudaEventT], stream: Rep[cudaStreamT]) = 
+    libFunction[CudaErrorT]("cudaEventRecord", Unwrap(event), Unwrap(stream))(Seq(0, 1), Seq(0, 1), Set())
+  
+  // __host__​__device__​cudaError_t 	cudaEventRecord ( cudaEvent_t event, cudaStream_t stream = 0 )
+  def cudaEventRecord(event: Rep[cudaEventT]) = {
+    libFunction[CudaErrorT]("cudaEventRecord", Unwrap(event))(Seq(0), Seq(0), Set())
+  }
+
+  // __host__​__device__cudaError_t cudaEventSynchronize ( cudaEvent_t event )
+  def cudaEventSynchronize(event: Rep[cudaEventT]) = 
+    libFunction[CudaErrorT]("cudaEventSynchronize", Unwrap(event))(Seq(0), Seq(0), Set())
+  
+  // __host__​cudaError_t cudaEventElapsedTime ( float* ms, cudaEvent_t start, cudaEvent_t end )
+  def cudaEventElapsedTime(ms: Var[Float], start: Rep[cudaEventT], end: Rep[cudaEventT]) = {
+    libFunction[CudaErrorT]("cudaEventElapsedTime", UnwrapV(ms), Unwrap(start), Unwrap(end))(Seq(1,2), Seq(0), Set(0))
+  }
+
+  // perform time measurement using cudaEvent functions, returns measured execution time
+  def measurement_cuda(clo: => Unit)(implicit __pos: SourceContext): Rep[Float] = {
+    val start = cudaEvent
+    val stop = cudaEvent
+    cudaCall(cudaEventCreate(start))
+    cudaCall(cudaEventCreate(stop))
+    cudaCall(cudaEventRecord(start))
+    val exec = clo
+    cudaCall(cudaEventRecord(stop))
+    cudaCall(cudaEventSynchronize(stop))
+    val time = var_new[Float](0.0f)
+    cudaCall(cudaEventElapsedTime(time, start, stop))
+    val res = time
+    res
+  }
+
+
 
   // CUDA Kernel Basics:
 
@@ -616,10 +663,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   abstract class Dim3
   def dim3(a: Rep[Int], b: Rep[Int] = unit(1), c: Rep[Int] = unit(1)): Rep[Dim3] =
     libFunction("dim3", Unwrap(a), Unwrap(b), Unwrap(c))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
-  
-  abstract class Dim1
-  def dim1(a: Rep[Int] = unit(1)): Rep[Dim1] =
-    libFunction("dim1", Unwrap(a))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
 
 
   // How do we generate the kernels (instead of manually writing them)
@@ -631,7 +674,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Wrap[(A,B,Dim3,Dim3)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
   
   def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]) =
-    Wrap[(A,B,Dim3,Dim3,Dim1)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
+    Wrap[(A,B,Dim3,Dim3,Int)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
   
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]) =
     Wrap[(A,B,C,Dim3,Dim3)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
@@ -749,6 +792,13 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
         xGrad(i) += yGrad(yOffset)
       }
     }
+  
+  // saxpy: single-precision a * x + y
+  def saxpy[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (size: Rep[Int], a: Rep[N], x: Rep[Array[N]], y: Rep[Array[N]]) =>
+      val i = blockIdxX * blockDimX * threadIdxX
+      __ifThenElse(i < size, {y(i) = a * x(i) + y(i)}, {})
+  }
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
