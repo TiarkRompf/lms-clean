@@ -69,6 +69,12 @@ bool check_float_array(const char *filename, float *gold, float *check, int size
   return check_floats(gold, check, size, 0.0005);
 }
 
+bool check_float_array(const char *filename, float *check, int size) {
+  float gold[size];
+  scan_float(filename, gold, size);
+  return check_floats(gold, check, size, 0.0005);
+}
+
 bool check_ints(int *gold, int *check, int size) {
   bool passed = true;
   for (int i = 0; i < size; i++) {
@@ -81,6 +87,12 @@ bool check_ints(int *gold, int *check, int size) {
 }
 
 bool check_int_array(const char *filename, int *gold, int *check, int size) {
+  scan_int(filename, gold, size);
+  return check_ints(gold, check, size);
+}
+
+bool check_int_array(const char *filename, int *check, int size) {
+  int gold[size];
   scan_int(filename, gold, size);
   return check_ints(gold, check, size);
 }

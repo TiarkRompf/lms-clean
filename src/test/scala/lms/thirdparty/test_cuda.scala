@@ -6,13 +6,14 @@ import lms.core.virtualize
 import lms.macros.SourceContext
 import lms.collection._
 import lms.collection.mutable.ArrayTypeLess
+import lms.thirdparty.{ScannerOps, CCodeGenScannerOps}
 
 
 class CudaTest extends TutorialFunSuite {
   val under = "thirdparty/cuda/"
 
   // first: get a driver :)
-  abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaOps { q =>
+  abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaLibs { q =>
     override val codegen = new DslGenC with CCodeGenCudaOps {
       val IR: q.type = q
     }
@@ -21,6 +22,12 @@ class CudaTest extends TutorialFunSuite {
     val curPath = System.getProperty("user.dir")
     override val sourceFile = s"$curPath/snippet.cu"
     override val executable = s"$curPath/snippet"
+  }
+
+  abstract class DslDriverCCudeScan[A: Manifest, B: Manifest] extends DslDriverCCuda[A, B] with ScannerOps { q =>
+    override val codegen = new DslGenC with CCodeGenCudaOps with CCodeGenScannerOps {
+      val IR: q.type = q
+    }
   }
 
   test("malloc_cuda_function") {
@@ -166,7 +173,7 @@ class CudaTest extends TutorialFunSuite {
 
   test("kernel_reverse") {
     val driver = new DslDriverCCuda[Int, Unit] {
-      
+
       @virtualize
       def snippet(arg: Rep[Int]) = {
 
@@ -227,7 +234,7 @@ class CudaTest extends TutorialFunSuite {
 
   test("kernel_2d_array") {
     val driver = new DslDriverCCuda[Int, Unit] {
-      
+
       @virtualize
       def snippet(arg: Rep[Int]) = {
         val x = NewSharedArray[Int](1, 2)
@@ -236,11 +243,40 @@ class CudaTest extends TutorialFunSuite {
         val y = NewSharedArray[Int](1, 2, 3)
         y(0)(0)(0) = 0
         printf("%d", (y(0)(1)(0)))
-        
+
       }
     }
     System.out.println(indent(driver.code))
   }
 
+  test("embedding") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val n_embeddings = 20
+        val embed_size = 60
+
+        val embedding = NewArray[Float](n_embeddings * embed_size)
+        scanFile[Float]("golden/embedding/embedding.data", embedding, n_embeddings * embed_size)
+        val cuda_embedding = cudaMalloc2[Float](n_embeddings * embed_size)
+        cudaCall(cudaMemcpyOfT(cuda_embedding, embedding, n_embeddings * embed_size, host2device))
+
+        val n_indices = 10
+        val indices = NewArray[Int](n_indices)
+        scanFile[Int]("golden/embedding/indices.data", indices, n_indices)
+        val cuda_indices = cudaMalloc2[Int](n_indices)
+        cudaCall(cudaMemcpyOfT(cuda_indices, indices, n_indices, host2device))
+
+        val output = NewArray[Float](n_indices * embed_size)
+        val cuda_output = cudaMalloc2[Float](n_indices * embed_size)
+        val cudaEmbeddingKernel = cudaEmbedding[Float]
+        cudaEmbeddingKernel(cuda_embedding, cuda_indices, cuda_output, embed_size, dim3(embed_size), dim3(n_indices))
+        cudaCall(cudaMemcpyOfT(output, cuda_output, n_indices * embed_size, device2host))
+        checkFile[Float]("golden/embedding/output.data", output, n_indices * embed_size)
+      }
+    }
+    check("embedding", driver.code, "cu")
+  }
 }
 

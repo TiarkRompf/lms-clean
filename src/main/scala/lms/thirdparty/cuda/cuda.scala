@@ -616,7 +616,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   abstract class Dim3
   def dim3(a: Rep[Int], b: Rep[Int] = unit(1), c: Rep[Int] = unit(1)): Rep[Dim3] =
     libFunction("dim3", Unwrap(a), Unwrap(b), Unwrap(c))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
-  
+
   abstract class Dim1
   def dim1(a: Rep[Int] = unit(1)): Rep[Dim1] =
     libFunction("dim1", Unwrap(a))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
@@ -629,10 +629,10 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]) =
     Wrap[(A,B,Dim3,Dim3)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
-  
+
   def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]) =
     Wrap[(A,B,Dim3,Dim3,Dim1)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
-  
+
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]) =
     Wrap[(A,B,C,Dim3,Dim3)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
 
@@ -751,6 +751,26 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     }
 }
 
+trait CudaLibs extends CudaOps {
+  def cudaEmbedding[T:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (embedding: Rep[Array[T]], indices: Rep[Array[Int]], output: Rep[Array[T]], embed_size: Rep[Int]) => {
+      generate_comment("this is cuda embedding kernel.")
+      generate_comment("arg0: 2D embedding table: <n_embedding x embed_size>")
+      generate_comment("arg1: 1D indices: <indices_size>")
+      generate_comment("arg2: 2D output: <indices_size x embed_size>")
+      generate_comment("arg3: embed_size")
+      generate_comment("invocation assumption: <<<dim3(a,1,1), dim3(indices_size,1,1)>>> where a <= embed_size")
+      generate_comment("each thread block handles one embedding vector")
+      val posIdx = indices(blockIdxX)
+      val tid = threadIdxX
+      val stride = blockDimX
+      for (i <- tid.until(embed_size, stride): Rep[Range]) {
+        output(blockIdxX * embed_size + i) = embedding(posIdx * embed_size + i)
+      }
+    }
+  }
+}
+
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
   // need to register the headers
   registerHeader("\"cuda_header.h\"")
@@ -783,7 +803,7 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "NewSharedArray", xs, _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit("__shared__ "); emit(s"$tpe "); shallow(s); 
+      emit("__shared__ "); emit(s"$tpe "); shallow(s);
       xs.foreach {x => emit("["); shallow(x); emit("]") }; emitln(";")
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
