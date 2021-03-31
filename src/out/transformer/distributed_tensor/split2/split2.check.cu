@@ -155,7 +155,7 @@ void Snippet(int x0) {
   // begin checking GPU array of size 256 and type Float at device (pre-name) x39 again binary file loss
   float* x44 = (float*)malloc(256 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x44, x32, (size_t)(256 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/loss", x6, (float*)malloc(256 * sizeof(float)), x44, 256);
+  check_float_array_rank("golden/loss", x6, x44, 256);
   // end checking GPU array of size 256 and type Float at device (pre-name) x39 again binary file loss
   // begin initializing fixed GPU array of size 256 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
@@ -163,45 +163,45 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x45, (size_t)(256 * sizeof(float))));
   x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x45, 1, 256);
   // end initializing fixed GPU array of size 256 and type Float and device (pre-rename) x39
-  // begin computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x120 and right_operand x280
+  // begin computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x120 and right_operand x279
   CUDA_CALL(cudaSetDevice(x6));
   float* x46 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x46, (size_t)(256 * sizeof(float))));
   x33<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x18, x45, x46, 256);
-  // end computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x120 and right_operand x280
-  // begin computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x293
+  // end computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x120 and right_operand x279
+  // begin computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x292
   CUDA_CALL(cudaSetDevice(x6));
   x47<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x41, x46, 256);
-  // end computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x293
-  // begin computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x103 and right_operand x280
+  // end computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x292
+  // begin computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x103 and right_operand x279
   CUDA_CALL(cudaSetDevice(x6));
   float* x54 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x54, (size_t)(256 * sizeof(float))));
   x33<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x17, x45, x54, 256);
-  // end computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x103 and right_operand x280
-  // begin computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x243 and addition_operand x343
+  // end computing MULT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x103 and right_operand x279
+  // begin computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x243 and addition_operand x342
   CUDA_CALL(cudaSetDevice(x6));
   x47<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x42, x54, 256);
-  // end computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x243 and addition_operand x343
+  // end computing ACCUM on GPU for size 256 and type Float at device (pre-rename) x39 with base_operand x243 and addition_operand x342
   // begin computing Concat on GPU for size 32 x 32 and type Float at device (pre-rename) x39 with input0 x243 input1 x256
   CUDA_CALL(cudaSetDevice(x6));
   float* x55 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x55, (size_t)(1024 * sizeof(float))));
   x56<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x42, x43, x55, 32, 16);
   // end computing Concat on GPU for size 32 x 32 and type Float at device (pre-rename) x39 with input0 x243 input1 x256
-  // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x363
+  // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x362
   CUDA_CALL(cudaSetDevice(x6));
   x47<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x55, 512);
-  // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x363
+  // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x362
   // begin checking GPU array of size 512 and type Float at device (pre-name) x39 again binary file weight_grad
   float* x67 = (float*)malloc(512 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x67, x9, (size_t)(512 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/weight_grad", x6, (float*)malloc(512 * sizeof(float)), x67, 512);
+  check_float_array_rank("golden/weight_grad", x6, x67, 512);
   // end checking GPU array of size 512 and type Float at device (pre-name) x39 again binary file weight_grad
   // begin checking GPU array of size 256 and type Float at device (pre-name) x39 again binary file input_grad
   float* x68 = (float*)malloc(256 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x68, x41, (size_t)(256 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/input_grad", x6, (float*)malloc(256 * sizeof(float)), x68, 256);
+  check_float_array_rank("golden/input_grad", x6, x68, 256);
   // end checking GPU array of size 256 and type Float at device (pre-name) x39 again binary file input_grad
   MPICHECK(MPI_Finalize());
   NCCLCHECK(ncclCommDestroy(x4));

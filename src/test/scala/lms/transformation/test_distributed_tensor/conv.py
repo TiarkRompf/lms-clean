@@ -8,15 +8,15 @@ def generate_data(lms_clean_root: str):
     torch.manual_seed(0)
 
     # model
-    input = torch.randn(temp, (2, 1, 9, 9))
+    input = torch.randn(2, 1, 9, 9)
     input.requires_grad = True
     weight = torch.randn(2, 1, 3, 3)
     weight.requires_grad = True
     loss = F.conv2d(
-      input, 
-      weight, 
-      stride=(1, 1), 
-      padding=(1, 1), 
+      input,
+      weight,
+      stride=(1, 1),
+      padding=(1, 1),
       dilation=(1, 1))
     loss.sum().backward()
 

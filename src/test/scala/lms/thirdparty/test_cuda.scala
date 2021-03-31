@@ -14,7 +14,7 @@ class CudaTest extends TutorialFunSuite {
 
   // first: get a driver :)
   abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaLibs { q =>
-    override val codegen = new DslGenC with CCodeGenCudaOps with PrimitiveOps {
+    override val codegen = new DslGenC with CCodeGenCudaOps {
       val IR: q.type = q
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"

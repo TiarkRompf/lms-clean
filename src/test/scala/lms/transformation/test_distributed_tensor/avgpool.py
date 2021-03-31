@@ -18,7 +18,7 @@ def generate_data(lms_clean_root: str):
     loss.sum().backward()
 
     # printer
-    printer = get_printer(lms_clean_root, test_name = "maxpool")
+    printer = get_printer(lms_clean_root, test_name = "avgpool")
     printer("input", input, dim=0, degree=2)
     printer("weight", weight, dim=0, degree=2)
     printer("loss", loss, dim=0, degree=2)

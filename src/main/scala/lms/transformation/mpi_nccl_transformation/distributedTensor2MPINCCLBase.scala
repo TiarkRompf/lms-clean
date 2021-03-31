@@ -77,11 +77,11 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     case m => throw new Exception(s"not yet supporting manifest ${m}")
   }
 
-  def CheckFileRank(fileName: Rep[String], rank: INT, gold: ARRAY, check: ARRAY, count: Int)(implicit pos: SourceContext) = check.et match {
+  def CheckFileRank(fileName: Rep[String], rank: INT, check: ARRAY, count: Int)(implicit pos: SourceContext) = check.et match {
     case m if m == manifest[Float] =>
-      LIB_FUNCTION(manifest[Unit], "check_float_array_rank", Unwrap(fileName), rank.x, gold.x, check.x, lms.core.Backend.Const(count))(Seq[Int](1, 2), Seq[Int](), Set[Int](), Adapter.CTRL)
+      LIB_FUNCTION(manifest[Unit], "check_float_array_rank", Unwrap(fileName), rank.x, check.x, lms.core.Backend.Const(count))(Seq[Int](1, 2), Seq[Int](), Set[Int](), Adapter.CTRL)
     case m if m == manifest[Int] =>
-      LIB_FUNCTION(manifest[Unit], "check_int_array_rank", Unwrap(fileName), rank.x, gold.x, check.x, lms.core.Backend.Const(count))(Seq[Int](1, 2), Seq[Int](), Set[Int](), Adapter.CTRL)
+      LIB_FUNCTION(manifest[Unit], "check_int_array_rank", Unwrap(fileName), rank.x, check.x, lms.core.Backend.Const(count))(Seq[Int](1, 2), Seq[Int](), Set[Int](), Adapter.CTRL)
     case m => throw new Exception(s"not yet supporting manifest ${m}")
   }
 
@@ -97,10 +97,9 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   // helper function for checking a GPU array against golden values
   def check_gpu_array(array: ARRAY, name: String, size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext) =
     withComment(s"checking GPU array of size $size and type $m at device (pre-name) ${device.x} again binary file ${name}") {
-      val goldenArray = cpu_array(size, m)
       val checkArray = cpu_array(size, m)
       CUDA_MEMCPY(checkArray, array, size, DEVICE2HOST, m)
-      CheckFileRank(unit("golden/" + name), device, goldenArray, checkArray, size)
+      CheckFileRank(unit("golden/" + name), device, checkArray, size)
     }
   // helper function for declaring a GPU array with fixed value
   val CUDA_FILL_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
