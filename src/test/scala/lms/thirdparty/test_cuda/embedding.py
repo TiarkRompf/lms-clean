@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import sys
-from utils import extend, get_printer, get_int_printer
+from utils import extend, get_printer
 
 
 def generate_data(lms_clean_root: str):
@@ -20,9 +20,8 @@ def generate_data(lms_clean_root: str):
 
     # printer
     printer = get_printer(lms_clean_root, test_name = "embedding")
-    int_printer = get_int_printer(lms_clean_root, test_name = "embedding")
     printer("embedding.data", embedding.weight)
-    int_printer("indices.data", indices)
+    printer("indices.data", indices)
     printer("output.data", output)
 
 if __name__ == '__main__':
