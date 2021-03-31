@@ -664,11 +664,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def dim3(a: Rep[Int], b: Rep[Int] = unit(1), c: Rep[Int] = unit(1)): Rep[Dim3] =
     libFunction("dim3", Unwrap(a), Unwrap(b), Unwrap(c))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
 
-  abstract class Dim1
-  def dim1(a: Rep[Int] = unit(1)): Rep[Dim1] =
-    libFunction("dim1", Unwrap(a))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
-
-
   // How do we generate the kernels (instead of manually writing them)
   // the cuda functions need Dim3 typed inputs :)
   def cudaGlobalFun[A:Manifest, B:Manifest](f: Rep[A] => Rep[B]) =
