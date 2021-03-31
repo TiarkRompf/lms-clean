@@ -230,6 +230,7 @@ class CudaTest extends TutorialFunSuite {
       
       @virtualize
       def snippet(arg: Rep[Int]) = {
+        generate_comment("Sanity check only, not runnable code")
         val x = NewSharedArray[Int](1, 2)
         x(0)(0) = 0
         printf("%d", (x(0)(1)))
@@ -239,7 +240,7 @@ class CudaTest extends TutorialFunSuite {
         
       }
     }
-    System.out.println(indent(driver.code))
+    check("kernel_2d_array", driver.code, "cu")
   }
 
   test("kernel_performance") {
