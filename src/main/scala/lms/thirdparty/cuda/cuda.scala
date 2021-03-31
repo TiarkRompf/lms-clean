@@ -9,7 +9,7 @@ import lms.core.utils.time
 import lms.macros.SourceContext
 import lms.collection.mutable.{ArrayOps, ArrayTypeLess, StackArrayOps}
 import lms.transformation.tensor.FixedSizeTensorDeviceTypeLess
-import lms.thirdparty.{CLibs, CCodeGenLibs, CLibTypeLess, SizeTOps, SIZE_TTypeLess, CCodeGenSizeTOps}
+import lms.thirdparty.{CCodeGenLibs, CCodeGenSizeTOps, CLibTypeLess, CLibs, SIZE_TTypeLess, SizeTOps}
 
 
 object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction {
@@ -392,6 +392,17 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaSyncThreads =
     libFunction[Unit]("__syncthreads")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
+  // warp size macro
+  def warpSize = cmacro[Int]("NVIDIA_WARP_SIZE")
+
+  // macro for infinity
+  def infinity[N:Numeric:Manifest]: Rep[N] = manifest[N] match {
+    case _:Manifest[Float] => cmacro[N]("INFINITY")
+    case _:Manifest[Int] => cmacro[N]("INT_MAX")
+    case _:Manifest[Long] => cmacro[N]("LONG_MAX")
+    case _ => ???
+  }
+
   // cudaError_t cudaMalloc ( void** devPtr, size_t size )
   def cudaMalloc[T:Manifest](devPtr: Rep[Array[T]], size: Rep[SizeT]) =
     libFunction[CudaErrorT]("cudaMalloc", Unwrap(devPtr), Unwrap(size))(Seq(1), Seq(0), Set(0))
@@ -477,6 +488,10 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaMemset[T](devPtr, value, SizeT(count * sizeOf[T]))
   }
 
+  // expf - single precision (float) exponential function
+  def expf[N:Numeric:Manifest](x: Rep[N]) =
+    libFunction[N]("expf", Unwrap(x))(Seq(), Seq(), Set())
+
   class cudaEventT
   def cudaEvent: Rep[cudaEventT] = newStruct[cudaEventT]("cudaEvent_t")
 
@@ -521,7 +536,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     val res = time
     res
   }
-
 
 
   // CUDA Kernel Basics:
@@ -666,7 +680,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def dim3(a: Rep[Int], b: Rep[Int] = unit(1), c: Rep[Int] = unit(1)): Rep[Dim3] =
     libFunction("dim3", Unwrap(a), Unwrap(b), Unwrap(c))(Seq[Int](), Seq[Int](), Set[Int](), Backend.UNSAFE)
 
-
   // How do we generate the kernels (instead of manually writing them)
   // the cuda functions need Dim3 typed inputs :)
   def cudaGlobalFun[A:Manifest, B:Manifest](f: Rep[A] => Rep[B]) =
@@ -674,15 +687,21 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]) =
     Wrap[(A,B,Dim3,Dim3)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
-  
+
   def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest](f: (Rep[A], Rep[B]) => Rep[C]) =
     Wrap[(A,B,Dim3,Dim3,Int)=>C](__topFun(f, 2, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)))), "__global__"))
-  
+
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]) =
     Wrap[(A,B,C,Dim3,Dim3)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
 
+  def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest](f: (Rep[A], Rep[B], Rep[C]) => Rep[D]) =
+    Wrap[(A,B,C,Dim3,Dim3,Int)=>D](__topFun(f, 3, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)))), "__global__"))
+
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]) =
     Wrap[(A,B,C,D,Dim3,Dim3)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), "__global__"))
+
+  def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]) =
+    Wrap[(A,B,C,D,Dim3,Dim3,Int)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), "__global__"))
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]) =
     Wrap[(A,B,C,D,E,Dim3,Dim3)=>F](__topFun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)))), "__global__"))
@@ -816,6 +835,129 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       }
     }
   
+  /*
+    reduce the data input array (from 0 to size) using the given op.
+    buffer(0) will contain the output of the reduction
+   */
+  def reduceHelper[N:Numeric:Manifest](input: Rep[Array[N]], size: Rep[Int], buffer: Rep[Array[N]], z: Rep[N], op: (Rep[N], Rep[N]) => Rep[N], skipFirstReduce:Boolean = false)(implicit  __pos: SourceContext) = {
+    val start = threadIdxX
+    val end = size
+    val stride = blockDimX
+
+    if (!skipFirstReduce) {
+      generate_comment("thread local reduce")
+      val threadVal = var_new[N](z)
+
+      for(i <- start.until(end, stride): Rep[Range]) {
+        __assign(threadVal, op(threadVal, input(i)))
+      }
+      buffer(threadIdxX) = threadVal
+      cudaSyncThreads
+    }
+
+    generate_comment("reduce to the first warp")
+    val warpVal = var_new[N](z)
+    __ifThenElse(threadIdxX < blockDimX / warpSize, {
+      val lane = threadIdxX
+      // TODO(Supun): need #pragma unroll here
+      for(i <- 0 until warpSize: Rep[Range]) {
+        __assign(warpVal, op(warpVal, buffer(lane * warpSize + i)))
+      }
+      buffer(lane) = warpVal
+    }, {})
+    cudaSyncThreads
+
+    generate_comment("reduce to the first thread")
+
+    __ifThenElse(ordering_equiv(threadIdxX, 0), {
+      val localVal = var_new[N](z)
+      for(i <- 0 until blockDimX / warpSize: Rep[Range]) {
+        __assign(localVal, op(localVal, buffer(i)))
+      }
+      buffer(0) = localVal
+    }, {})
+
+    cudaSyncThreads
+  }
+
+  def softmax[N:Numeric:Manifest](log: Boolean)(implicit  __pos: SourceContext) = cudaGlobalDynamicFun {
+    (input: Rep[Array[N]], output: Rep[Array[N]], lastDimSize: Rep[Int]) =>
+      assert(!log, "log softmax not implemented yet")
+      val buffer = NewDynSharedArray[N]
+
+      val input_t = input.slice(lastDimSize * blockIdxX, lastDimSize * blockIdxX + lastDimSize)
+      val output_t = output.slice(lastDimSize * blockIdxX, lastDimSize * blockIdxX + lastDimSize)
+
+      // find the max
+      reduceHelper[N](input_t, lastDimSize, buffer, -infinity[N], (a: Rep[N], b: Rep[N]) => __ifThenElse(a < b, b, a))
+
+      val localVal = var_new[N](implicitly[Numeric[N]].zero)
+      for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
+        val normalized = input_t(i) - buffer(0)
+        val expVal = expf[N](normalized)
+        localVal += expVal
+        if (log) {
+          output_t(i) = normalized
+        } else {
+          output_t(i) = expVal
+        }
+      }
+
+      buffer(threadIdxX) = localVal
+      cudaSyncThreads
+
+      // find the sum
+      // thread level reduce is already done, skip the first reduce
+      reduceHelper[N](input_t, lastDimSize, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b, skipFirstReduce = true)
+
+      for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
+        if (log) {
+          output_t(i) = output_t(i) - buffer(0)
+        } else {
+          output_t(i) = output_t(i) / buffer(0)
+        }
+      }
+  }
+
+  // TODO(Supun): test log Softmax case
+  def softmaxGrad[N:Numeric:Manifest](log: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
+    (gradInput: Rep[Array[N]], gradOutput: Rep[Array[N]], output: Rep[Array[N]], size: Rep[Int]) =>
+      assert(!log, "log softmax not implemented yet")
+
+      val buffer = NewDynSharedArray[N]
+
+      val gradInput_t = gradInput.slice(size * blockIdxX, size * blockIdxX + size)
+      val gradOutput_t = gradOutput.slice(size * blockIdxX, size * blockIdxX + size)
+      val output_t = output.slice(size * blockIdxX, size * blockIdxX + size)
+
+      val start = threadIdxX
+      val end = size
+      val stride = blockDimX
+
+      // compute the sum (gradOutput * output sum)
+      val threadVal = var_new[N](implicitly[Numeric[N]].zero)
+      for(i <- start.until(end, stride)) {
+        if (log) {
+          threadVal += gradOutput_t(i)
+        } else {
+          threadVal += gradOutput_t(i) * output_t(i)
+        }
+      }
+      buffer(threadIdxX) = threadVal
+
+      cudaSyncThreads
+      reduceHelper[N](null, size, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b, skipFirstReduce = true)
+
+      // update the gradient
+      for(i <- start.until(end, stride)) {
+        if (log) {
+          gradInput_t(i) = gradOutput_t(i) - buffer(0) * expf[N](output_t(i))
+        } else {
+          gradInput_t(i) = output_t(i) * (gradOutput_t(i) - buffer(0))
+        }
+      }
+  }
+
   // saxpy: single-precision a * x + y
   def saxpy[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (size: Rep[Int], a: Rep[N], x: Rep[Array[N]], y: Rep[Array[N]]) =>
