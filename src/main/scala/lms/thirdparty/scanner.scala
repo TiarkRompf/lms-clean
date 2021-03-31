@@ -79,9 +79,9 @@ trait ScannerOps extends Equal with ArrayOps with RangeOps with CLibs {
 
   def checkFile[T:Manifest](name: Rep[String], array: Rep[Array[T]], size: Rep[Int]) = manifest[T] match {
     case m if m == manifest[Float] =>
-      libFunction[Unit]("check_float_array", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0, 1), Seq[Int](), Set[Int]())
+      libFunction[Unit]("check_float_array", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0, 1), Seq[Int](), Set[Int](), Adapter.CTRL)
     case m if m == manifest[Int] =>
-      libFunction[Unit]("check_int_array", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0, 1), Seq[Int](), Set[Int]())
+      libFunction[Unit]("check_int_array", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0, 1), Seq[Int](), Set[Int](), Adapter.CTRL)
     case m => throw new Exception(s"not yet supporting manifest ${m} in checkFile function")
   }
 }

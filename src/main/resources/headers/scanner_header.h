@@ -69,10 +69,11 @@ bool check_float_array(const char *filename, float *gold, float *check, int size
   return check_floats(gold, check, size, 0.0005);
 }
 
-bool check_float_array(const char *filename, float *check, int size) {
+void check_float_array(const char *filename, float *check, int size) {
   float gold[size];
   scan_float(filename, gold, size);
-  return check_floats(gold, check, size, 0.0005);
+  if (check_floats(gold, check, size, 0.0005))
+    fprintf(stdout, "Checking value with %s passed!\n", filename);
 }
 
 bool check_ints(int *gold, int *check, int size) {
@@ -91,10 +92,11 @@ bool check_int_array(const char *filename, int *gold, int *check, int size) {
   return check_ints(gold, check, size);
 }
 
-bool check_int_array(const char *filename, int *check, int size) {
+void check_int_array(const char *filename, int *check, int size) {
   int gold[size];
   scan_int(filename, gold, size);
-  return check_ints(gold, check, size);
+  if (check_ints(gold, check, size))
+    fprintf(stdout, "Checking value with %s passed!\n", filename);
 }
 
 // hacky helper functions that should be handled by codegen instead
