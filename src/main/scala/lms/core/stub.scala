@@ -330,6 +330,18 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
       Wrap[K](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m),Unwrap(n),Unwrap(o),Unwrap(p))()())
   }
 
+  def fun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest,L:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J], Rep[K]) => Rep[L]) =
+    Wrap[(A,B,C,D,E,F,G,H,I,J,K)=>L](__fun(f, 10,
+      xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9)), Wrap[K](xn(10))))))
+  
+  def doLambda[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest,L:Manifest]
+      (f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J], Rep[K]) => Rep[L]) = fun(f)
+  implicit class FunOps11[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest,L:Manifest](f: Rep[(A,B,C,D,E,F,G,H,I,J,K) => L]) {
+    def apply(x: Rep[A], y: Rep[B], z: Rep[C], w: Rep[D], k: Rep[E], l: Rep[F], m: Rep[G], n: Rep[H], o: Rep[I], p: Rep[J], q: Rep[K]): Rep[L] =
+      Wrap[L](Adapter.g.reflectEffect("@",Unwrap(f),Unwrap(x),Unwrap(y),Unwrap(z),Unwrap(w),Unwrap(k),Unwrap(l),Unwrap(m),Unwrap(n),Unwrap(o),Unwrap(p),Unwrap(q))()())
+  }
+  
   def __fun[T:Manifest](f: AnyRef, arity: Int, gf: List[Backend.Exp] => Backend.Exp, captures: Backend.Exp*): Backend.Exp = {
     val can = canonicalize(f)
     Adapter.funTable.find(_._2 == can) match {
