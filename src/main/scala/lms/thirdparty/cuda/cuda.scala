@@ -650,6 +650,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   val tileDim = 32
   val gridSize = 28
   val blockSize = 512
+  val blockRows = 8
   val basic_config = Seq(Backend.Const(gridSize), Backend.Const(blockSize))
   
   // How to bind to manually written kernels (see cuda_header.h)
@@ -701,7 +702,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def threadIdxX: Rep[Int] = cmacro[Int]("threadIdx.x")
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
-  def blockRows: Rep[Int] = cmacro[Int]("BLOCK_ROWS")
 
   // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
