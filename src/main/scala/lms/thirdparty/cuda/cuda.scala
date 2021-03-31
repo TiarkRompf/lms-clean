@@ -9,7 +9,7 @@ import lms.core.utils.time
 import lms.macros.SourceContext
 import lms.collection.mutable.{ArrayOps, ArrayTypeLess, StackArrayOps}
 import lms.transformation.tensor.FixedSizeTensorDeviceTypeLess
-import lms.thirdparty.{CLibs, CCodeGenLibs, CLibTypeLess, SizeTOps, SIZE_TTypeLess, CCodeGenSizeTOps}
+import lms.thirdparty.{CCodeGenLibs, CCodeGenSizeTOps, CLibTypeLess, CLibs, SIZE_TTypeLess, SizeTOps}
 
 
 object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction {
@@ -396,8 +396,12 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def warpSize = cmacro[Int]("NVIDIA_WARP_SIZE")
 
   // macro for infinity
-  // TODO(Supun): C Macro INFINITY is only defined for float, need to use INT_MAX, LONG_MAX etc. for others
-  def infinity[N:Numeric:Manifest] = cmacro[N]("INFINITY")
+  def infinity[N:Numeric:Manifest]: Rep[N] = manifest[N] match {
+    case _:Manifest[Float] => cmacro[N]("INFINITY")
+    case _:Manifest[Int] => cmacro[N]("INT_MAX")
+    case _:Manifest[Long] => cmacro[N]("LONG_MAX")
+    case _ => ???
+  }
 
   // cudaError_t cudaMalloc ( void** devPtr, size_t size )
   def cudaMalloc[T:Manifest](devPtr: Rep[Array[T]], size: Rep[SizeT]) =
@@ -853,7 +857,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     cudaSyncThreads
   }
 
-  // TODO(Supun): handle case when log = true (i.e., log softmax)
   def softmax[N:Numeric:Manifest](log: Boolean)(implicit  __pos: SourceContext) = cudaGlobalDynamicFun {
     (input: Rep[Array[N]], output: Rep[Array[N]], lastDimSize: Rep[Int]) =>
       assert(!log, "log softmax not implemented yet")
@@ -867,9 +870,14 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
       val localVal = var_new[N](implicitly[Numeric[N]].zero)
       for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
-        val expVal = expf[N](input_t(i) - buffer(0))
+        val normalized = input_t(i) - buffer(0)
+        val expVal = expf[N](normalized)
         localVal += expVal
-        output_t(i) = expVal
+        if (log) {
+          output_t(i) = normalized
+        } else {
+          output_t(i) = expVal
+        }
       }
 
       buffer(threadIdxX) = localVal
@@ -880,11 +888,15 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       reduceHelper[N](input_t, lastDimSize, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b, skipFirstReduce = true)
 
       for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
-        output_t(i) = output_t(i) / buffer(0)
+        if (log) {
+          output_t(i) = output_t(i) - buffer(0)
+        } else {
+          output_t(i) = output_t(i) / buffer(0)
+        }
       }
   }
 
-  // TODO(Supun): Handle log softmax
+  // TODO(Supun): test log Softmax case
   def softmaxGrad[N:Numeric:Manifest](log: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (gradInput: Rep[Array[N]], gradOutput: Rep[Array[N]], output: Rep[Array[N]], size: Rep[Int]) =>
       assert(!log, "log softmax not implemented yet")
@@ -902,7 +914,11 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       // compute the sum (gradOutput * output sum)
       val threadVal = var_new[N](implicitly[Numeric[N]].zero)
       for(i <- start.until(end, stride)) {
-        threadVal += gradOutput_t(i) * output_t(i)
+        if (log) {
+          threadVal += gradOutput_t(i)
+        } else {
+          threadVal += gradOutput_t(i) * output_t(i)
+        }
       }
       buffer(threadIdxX) = threadVal
 
@@ -911,7 +927,11 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
       // update the gradient
       for(i <- start.until(end, stride)) {
-        gradInput_t(i) = output_t(i) * (gradOutput_t(i) - buffer(0))
+        if (log) {
+          gradInput_t(i) = gradOutput_t(i) - buffer(0) * expf[N](output_t(i))
+        } else {
+          gradInput_t(i) = output_t(i) * (gradOutput_t(i) - buffer(0))
+        }
       }
   }
 
