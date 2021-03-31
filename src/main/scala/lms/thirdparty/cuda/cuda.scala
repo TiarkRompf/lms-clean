@@ -818,15 +818,8 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def maskedFill[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N], 
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
-    // dim0_shape: Rep[Int], dim0_stride: Rep[Int], 
-    // dim_shape: Rep[List[Int]], dim_stride: Rep[List[Int]],
-    offset_size: Rep[Int], input_size: Rep[Int]) => {
-      /*val dim0_shape = dim_shape(0)
-      val dim1_shape = dim_shape(1)
-      val dim0_stride = dim_stride(0)
-      val dim1_stride = dim_stride(1)*/
-      // val dim1_shape = dim0_shape
-      // val dim1_stride = dim0_stride
+    input_size: Rep[Int]) => {
+
 
       val tid = var_new[Int](blockIdxX * blockIdxY + threadIdxX)
       val stride = blockDimX * gridDimX
@@ -856,10 +849,8 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   
   def maskedFillGrad[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (y_d: Rep[Array[N]], x_d: Rep[Array[N]], mask: Rep[Array[Int]],
-    dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], /*dim1_stride: Rep[Int],*/
-    offset_size: Rep[Int], input_size: Rep[Int]) => {
-      // val dim1_shape = dim0_shape
-      val dim1_stride = dim0_stride
+    dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
+    input_size: Rep[Int]) => {
 
       val tid = var_new[Int](blockIdxX * blockIdxY + threadIdxX)
       val stride = blockDimX * gridDimX
