@@ -151,7 +151,7 @@ void Snippet(int x0) {
   // begin checking GPU array of size 9 and type Float at device (pre-name) x39 again binary file loss
   float* x37 = (float*)malloc(9 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x37, x26, (size_t)(9 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/loss", x6, (float*)malloc(9 * sizeof(float)), x37, 9);
+  check_float_array_rank("golden/loss", x6, x37, 9);
   // end checking GPU array of size 9 and type Float at device (pre-name) x39 again binary file loss
   // begin initializing fixed GPU array of size 9 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
@@ -159,14 +159,14 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x38, (size_t)(9 * sizeof(float))));
   x11<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x38, 1, 9);
   // end initializing fixed GPU array of size 9 and type Float and device (pre-rename) x39
-  // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x243 and addition_operand x267
+  // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x243 and addition_operand x266
   CUDA_CALL(cudaSetDevice(x6));
   x39<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x36, x38, 9);
-  // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x243 and addition_operand x267
-  // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x267
+  // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x243 and addition_operand x266
+  // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x266
   CUDA_CALL(cudaSetDevice(x6));
   x39<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x35, x38, 9);
-  // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x267
+  // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x266
   // begin allocating gpu array for the gradient of input of dropout
   CUDA_CALL(cudaSetDevice(x6));
   float* x46 = (float*)malloc(0 * sizeof(float));
@@ -193,19 +193,19 @@ void Snippet(int x0) {
   // begin dropout backward pass
   CUDNNCHECK(cudnnDropoutBackward(x7, x50, x19, x36, x19, x46, x22, x47));
   // end dropout backward pass
-  // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x324
+  // begin computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x323
   CUDA_CALL(cudaSetDevice(x6));
   x39<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x46, 9);
-  // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x324
+  // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x323
   // begin checking GPU array of size 9 and type Float at device (pre-name) x39 again binary file weight_grad
   float* x51 = (float*)malloc(9 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x51, x10, (size_t)(9 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/weight_grad", x6, (float*)malloc(9 * sizeof(float)), x51, 9);
+  check_float_array_rank("golden/weight_grad", x6, x51, 9);
   // end checking GPU array of size 9 and type Float at device (pre-name) x39 again binary file weight_grad
   // begin checking GPU array of size 9 and type Float at device (pre-name) x39 again binary file input_grad
   float* x52 = (float*)malloc(9 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x52, x35, (size_t)(9 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/input_grad", x6, (float*)malloc(9 * sizeof(float)), x52, 9);
+  check_float_array_rank("golden/input_grad", x6, x52, 9);
   // end checking GPU array of size 9 and type Float at device (pre-name) x39 again binary file input_grad
   cudnnDestroyTensorDescriptor(x19);
   CUDNNCHECK(cudnnDestroy(x7));

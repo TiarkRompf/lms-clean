@@ -6,14 +6,15 @@ import lms.core.virtualize
 import lms.macros.SourceContext
 import lms.collection._
 import lms.collection.mutable.ArrayTypeLess
+import lms.thirdparty.{ScannerOps, CCodeGenScannerOps}
 
 
 class CudaTest extends TutorialFunSuite {
   val under = "thirdparty/cuda/"
 
   // first: get a driver :)
-  abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaOps { q =>
-    override val codegen = new DslGenC with CCodeGenCudaOps with PrimitiveOps {
+  abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaLibs { q =>
+    override val codegen = new DslGenC with CCodeGenCudaOps {
       val IR: q.type = q
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"
@@ -21,6 +22,12 @@ class CudaTest extends TutorialFunSuite {
     val curPath = System.getProperty("user.dir")
     override val sourceFile = s"$curPath/snippet.cu"
     override val executable = s"$curPath/snippet"
+  }
+
+  abstract class DslDriverCCudeScan[A: Manifest, B: Manifest] extends DslDriverCCuda[A, B] with ScannerOps { q =>
+    override val codegen = new DslGenC with CCodeGenCudaOps with CCodeGenScannerOps {
+      val IR: q.type = q
+    }
   }
 
   test("malloc_cuda_function") {
@@ -161,12 +168,11 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaFree(cuda_inG))
       }
     }
-    System.out.println(indent(driver.code))
+    check("remove_conditional", driver.code, "cu")
   }
 
   test("kernel_reverse") {
     val driver = new DslDriverCCuda[Int, Unit] {
-      
       @virtualize
       def snippet(arg: Rep[Int]) = {
 
@@ -227,7 +233,6 @@ class CudaTest extends TutorialFunSuite {
 
   test("kernel_2d_array") {
     val driver = new DslDriverCCuda[Int, Unit] {
-      
       @virtualize
       def snippet(arg: Rep[Int]) = {
         generate_comment("Sanity check only, not runnable code")
@@ -237,7 +242,92 @@ class CudaTest extends TutorialFunSuite {
         val y = NewSharedArray[Int](1, 2, 3)
         y(0)(0)(0) = 0
         printf("%d", (y(0)(1)(0)))
-        
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
+  test("embedding") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val n_embeddings = 20
+        val embed_size = 60
+
+        val embedding = NewArray[Float](n_embeddings * embed_size)
+        scanFile[Float]("golden/embedding/embedding.data", embedding, n_embeddings * embed_size)
+        val cuda_embedding = cudaMalloc2[Float](n_embeddings * embed_size)
+        cudaCall(cudaMemcpyOfT(cuda_embedding, embedding, n_embeddings * embed_size, host2device))
+
+        val n_indices = 10
+        val indices = NewArray[Int](n_indices)
+        scanFile[Int]("golden/embedding/indices.data", indices, n_indices)
+        val cuda_indices = cudaMalloc2[Int](n_indices)
+        cudaCall(cudaMemcpyOfT(cuda_indices, indices, n_indices, host2device))
+
+        val output = NewArray[Float](n_indices * embed_size)
+        val cuda_output = cudaMalloc2[Float](n_indices * embed_size)
+        val cudaEmbeddingKernel = cudaEmbedding[Float]
+        cudaEmbeddingKernel(cuda_embedding, cuda_indices, cuda_output, embed_size, dim3(embed_size), dim3(n_indices))
+        cudaCall(cudaMemcpyOfT(output, cuda_output, n_indices * embed_size, device2host))
+        checkFile[Float]("golden/embedding/output.data", output, n_indices * embed_size)
+      }
+    }
+    check("embedding", driver.code, "cu")
+  }
+
+  // TODO(Supun): Currently, this just emits the generated code (always passes the test)
+  //  and we need to manually run the generated code to test
+  test("softmax_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val dataSize = 2*2*3
+        val data = Seq[Rep[Float]](1, 2, 3, 4, 6, 8, 1, 5, 9, 1, 9, 12)
+        val hostInput = Array[Float](data:_*)
+        val devInput = cudaMalloc2[Float](dataSize)
+
+        val hostOutput = NewArray[Float](dataSize)
+        val devOutput = cudaMalloc2[Float](dataSize)
+
+        val expectedOutput =
+          Array[Float](Seq[Rep[Float]](0.09f, 0.2447f, 0.6652f, 0.0158f, 0.1173f, 0.8668f,
+                            0.0003f, 0.01798f, 0.9817f, 0.000015f, 0.0474f, 0.9525f):_*)
+
+        cudaCall(cudaMemcpyOfT(devInput, hostInput, dataSize, host2device))
+        val softmaxKernel = softmax[Float](false)
+        softmaxKernel(devInput, devOutput, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        cudaCall(cudaMemcpyOfT(hostOutput, devOutput, dataSize, device2host))
+
+        // validate the output
+        for(i <- (0 until dataSize): Rep[Range]) {
+          if (Math.abs(hostOutput(i) - expectedOutput(i)) > 0.0001f) {
+            printf("Error! Expected: %.3f got %.3f\n", expectedOutput(i), hostOutput(i))
+          } else {
+            printf("Matched\n")
+          }
+        }
+      }
+    }
+//    check("softmax", driver.code, "cu")
+    System.out.println(indent(driver.code))
+
+  }
+
+  // TODO(Supun): Remove. Added just to observe and manually test the kernel
+  // Tested by replacing the generated kernel in cublas_header and running lantern(old) test
+  test("softmaxGrad_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val dummy = NewArray[Float](1)
+
+        val softmaxGradKernel = softmaxGrad[Float](false)
+        softmaxGradKernel(dummy, dummy, dummy, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
       }
     }
     check("kernel_2d_array", driver.code, "cu")
@@ -247,7 +337,7 @@ class CudaTest extends TutorialFunSuite {
     // Based on example shown in:
     // https://developer.nvidia.com/blog/how-implement-performance-metrics-cuda-cc/
     val driver = new DslDriverCCuda[Int, Unit] {
-      
+
       @virtualize
       def snippet(arg: Rep[Int]) = {
 
