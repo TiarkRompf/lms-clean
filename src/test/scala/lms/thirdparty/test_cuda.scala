@@ -318,9 +318,32 @@ class CudaTest extends TutorialFunSuite {
 
         cudaCall(cudaMemcpyOfT[Float](output, output_d, n, device2host))
 
+        printf("masked fill output:\n")
         for (i <- (0 until n): Rep[Range]) {
           printf("%f,", output(i))
         }
+        printf("\n")
+
+        val dinput = NewArray[Float](n)
+        val doutput = NewArray[Float](n)
+        for (i <- (0 until n): Rep[Range]) {
+          doutput(i) = 1.0f
+        }
+        val dinput_d = cudaMalloc2[Float](n)
+        val doutput_d = cudaMalloc2[Float](n)
+
+        cudaCall(cudaMemcpyOfT[Float](doutput_d, doutput, n, host2device))
+
+        val maskedFillGradFloat = maskedFillGrad[Float](true)
+        maskedFillGradFloat(doutput_d, dinput_d, mask_d, (n + 511)/512, 1, 1, 1, n, dim3((n + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](dinput, dinput_d, n, device2host))
+
+        printf("masked fill input gradient:\n")
+        for (i <- (0 until n): Rep[Range]) {
+          printf("%f,", dinput(i))
+        }
+        printf("\n")
       }
     }
     check("kernel_masked_fill", driver.code, "cu")
