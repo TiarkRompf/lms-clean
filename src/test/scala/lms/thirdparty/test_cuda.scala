@@ -292,13 +292,16 @@ class CudaTest extends TutorialFunSuite {
       
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val maskedFillFloat = maskedFill[Float](true)
+       
         val n = 64
         val input = NewArray[Float](n)
         val mask = NewArray[Int](n)
         val output = NewArray[Float](n)
-
+        val maskedFillFloat = maskedFill[Float](true)
         maskedFillFloat(input, output, mask, 1.0f, 8, 1, 0, 64, dim3(1), dim3(1))
+
+        val maskedFillGradFloat = maskedFillGrad[Float](true)
+        maskedFillGradFloat(input, output, mask, 8, 1, 0, 64, dim3(1), dim3(1))
         
         for (i <- (0 until n): Rep[Range]) {
           printf("%d,", output(n))
