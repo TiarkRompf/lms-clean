@@ -821,7 +821,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     input_size: Rep[Int]) => {
 
 
-      val tid = var_new[Int](blockIdxX * blockIdxY + threadIdxX)
+      val tid = var_new[Int](blockIdxX * blockDimX + threadIdxX)
       val stride = blockDimX * gridDimX
 
       val i = var_new[Int](tid / dim0_stride)
@@ -832,9 +832,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       __whileDo(idx < input_size, {
         val mask_id = if (ijSwapped)
           (j % dim1_shape) * dim0_shape + (i % dim0_shape) else
-          (i % dim1_shape) * dim0_shape + (j % dim0_shape)
+          (i % dim0_shape) * dim1_shape + (j % dim1_shape)
 
-        out(idx) = __ifThenElse(ordering_equiv(mask(mask_id), 0), { value }, { in(idx) })
+        out(idx) = __ifThenElse(ordering_equiv(mask(mask_id), 0), { in(idx) }, { value })
 
         __assign(tid, tid + stride)
         __assign(i, tid / dim0_stride)
@@ -852,7 +852,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
     input_size: Rep[Int]) => {
 
-      val tid = var_new[Int](blockIdxX * blockIdxY + threadIdxX)
+      val tid = var_new[Int](blockIdxX * blockDimX + threadIdxX)
       val stride = blockDimX * gridDimX
 
       val i = var_new[Int](tid / dim0_stride)
@@ -863,7 +863,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       __whileDo(idx < input_size, {
         val mask_id = if (ijSwapped)
           (j % dim1_shape) * dim0_shape + (i % dim0_shape) else
-          (i % dim1_shape) * dim0_shape + (j % dim0_shape)
+          (i % dim0_shape) * dim1_shape + (j % dim1_shape)
 
         __ifThenElse(ordering_equiv(mask(mask_id), 0), { x_d(idx) = x_d(idx) + y_d(idx) }, {  })
 

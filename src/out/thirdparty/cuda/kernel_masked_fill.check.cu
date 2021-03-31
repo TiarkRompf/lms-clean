@@ -8,69 +8,59 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /************* Functions **************/
-__global__ void x4(float* x5, float* x6, int* x7, float x8, int x9, int x10, int x11, int x12, int x13) {
-  int x14 = blockIdx.x * blockIdx.y + threadIdx.x;
-  int x15 = x14;
-  int x16 = blockDim.x * gridDim.x;
-  int x17 = x14 / x11;
-  int x18 = x17;
-  int x19 = x17 * x11;
-  int x20 = x14 - x19;
-  int x21 = x20 / x12;
-  int x22 = x21;
-  int x23 = x21 * x12;
-  int x24 = x19 + x23 + (x20 - x23);
-  while (x24 < x13) {
-    x6[x24] = x7[x22 % x10 * x9 + x18 % x9] == 0 ? x8 : x5[x24];
-    int x25 = x15 + x16;
-    x15 = x25;
-    int x26 = x25 / x11;
-    x18 = x26;
-    int x27 = x26 * x11;
-    int x28 = x25 - x27;
-    int x29 = x28 / x12;
-    x22 = x29;
-    int x30 = x29 * x12;
-    x24 = x27 + x30 + (x28 - x30);
-  }
-}
-__global__ void x31(float* x32, float* x33, int* x34, int x35, int x36, int x37, int x38, int x39) {
-  int x40 = blockIdx.x * blockIdx.y + threadIdx.x;
-  int x41 = x40;
-  int x42 = blockDim.x * gridDim.x;
-  int x43 = x40 / x37;
-  int x44 = x43;
-  int x45 = x43 * x37;
-  int x46 = x40 - x45;
-  int x47 = x46 / x38;
-  int x48 = x47;
-  int x49 = x47 * x38;
-  int x50 = x45 + x49 + (x46 - x49);
-  while (x50 < x39) {
-    if (x34[x48 % x36 * x35 + x44 % x35] == 0) x33[x50] = x33[x50] + x32[x50];
-    int x51 = x41 + x42;
-    x41 = x51;
-    int x52 = x51 / x37;
-    x44 = x52;
-    int x53 = x52 * x37;
-    int x54 = x51 - x53;
-    int x55 = x54 / x38;
-    x48 = x55;
-    int x56 = x55 * x38;
-    x50 = x53 + x56 + (x54 - x56);
+__global__ void x9(float* x10, float* x11, int* x12, float x13, int x14, int x15, int x16, int x17, int x18) {
+  int x19 = blockIdx.x * blockDim.x + threadIdx.x;
+  int x20 = x19;
+  int x21 = blockDim.x * gridDim.x;
+  int x22 = x19 / x16;
+  int x23 = x22;
+  int x24 = x22 * x16;
+  int x25 = x19 - x24;
+  int x26 = x25 / x17;
+  int x27 = x26;
+  int x28 = x26 * x17;
+  int x29 = x24 + x28 + (x25 - x28);
+  while (x29 < x18) {
+    x11[x29] = x12[x27 % x15 * x14 + x23 % x14] == 0 ? x10[x29] : x13;
+    int x30 = x20 + x21;
+    x20 = x30;
+    int x31 = x30 / x16;
+    x23 = x31;
+    int x32 = x31 * x16;
+    int x33 = x30 - x32;
+    int x34 = x33 / x17;
+    x27 = x34;
+    int x35 = x34 * x17;
+    x29 = x32 + x35 + (x33 - x35);
   }
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  float* x1 = (float*)malloc(64 * sizeof(float));
-  int* x2 = (int*)malloc(64 * sizeof(int));
-  float* x3 = (float*)malloc(64 * sizeof(float));
-  x4<<<dim3(1, 1, 1), dim3(1, 1, 1)>>>(x1, x3, x2, 1.0, 8, 8, 1, 1, 64);
-  x31<<<dim3(1, 1, 1), dim3(1, 1, 1)>>>(x1, x3, x2, 8, 8, 1, 1, 64);
-  int x57 = 0;
-  while (x57 != 64) {
-    printf("%d,", x3[64]);
-    x57 = x57 + 1;
+  float* x1 = (float*)malloc(4096 * sizeof(float));
+  int* x2 = (int*)malloc(4096 * sizeof(int));
+  float* x3 = (float*)malloc(4096 * sizeof(float));
+  float* x4 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)(4096 * sizeof(float))));
+  int* x5 = (int*)malloc(0 * sizeof(int));
+  CUDA_CALL(cudaMalloc(&x5, (size_t)(4096 * sizeof(int))));
+  float* x6 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x6, (size_t)(4096 * sizeof(float))));
+  int x7 = 0;
+  while (x7 != 4096) {
+    int x8 = x7;
+    x1[x8] = (float)x8;
+    if (x8 % 2 == 0) x2[x8] = 1;
+    else x2[x8] = 0;
+    x7 = x7 + 1;
+  }
+  CUDA_CALL(cudaMemcpy(x4, x1, (size_t)(4096 * sizeof(float)), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(x5, x2, (size_t)(4096 * sizeof(int)), cudaMemcpyHostToDevice));
+  x9<<<dim3(8, 1, 1), dim3(512, 1, 1)>>>(x4, x6, x5, 0.0, 8, 1, 1, 1, 4096);
+  CUDA_CALL(cudaMemcpy(x3, x6, (size_t)(4096 * sizeof(float)), cudaMemcpyDeviceToHost));
+  int x36 = 0;
+  while (x36 != 4096) {
+    printf("%f,", x3[x36]);
+    x36 = x36 + 1;
   }
 }
 /*****************************************

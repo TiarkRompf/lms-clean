@@ -293,18 +293,33 @@ class CudaTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]) = {
        
-        val n = 64
+        val n = 4096
         val input = NewArray[Float](n)
         val mask = NewArray[Int](n)
         val output = NewArray[Float](n)
-        val maskedFillFloat = maskedFill[Float](true)
-        maskedFillFloat(input, output, mask, 1.0f, 8, 8, 1, 1, 64, dim3(1), dim3(1))
+        val input_d = cudaMalloc2[Float](n)
+        val mask_d = cudaMalloc2[Int](n)
+        val output_d = cudaMalloc2[Float](n)
 
-        val maskedFillGradFloat = maskedFillGrad[Float](true)
-        maskedFillGradFloat(input, output, mask, 8, 8, 1, 1, 64, dim3(1), dim3(1))
-        
         for (i <- (0 until n): Rep[Range]) {
-          printf("%d,", output(n))
+          input(i) = i
+          if (i % 2 == 0) {
+            mask(i) = 1
+          } else {
+            mask(i) = 0
+          }
+        }
+
+        cudaCall(cudaMemcpyOfT[Float](input_d, input, n, host2device))
+        cudaCall(cudaMemcpyOfT[Int](mask_d, mask, n, host2device))
+
+        val maskedFillFloat = maskedFill[Float](true)
+        maskedFillFloat(input_d, output_d, mask_d, 0.0f, (n + 511)/512, 1, 1, 1, n, dim3((n + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](output, output_d, n, device2host))
+
+        for (i <- (0 until n): Rep[Range]) {
+          printf("%f,", output(i))
         }
       }
     }
