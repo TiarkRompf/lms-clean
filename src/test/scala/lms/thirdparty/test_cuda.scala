@@ -286,5 +286,26 @@ class CudaTest extends TutorialFunSuite {
     }
     check("kernel_performance", driver.code, "cu")
   }
+
+    test("kernel_masked_fill") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val maskedFillFloat = maskedFill[Float](true)
+        val n = 64
+        val input = NewArray[Float](n)
+        val mask = NewArray[Int](n)
+        val output = NewArray[Float](n)
+
+        maskedFillFloat(input, output, mask, 1.0f, 8, 1, 0, 64, dim3(1), dim3(1))
+        
+        for (i <- (0 until n): Rep[Range]) {
+          printf("%d,", output(n))
+        }
+      }
+    }
+    check("kernel_masked_fill", driver.code, "cu")
+  }
 }
 

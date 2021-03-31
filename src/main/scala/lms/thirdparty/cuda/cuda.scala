@@ -690,6 +690,12 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]) =
     Wrap[(A,B,C,D,E,F,G,H,Dim3,Dim3)=>I](__topFun(f, 8, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)))), "__global__"))
+  
+  def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J]) => Rep[K]) =
+    Wrap[(A,B,C,D,E,F,G,H,I,J,Dim3,Dim3)=>K](__topFun(f, 10, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9)))), "__global__"))
+  
+  def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest,L:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J], Rep[K]) => Rep[L]) =
+    Wrap[(A,B,C,D,E,F,G,H,I,J,K,Dim3,Dim3)=>L](__topFun(f, 11, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9)), Wrap[K](xn(10)))), "__global__"))
 
   // When coding kernel functions, we often need some kernel variables
   def gridDimX: Rep[Int] = cmacro[Int]("gridDim.x")
@@ -805,24 +811,43 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def maskedFill[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N], 
-    dim_shape: Rep[List[Int]], dim_stride: Rep[List[Int]], 
+    // dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
+    dim0_shape: Rep[Int], dim0_stride: Rep[Int], 
+    // dim_shape: Rep[List[Int]], dim_stride: Rep[List[Int]],
     offset_size: Rep[Int], input_size: Rep[Int]) => {
-      val dim0_shape = dim_shape(0)
+      /*val dim0_shape = dim_shape(0)
       val dim1_shape = dim_shape(1)
       val dim0_stride = dim_stride(0)
-      val dim1_stride = dim_stride(1)
+      val dim1_stride = dim_stride(1)*/
+      val dim1_shape = dim0_shape
+      val dim1_stride = dim0_stride
 
-      val tid = blockIdxX * blockIdxY + threadIdxX
+      val tid = var_new[Int](blockIdxX * blockIdxY + threadIdxX)
       val stride = blockDimX * gridDimX
 
-      val i = tid / dim0_stride
-      val j = (tid - i * dim0_stride) / dim1_stride
-      val inner_idx = tid - i * dim0_stride - j * dim1_stride
-      val idx = i * dim0_stride + j * dim1_stride + inner_idx
+      val i = var_new[Int](tid / dim0_stride)
+      val j = var_new[Int]((tid - i * dim0_stride) / dim1_stride)
+      val inner_idx = var_new[Int](tid - i * dim0_stride - j * dim1_stride)
+      val idx = var_new[Int](i * dim0_stride + j * dim1_stride + inner_idx)
 
-      0
+      __whileDo(idx < input_size, {
+        val mask_id = if (ijSwapped)
+          (j % dim1_shape) * dim0_shape + (i % dim0_shape) else
+          (i % dim1_shape) * dim0_shape + (j % dim0_shape)
+        val zero = 0
+        out(idx) = __ifThenElse(ordering_equiv(mask(mask_id), 0), { value }, { in(idx) })
+
+        __assign(tid, tid + stride)
+        __assign(i, tid / dim0_stride)
+        __assign(j, (tid - i * dim0_stride) / dim1_stride)
+        __assign(inner_idx, tid - i * dim0_stride - j * dim1_stride)
+        __assign(idx, i * dim0_stride + j * dim1_stride + inner_idx)
+        
+      })
     }
   }
+
+  // def maskedFillGrad[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
