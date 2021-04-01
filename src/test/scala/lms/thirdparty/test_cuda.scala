@@ -235,12 +235,15 @@ class CudaTest extends TutorialFunSuite {
     val driver = new DslDriverCCuda[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val x = NewSharedArray[Int](1, 2)
-        x(0)(0) = 0
-        printf("%d", (x(0)(1)))
-        val y = NewSharedArray[Int](1, 2, 3)
-        y(0)(0)(0) = 0
-        printf("%d", (y(0)(1)(0)))
+        val a = NewSharedArray[Int](1)
+        a(0) = 0
+        printf("%d", a(1))
+        val b = NewSharedArray[Int](1, 2)
+        b(0)(0) = 0
+        printf("%d", b(0)(1))
+        val c = NewSharedArray[Int](1, 2, 3)
+        c(0)(0)(0) = 0
+        printf("%d", c(0)(1)(0))
       }
     }
     System.out.println(indent(driver.code))
