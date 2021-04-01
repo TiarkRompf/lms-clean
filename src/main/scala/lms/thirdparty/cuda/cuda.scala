@@ -661,10 +661,12 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
 
   // Some global values for our GPU
+  val tileDim = 32
   val gridSize = 28
   val blockSize = 512
+  val blockRows = 8
   val basic_config = Seq(Backend.Const(gridSize), Backend.Const(blockSize))
-
+  
   // How to bind to manually written kernels (see cuda_header.h)
   // this CUDA kernel fills a value to the cuda array
   def cudaArrayFill[T:Manifest](res: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =
@@ -719,7 +721,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def threadIdxX: Rep[Int] = cmacro[Int]("threadIdx.x")
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
-
 
   // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
@@ -812,6 +813,28 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       }
     }
 
+  def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]]) => 
+      val tile = NewSharedArray[N](tileDim, tileDim + 1)
+      
+      val x = blockIdxX * tileDim + threadIdxX
+      val y = blockIdxY * tileDim + threadIdxY
+      val width = gridDimX * tileDim
+
+      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        tile(threadIdxY + i)(threadIdxX) = in((y + i) * width + x)
+      }
+
+      cudaSyncThreads
+
+      val row = blockIdxY * tileDim + threadIdxX
+      val col = blockIdxX * tileDim + threadIdxY
+
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out((col + i) * width + row) = tile(threadIdxX)(threadIdxY + i)
+      }
+    }
+  
   /*
     reduce the data input array (from 0 to size) using the given op.
     buffer(0) will contain the output of the reduction
