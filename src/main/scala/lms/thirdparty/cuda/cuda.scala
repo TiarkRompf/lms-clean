@@ -496,26 +496,26 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaEvent: Rep[cudaEventT] = newStruct[cudaEventT]("cudaEvent_t")
 
   // __host__​cudaError_t cudaEventCreate( cudaEvent_t* event )
-  def cudaEventCreate(event: Rep[cudaEventT]) = 
+  def cudaEventCreate(event: Rep[cudaEventT]) =
     libFunction[CudaErrorT]("cudaEventCreate", Unwrap(event))(Seq(0), Seq(0), Set(0))
-  
+
   // __host__​cudaError_t cudaEventDestroy( cudaEvent_t* event )
-  def cudaEventDestroy(event: Rep[cudaEventT]) = 
+  def cudaEventDestroy(event: Rep[cudaEventT]) =
     libFunction[CudaErrorT]("cudaEventDestroy", Unwrap(event))(Seq(0), Seq(0), Set())
-  
+
   // __host__​__device__​cudaError_t 	cudaEventRecord ( cudaEvent_t event, cudaStream_t stream = 0 )
-  def cudaEventRecord(event: Rep[cudaEventT], stream: Rep[cudaStreamT]) = 
+  def cudaEventRecord(event: Rep[cudaEventT], stream: Rep[cudaStreamT]) =
     libFunction[CudaErrorT]("cudaEventRecord", Unwrap(event), Unwrap(stream))(Seq(0, 1), Seq(0, 1), Set())
-  
+
   // __host__​__device__​cudaError_t 	cudaEventRecord ( cudaEvent_t event, cudaStream_t stream = 0 )
   def cudaEventRecord(event: Rep[cudaEventT]) = {
     libFunction[CudaErrorT]("cudaEventRecord", Unwrap(event))(Seq(0), Seq(0), Set())
   }
 
   // __host__​__device__cudaError_t cudaEventSynchronize ( cudaEvent_t event )
-  def cudaEventSynchronize(event: Rep[cudaEventT]) = 
+  def cudaEventSynchronize(event: Rep[cudaEventT]) =
     libFunction[CudaErrorT]("cudaEventSynchronize", Unwrap(event))(Seq(0), Seq(0), Set())
-  
+
   // __host__​cudaError_t cudaEventElapsedTime ( float* ms, cudaEvent_t start, cudaEvent_t end )
   def cudaEventElapsedTime(ms: Var[Float], start: Rep[cudaEventT], end: Rep[cudaEventT]) = {
     libFunction[CudaErrorT]("cudaEventElapsedTime", UnwrapV(ms), Unwrap(start), Unwrap(end))(Seq(1,2), Seq(0), Set(0))
@@ -943,6 +943,26 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   }
 }
 
+trait CudaLibs extends CudaOps {
+  def cudaEmbedding[T:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (embedding: Rep[Array[T]], indices: Rep[Array[Int]], output: Rep[Array[T]], embed_size: Rep[Int]) => {
+      generate_comment("this is cuda embedding kernel.")
+      generate_comment("arg0: 2D embedding table: <n_embedding x embed_size>")
+      generate_comment("arg1: 1D indices: <indices_size>")
+      generate_comment("arg2: 2D output: <indices_size x embed_size>")
+      generate_comment("arg3: embed_size")
+      generate_comment("invocation assumption: <<<dim3(a,1,1), dim3(indices_size,1,1)>>> where a <= embed_size")
+      generate_comment("each thread block handles one embedding vector")
+      val posIdx = indices(blockIdxX)
+      val tid = threadIdxX
+      val stride = blockDimX
+      for (i <- tid.until(embed_size, stride): Rep[Range]) {
+        output(blockIdxX * embed_size + i) = embedding(posIdx * embed_size + i)
+      }
+    }
+  }
+}
+
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
   // need to register the headers
   registerHeader("\"cuda_header.h\"")
@@ -975,7 +995,7 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "NewSharedArray", xs, _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      emit("__shared__ "); emit(s"$tpe "); shallow(s); 
+      emit("__shared__ "); emit(s"$tpe "); shallow(s);
       xs.foreach {x => emit("["); shallow(x); emit("]") }; emitln(";")
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))

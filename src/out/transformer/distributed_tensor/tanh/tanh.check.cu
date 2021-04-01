@@ -104,7 +104,7 @@ void Snippet(int x0) {
   // begin checking GPU array of size 512 and type Float at device (pre-name) x39 again binary file loss
   float* x24 = (float*)malloc(512 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x24, x9, (size_t)(512 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/loss", x6, (float*)malloc(512 * sizeof(float)), x24, 512);
+  check_float_array_rank("golden/loss", x6, x24, 512);
   // end checking GPU array of size 512 and type Float at device (pre-name) x39 again binary file loss
   // begin initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
@@ -112,20 +112,20 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x25, (size_t)(512 * sizeof(float))));
   x18<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x25, 1, 512);
   // end initializing fixed GPU array of size 512 and type Float and device (pre-rename) x39
-  // begin computing TANH_GRAD on GPU for size 512 and type Float at device (pre-rename) x39 with left_operand x155 and right_operand x62
+  // begin computing TANH_GRAD on GPU for size 512 and type Float at device (pre-rename) x39 with left_operand x154 and right_operand x62
   CUDA_CALL(cudaSetDevice(x6));
   float* x26 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x26, (size_t)(512 * sizeof(float))));
   x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x25, x9, x26, 512);
-  // end computing TANH_GRAD on GPU for size 512 and type Float at device (pre-rename) x39 with left_operand x155 and right_operand x62
-  // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x104 and addition_operand x168
+  // end computing TANH_GRAD on GPU for size 512 and type Float at device (pre-rename) x39 with left_operand x154 and right_operand x62
+  // begin computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x104 and addition_operand x167
   CUDA_CALL(cudaSetDevice(x6));
   x36<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x17, x26, 512);
-  // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x104 and addition_operand x168
+  // end computing ACCUM on GPU for size 512 and type Float at device (pre-rename) x39 with base_operand x104 and addition_operand x167
   // begin checking GPU array of size 512 and type Float at device (pre-name) x39 again binary file input_grad
   float* x43 = (float*)malloc(512 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x43, x17, (size_t)(512 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/input_grad", x6, (float*)malloc(512 * sizeof(float)), x43, 512);
+  check_float_array_rank("golden/input_grad", x6, x43, 512);
   // end checking GPU array of size 512 and type Float at device (pre-name) x39 again binary file input_grad
   MPICHECK(MPI_Finalize());
   NCCLCHECK(ncclCommDestroy(x4));

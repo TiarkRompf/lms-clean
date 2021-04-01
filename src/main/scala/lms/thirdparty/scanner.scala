@@ -67,6 +67,23 @@ trait ScannerOps extends Equal with ArrayOps with RangeOps with CLibs {
     val inputs = Seq(Unwrap(fp), Unwrap(format)) ++ contents.map(Unwrap)
     libFunction[Unit]("fprintf", inputs: _*)((Range(0, inputs.length): Range).toSeq, Seq(0), Set[Int]())
   }
+
+  // some helper functions that directly use C code implementation in scanner_header.h
+  def scanFile[T:Manifest](name: Rep[String], array: Rep[Array[T]], size: Rep[Int]) = manifest[T] match {
+    case m if m == manifest[Float] =>
+      libFunction[Unit]("scan_float", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0), Seq(1), Set[Int]())
+    case m if m == manifest[Int] =>
+      libFunction[Unit]("scan_int", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0), Seq(1), Set[Int]())
+    case m => throw new Exception(s"not yet supporting manifest ${m} in scanFile function")
+  }
+
+  def checkFile[T:Manifest](name: Rep[String], array: Rep[Array[T]], size: Rep[Int]) = manifest[T] match {
+    case m if m == manifest[Float] =>
+      libFunction[Unit]("check_float_array", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0, 1), Seq[Int](), Set[Int](), Adapter.CTRL)
+    case m if m == manifest[Int] =>
+      libFunction[Unit]("check_int_array", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0, 1), Seq[Int](), Set[Int](), Adapter.CTRL)
+    case m => throw new Exception(s"not yet supporting manifest ${m} in checkFile function")
+  }
 }
 
 trait CCodeGenScannerOps extends ExtendedCCodeGen with CCodeGenLibs {

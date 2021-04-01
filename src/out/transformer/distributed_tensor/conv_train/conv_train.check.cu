@@ -152,7 +152,7 @@ void Snippet(int x0) {
     // begin checking GPU array of size 162 and type Float at device (pre-name) x39 again binary file loss
     float* x49 = (float*)malloc(162 * sizeof(float));
     CUDA_CALL(cudaMemcpy(x49, x41, (size_t)(162 * sizeof(float)), cudaMemcpyDeviceToHost));
-    check_float_array_rank("golden/loss", x6, (float*)malloc(162 * sizeof(float)), x49, 162);
+    check_float_array_rank("golden/loss", x6, x49, 162);
     // end checking GPU array of size 162 and type Float at device (pre-name) x39 again binary file loss
     // begin initializing fixed GPU array of size 162 and type Float and device (pre-rename) x39
     CUDA_CALL(cudaSetDevice(x6));
@@ -187,10 +187,10 @@ void Snippet(int x0) {
     // end convolution backward filter pass
     ncclAllReduce(x51, x51, (size_t)18, ncclFloat32, ncclSum, x4, x5);
     CUDA_CALL(cudaStreamSynchronize(x5));
-    // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x241
+    // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x240
     CUDA_CALL(cudaSetDevice(x6));
     x19<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x51, 18);
-    // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x241
+    // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x240
     // begin computing SGD on GPU for size 18 and type Float at device (pre-name) x39 with weight x50, grad x67, and momentum x107
     CUDA_CALL(cudaSetDevice(x6));
     x26<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x10, x17, 18);
