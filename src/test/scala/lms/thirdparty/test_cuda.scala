@@ -242,6 +242,41 @@ class CudaTest extends TutorialFunSuite {
     System.out.println(indent(driver.code))
   }
 
+  test("transpose_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val rcount = 32
+        val ccount = 32
+        val size = rcount * ccount
+        val input = NewArray[Int](size)
+        val output = NewArray[Int](size)
+
+        for (i <- (0 until size): Rep[Range]) {
+          input(i) = i + 1
+        }
+
+        for (i <- (0 until rcount): Rep[Range]) {
+          for (j <- (0 until ccount): Rep[Range]) {
+            printf("%d ", (input(i * rcount + j)))
+          }
+          printf("\n");
+        }
+
+        val transposeKernel = cudaTranspose[Int]
+        transposeKernel(input, output, dim3(rcount, ccount), dim3(ccount, rcount))
+
+        for (i <- (0 until rcount): Rep[Range]) {
+          for (j <- (0 until ccount): Rep[Range]) {
+            printf("%d ", (output(i * rcount + j)))
+          }
+        }
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
   // TODO(Supun): Currently, this just emits the generated code (always passes the test)
   //  and we need to manually run the generated code to test
   test("softmax_kernel") {

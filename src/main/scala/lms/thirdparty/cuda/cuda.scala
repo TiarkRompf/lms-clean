@@ -814,14 +814,14 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     }
 
   def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]]) => 
+    (in: Rep[Array[N]], out: Rep[Array[N]]) =>
       val tile = NewSharedArray[N](tileDim, tileDim + 1)
       
       val x = blockIdxX * tileDim + threadIdxX
       val y = blockIdxY * tileDim + threadIdxY
       val width = gridDimX * tileDim
 
-      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
         tile(threadIdxY + i)(threadIdxX) = in((y + i) * width + x)
       }
 
