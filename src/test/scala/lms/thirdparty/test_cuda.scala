@@ -231,67 +231,30 @@ class CudaTest extends TutorialFunSuite {
     check("kernel_reverse", driver.code, "cu")
   }
 
-  // (luke) TODO: rewrite the test case
   test("kernel_2d_array") {
     val driver = new DslDriverCCuda[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        /*
         val a = NewSharedArray[Int](1)
         a(0) = 0
-        printf("%d", a(1))
-        val b = NewSharedArray[Int](1, 2)
-        b(0)(0) = 0
-        printf("%d", b(0)(1))
-        val c = NewSharedArray[Int](1, 2, 3)
-        c(0)(0)(0) = 0
-        printf("%d", c(0)(1)(0))*/
-        val a = NewSharedArray[Int](1)
-        a(0) = 0
-        val b = NewSharedMatrix[Int](2, 2)
+        val b = NewSharedArray[Int](2, 2)
         b(0, 0) = arg
         printf("%d", b(0, 1))
         printf("%d", b(1, 1))
-        
-        val c = NewSharedNdArray[Int](3, 2)
-        c.update(0, 0)(0)
-        c.update(0, 1)(1)
-        // c(1, 0) = 2
-        // c(1, 1) = 3
-        c.update(2, 0)(4)
-        c.update(2, 1)(5)
-        printf("%d", c(0, 0))
-        printf("%d", c(0, 1))
-        printf("%d", c(1, 0))
-        printf("%d", c(1, 1))
-        printf("%d", c(2, 0))
-        printf("%d", c(2, 1))
-
-        val d = NewSharedNdArray[Int](4, 3, 2)
-        d.update(0, 0, 0)(0)
-        d.update(0, 0, 1)(1)
-        d.update(0, 1, 0)(2)
-        d.update(0, 1, 1)(3)
-        d.update(0, 2, 0)(4)
-        d.update(0, 2, 1)(5)
-        d.update(1, 0, 0)(6)
-        d.update(1, 0, 1)(7)
-
-        printf("%d", d(0, 0, 0))
-        printf("%d", d(0, 0, 1))
-        printf("%d", d(0, 1, 0))
-        printf("%d", d(0, 1, 1))
-        printf("%d", d(0, 2, 0))
-        printf("%d", d(0, 2, 1))
-        printf("%d", d(1, 0, 0))
-        printf("%d", d(1, 0, 1))
-
-        val e = NewSharedNdArray[Int](2)
-        e.update(0)(0)
-        e.update(1)(1)
-
-        printf("%d", e(0))
-        printf("%d", e(1))
+        val c = NewSharedArray[Int](2, 2, 3)
+        c(0, 0, 0) = arg
+        printf("%d", c(0, 0, 0))
+        printf("%d", c(0, 0, 1))
+        printf("%d", c(0, 0, 2))
+        printf("%d", c(0, 1, 0))
+        printf("%d", c(0, 1, 1))
+        printf("%d", c(0, 1, 2))
+        printf("%d", c(1, 0, 0))
+        printf("%d", c(1, 0, 1))
+        printf("%d", c(1, 0, 2))
+        printf("%d", c(1, 1, 0))
+        printf("%d", c(1, 1, 1))
+        printf("%d", c(1, 1, 2))
       }
     }
     System.out.println(indent(driver.code))
