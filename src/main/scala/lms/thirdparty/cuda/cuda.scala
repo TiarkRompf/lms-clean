@@ -451,7 +451,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   case class NdArray[T:Manifest](x: Rep[Array[T]], xs: Seq[Int]) {
     val dim = xs.length
-    def offset(is: Seq[Rep[Int]]) = (xs, is).zipped.map(_*_).reduce((x, y) => x + y)
+    def offset(is: Seq[Rep[Int]])(implicit __pos: SourceContext) = (xs, is).zipped.map(_*_).reduce((x, y) => x + y)
     
     def apply(is: Rep[Int]*)(implicit __pos: SourceContext): Rep[T] = {
       assert(is.size == dim, "wrong arguments to N-d array")
