@@ -420,10 +420,12 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     addr
   }
 
+  // (luke) TODO: can be replaced by NewSharedNdArray
   def NewSharedArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
   }
 
+  // (luke) TODO: replaced by NewSharedMatrix, to remove
   def NewSharedArray[T:Manifest](x: Rep[Int], y: Rep[Int]): Rep[Array[Array[T]]] = {
     Wrap[Array[Array[T]]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x), Unwrap(y)))
   }
@@ -442,8 +444,30 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Matrix(Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x * y))), y)
   }
 
+  // (luke) TODO: replaced by NdArray, to remove
   def NewSharedArray[T:Manifest](x: Rep[Int], y: Rep[Int], z: Rep[Int]): Rep[Array[Array[Array[T]]]] = {
     Wrap[Array[Array[Array[T]]]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x), Unwrap(y), Unwrap(z)))
+  }
+
+  case class NdArray[T:Manifest](x: Rep[Array[T]], xs: Seq[Int]) {
+    val dim = xs.length
+    def offset(is: Seq[Rep[Int]]) = (xs, is).zipped.map(_*_).reduce((x, y) => x + y)
+    
+    def apply(is: Rep[Int]*)(implicit __pos: SourceContext): Rep[T] = {
+      assert(is.size == dim, "wrong arguments to N-d array")
+      Wrap[T](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(offset(is)))(Unwrap(x)))
+    }
+    // (luke) TODO: what is a better way to do this?
+    def update(is: Rep[Int]*)(y: Rep[T])(implicit __pos: SourceContext): Unit = {
+      assert(is.size == dim, "wrong arguments to N-d array")
+      Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(offset(is)), Unwrap(y))(Unwrap(x))
+    }
+  }
+  
+  def NewSharedNdArray[T:Manifest](sizes: Int*): NdArray[T] = {
+    val total = sizes.reduce((x, y) => x * y)
+    val xs = sizes.reverse.init.scanLeft(1) {(acc, x) => acc * x }
+    NdArray(Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(total))), xs.reverse)
   }
 
   def NewDynSharedArray[T:Manifest]: Rep[Array[T]] = {
@@ -829,14 +853,17 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]]) =>
-      val tile = NewSharedMatrix[N](tileDim, tileDim + 1)
+      // val tile = NewSharedMatrix[N](tileDim, tileDim + 1)
+      val tile = NewSharedNdArray[N](tileDim, tileDim + 1)
 
       val x = blockIdxX * tileDim + threadIdxX
       val y = blockIdxY * tileDim + threadIdxY
       val width = gridDimX * tileDim
 
       for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        tile(threadIdxY + i, threadIdxX) = in((y + i) * width + x)
+        // tile(threadIdxY + i, threadIdxX) = in((y + i) * width + x)
+        val value = in((y + i) * width + x)
+        tile.update(threadIdxY + i, threadIdxX)(value)
       }
 
       cudaSyncThreads
@@ -1031,10 +1058,12 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "NewSharedArray", xs, _) =>
-      var tpe = typeMap.get(s)
-      (1 to xs.length) foreach { _ => tpe = tpe.map(_.typeArguments.head) }
-      val tpeAfter = remap(tpe.getOrElse(manifest[Unknown]))
-      emit("__shared__ "); emit(s"$tpeAfter "); shallow(s);
+      // var tpe = typeMap.get(s)
+      // (1 to xs.length) foreach { _ => tpe = tpe.map(_.typeArguments.head) }
+      // val tpeAfter = remap(tpe.getOrElse(manifest[Unknown]))
+      // emit("__shared__ "); emit(s"$tpeAfter "); shallow(s);
+      val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      emit("__shared__ "); emit(s"$tpe "); shallow(s);
       xs.foreach {x => emit("["); shallow(x); emit("]") }; emitln(";")
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
