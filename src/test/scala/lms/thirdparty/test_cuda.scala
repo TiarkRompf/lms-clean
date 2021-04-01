@@ -314,7 +314,7 @@ class CudaTest extends TutorialFunSuite {
         }
       }
     }
-//    check("softmax", driver.code, "cu")
+    // check("softmax", driver.code, "cu")
     System.out.println(indent(driver.code))
 
   }
@@ -378,6 +378,25 @@ class CudaTest extends TutorialFunSuite {
       }
     }
     check("kernel_performance", driver.code, "cu")
+  }
+
+  test("transpose") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val a = 64
+        val in = cudaMalloc2[Float](a * a)
+        val out = cudaMalloc2[Float](a * a)
+
+        val transposeFun = cudaTranspose[Float]
+        transposeFun(in, out, dim3(32, 32, 1), dim3(2, 2, 1))
+
+        val out2 = NewArray[Float](a * a)
+        cudaCall(cudaMemcpyOfT[Float](out2, out, a * a, device2host))
+        printf("%f", out2(0))
+      }
+    }
+    System.out.println(indent(driver.code))
   }
 }
 
