@@ -1027,7 +1027,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
 }
 
-trait CudaLibraries extends CudaOps {
+trait CudaLibs extends CudaOps {
   def cudaEmbedding[T:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (embedding: Rep[Array[T]], indices: Rep[Array[Int]], output: Rep[Array[T]], embed_size: Rep[Int]) => {
       generate_comment("this is cuda embedding kernel.")
