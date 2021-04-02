@@ -445,7 +445,7 @@ class CudaTest extends TutorialFunSuite {
 
         val output = NewArray[Float](n)
         val cuda_output = cudaMalloc2[Float](n)
-        val maskedFillKernel = maskedFill[Float](true)
+        val maskedFillKernel = maskedFill[Float](false)
         maskedFillKernel(cuda_input, cuda_output, cuda_mask, maskValue, d0, d1, d0, 1, n, dim3((n + 511)/512), dim3(512))
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, n, device2host))
         checkFile[Float]("golden/maskedFill/output.data", output, n)

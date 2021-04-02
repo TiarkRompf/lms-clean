@@ -36,7 +36,7 @@ __global__ void x7(float* x8, float* x9, int* x10, float x11, int x12, int x13, 
   int x26 = x24 * x15;
   int x27 = x22 + x26 + (x23 - x26);
   while (x27 < x16) {
-    x9[x27] = x10[x25 % x13 * x12 + x21 % x12] == 0 ? x8[x27] : x11;
+    x9[x27] = x10[x21 % x12 * x13 + x25 % x13] == 0 ? x8[x27] : x11;
     int x28 = x18 + x19;
     x18 = x28;
     int x29 = x28 / x14;
