@@ -13,7 +13,7 @@ class CudaTest extends TutorialFunSuite {
   val under = "thirdparty/cuda/"
 
   // first: get a driver :)
-  abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaLibrary { q =>
+  abstract class DslDriverCCuda[A: Manifest, B: Manifest] extends DslDriverC[A,B] with CudaLibs { q =>
     override val codegen = new DslGenC with CCodeGenCudaOps {
       val IR: q.type = q
     }
