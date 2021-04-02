@@ -7,7 +7,6 @@ import lms.macros.SourceContext
 import lms.collection._
 import lms.collection.mutable.ArrayTypeLess
 import lms.thirdparty.{ScannerOps, CCodeGenScannerOps}
-// import lms.collection.mutable.{ArrayOps, StackArrayOps, CCodeGenStackArray}
 
 
 class CudaTest extends TutorialFunSuite {
