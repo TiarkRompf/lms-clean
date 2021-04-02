@@ -51,22 +51,22 @@ __global__ void x7(float* x8, float* x9, int* x10, float x11, int x12, int x13, 
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  float* x1 = (float*)malloc(4096 * sizeof(float));
-  scan_float("golden/emaskedFill/input.data", x1, 4096);
+  float* x1 = (float*)malloc(64 * sizeof(float));
+  scan_float("golden/maskedFill/input.data", x1, 64);
   float* x2 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x2, (size_t)(4096 * sizeof(float))));
-  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(4096 * sizeof(float)), cudaMemcpyHostToDevice));
-  int* x3 = (int*)malloc(4096 * sizeof(int));
-  scan_int("golden/emaskedFill/mask.data", x3, 4096);
+  CUDA_CALL(cudaMalloc(&x2, (size_t)(64 * sizeof(float))));
+  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(64 * sizeof(float)), cudaMemcpyHostToDevice));
+  int* x3 = (int*)malloc(64 * sizeof(int));
+  scan_int("golden/maskedFill/mask.data", x3, 64);
   int* x4 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x4, (size_t)(4096 * sizeof(int))));
-  CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(4096 * sizeof(int)), cudaMemcpyHostToDevice));
-  float* x5 = (float*)malloc(4096 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)(64 * sizeof(int))));
+  CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(64 * sizeof(int)), cudaMemcpyHostToDevice));
+  float* x5 = (float*)malloc(64 * sizeof(float));
   float* x6 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x6, (size_t)(4096 * sizeof(float))));
-  x7<<<dim3(8, 1, 1), dim3(512, 1, 1)>>>(x2, x6, x4, 0.0, 64, 64, 64, 1, 4096);
-  CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(4096 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array("golden/emaskedFill/output.data", x5, 4096);
+  CUDA_CALL(cudaMalloc(&x6, (size_t)(64 * sizeof(float))));
+  x7<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, x6, x4, 0.0, 8, 8, 8, 1, 64);
+  CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(64 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array("golden/maskedFill/output.data", x5, 64);
 }
 /*****************************************
 End of C Generated Code

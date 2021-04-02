@@ -9,8 +9,8 @@ def generate_data(lms_clean_root: str):
     torch.manual_seed(0)
 
     # model
-    d0 = 64
-    d1 = 64
+    d0 = 8
+    d1 = 8
     input = torch.randn(d0, d1)
     mask = torch.randint(0, 2, (d0, d1))
 
