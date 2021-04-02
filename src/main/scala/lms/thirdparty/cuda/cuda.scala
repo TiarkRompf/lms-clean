@@ -1037,10 +1037,6 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "NewSharedArray", xs, _) =>
-      // var tpe = typeMap.get(s)
-      // (1 to xs.length) foreach { _ => tpe = tpe.map(_.typeArguments.head) }
-      // val tpeAfter = remap(tpe.getOrElse(manifest[Unknown]))
-      // emit("__shared__ "); emit(s"$tpeAfter "); shallow(s);
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("__shared__ "); emit(s"$tpe "); shallow(s);
       xs.foreach {x => emit("["); shallow(x); emit("]") }; emitln(";")
