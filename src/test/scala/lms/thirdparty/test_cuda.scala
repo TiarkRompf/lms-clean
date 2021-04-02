@@ -377,66 +377,6 @@ class CudaTest extends TutorialFunSuite {
     check("kernel_performance", driver.code, "cu")
   }
 
-  // (Luke) TODO: remove this test case after pytorch one is checked
-  test("kernel_maskedFill_old") {
-    val driver = new DslDriverCCuda[Int, Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        val n = 4096
-        val input = NewArray[Float](n)
-        val mask = NewArray[Int](n)
-        val output = NewArray[Float](n)
-        val input_d = cudaMalloc2[Float](n)
-        val mask_d = cudaMalloc2[Int](n)
-        val output_d = cudaMalloc2[Float](n)
-
-        for (i <- (0 until n): Rep[Range]) {
-          input(i) = i
-          if (i % 2 == 0) {
-            mask(i) = 1
-          } else {
-            mask(i) = 0
-          }
-        }
-
-        cudaCall(cudaMemcpyOfT[Float](input_d, input, n, host2device))
-        cudaCall(cudaMemcpyOfT[Int](mask_d, mask, n, host2device))
-
-        val maskedFillFloat = maskedFill[Float](true)
-        maskedFillFloat(input_d, output_d, mask_d, 0.0f, (n + 511)/512, 1, 1, 1, n, dim3((n + 511)/512), dim3(512))
-
-        cudaCall(cudaMemcpyOfT[Float](output, output_d, n, device2host))
-
-        printf("masked fill output:\n")
-        for (i <- (0 until n): Rep[Range]) {
-          printf("%f,", output(i))
-        }
-        printf("\n")
-
-        val dinput = NewArray[Float](n)
-        val doutput = NewArray[Float](n)
-        for (i <- (0 until n): Rep[Range]) {
-          doutput(i) = 1.0f
-        }
-        val dinput_d = cudaMalloc2[Float](n)
-        val doutput_d = cudaMalloc2[Float](n)
-
-        cudaCall(cudaMemcpyOfT[Float](doutput_d, doutput, n, host2device))
-
-        val maskedFillGradFloat = maskedFillGrad[Float](true)
-        maskedFillGradFloat(doutput_d, dinput_d, mask_d, (n + 511)/512, 1, 1, 1, n, dim3((n + 511)/512), dim3(512))
-
-        cudaCall(cudaMemcpyOfT[Float](dinput, dinput_d, n, device2host))
-
-        printf("masked fill input gradient:\n")
-        for (i <- (0 until n): Rep[Range]) {
-          printf("%f,", dinput(i))
-        }
-        printf("\n")
-      }
-    }
-  }
-
   test("kernel_maskedFill") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
       
