@@ -961,8 +961,18 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N], 
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
     input_size: Rep[Int]) => {
-
-
+      generate_comment("this is the cuda masked fill kernel.")
+      generate_comment("`ijSwapped` is true if dim0 > dim1, in this case dim0 and dim1 are swapped")
+      generate_comment("arg0: 2D in: input array of size `input_size`")
+      generate_comment("arg1: 2D out: output array of size `input_size`")
+      generate_comment("arg2: 2D out: output array of size input_size`")
+      generate_comment("arg3: value: the value to fill")
+      generate_comment("arg4: dim0_shape: shape of dim0")
+      generate_comment("arg5: dim1_shape: shape of dim1")
+      generate_comment("arg6: dim0_stride: stride of dim0")
+      generate_comment("arg7: dim1_stride: stride of dim1")
+      generate_comment("arg8: input_size: number of elements of arg0, arg1 and arg2")
+      
       val tid = var_new[Int](blockIdxX * blockDimX + threadIdxX)
       val stride = blockDimX * gridDimX
 
@@ -988,7 +998,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     }
   }
 
-  
   def maskedFillGrad[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (y_d: Rep[Array[N]], x_d: Rep[Array[N]], mask: Rep[Array[Int]],
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
@@ -1072,6 +1081,8 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "NewSharedArray", xs, _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+      System.out.println("type before map: %s", typeMap.get(s))
+      System.out.println("type after map: %s", typeMap.get(s).map(_.typeArguments))
       emit("__shared__ "); emit(s"$tpe "); shallow(s);
       xs.foreach {x => emit("["); shallow(x); emit("]") }; emitln(";")
     case n @ Node(s, "NewDynSharedArray", List(), _) =>

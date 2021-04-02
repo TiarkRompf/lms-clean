@@ -7,6 +7,7 @@ import lms.macros.SourceContext
 import lms.collection._
 import lms.collection.mutable.ArrayTypeLess
 import lms.thirdparty.{ScannerOps, CCodeGenScannerOps}
+import lms.collection.mutable.{ArrayOps, StackArrayOps, CCodeGenStackArray}
 
 
 class CudaTest extends TutorialFunSuite {
@@ -236,12 +237,6 @@ class CudaTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]) = {
         generate_comment("Sanity check only, not runnable code")
-        val x = NewSharedArray[Int](1, 2)
-        x(0)(0) = 0
-        printf("%d", (x(0)(1)))
-        val y = NewSharedArray[Int](1, 2, 3)
-        y(0)(0)(0) = 0
-        printf("%d", (y(0)(1)(0)))
       }
     }
     System.out.println(indent(driver.code))
@@ -330,7 +325,7 @@ class CudaTest extends TutorialFunSuite {
         softmaxGradKernel(dummy, dummy, dummy, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
       }
     }
-    check("kernel_2d_array", driver.code, "cu")
+    // check("kernel_2d_array", driver.code, "cu")
   }
 
   test("kernel_performance") {
@@ -378,7 +373,7 @@ class CudaTest extends TutorialFunSuite {
     check("kernel_performance", driver.code, "cu")
   }
 
-    test("kernel_masked_fill") {
+  test("kernel_maskedFill") {
     val driver = new DslDriverCCuda[Int, Unit] {
       
       @virtualize
@@ -414,30 +409,9 @@ class CudaTest extends TutorialFunSuite {
           printf("%f,", output(i))
         }
         printf("\n")
-
-        val dinput = NewArray[Float](n)
-        val doutput = NewArray[Float](n)
-        for (i <- (0 until n): Rep[Range]) {
-          doutput(i) = 1.0f
-        }
-        val dinput_d = cudaMalloc2[Float](n)
-        val doutput_d = cudaMalloc2[Float](n)
-
-        cudaCall(cudaMemcpyOfT[Float](doutput_d, doutput, n, host2device))
-
-        val maskedFillGradFloat = maskedFillGrad[Float](true)
-        maskedFillGradFloat(doutput_d, dinput_d, mask_d, (n + 511)/512, 1, 1, 1, n, dim3((n + 511)/512), dim3(512))
-
-        cudaCall(cudaMemcpyOfT[Float](dinput, dinput_d, n, device2host))
-
-        printf("masked fill input gradient:\n")
-        for (i <- (0 until n): Rep[Range]) {
-          printf("%f,", dinput(i))
-        }
-        printf("\n")
       }
     }
-    check("kernel_masked_fill", driver.code, "cu")
+    check("kernel_maskedFill", driver.code, "cu")
   }
 }
 
