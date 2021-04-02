@@ -1047,6 +1047,26 @@ trait CudaLibrary extends CudaOps {
   }
 }
 
+trait CudaLibs extends CudaOps {
+  def cudaEmbedding[T:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (embedding: Rep[Array[T]], indices: Rep[Array[Int]], output: Rep[Array[T]], embed_size: Rep[Int]) => {
+      generate_comment("this is cuda embedding kernel.")
+      generate_comment("arg0: 2D embedding table: <n_embedding x embed_size>")
+      generate_comment("arg1: 1D indices: <indices_size>")
+      generate_comment("arg2: 2D output: <indices_size x embed_size>")
+      generate_comment("arg3: embed_size")
+      generate_comment("invocation assumption: <<<dim3(a,1,1), dim3(indices_size,1,1)>>> where a <= embed_size")
+      generate_comment("each thread block handles one embedding vector")
+      val posIdx = indices(blockIdxX)
+      val tid = threadIdxX
+      val stride = blockDimX
+      for (i <- tid.until(embed_size, stride): Rep[Range]) {
+        output(blockIdxX * embed_size + i) = embedding(posIdx * embed_size + i)
+      }
+    }
+  }
+}
+
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
   // need to register the headers
   registerHeader("\"cuda_header.h\"")
