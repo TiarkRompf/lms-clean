@@ -7,7 +7,7 @@ import lms.macros.SourceContext
 import lms.collection._
 import lms.collection.mutable.ArrayTypeLess
 import lms.thirdparty.{ScannerOps, CCodeGenScannerOps}
-import lms.collection.mutable.{ArrayOps, StackArrayOps, CCodeGenStackArray}
+// import lms.collection.mutable.{ArrayOps, StackArrayOps, CCodeGenStackArray}
 
 
 class CudaTest extends TutorialFunSuite {
@@ -230,6 +230,21 @@ class CudaTest extends TutorialFunSuite {
       }
     }
     check("kernel_reverse", driver.code, "cu")
+  }
+
+  test("kernel_2d_array") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val x = NewSharedArray[Int](1, 2)
+        x(0)(0) = 0
+        printf("%d", (x(0)(1)))
+        val y = NewSharedArray[Int](1, 2, 3)
+        y(0)(0)(0) = 0
+        printf("%d", (y(0)(1)(0)))
+      }
+    }
+    System.out.println(indent(driver.code))
   }
 
   test("embedding") {
