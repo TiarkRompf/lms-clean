@@ -363,12 +363,11 @@ class CudaTest extends TutorialFunSuite {
     check("kernel_performance", driver.code, "cu")
   }
 
-  test("kernel_maskedFill") {
+  // (Luke) TODO: remove this test case after pytorch one is checked
+  test("kernel_maskedFill_old") {
     val driver = new DslDriverCCuda[Int, Unit] {
-      
       @virtualize
       def snippet(arg: Rep[Int]) = {
-       
         val n = 4096
         val input = NewArray[Float](n)
         val mask = NewArray[Int](n)
@@ -399,6 +398,56 @@ class CudaTest extends TutorialFunSuite {
           printf("%f,", output(i))
         }
         printf("\n")
+
+        val dinput = NewArray[Float](n)
+        val doutput = NewArray[Float](n)
+        for (i <- (0 until n): Rep[Range]) {
+          doutput(i) = 1.0f
+        }
+        val dinput_d = cudaMalloc2[Float](n)
+        val doutput_d = cudaMalloc2[Float](n)
+
+        cudaCall(cudaMemcpyOfT[Float](doutput_d, doutput, n, host2device))
+
+        val maskedFillGradFloat = maskedFillGrad[Float](true)
+        maskedFillGradFloat(doutput_d, dinput_d, mask_d, (n + 511)/512, 1, 1, 1, n, dim3((n + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](dinput, dinput_d, n, device2host))
+
+        printf("masked fill input gradient:\n")
+        for (i <- (0 until n): Rep[Range]) {
+          printf("%f,", dinput(i))
+        }
+        printf("\n")
+      }
+    }
+  }
+
+  test("kernel_maskedFill") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+      
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val d0 = 64
+        val d1 = 64
+        val n = d0 * d1
+
+        val input = NewArray[Float](n)
+        scanFile[Float]("golden/emaskedFill/input.data", input, n)
+        val cuda_input = cudaMalloc2[Float](n)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input, input, n, host2device))
+
+        val mask = NewArray[Int](n)
+        scanFile[Int]("golden/emaskedFill/mask.data", mask, n)
+        val cuda_mask = cudaMalloc2[Int](n)
+        cudaCall(cudaMemcpyOfT[Int](cuda_mask, mask, n, host2device))
+
+        val output = NewArray[Float](n)
+        val cuda_output = cudaMalloc2[Float](n)
+        val maskedFillKernel = maskedFill[Float](true)
+        maskedFillKernel(cuda_input, cuda_output, cuda_mask, 0.0f, d0, d1, d0, 1, n, dim3((n + 511)/512), dim3(512, 1, 1))
+        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, n, device2host))
+        checkFile[Float]("golden/emaskedFill/output.data", output, n)
       }
     }
     check("kernel_maskedFill", driver.code, "cu")

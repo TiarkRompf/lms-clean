@@ -1,14 +1,18 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include "cuda_header.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "scanner_header.h"
 /************* Functions **************/
-__global__ void x9(float* x10, float* x11, int* x12, float x13, int x14, int x15, int x16, int x17, int x18) {
+__global__ void x7(float* x8, float* x9, int* x10, float x11, int x12, int x13, int x14, int x15, int x16) {
   // this is the cuda masked fill kernel.
   // `ijSwapped` is true if dim0 > dim1, in this case dim0 and dim1 are swapped
   // arg0: 2D in: input array of size `input_size`
@@ -20,61 +24,49 @@ __global__ void x9(float* x10, float* x11, int* x12, float x13, int x14, int x15
   // arg6: dim0_stride: stride of dim0
   // arg7: dim1_stride: stride of dim1
   // arg8: input_size: number of elements of arg0, arg1 and arg2
-  int x19 = blockIdx.x * blockDim.x + threadIdx.x;
-  int x20 = x19;
-  int x21 = blockDim.x * gridDim.x;
-  int x22 = x19 / x16;
-  int x23 = x22;
-  int x24 = x22 * x16;
-  int x25 = x19 - x24;
-  int x26 = x25 / x17;
-  int x27 = x26;
-  int x28 = x26 * x17;
-  int x29 = x24 + x28 + (x25 - x28);
-  while (x29 < x18) {
-    x11[x29] = x12[x27 % x15 * x14 + x23 % x14] == 0 ? x10[x29] : x13;
-    int x30 = x20 + x21;
-    x20 = x30;
-    int x31 = x30 / x16;
-    x23 = x31;
-    int x32 = x31 * x16;
-    int x33 = x30 - x32;
-    int x34 = x33 / x17;
-    x27 = x34;
-    int x35 = x34 * x17;
-    x29 = x32 + x35 + (x33 - x35);
+  int x17 = blockIdx.x * blockDim.x + threadIdx.x;
+  int x18 = x17;
+  int x19 = blockDim.x * gridDim.x;
+  int x20 = x17 / x14;
+  int x21 = x20;
+  int x22 = x20 * x14;
+  int x23 = x17 - x22;
+  int x24 = x23 / x15;
+  int x25 = x24;
+  int x26 = x24 * x15;
+  int x27 = x22 + x26 + (x23 - x26);
+  while (x27 < x16) {
+    x9[x27] = x10[x25 % x13 * x12 + x21 % x12] == 0 ? x8[x27] : x11;
+    int x28 = x18 + x19;
+    x18 = x28;
+    int x29 = x28 / x14;
+    x21 = x29;
+    int x30 = x29 * x14;
+    int x31 = x28 - x30;
+    int x32 = x31 / x15;
+    x25 = x32;
+    int x33 = x32 * x15;
+    x27 = x30 + x33 + (x31 - x33);
   }
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(4096 * sizeof(float));
-  int* x2 = (int*)malloc(4096 * sizeof(int));
-  float* x3 = (float*)malloc(4096 * sizeof(float));
-  float* x4 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x4, (size_t)(4096 * sizeof(float))));
-  int* x5 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x5, (size_t)(4096 * sizeof(int))));
+  scan_float("golden/emaskedFill/input.data", x1, 4096);
+  float* x2 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x2, (size_t)(4096 * sizeof(float))));
+  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(4096 * sizeof(float)), cudaMemcpyHostToDevice));
+  int* x3 = (int*)malloc(4096 * sizeof(int));
+  scan_int("golden/emaskedFill/mask.data", x3, 4096);
+  int* x4 = (int*)malloc(0 * sizeof(int));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)(4096 * sizeof(int))));
+  CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(4096 * sizeof(int)), cudaMemcpyHostToDevice));
+  float* x5 = (float*)malloc(4096 * sizeof(float));
   float* x6 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x6, (size_t)(4096 * sizeof(float))));
-  int x7 = 0;
-  while (x7 != 4096) {
-    int x8 = x7;
-    x1[x8] = (float)x8;
-    if (x8 % 2 == 0) x2[x8] = 1;
-    else x2[x8] = 0;
-    x7 = x7 + 1;
-  }
-  CUDA_CALL(cudaMemcpy(x4, x1, (size_t)(4096 * sizeof(float)), cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMemcpy(x5, x2, (size_t)(4096 * sizeof(int)), cudaMemcpyHostToDevice));
-  x9<<<dim3(8, 1, 1), dim3(512, 1, 1)>>>(x4, x6, x5, 0.0, 8, 1, 1, 1, 4096);
-  CUDA_CALL(cudaMemcpy(x3, x6, (size_t)(4096 * sizeof(float)), cudaMemcpyDeviceToHost));
-  printf("masked fill output:\n");
-  int x36 = 0;
-  while (x36 != 4096) {
-    printf("%f,", x3[x36]);
-    x36 = x36 + 1;
-  }
-  printf("\n");
+  x7<<<dim3(8, 1, 1), dim3(512, 1, 1)>>>(x2, x6, x4, 0.0, 64, 64, 64, 1, 4096);
+  CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(4096 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array("golden/emaskedFill/output.data", x5, 4096);
 }
 /*****************************************
 End of C Generated Code
