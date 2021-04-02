@@ -232,16 +232,6 @@ class CudaTest extends TutorialFunSuite {
     check("kernel_reverse", driver.code, "cu")
   }
 
-  test("kernel_2d_array") {
-    val driver = new DslDriverCCuda[Int, Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        generate_comment("Sanity check only, not runnable code")
-      }
-    }
-    System.out.println(indent(driver.code))
-  }
-
   test("embedding") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
 
