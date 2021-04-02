@@ -962,16 +962,14 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
     input_size: Rep[Int]) => {
       generate_comment("this is the cuda masked fill kernel.")
-      generate_comment("`ijSwapped` is true if dim0 > dim1, in this case dim0 and dim1 are swapped")
-      generate_comment("arg0: 2D in: input array of size `input_size`")
-      generate_comment("arg1: 2D out: output array of size `input_size`")
-      generate_comment("arg2: 2D out: output array of size input_size`")
-      generate_comment("arg3: value: the value to fill")
-      generate_comment("arg4: dim0_shape: shape of dim0")
-      generate_comment("arg5: dim1_shape: shape of dim1")
-      generate_comment("arg6: dim0_stride: stride of dim0")
-      generate_comment("arg7: dim1_stride: stride of dim1")
-      generate_comment("arg8: input_size: number of elements of arg0, arg1 and arg2")
+      generate_comment("The kernel takes an N-d input tensor `in` and selects two dimensions `i` and `j` to work with.")
+      generate_comment("`ijSwapped` is true if and only if i > j.")
+      generate_comment("`dim0_shape` and `dim1_shape` are shapes of dimension `i` and `j` in input tensor, respectively.")
+      generate_comment("`dim0_stide` and `dim1_stide` denote the physical distance between two logically contigent elements")
+      generate_comment("in `i` and `j` of the input array, respectively.")
+      generate_comment("The kernel also takes a 2-d `mask` tensor, of shape (dim0_shape, dim1_shape). This mask tensor")
+      generate_comment("contains only zeros and ones. The kernel fills elements of input tensor with `value` where mask is")
+      generate_comment("zero and stores the result to `out`.")
       
       val tid = var_new[Int](blockIdxX * blockDimX + threadIdxX)
       val stride = blockDimX * gridDimX
@@ -1081,8 +1079,6 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "NewSharedArray", xs, _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
-      System.out.println("type before map: %s", typeMap.get(s))
-      System.out.println("type after map: %s", typeMap.get(s).map(_.typeArguments))
       emit("__shared__ "); emit(s"$tpe "); shallow(s);
       xs.foreach {x => emit("["); shallow(x); emit("]") }; emitln(";")
     case n @ Node(s, "NewDynSharedArray", List(), _) =>

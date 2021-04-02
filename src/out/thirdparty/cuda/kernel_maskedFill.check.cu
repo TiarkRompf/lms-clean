@@ -14,16 +14,14 @@ Emitting C Generated Code
 /************* Functions **************/
 __global__ void x7(float* x8, float* x9, int* x10, float x11, int x12, int x13, int x14, int x15, int x16) {
   // this is the cuda masked fill kernel.
-  // `ijSwapped` is true if dim0 > dim1, in this case dim0 and dim1 are swapped
-  // arg0: 2D in: input array of size `input_size`
-  // arg1: 2D out: output array of size `input_size`
-  // arg2: 2D out: output array of size input_size`
-  // arg3: value: the value to fill
-  // arg4: dim0_shape: shape of dim0
-  // arg5: dim1_shape: shape of dim1
-  // arg6: dim0_stride: stride of dim0
-  // arg7: dim1_stride: stride of dim1
-  // arg8: input_size: number of elements of arg0, arg1 and arg2
+  // The kernel takes an N-d input tensor `in` and selects two dimensions `i` and `j` to work with.
+  // `ijSwapped` is true if and only if i > j.
+  // `dim0_shape` and `dim1_shape` are shapes of dimension `i` and `j` in input tensor, respectively.
+  // `dim0_stide` and `dim1_stide` denote the physical distance between two logically contigent elements
+  // in `i` and `j` of the input array, respectively.
+  // The kernel also takes a 2-d `mask` tensor, of shape (dim0_shape, dim1_shape). This mask tensor
+  // contains only zeros and ones. The kernel fills elements of input tensor with `value` where mask is
+  // zero and stores the result to `out`.
   int x17 = blockIdx.x * blockDim.x + threadIdx.x;
   int x18 = x17;
   int x19 = blockDim.x * gridDim.x;
