@@ -681,10 +681,8 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
 
   // Some global values for our GPU
-  val tileDim = 32
   val gridSize = 28
   val blockSize = 512
-  val blockRows = 8
   val basic_config = Seq(Backend.Const(gridSize), Backend.Const(blockSize))
 
   // How to bind to manually written kernels (see cuda_header.h)
@@ -832,17 +830,53 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
         xGrad(i) += yGrad(yOffset)
       }
     }
+  
+  // Cuda Tranpose Values
+  val blockRows = 8
+  val tileDim = 32
+
+  def cudaMatrixCopy[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]]) =>
+      generate_comment("Cuda Matrix Copy")
+      (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
+      (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
+      
+      val x = blockIdxX * tileDim + threadIdxX
+      val y = blockIdxY * tileDim + threadIdxY
+      val width = gridDimX * tileDim
+
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out((y + i) * width + x) = in((y + i) * width + x)
+      }
+  }
+
+  def cudaTransposeNaive[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]]) =>
+      generate_comment("Cuda Transpose Naive")
+      (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
+      (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
+      
+      val x = blockIdxX * tileDim + threadIdxX
+      val y = blockIdxY * tileDim + threadIdxY
+      val width = gridDimX * tileDim
+
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out(x * width + (y + i)) = in((y + i) * width + x)
+      }
+  }
 
   def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]]) =>
+      generate_comment("Cuda Coalesced Transpose")
+      (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
+      (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
       val tile = NewSharedArray[N](tileDim, tileDim + 1)
-
       val x = blockIdxX * tileDim + threadIdxX
       val y = blockIdxY * tileDim + threadIdxY
       val width = gridDimX * tileDim
 
       for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        tile(threadIdxY + i, threadIdxX) = in((y + i) * width + x)
+          tile(threadIdxY + i, threadIdxX) = in((y + i) * width + x)
       }
 
       cudaSyncThreads
@@ -851,7 +885,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       val col = blockIdxX * tileDim + threadIdxY
 
       for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        out((col + i) * width + row) = tile(threadIdxX, threadIdxY + i)
+          out((col + i) * width + row) = tile(threadIdxX, threadIdxY + i)
       }
     }
 
