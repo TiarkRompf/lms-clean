@@ -235,6 +235,7 @@ class CudaTest extends TutorialFunSuite {
     val driver = new DslDriverCCuda[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
+        generate_comment("sanity check only, not runnable code")
         val a = NewSharedArray[Int](1)
         a(0) = 0
         val b = NewSharedArray[Int](2, 2)
@@ -257,7 +258,7 @@ class CudaTest extends TutorialFunSuite {
         printf("%d", c(1, 1, 2))
       }
     }
-    System.out.println(indent(driver.code))
+    check("kernel_2d_array", driver.code, "cu")
   }
 
   test("embedding") {
