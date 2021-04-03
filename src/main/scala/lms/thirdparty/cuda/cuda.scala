@@ -424,13 +424,33 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
   }
 
-  def NewSharedArray[T:Manifest](x: Rep[Int], y: Rep[Int]): Rep[Array[Array[T]]] = {
-    Wrap[Array[Array[T]]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x), Unwrap(y)))
+  case class Matrix2D[T:Manifest](x: Rep[Array[T]], skip: Int) {
+    def apply(i: Rep[Int], j: Rep[Int])(implicit __pos: SourceContext): Rep[T] = {
+      val offset = skip * i + j
+      Wrap[T](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(offset))(Unwrap(x)))
+    }
+    def update(i: Rep[Int], j: Rep[Int], y: Rep[T])(implicit __pos: SourceContext): Unit = {
+      val offset = skip * i + j
+      Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(offset), Unwrap(y))(Unwrap(x))
+    }
+  }
+  def NewSharedArray[T:Manifest](x: Int, y: Int): Matrix2D[T] = {
+    Matrix2D(Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x * y))), y)
   }
 
-  def NewSharedArray[T:Manifest](x: Rep[Int], y: Rep[Int], z: Rep[Int]): Rep[Array[Array[Array[T]]]] = {
-    Wrap[Array[Array[Array[T]]]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x), Unwrap(y), Unwrap(z)))
+  case class Matrix3D[T:Manifest](x: Rep[Array[T]], skip0: Int, skip1: Int) {
+    def apply(i: Rep[Int], j: Rep[Int], k: Rep[Int])(implicit __pos: SourceContext): Rep[T] = {
+      val offset = skip0 * i + skip1 * j + k
+      Wrap[T](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(offset))(Unwrap(x)))
+    }
+    def update(i: Rep[Int], j: Rep[Int], k: Rep[Int], y: Rep[T])(implicit __pos: SourceContext): Unit = {
+      val offset = skip0 * i + skip1 * j + k
+      Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(offset), Unwrap(y))(Unwrap(x))
+    }
   }
+  def NewSharedArray[T:Manifest](x: Int, y: Int, z: Int): Matrix3D[T] = {
+    Matrix3D(Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x * y * z))), y * z, z)
+  }  
 
   def NewDynSharedArray[T:Manifest]: Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewDynSharedArray"))
@@ -720,7 +740,6 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
 
-
   // Here we will implement some cuda kernel functions using the `cudaGlobalFun`
   def cudaFill[T:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (data: Rep[Array[T]], value: Rep[T], size: Rep[Int]) =>
@@ -809,6 +828,64 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
         }
         // operate data
         xGrad(i) += yGrad(yOffset)
+      }
+    }
+  
+  // Cuda Tranpose Values
+  val blockRows = 8
+  val tileDim = 32
+
+  def cudaMatrixCopy[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]]) =>
+      generate_comment("Cuda Matrix Copy")
+      (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
+      (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
+      
+      val x = blockIdxX * tileDim + threadIdxX
+      val y = blockIdxY * tileDim + threadIdxY
+      val width = gridDimX * tileDim
+
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out((y + i) * width + x) = in((y + i) * width + x)
+      }
+  }
+
+  def cudaTransposeNaive[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]]) =>
+      generate_comment("Cuda Transpose Naive")
+      (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
+      (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
+      
+      val x = blockIdxX * tileDim + threadIdxX
+      val y = blockIdxY * tileDim + threadIdxY
+      val width = gridDimX * tileDim
+
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out(x * width + (y + i)) = in((y + i) * width + x)
+      }
+  }
+
+  def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]]) =>
+      generate_comment("Cuda Coalesced Transpose")
+      (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
+      (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
+      val tile = NewSharedArray[N](tileDim, tileDim + 1)
+      val x = blockIdxX * tileDim + threadIdxX
+      val y = blockIdxY * tileDim + threadIdxY
+      val width = gridDimX * tileDim
+
+      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+          tile(threadIdxY + i, threadIdxX) = in((y + i) * width + x)
+      }
+
+      cudaSyncThreads
+
+      val row = blockIdxY * tileDim + threadIdxX
+      val col = blockIdxX * tileDim + threadIdxY
+
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+          out((col + i) * width + row) = tile(threadIdxX, threadIdxY + i)
       }
     }
 

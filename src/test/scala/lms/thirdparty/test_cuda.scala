@@ -235,15 +235,30 @@ class CudaTest extends TutorialFunSuite {
     val driver = new DslDriverCCuda[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val x = NewSharedArray[Int](1, 2)
-        x(0)(0) = 0
-        printf("%d", (x(0)(1)))
-        val y = NewSharedArray[Int](1, 2, 3)
-        y(0)(0)(0) = 0
-        printf("%d", (y(0)(1)(0)))
+        generate_comment("sanity check only, not runnable code")
+        val a = NewSharedArray[Int](1)
+        a(0) = 0
+        val b = NewSharedArray[Int](2, 2)
+        b(0, 0) = arg
+        printf("%d", b(0, 1))
+        printf("%d", b(1, 1))
+        val c = NewSharedArray[Int](2, 2, 3)
+        c(0, 0, 0) = arg
+        printf("%d", c(0, 0, 0))
+        printf("%d", c(0, 0, 1))
+        printf("%d", c(0, 0, 2))
+        printf("%d", c(0, 1, 0))
+        printf("%d", c(0, 1, 1))
+        printf("%d", c(0, 1, 2))
+        printf("%d", c(1, 0, 0))
+        printf("%d", c(1, 0, 1))
+        printf("%d", c(1, 0, 2))
+        printf("%d", c(1, 1, 0))
+        printf("%d", c(1, 1, 1))
+        printf("%d", c(1, 1, 2))
       }
     }
-    System.out.println(indent(driver.code))
+    check("kernel_2d_array", driver.code, "cu")
   }
 
   test("embedding") {
@@ -311,7 +326,7 @@ class CudaTest extends TutorialFunSuite {
         }
       }
     }
-//    check("softmax", driver.code, "cu")
+    // check("softmax", driver.code, "cu")
     System.out.println(indent(driver.code))
 
   }
@@ -375,6 +390,185 @@ class CudaTest extends TutorialFunSuite {
       }
     }
     check("kernel_performance", driver.code, "cu")
+  }
+
+  test("transpose_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val rcount = 64 
+        val ccount = 64
+        val size = rcount * ccount
+        val tileDim = 32
+        val blockRows = 8
+        val input = NewArray[Int](size)
+        val output = NewArray[Int](size)
+
+        for (i <- (0 until size): Rep[Range]) {
+          input(i) = i + 1
+        }
+
+        val cuda_input = cudaMalloc2[Int](size)
+        val cuda_output = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
+
+        val transposeKernel = cudaTranspose[Int]
+        transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+        cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
+
+        for (i <- (0 until rcount): Rep[Range]) {
+          for (j <- (0 until ccount): Rep[Range]) {
+            if (input(rcount * i + j) != output(rcount * j + i)) {
+              printf("Transpose Incorrect!\n")
+              exit(1)
+            }
+          }
+        }
+        printf("Transpose Correct\n")
+      }
+    }
+    check("transpose", driver.code, "cu")
+  }
+
+  test("transpose_naive_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val rcount = 64 
+        val ccount = 64
+        val size = rcount * ccount
+        val tileDim = 32
+        val blockRows = 8
+        val input = NewArray[Int](size)
+        val output = NewArray[Int](size)
+
+        for (i <- (0 until size): Rep[Range]) {
+          input(i) = i + 1
+        }
+
+        val cuda_input = cudaMalloc2[Int](size)
+        val cuda_output = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
+
+        val transposeKernel = cudaTransposeNaive[Int]
+        transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+        cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
+
+        for (i <- (0 until rcount): Rep[Range]) {
+          for (j <- (0 until ccount): Rep[Range]) {
+            if (input(rcount * i + j) != output(rcount * j + i)) {
+              printf("Transpose Incorrect!\n")
+              exit(1)
+            }
+          }
+        }
+        printf("Transpose Correct\n")
+      }
+    }
+    check("transpose_naive", driver.code, "cu")
+  } 
+
+  test("copy_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val rcount = 64 
+        val ccount = 64
+        val size = rcount * ccount
+        val tileDim = 32
+        val blockRows = 8
+        val input = NewArray[Int](size)
+        val output = NewArray[Int](size)
+
+        for (i <- (0 until size): Rep[Range]) {
+          input(i) = i + 1
+        }
+
+        val cuda_input = cudaMalloc2[Int](size)
+        val cuda_output = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
+
+        val copyKernel = cudaMatrixCopy[Int]
+        copyKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+        cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
+
+        for (i <- (0 until rcount): Rep[Range]) {
+          for (j <- (0 until ccount): Rep[Range]) {
+            if (input(rcount * i + j) != output(rcount * i + j)) {
+              printf("Copy Incorrect!\n")
+              exit(1)
+            }
+          }
+        }
+        printf("Copy Correct\n")
+      }
+    }
+    check("copy", driver.code, "cu")
+  }
+
+  test("transpose_performance") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val rcount = 64 
+        val ccount = 64
+        val size = rcount * ccount
+        val tileDim = 32
+        val blockRows = 8
+        val input = NewArray[Int](size)
+        val output = NewArray[Int](size)
+        val iter_count = 100
+
+        for (i <- (0 until size): Rep[Range]) {
+          input(i) = i + 1
+        }
+
+        val cuda_input = cudaMalloc2[Int](size)
+        val cuda_output = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
+
+        val copyTime = measurement_cuda {
+          val copyKernel = cudaMatrixCopy[Int]
+          for (i <- (0 until iter_count): Rep[Range]) {
+            copyKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+          }
+        }
+        cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
+
+        val naive_transpose_time = measurement_cuda {
+          val naiveTransposeKernel = cudaTransposeNaive[Int]
+          for (i <- (0 until iter_count): Rep[Range]) {
+            naiveTransposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+          }
+        }
+        cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
+
+        val transpose_time = measurement_cuda {
+          val transposeKernel = cudaTranspose[Int]
+          for (i <- (0 until iter_count): Rep[Range]) {
+            transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+          }
+        }
+        cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
+
+        printf("COPY KERNEL STATS:\n")
+        printf("Time: %f ms\n", copyTime)
+        printf("Bandwidth (GB/s): %f\n", 2 * size * 1e-6 / copyTime)
+        printf("=======================\n")
+        printf("NAIVE TRANSPOSE KERNEL STATS:\n")
+        printf("Time: %f ms\n", naive_transpose_time)
+        printf("Bandwidth (GB/s): %f\n", 2 * size * 1e-6 / naive_transpose_time)
+        printf("=======================\n")
+        printf("COALESCED TRANSPOSE KERNEL STATS:\n")
+        printf("Time: %f ms\n", transpose_time)
+        printf("Bandwidth (GB/s): %f\n", 2 * size * 1e-6 / transpose_time)
+      }
+    }
+    check("transpose_performance", driver.code, "cu")
   }
 }
 
