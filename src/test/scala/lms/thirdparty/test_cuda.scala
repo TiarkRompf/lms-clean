@@ -46,6 +46,171 @@ class CudaTest extends TutorialFunSuite {
     check("malloc", driver.code, "cu")
   }
 
+  test("remove_conditional") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        // now lets use the function with 2 different setting
+        val arr = Array(1, 2, 3, 4, 5)
+        val cuda_arr = cudaMalloc2[Int](5)
+        cudaCall(cudaMemcpyOfT(cuda_arr, arr, 5, host2device))
+        val cuda_grad = cudaMalloc2[Int](5)
+        cudaArrayFill[Int](cuda_grad, 8, 5)
+
+        // not inPlace
+        val cuda_inG = cudaMalloc2[Int](5)
+        val hardTanhGradIntFalse = hardTanhGrad[Int](false)
+        hardTanhGradIntFalse(cuda_arr, cuda_inG, cuda_grad, -2, 2, 5, dim3(28), dim3(512))
+        printf("%d %d %d %d %d", cuda_inG(0), cuda_inG(1), cuda_inG(2), cuda_inG(3), cuda_inG(4))
+
+        // inPlace
+        val hardTanhGradIntTrue = hardTanhGrad[Int](true)
+        hardTanhGradIntTrue(cuda_arr, cuda_grad, cuda_grad, -2, 2, 5, dim3(28), dim3(512))
+        printf("%d %d %d %d %d", cuda_grad(0), cuda_grad(1), cuda_grad(2), cuda_grad(3), cuda_grad(4))
+
+        cudaCall(cudaFree(cuda_arr))
+        cudaCall(cudaFree(cuda_grad))
+        cudaCall(cudaFree(cuda_inG))
+      }
+    }
+    check("remove_conditional", driver.code, "cu")
+  }
+
+  test("cuda_performance") {
+    // Based on example shown in:
+    // https://developer.nvidia.com/blog/how-implement-performance-metrics-cuda-cc/
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+
+        val n = 4096
+        val x = NewArray[Float](n)
+        val y = NewArray[Float](n)
+        val d_x = cudaMalloc2[Float](n)
+        val d_y = cudaMalloc2[Float](n)
+
+        for (i <- (0 until n): Rep[Range]) {
+          x(i) = 1.0f
+          y(i) = 2.0f
+        }
+
+        cudaCall(cudaMemcpyOfT[Float](d_x, x, n, host2device))
+        cudaCall(cudaMemcpyOfT[Float](d_y, y, n, host2device))
+
+        val time = measurement_cuda {
+          val saxpyFloat = saxpy[Float]
+          saxpyFloat(n, 2.0f, d_x, d_y, dim3((n + 511)/512), dim3(512))
+        }
+
+        cudaCall(cudaMemcpyOfT[Float](y, d_y, n, device2host))
+
+        var maxError = 0.0f
+        for (i <- (0 until n): Rep[Range]) {
+          val error = Math.abs(y(i) - 4.0f)
+          if (error > maxError) {
+            maxError = error
+          }
+        }
+
+        printf("Max error: %f\n", maxError)
+        printf("Time: %f\n", time)
+        printf("Effective Bandwidth (GB/s): %f\n", n*4*3/time/1e6);
+      }
+    }
+    check("cuda_performance", driver.code, "cu")
+  }
+
+  test("kernel_2d_array") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        generate_comment("sanity check only, not runnable code")
+        val a = NewSharedArray[Int](1)
+        a(0) = 0
+        val b = NewSharedArray[Int](2, 2)
+        b(0, 0) = arg
+        printf("%d", b(0, 1))
+        printf("%d", b(1, 1))
+        val c = NewSharedArray[Int](2, 2, 3)
+        c(0, 0, 0) = arg
+        printf("%d", c(0, 0, 0))
+        printf("%d", c(0, 0, 1))
+        printf("%d", c(0, 0, 2))
+        printf("%d", c(0, 1, 0))
+        printf("%d", c(0, 1, 1))
+        printf("%d", c(0, 1, 2))
+        printf("%d", c(1, 0, 0))
+        printf("%d", c(1, 0, 1))
+        printf("%d", c(1, 0, 2))
+        printf("%d", c(1, 1, 0))
+        printf("%d", c(1, 1, 1))
+        printf("%d", c(1, 1, 2))
+      }
+    }
+    check("kernel_2d_array", driver.code, "cu")
+  }
+
+  test("kernel_shared_array") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+
+        val staticReverse = cudaGlobalFun[Array[Int], Int, Unit]((d, n) => {
+          val s = NewSharedArray[Int](64)
+          val t = threadIdxX
+          val tr = n - t - 1
+          s(t) = d(t)
+          cudaSyncThreads
+          d(t) = s(tr)
+        })
+
+        val dynamicReverse = cudaGlobalDynamicFun[Array[Int], Int, Unit]((d, n) => {
+          val s = NewDynSharedArray[Int]
+          val t = threadIdxX
+          val tr = n - t - 1
+          s(t) = d(t)
+          cudaSyncThreads
+          d(t) = s(tr)
+        })
+
+        val n = 64
+        val a = NewArray[Int](n)
+        val r = NewArray[Int](n)
+        val d = NewArray[Int](n)
+
+        for (i <- (0 until n): Rep[Range]) {
+          a(i) = i
+          r(i) = n - i - 1
+          d(i) = 0
+        }
+
+        val d_d = cudaMalloc2[Int](n)
+
+        cudaMemcpyOfT[Int](d_d, a, n, host2device)
+        staticReverse(d_d, n, dim3(1), dim3(n))
+        cudaMemcpyOfT[Int](d, d_d, n, device2host)
+
+        for (i <- (0 until n): Rep[Range]) {
+          if (d(i) != r(i)) {
+            printf("Error!")
+          }
+        }
+
+        cudaMemcpyOfT[Int](d_d, a, n, host2device)
+        dynamicReverse(d_d, n, dim3(1), dim3(n), n * sizeOf[Int])
+        cudaMemcpyOfT[Int](d, d_d, n, device2host)
+
+        for (i <- (0 until n): Rep[Range]) {
+          if (d(i) != r(i)) {
+            printf("Error!")
+          }
+        }
+      }
+    }
+    check("kernel_shared_array", driver.code, "cu")
+  }
+
   test("fill_manual_kernel") {
     val driver = new DslDriverCCuda[Int, Unit] {
       @virtualize
@@ -141,127 +306,7 @@ class CudaTest extends TutorialFunSuite {
     check("cap_gen_kernel", driver.code, "cu")
   }
 
-  test("remove_conditional") {
-    val driver = new DslDriverCCuda[Int, Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        // now lets use the function with 2 different setting
-        val arr = Array(1, 2, 3, 4, 5)
-        val cuda_arr = cudaMalloc2[Int](5)
-        cudaCall(cudaMemcpyOfT(cuda_arr, arr, 5, host2device))
-        val cuda_grad = cudaMalloc2[Int](5)
-        cudaArrayFill[Int](cuda_grad, 8, 5)
-
-        // not inPlace
-        val cuda_inG = cudaMalloc2[Int](5)
-        val hardTanhGradIntFalse = hardTanhGrad[Int](false)
-        hardTanhGradIntFalse(cuda_arr, cuda_inG, cuda_grad, -2, 2, 5, dim3(28), dim3(512))
-        printf("%d %d %d %d %d", cuda_inG(0), cuda_inG(1), cuda_inG(2), cuda_inG(3), cuda_inG(4))
-
-        // inPlace
-        val hardTanhGradIntTrue = hardTanhGrad[Int](true)
-        hardTanhGradIntTrue(cuda_arr, cuda_grad, cuda_grad, -2, 2, 5, dim3(28), dim3(512))
-        printf("%d %d %d %d %d", cuda_grad(0), cuda_grad(1), cuda_grad(2), cuda_grad(3), cuda_grad(4))
-
-        cudaCall(cudaFree(cuda_arr))
-        cudaCall(cudaFree(cuda_grad))
-        cudaCall(cudaFree(cuda_inG))
-      }
-    }
-    check("remove_conditional", driver.code, "cu")
-  }
-
-  test("kernel_reverse") {
-    val driver = new DslDriverCCuda[Int, Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-
-        val staticReverse = cudaGlobalFun[Array[Int], Int, Unit]((d, n) => {
-          val s = NewSharedArray[Int](64)
-          val t = threadIdxX
-          val tr = n - t - 1
-          s(t) = d(t)
-          cudaSyncThreads
-          d(t) = s(tr)
-        })
-
-        val dynamicReverse = cudaGlobalDynamicFun[Array[Int], Int, Unit]((d, n) => {
-          val s = NewDynSharedArray[Int]
-          val t = threadIdxX
-          val tr = n - t - 1
-          s(t) = d(t)
-          cudaSyncThreads
-          d(t) = s(tr)
-        })
-
-        val n = 64
-        val a = NewArray[Int](n)
-        val r = NewArray[Int](n)
-        val d = NewArray[Int](n)
-
-        for (i <- (0 until n): Rep[Range]) {
-          a(i) = i
-          r(i) = n - i - 1
-          d(i) = 0
-        }
-
-        val d_d = cudaMalloc2[Int](n)
-
-        cudaMemcpyOfT[Int](d_d, a, n, host2device)
-        staticReverse(d_d, n, dim3(1), dim3(n))
-        cudaMemcpyOfT[Int](d, d_d, n, device2host)
-
-        for (i <- (0 until n): Rep[Range]) {
-          if (d(i) != r(i)) {
-            printf("Error!")
-          }
-        }
-
-        cudaMemcpyOfT[Int](d_d, a, n, host2device)
-        dynamicReverse(d_d, n, dim3(1), dim3(n), n * sizeOf[Int])
-        cudaMemcpyOfT[Int](d, d_d, n, device2host)
-
-        for (i <- (0 until n): Rep[Range]) {
-          if (d(i) != r(i)) {
-            printf("Error!")
-          }
-        }
-      }
-    }
-    check("kernel_reverse", driver.code, "cu")
-  }
-
-  test("kernel_2d_array") {
-    val driver = new DslDriverCCuda[Int, Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        generate_comment("sanity check only, not runnable code")
-        val a = NewSharedArray[Int](1)
-        a(0) = 0
-        val b = NewSharedArray[Int](2, 2)
-        b(0, 0) = arg
-        printf("%d", b(0, 1))
-        printf("%d", b(1, 1))
-        val c = NewSharedArray[Int](2, 2, 3)
-        c(0, 0, 0) = arg
-        printf("%d", c(0, 0, 0))
-        printf("%d", c(0, 0, 1))
-        printf("%d", c(0, 0, 2))
-        printf("%d", c(0, 1, 0))
-        printf("%d", c(0, 1, 1))
-        printf("%d", c(0, 1, 2))
-        printf("%d", c(1, 0, 0))
-        printf("%d", c(1, 0, 1))
-        printf("%d", c(1, 0, 2))
-        printf("%d", c(1, 1, 0))
-        printf("%d", c(1, 1, 1))
-        printf("%d", c(1, 1, 2))
-      }
-    }
-    check("kernel_2d_array", driver.code, "cu")
-  }
-
-  test("embedding") {
+  test("embedding_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
 
       @virtualize
@@ -288,7 +333,7 @@ class CudaTest extends TutorialFunSuite {
         checkFile[Float]("golden/embedding/output.data", output, n_indices * embed_size)
       }
     }
-    check("embedding", driver.code, "cu")
+    check("embedding_kernel", driver.code, "cu")
   }
 
   // TODO(Supun): Currently, this just emits the generated code (always passes the test)
@@ -347,53 +392,7 @@ class CudaTest extends TutorialFunSuite {
     // check("kernel_2d_array", driver.code, "cu")
   }
 
-  test("kernel_performance") {
-    // Based on example shown in:
-    // https://developer.nvidia.com/blog/how-implement-performance-metrics-cuda-cc/
-    val driver = new DslDriverCCuda[Int, Unit] {
-
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-
-        val n = 4096
-        val x = NewArray[Float](n)
-        val y = NewArray[Float](n)
-        val d_x = cudaMalloc2[Float](n)
-        val d_y = cudaMalloc2[Float](n)
-
-        for (i <- (0 until n): Rep[Range]) {
-          x(i) = 1.0f
-          y(i) = 2.0f
-        }
-
-        cudaCall(cudaMemcpyOfT[Float](d_x, x, n, host2device))
-        cudaCall(cudaMemcpyOfT[Float](d_y, y, n, host2device))
-
-        val time = measurement_cuda {
-          val saxpyFloat = saxpy[Float]
-          saxpyFloat(n, 2.0f, d_x, d_y, dim3((n + 511)/512), dim3(512))
-        }
-
-        cudaCall(cudaMemcpyOfT[Float](y, d_y, n, device2host))
-
-        var maxError = 0.0f
-        for (i <- (0 until n): Rep[Range]) {
-          val error = Math.abs(y(i) - 4.0f)
-          if (error > maxError) {
-            maxError = error
-          }
-        }
-
-        printf("Max error: %f\n", maxError)
-        printf("Time: %f\n", time)
-        printf("Effective Bandwidth (GB/s): %f\n", n*4*3/time/1e6);
-      }
-    }
-    check("kernel_performance", driver.code, "cu")
-  }
-
-
-  test("kernel_maskedFill") {
+  test("maskedFill_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
       
       @virtualize
@@ -421,7 +420,7 @@ class CudaTest extends TutorialFunSuite {
         checkFile[Float]("golden/maskedFill/output.data", output, n)
       }
     }
-    check("kernel_maskedFill", driver.code, "cu")
+    check("maskedFill_kernel", driver.code, "cu")
   }
   
   test("transpose_kernel") {
