@@ -344,7 +344,7 @@ class CudaTest extends TutorialFunSuite {
         softmaxGradKernel(dummy, dummy, dummy, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
       }
     }
-    System.out.println(indent(driver.code))
+    // check("kernel_2d_array", driver.code, "cu")
   }
 
   test("kernel_performance") {
@@ -392,6 +392,38 @@ class CudaTest extends TutorialFunSuite {
     check("kernel_performance", driver.code, "cu")
   }
 
+
+  test("kernel_maskedFill") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+      
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val d0 = 8
+        val d1 = 8
+        val n = d0 * d1
+        val maskValue = 0.0f
+
+        val input = NewArray[Float](n)
+        scanFile[Float]("golden/maskedFill/input.data", input, n)
+        val cuda_input = cudaMalloc2[Float](n)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input, input, n, host2device))
+
+        val mask = NewArray[Int](n)
+        scanFile[Int]("golden/maskedFill/mask.data", mask, n)
+        val cuda_mask = cudaMalloc2[Int](n)
+        cudaCall(cudaMemcpyOfT[Int](cuda_mask, mask, n, host2device))
+
+        val output = NewArray[Float](n)
+        val cuda_output = cudaMalloc2[Float](n)
+        val maskedFillKernel = maskedFill[Float](false)
+        maskedFillKernel(cuda_input, cuda_output, cuda_mask, maskValue, d0, d1, d0, 1, n, dim3((n + 511)/512), dim3(512))
+        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, n, device2host))
+        checkFile[Float]("golden/maskedFill/output.data", output, n)
+      }
+    }
+    check("kernel_maskedFill", driver.code, "cu")
+  }
+  
   test("transpose_kernel") {
     val driver = new DslDriverCCuda[Int, Unit] {
 
