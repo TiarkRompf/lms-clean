@@ -710,11 +710,15 @@ trait RangeOps extends Equal with OrderingOps {
   implicit class intWrapper(start: Int) {
     // Note that these are ambiguous - need to use type ascription here (e.g. 1 until 10 : Rep[Range])
     def until(end: Rep[Int])(implicit pos: SourceContext) = range_until(unit(start),end)
+    def until(end: Rep[Int], step: Rep[Int])(implicit pos: SourceContext) = range_until(unit(start), end, step)
     def until(end: Int)(implicit pos: SourceContext): Rep[Range] = range_until(unit(start),unit(end))
     def until(end: Int)(implicit pos: SourceContext, o: Overloaded1): Range = new Range(start,end,1)
   }
   def range_until(start: Rep[Int], end: Rep[Int]): Rep[Range] = {
     Wrap[Range](Adapter.g.reflect("range_until", Unwrap(start), Unwrap(end)))
+  }
+  def range_until(start: Rep[Int], end: Rep[Int], step: Rep[Int]): Rep[Range] = {
+    Wrap[Range](Adapter.g.reflect("range_until_step", Unwrap(start), Unwrap(end), Unwrap(step)))
   }
 
   implicit class RangeConstrOps(lhs: Rep[Int]) {
