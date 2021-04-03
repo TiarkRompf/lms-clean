@@ -333,7 +333,7 @@ class CudaTest extends TutorialFunSuite {
         checkFile[Float]("golden/embedding/output.data", output, n_indices * embed_size)
       }
     }
-    check("embedding_kernel", driver.code, "cu")
+    check("embedding", driver.code, "cu")
   }
 
   // TODO(Supun): Currently, this just emits the generated code (always passes the test)
@@ -371,9 +371,7 @@ class CudaTest extends TutorialFunSuite {
         }
       }
     }
-    // check("softmax", driver.code, "cu")
-    System.out.println(indent(driver.code))
-
+    check("softmax", driver.code, "cu")
   }
 
   // TODO(Supun): Remove. Added just to observe and manually test the kernel
@@ -420,7 +418,7 @@ class CudaTest extends TutorialFunSuite {
         checkFile[Float]("golden/maskedFill/output.data", output, n)
       }
     }
-    check("maskedFill_kernel", driver.code, "cu")
+    check("maskedFill", driver.code, "cu")
   }
   
   test("transpose_kernel") {
