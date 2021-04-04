@@ -397,16 +397,26 @@ class CudaTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val rcount = 64 
-        val ccount = 64
+        val rcount = 213
+        val ccount = 56
         val size = rcount * ccount
         val tileDim = 32
         val blockRows = 8
+        val dimGrid = dim3((ccount + tileDim - 1) / tileDim, (rcount + tileDim - 1) / tileDim)
+        val dimBlock = dim3(tileDim, blockRows)
+
         val input = NewArray[Int](size)
         val output = NewArray[Int](size)
+        val golden = NewArray[Int](size)
 
         for (i <- (0 until size): Rep[Range]) {
-          input(i) = i + 1
+          input(i) = i
+        }
+
+        for (j <- (0 until ccount): Rep[Range]) {
+          for (i <- (0 until rcount): Rep[Range]) {
+            golden(j * rcount + i) = input(i * ccount + j)
+          }
         }
 
         val cuda_input = cudaMalloc2[Int](size)
@@ -414,15 +424,13 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
 
         val transposeKernel = cudaTranspose[Int]
-        transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+        transposeKernel(cuda_input, cuda_output, rcount, ccount, dimGrid, dimBlock)
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
-        for (i <- (0 until rcount): Rep[Range]) {
-          for (j <- (0 until ccount): Rep[Range]) {
-            if (input(rcount * i + j) != output(rcount * j + i)) {
-              printf("Transpose Incorrect!\n")
-              exit(1)
-            }
+        for (i <- (0 until size): Rep[Range]) {
+          if (golden(i) != output(i)) {
+            printf("Transpose Incorrect!\n")
+            exit(1)
           }
         }
         printf("Transpose Correct\n")
@@ -550,7 +558,9 @@ class CudaTest extends TutorialFunSuite {
         val transpose_time = measurement_cuda {
           val transposeKernel = cudaTranspose[Int]
           for (i <- (0 until iter_count): Rep[Range]) {
-            transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+            val dimGrid = dim3((ccount + tileDim - 1) / tileDim, (rcount + tileDim - 1) / tileDim)
+            val dimBlock = dim3(tileDim, blockRows)
+            transposeKernel(cuda_input, cuda_output, rcount, ccount, dimGrid, dimBlock)
           }
         }
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))

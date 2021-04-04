@@ -866,29 +866,33 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   }
 
   def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]]) =>
+    (in: Rep[Array[N]], out: Rep[Array[N]], n: Rep[Int], m: Rep[Int]) =>
       generate_comment("Cuda Coalesced Transpose")
-      (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
-      (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
-      val tile = NewSharedArray[N](tileDim, tileDim + 1)
-      val x = blockIdxX * tileDim + threadIdxX
-      val y = blockIdxY * tileDim + threadIdxY
-      val width = gridDimX * tileDim
+      generate_comment("arg0: 2D Input Matrix (n x m)")
+      generate_comment("arg1: 2D Output Transposed Matrix (m x n)")
 
-      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-          tile(threadIdxY + i, threadIdxX) = in((y + i) * width + x)
+      val tile = NewSharedArray[N](tileDim, tileDim + 1)
+
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        val x = blockIdxX * tileDim + threadIdxX
+        val y = blockIdxY * tileDim + threadIdxY + i
+
+        __ifThenElse((x < m) && (y < n), {
+          tile(threadIdxY + i, threadIdxX) = in(y * m + x)
+        }, {})
       }
 
       cudaSyncThreads
 
-      val row = blockIdxY * tileDim + threadIdxX
-      val col = blockIdxX * tileDim + threadIdxY
-
       for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-          out((col + i) * width + row) = tile(threadIdxX, threadIdxY + i)
+        val x = blockIdxY * tileDim + threadIdxX
+        val y = blockIdxX * tileDim + threadIdxY + i
+
+        __ifThenElse(x < n && y < m, {
+          out(y * n + x) = tile(threadIdxX, threadIdxY + i)
+        }, {})
       }
     }
-
   /*
     reduce the data input array (from 0 to size) using the given op.
     buffer(0) will contain the output of the reduction

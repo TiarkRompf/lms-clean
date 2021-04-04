@@ -37,28 +37,25 @@ __global__ void x22(int* x23, int* x24) {
     x28 = x28 + 8;
   }
 }
-__global__ void x36(int* x37, int* x38) {
+__global__ void x36(int* x37, int* x38, int x39, int x40) {
   // Cuda Coalesced Transpose
-  // arg0: 2D Input Matrix (n x n) where n is a multiple of 32
-  // arg1: 2D Output Matrix (n x n) where n is a multiple of 32
-  __shared__ int x39[1056];
-  int x40 = blockIdx.x * 32 + threadIdx.x;
-  int x41 = blockIdx.y * 32 + threadIdx.y;
-  int x42 = gridDim.x * 32;
-  int x43 = 0;
-  while (x43 < 32) {
-    int x44 = x43;
-    x39[33 * (threadIdx.y + x44) + threadIdx.x] = x37[(x41 + x44) * x42 + x40];
-    x43 = x43 + 8;
+  // arg0: 2D Input Matrix (n x m)
+  // arg1: 2D Output Transposed Matrix (m x n)
+  __shared__ int x41[1056];
+  int x42 = 0;
+  while (x42 < 32) {
+    int x43 = x42;
+    int x44 = blockIdx.x * 32 + threadIdx.x;
+    if (x44 < x40 && blockIdx.y * 32 + threadIdx.y + x43 < x39) x41[33 * (threadIdx.y + x43) + threadIdx.x] = x37[(blockIdx.y * 32 + threadIdx.y + x43) * x40 + x44];
+    x42 = x42 + 8;
   }
   __syncthreads();
-  int x45 = blockIdx.y * 32 + threadIdx.x;
-  int x46 = blockIdx.x * 32 + threadIdx.y;
-  int x47 = 0;
-  while (x47 < 32) {
-    int x48 = x47;
-    x38[(x46 + x48) * x42 + x45] = x39[33 * threadIdx.x + (threadIdx.y + x48)];
-    x47 = x47 + 8;
+  int x45 = 0;
+  while (x45 < 32) {
+    int x46 = x45;
+    int x47 = blockIdx.y * 32 + threadIdx.x;
+    if (x47 < x39 && blockIdx.x * 32 + threadIdx.y + x46 < x40) x38[(blockIdx.x * 32 + threadIdx.y + x46) * x39 + x47] = x41[33 * threadIdx.x + (threadIdx.y + x46)];
+    x45 = x45 + 8;
   }
 }
 /**************** Snippet ****************/
@@ -113,16 +110,16 @@ void Snippet(int x0) {
   CUDA_CALL(cudaEventCreate(&x34));
   CUDA_CALL(cudaEventCreate(&x35));
   CUDA_CALL(cudaEventRecord(x34));
-  int x49 = 0;
-  while (x49 != 100) {
-    x36<<<dim3(2, 2, 1), dim3(32, 8, 1)>>>(x5, x6);
-    x49 = x49 + 1;
+  int x48 = 0;
+  while (x48 != 100) {
+    x36<<<dim3(2, 2, 1), dim3(32, 8, 1)>>>(x5, x6, 64, 64);
+    x48 = x48 + 1;
   }
   CUDA_CALL(cudaEventRecord(x35));
   CUDA_CALL(cudaEventSynchronize(x35));
-  float x50 = 0.0;
-  CUDA_CALL(cudaEventElapsedTime(&x50, x34, x35));
-  float x51 = x50;
+  float x49 = 0.0;
+  CUDA_CALL(cudaEventElapsedTime(&x49, x34, x35));
+  float x50 = x49;
   CUDA_CALL(cudaMemcpy(x2, x6, (size_t)(4096 * sizeof(int)), cudaMemcpyDeviceToHost));
   printf("COPY KERNEL STATS:\n");
   printf("Time: %f ms\n", x19);
@@ -133,8 +130,8 @@ void Snippet(int x0) {
   printf("Bandwidth (GB/s): %f\n", 0.008192 / (double)x33);
   printf("=======================\n");
   printf("COALESCED TRANSPOSE KERNEL STATS:\n");
-  printf("Time: %f ms\n", x51);
-  printf("Bandwidth (GB/s): %f\n", 0.008192 / (double)x51);
+  printf("Time: %f ms\n", x50);
+  printf("Bandwidth (GB/s): %f\n", 0.008192 / (double)x50);
 }
 /*****************************************
 End of C Generated Code
