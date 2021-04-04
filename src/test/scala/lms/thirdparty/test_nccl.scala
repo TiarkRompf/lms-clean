@@ -19,7 +19,6 @@ class NCCLTest extends TutorialFunSuite {
       val IR: q.type = q
 
       registerHeader("\"nccl_header.h\"")
-      // registerHeader("<nccl.h>")
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"
 

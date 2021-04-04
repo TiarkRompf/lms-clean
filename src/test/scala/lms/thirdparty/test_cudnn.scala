@@ -10,14 +10,13 @@ import lms.collection.mutable._
 import lms.thirdparty.array_computation.{CUDATypeLess, CCodeGenCudaOps, CudaOps}
 
 class CudnnTest extends TutorialFunSuite {
-  val under = "thirdparty/cuda"
+  val under = "thirdparty/cudnn/"
 
   abstract class DslDriverCPPCudnn[A: Manifest, B: Manifest] extends DslDriverCPP[A,B] with CudaOps with CUDNNOps with ArrayOps with SizeTOps { q =>
     override val codegen = new DslGenCPP with CCodeGenLibs with CCodeGenCudaOps with CCodeGenStackArray with CCodeGenSizeTOps with CCodeGenCUDNN {
       val IR: q.type = q
     }
     override val compilerCommand = "nvcc -std=c++11 -O3"
-    // nvcc -o conv-test conv-test.cu -l cudnn
 
     val curPath = System.getProperty("user.dir")
     override val sourceFile = s"$curPath/snippet.cu"
