@@ -16,10 +16,11 @@ def generate_data(lms_clean_root: str):
     mask = torch.randint(0, 2, (d0, d1))
     output = input.masked_fill(mask, 0.0)
     output.sum().backward()
+    print(output.grad)
 
     # printer
     printer = get_printer(lms_clean_root, test_name = "maskedFill")
-    printer("input.data", input.weight)
+    printer("input.data", input)
     printer("mask.data", mask)
     printer("output.data", output)
     printer("input_grad.data", input.grad)
