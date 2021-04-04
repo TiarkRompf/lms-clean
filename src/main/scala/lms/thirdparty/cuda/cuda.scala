@@ -853,6 +853,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       generate_comment("this is cuda saxpy (single-precision A * X plus Y) kernel")
       generate_comment("arg0: size of input array")
       val i = blockIdxX * blockDimX + threadIdxX
+      val i = blockIdxX * blockDimX * threadIdxX
       __ifThenElse(i < size, {y(i) = a * x(i) + y(i)}, {})
   }
 }
