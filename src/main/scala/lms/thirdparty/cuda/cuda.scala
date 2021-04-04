@@ -913,10 +913,14 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def maskedFillGrad[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
+  def cudaMaskedFillGrad[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (y_d: Rep[Array[N]], x_d: Rep[Array[N]], mask: Rep[Array[Int]],
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
     input_size: Rep[Int]) => {
+      generate_comment("this is the cuda masked fill gradient kernel.")
+      generate_comment("arg0: gradient of N-d output tensor.")
+      generate_comment("arg1: gradient of N-d input tensor.")
+      generate_comment("Other parameters are same as maskedFill")
 
       val tid = var_new[Int](blockIdxX * blockDimX + threadIdxX)
       val stride = blockDimX * gridDimX
