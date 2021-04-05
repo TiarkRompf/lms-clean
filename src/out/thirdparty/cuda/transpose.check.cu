@@ -12,6 +12,8 @@ __global__ void x13(int* x14, int* x15, int x16, int x17) {
   // Cuda Coalesced Transpose
   // arg0: 2D Input Matrix (n x m)
   // arg1: 2D Output Transposed Matrix (m x n)
+  // arg2: number of rows for input matrix
+  // arg3: number of columns for input matrix
   __shared__ int x18[1056];
   int x19 = blockIdx.x * 32 + threadIdx.x;
   int x20 = blockIdx.y * 32 + threadIdx.y;

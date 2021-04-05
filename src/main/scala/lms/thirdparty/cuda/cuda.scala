@@ -835,6 +835,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   val blockRows = 8
   val tileDim = 32
 
+  // cuda matrix copy function for baseline
   def cudaMatrixCopy[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]]) =>
       generate_comment("Cuda Matrix Copy")
@@ -850,6 +851,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       }
   }
 
+  // naive cuda transpose kernel
   def cudaTransposeNaive[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]]) =>
       generate_comment("Cuda Transpose Naive")
@@ -865,11 +867,14 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       }
   }
 
+  // cuda transpose using coalesced approach
   def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], n: Rep[Int], m: Rep[Int]) =>
       generate_comment("Cuda Coalesced Transpose")
       generate_comment("arg0: 2D Input Matrix (n x m)")
       generate_comment("arg1: 2D Output Transposed Matrix (m x n)")
+      generate_comment("arg2: number of rows for input matrix")
+      generate_comment("arg3: number of columns for input matrix")
 
       val tile = NewSharedArray[N](tileDim, tileDim + 1)
       val x = var_new(blockIdxX * tileDim + threadIdxX)

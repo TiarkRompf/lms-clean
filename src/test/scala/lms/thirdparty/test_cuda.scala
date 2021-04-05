@@ -436,7 +436,7 @@ class CudaTest extends TutorialFunSuite {
         printf("Transpose Correct\n")
       }
     }
-    check("transpose", driver.code, "cu")
+  check("transpose", driver.code, "cu")
   }
 
   test("transpose_naive_kernel") {
