@@ -110,7 +110,7 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x41, (size_t)(64 * sizeof(float))));
   x42<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x34, x41, x4, 8, 8, 8, 1, 64);
   float* x68 = (float*)malloc(64 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x68, x6, (size_t)(64 * sizeof(float)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x68, x41, (size_t)(64 * sizeof(float)), cudaMemcpyDeviceToHost));
   check_float_array("golden/maskedFill/input_grad.data", x68, 64);
 }
 /*****************************************

@@ -436,7 +436,7 @@ class CudaTest extends TutorialFunSuite {
           n, dim3((n + 511)/512), dim3(512))
 
         val dinput =  NewArray[Float](n)
-        cudaCall(cudaMemcpyOfT[Float](dinput, cuda_output, n, device2host))
+        cudaCall(cudaMemcpyOfT[Float](dinput, cuda_dinput, n, device2host))
         checkFile[Float]("golden/maskedFill/input_grad.data", dinput, n)
       }
     }
