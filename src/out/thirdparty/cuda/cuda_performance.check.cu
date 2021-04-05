@@ -9,7 +9,9 @@ Emitting C Generated Code
 #include <stdbool.h>
 /************* Functions **************/
 __global__ void x9(int x10, float x11, float* x12, float* x13) {
-  int x14 = blockIdx.x * blockDim.x * threadIdx.x;
+  // this is cuda saxpy (single-precision A * X plus Y) kernel
+  // arg0: size of input array
+  int x14 = blockIdx.x * blockDim.x + threadIdx.x;
   if (x14 < x10) x13[x14] = x11 * x12[x14] + x13[x14];
 }
 /**************** Snippet ****************/

@@ -850,7 +850,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // saxpy: single-precision a * x + y
   def saxpy[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (size: Rep[Int], a: Rep[N], x: Rep[Array[N]], y: Rep[Array[N]]) =>
-      val i = blockIdxX * blockDimX * threadIdxX
+      generate_comment("this is cuda saxpy (single-precision A * X plus Y) kernel")
+      generate_comment("arg0: size of input array")
+      val i = blockIdxX * blockDimX + threadIdxX
       __ifThenElse(i < size, {y(i) = a * x(i) + y(i)}, {})
   }
 }
