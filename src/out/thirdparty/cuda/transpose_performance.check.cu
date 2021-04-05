@@ -42,20 +42,24 @@ __global__ void x36(int* x37, int* x38, int x39, int x40) {
   // arg0: 2D Input Matrix (n x m)
   // arg1: 2D Output Transposed Matrix (m x n)
   __shared__ int x41[1056];
-  int x42 = 0;
-  while (x42 < 32) {
-    int x43 = x42;
-    int x44 = blockIdx.x * 32 + threadIdx.x;
-    if (x44 < x40 && blockIdx.y * 32 + threadIdx.y + x43 < x39) x41[33 * (threadIdx.y + x43) + threadIdx.x] = x37[(blockIdx.y * 32 + threadIdx.y + x43) * x40 + x44];
-    x42 = x42 + 8;
+  int x42 = blockIdx.x * 32 + threadIdx.x;
+  int x43 = blockIdx.y * 32 + threadIdx.y;
+  int x44 = 0;
+  while (x44 < 32) {
+    int x45 = x44;
+    if (x42 < x40 && x43 < x39) x41[33 * (threadIdx.y + x45) + threadIdx.x] = x37[x43 * x40 + x42];
+    x43 = x43 + 8;
+    x44 = x44 + 8;
   }
   __syncthreads();
-  int x45 = 0;
-  while (x45 < 32) {
-    int x46 = x45;
-    int x47 = blockIdx.y * 32 + threadIdx.x;
-    if (x47 < x39 && blockIdx.x * 32 + threadIdx.y + x46 < x40) x38[(blockIdx.x * 32 + threadIdx.y + x46) * x39 + x47] = x41[33 * threadIdx.x + (threadIdx.y + x46)];
-    x45 = x45 + 8;
+  x42 = blockIdx.y * 32 + threadIdx.x;
+  x43 = blockIdx.x * 32 + threadIdx.y;
+  int x46 = 0;
+  while (x46 < 32) {
+    int x47 = x46;
+    if (x42 < x39 && x43 < x40) x38[x43 * x39 + x42] = x41[33 * threadIdx.x + (threadIdx.y + x47)];
+    x43 = x43 + 8;
+    x46 = x46 + 8;
   }
 }
 /**************** Snippet ****************/

@@ -872,25 +872,28 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       generate_comment("arg1: 2D Output Transposed Matrix (m x n)")
 
       val tile = NewSharedArray[N](tileDim, tileDim + 1)
+      val x = var_new(blockIdxX * tileDim + threadIdxX)
+      val y = var_new(blockIdxY * tileDim + threadIdxY)
 
       for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        val x = blockIdxX * tileDim + threadIdxX
-        val y = blockIdxY * tileDim + threadIdxY + i
-
         __ifThenElse((x < m) && (y < n), {
           tile(threadIdxY + i, threadIdxX) = in(y * m + x)
         }, {})
+
+        __assign(y, y + blockRows)
       }
 
       cudaSyncThreads
 
-      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        val x = blockIdxY * tileDim + threadIdxX
-        val y = blockIdxX * tileDim + threadIdxY + i
+      __assign(x, blockIdxY * tileDim + threadIdxX)
+      __assign(y, blockIdxX * tileDim + threadIdxY)
 
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
         __ifThenElse(x < n && y < m, {
           out(y * n + x) = tile(threadIdxX, threadIdxY + i)
         }, {})
+
+        __assign(y, y + blockRows)
       }
     }
   /*
