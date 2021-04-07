@@ -450,7 +450,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   }
   def NewSharedArray[T:Manifest](x: Int, y: Int, z: Int): Matrix3D[T] = {
     Matrix3D(Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x * y * z))), y * z, z)
-  }  
+  }
 
   def NewDynSharedArray[T:Manifest]: Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewDynSharedArray"))
@@ -726,19 +726,19 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]) =
     Wrap[(A,B,C,D,E,F,Dim3,Dim3)=>G](__topFun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), "__global__"))
-  
+
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G]) => Rep[H]) =
     Wrap[(A,B,C,D,E,F,G,Dim3,Dim3)=>H](__topFun(f, 7, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)))), "__global__"))
-  
+
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H]) => Rep[I]) =
     Wrap[(A,B,C,D,E,F,G,H,Dim3,Dim3)=>I](__topFun(f, 8, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)))), "__global__"))
-  
+
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I]) => Rep[J]) =
     Wrap[(A,B,C,D,E,F,G,H,I,Dim3,Dim3)=>J](__topFun(f, 9, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)))), "__global__"))
-  
+
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J]) => Rep[K]) =
     Wrap[(A,B,C,D,E,F,G,H,I,J,Dim3,Dim3)=>K](__topFun(f, 10, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9)))), "__global__"))
-  
+
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest,H:Manifest,I:Manifest,J:Manifest,K:Manifest,L:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F], Rep[G], Rep[H], Rep[I], Rep[J], Rep[K]) => Rep[L]) =
     Wrap[(A,B,C,D,E,F,G,H,I,J,K,Dim3,Dim3)=>L](__topFun(f, 11, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)), Wrap[G](xn(6)), Wrap[H](xn(7)), Wrap[I](xn(8)), Wrap[J](xn(9)), Wrap[K](xn(10)))), "__global__"))
 
@@ -877,7 +877,7 @@ trait CudaLibs extends CudaOps {
   }
 
   def cudaMaskedFill[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N], 
+    (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N],
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
     input_size: Rep[Int]) => {
       generate_comment("this is the cuda masked fill kernel.")
@@ -889,7 +889,7 @@ trait CudaLibs extends CudaOps {
       generate_comment("The kernel also takes a 2-d `mask` tensor, of shape (dim0_shape, dim1_shape). This mask tensor")
       generate_comment("contains only zeros and ones. The kernel fills elements of input tensor with `value` where mask is")
       generate_comment("zero and stores the result to `out`.")
-      
+
       val tid = var_new[Int](blockIdxX * blockDimX + threadIdxX)
       val stride = blockDimX * gridDimX
 
@@ -910,7 +910,7 @@ trait CudaLibs extends CudaOps {
         __assign(j, (tid - i * dim0_stride) / dim1_stride)
         __assign(inner_idx, tid - i * dim0_stride - j * dim1_stride)
         __assign(idx, i * dim0_stride + j * dim1_stride + inner_idx)
-        
+
       })
     }
   }
@@ -924,7 +924,7 @@ trait CudaLibs extends CudaOps {
       generate_comment("Cuda Matrix Copy")
       (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
       (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
-      
+
       val x = blockIdxX * tileDim + threadIdxX
       val y = blockIdxY * tileDim + threadIdxY
       val width = gridDimX * tileDim
@@ -939,7 +939,7 @@ trait CudaLibs extends CudaOps {
       generate_comment("Cuda Transpose Naive")
       (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
       (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
-      
+
       val x = blockIdxX * tileDim + threadIdxX
       val y = blockIdxY * tileDim + threadIdxY
       val width = gridDimX * tileDim
@@ -973,7 +973,117 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-    /*
+  def cudaTranspose2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], dimY: Rep[Int], dimX: Rep[Int]) =>
+      generate_comment("this is the transpose kernel")
+      generate_comment("arg0: 2D Input Matrix (dimY x dimX) where dimY and dimX are multiples of 32")
+      generate_comment("arg1: 2D Output Matrix (dimX x dimY)")
+      generate_comment("caller must use <<<dim3(dimX/32, dimY/32, 1), dim3(32, 32, 1)>>>")
+      generate_comment("using gridDimX=dimX/32, gridDimY=dimY/32, blockDimX=32, blockDimY=32")
+      val tile = NewSharedArray[N](tileDim, tileDim + 1) // for resolving banking conflict
+
+      generate_comment("read data from input array to shared memory")
+      // helper function from block indices and thread indices to input reads
+      def in_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int]): Rep[N] = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        in(y * dimX + x)
+      }
+      tile(threadIdxY, threadIdxX) = in_offset(blockIdxX, blockIdxY, threadIdxX, threadIdxY)
+
+      generate_comment("sync threads")
+      cudaSyncThreads
+
+      generate_comment("write date from shared memory to output array")
+      // helper function from block indices and thread indices to output writes
+      def out_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        out(y * dimY + x) = value
+      }
+      // we want to swap block indices, but maintain thread indices (so that the writes are coalleased)
+      // then we must read the tile in a transposed manner (swap thread indices)
+      out_offset(blockIdxY, blockIdxX, threadIdxX, threadIdxY, tile(threadIdxX, threadIdxY))
+  }
+
+  def cudaTranspose3[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], dimY: Rep[Int], dimX: Rep[Int]) =>
+      generate_comment("this is the transpose kernel")
+      generate_comment("arg0: 2D Input Matrix (dimY x dimX) where dimY and dimX are multiples of 32")
+      generate_comment("arg1: 2D Output Matrix (dimX x dimY)")
+      generate_comment("caller must use <<<dim3(dimX/32, dimY/32, 1), dim3(32, 8, 1)>>>")
+      generate_comment("using gridDimX=dimX/32, gridDimY=dimY/32, blockDimX=32, blockDimY=8")
+      val tile = NewSharedArray[N](tileDim, tileDim + 1) // for resolving banking conflict
+
+      generate_comment("read data from input array to shared memory")
+      // helper function from block indices and thread indices to input reads
+      // threadIdxX still covers a row but threadIdxY needs a for loop of size 4
+      def in_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int]): Rep[N] = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        in(y * dimX + x)
+      }
+      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        tile(threadIdxY + i, threadIdxX) = in_offset(blockIdxX, blockIdxY, threadIdxX, threadIdxY + i)
+      }
+
+      generate_comment("sync threads")
+      cudaSyncThreads
+
+      generate_comment("write data from shared memory to output array")
+      // helper function from block indices and thread indices to output writes
+      def out_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        out(y * dimY + x) = value
+      }
+      // we want to swap block indices, but maintain thread indices (so that the writes are coaleased)
+      // then we must read the tile in a transposed manner (swap read indices)
+      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out_offset(blockIdxY, blockIdxX, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
+      }
+  }
+
+  def cudaTranspose4[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], dimY: Rep[Int], dimX: Rep[Int]) =>
+      generate_comment("this is the transpose kernel")
+      generate_comment("arg0: 2D Input Matrix (dimY x dimX) may not be multiples of 32")
+      generate_comment("arg1: 2D Output Matrix (dimX x dimY)")
+      generate_comment("caller must use <<<dim3((dimX+31)/32, (dimY+31)/32, 1), dim3(32, 8, 1)>>>")
+      generate_comment("using gridDimX=(dimX+31)/32, gridDimY=(dimY+31)/32, blockDimX=32, blockDimY=8")
+      val tile = NewSharedArray[N](tileDim, tileDim + 1) // for resolving banking conflict
+
+      generate_comment("read data from input array to shared memory")
+      // helper function from block indices and thread indices to input reads
+      def in_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], func: Rep[N] => Unit) = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        __ifThenElse(y < dimY && x < dimX, func(in(y * dimX + x)), {})
+      }
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        in_offset(blockIdxX, blockIdxY, threadIdxX, threadIdxY + i, value => {
+          tile(threadIdxY + i, threadIdxX) = value
+        })
+      }
+
+      generate_comment("sync threads")
+      cudaSyncThreads
+
+      generate_comment("write data from shared memory to output array")
+      // helper function from block indices and thread indices to output writes
+      def out_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        __ifThenElse(y < dimX && x < dimY, {out(y * dimY + x) = value}, {})
+      }
+      // we want to swap block indices, but maintain thread indices (so that the writes are coaleased)
+      // then we must read the tile in a transposed manner (swap read indices)
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out_offset(blockIdxY, blockIdxX, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
+      }
+  }
+
+  /*
     reduce the data input array (from 0 to size) using the given op.
     buffer(0) will contain the output of the reduction
    */
