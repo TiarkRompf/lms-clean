@@ -973,116 +973,6 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  def cudaTranspose2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]], dimY: Rep[Int], dimX: Rep[Int]) =>
-      generate_comment("this is the transpose kernel")
-      generate_comment("arg0: 2D Input Matrix (dimY x dimX) where dimY and dimX are multiples of 32")
-      generate_comment("arg1: 2D Output Matrix (dimX x dimY)")
-      generate_comment("caller must use <<<dim3(dimX/32, dimY/32, 1), dim3(32, 32, 1)>>>")
-      generate_comment("using gridDimX=dimX/32, gridDimY=dimY/32, blockDimX=32, blockDimY=32")
-      val tile = NewSharedArray[N](tileDim, tileDim + 1) // for resolving banking conflict
-
-      generate_comment("read data from input array to shared memory")
-      // helper function from block indices and thread indices to input reads
-      def in_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int]): Rep[N] = {
-        val x = bX * tileDim + tX
-        val y = bY * tileDim + tY
-        in(y * dimX + x)
-      }
-      tile(threadIdxY, threadIdxX) = in_offset(blockIdxX, blockIdxY, threadIdxX, threadIdxY)
-
-      generate_comment("sync threads")
-      cudaSyncThreads
-
-      generate_comment("write date from shared memory to output array")
-      // helper function from block indices and thread indices to output writes
-      def out_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
-        val x = bX * tileDim + tX
-        val y = bY * tileDim + tY
-        out(y * dimY + x) = value
-      }
-      // we want to swap block indices, but maintain thread indices (so that the writes are coalleased)
-      // then we must read the tile in a transposed manner (swap thread indices)
-      out_offset(blockIdxY, blockIdxX, threadIdxX, threadIdxY, tile(threadIdxX, threadIdxY))
-  }
-
-  def cudaTranspose3[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]], dimY: Rep[Int], dimX: Rep[Int]) =>
-      generate_comment("this is the transpose kernel")
-      generate_comment("arg0: 2D Input Matrix (dimY x dimX) where dimY and dimX are multiples of 32")
-      generate_comment("arg1: 2D Output Matrix (dimX x dimY)")
-      generate_comment("caller must use <<<dim3(dimX/32, dimY/32, 1), dim3(32, 8, 1)>>>")
-      generate_comment("using gridDimX=dimX/32, gridDimY=dimY/32, blockDimX=32, blockDimY=8")
-      val tile = NewSharedArray[N](tileDim, tileDim + 1) // for resolving banking conflict
-
-      generate_comment("read data from input array to shared memory")
-      // helper function from block indices and thread indices to input reads
-      // threadIdxX still covers a row but threadIdxY needs a for loop of size 4
-      def in_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int]): Rep[N] = {
-        val x = bX * tileDim + tX
-        val y = bY * tileDim + tY
-        in(y * dimX + x)
-      }
-      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        tile(threadIdxY + i, threadIdxX) = in_offset(blockIdxX, blockIdxY, threadIdxX, threadIdxY + i)
-      }
-
-      generate_comment("sync threads")
-      cudaSyncThreads
-
-      generate_comment("write data from shared memory to output array")
-      // helper function from block indices and thread indices to output writes
-      def out_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
-        val x = bX * tileDim + tX
-        val y = bY * tileDim + tY
-        out(y * dimY + x) = value
-      }
-      // we want to swap block indices, but maintain thread indices (so that the writes are coaleased)
-      // then we must read the tile in a transposed manner (swap read indices)
-      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        out_offset(blockIdxY, blockIdxX, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
-      }
-  }
-
-  def cudaTranspose4[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]], dimY: Rep[Int], dimX: Rep[Int]) =>
-      generate_comment("this is the transpose kernel")
-      generate_comment("arg0: 2D Input Matrix (dimY x dimX) may not be multiples of 32")
-      generate_comment("arg1: 2D Output Matrix (dimX x dimY)")
-      generate_comment("caller must use <<<dim3((dimX+31)/32, (dimY+31)/32, 1), dim3(32, 8, 1)>>>")
-      generate_comment("using gridDimX=(dimX+31)/32, gridDimY=(dimY+31)/32, blockDimX=32, blockDimY=8")
-      val tile = NewSharedArray[N](tileDim, tileDim + 1) // for resolving banking conflict
-
-      generate_comment("read data from input array to shared memory")
-      // helper function from block indices and thread indices to input reads
-      def in_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], func: Rep[N] => Unit) = {
-        val x = bX * tileDim + tX
-        val y = bY * tileDim + tY
-        __ifThenElse(y < dimY && x < dimX, func(in(y * dimX + x)), {})
-      }
-      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        in_offset(blockIdxX, blockIdxY, threadIdxX, threadIdxY + i, value => {
-          tile(threadIdxY + i, threadIdxX) = value
-        })
-      }
-
-      generate_comment("sync threads")
-      cudaSyncThreads
-
-      generate_comment("write data from shared memory to output array")
-      // helper function from block indices and thread indices to output writes
-      def out_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
-        val x = bX * tileDim + tX
-        val y = bY * tileDim + tY
-        __ifThenElse(y < dimX && x < dimY, {out(y * dimY + x) = value}, {})
-      }
-      // we want to swap block indices, but maintain thread indices (so that the writes are coaleased)
-      // then we must read the tile in a transposed manner (swap read indices)
-      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        out_offset(blockIdxY, blockIdxX, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
-      }
-  }
-
   /*
     reduce the data input array (from 0 to size) using the given op.
     buffer(0) will contain the output of the reduction
@@ -1205,6 +1095,96 @@ trait CudaLibs extends CudaOps {
         }
       }
   }
+
+  // kernel function for 2D transpose
+  def cudaTranspose2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], dimY: Rep[Int], dimX: Rep[Int]) =>
+      generate_comment("this is the transpose kernel")
+      generate_comment("arg0: 2D Input Matrix (dimY x dimX) may not be multiples of 32")
+      generate_comment("arg1: 2D Output Matrix (dimX x dimY)")
+      generate_comment("arg2: dimY of input")
+      generate_comment("arg3: dimX of input")
+      generate_comment("caller must use <<<dim3((dimX+31)/32, (dimY+31)/32, 1), dim3(32, 8, 1)>>>")
+      generate_comment("using gridDimX=(dimX+31)/32, gridDimY=(dimY+31)/32, blockDimX=32, blockDimY=8")
+      val tile = NewSharedArray[N](tileDim, tileDim + 1) // for resolving banking conflict
+
+      generate_comment("read data from input array to shared memory")
+      // helper function from block indices and thread indices to input reads
+      def in_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], func: Rep[N] => Unit) = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        __ifThenElse(y < dimY && x < dimX, func(in(y * dimX + x)), {})
+      }
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        in_offset(blockIdxX, blockIdxY, threadIdxX, threadIdxY + i, value => {
+          tile(threadIdxY + i, threadIdxX) = value
+        })
+      }
+
+      generate_comment("sync threads")
+      cudaSyncThreads
+
+      generate_comment("write data from shared memory to output array")
+      // helper function from block indices and thread indices to output writes
+      def out_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        __ifThenElse(y < dimX && x < dimY, {out(y * dimY + x) = value}, {})
+      }
+      // we want to swap block indices, but maintain thread indices (so that the writes are coaleased)
+      // then we must read the tile in a transposed manner (swap read indices)
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out_offset(blockIdxY, blockIdxX, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
+      }
+  }
+
+  // helper function for 3D permutation of [1, 0, 2]
+  def cudaPermute102[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], dimZ: Rep[Int], dimY: Rep[Int], dimX: Rep[Int]) =>
+      generate_comment("this is the permute kernel for [1, 0, 2]")
+      generate_comment("arg0: 3D input tensor (dimZ x dimY x dimX)")
+      generate_comment("arg1: 3D output tensor (dimY x dimZ x dimX)")
+      generate_comment("arg2: dimZ of input")
+      generate_comment("arg3: dimY of input")
+      generate_comment("arg4: dimX of input")
+      generate_comment("caller must use <<<dim3(dimY, dimZ, 1), dim3(A, 1, 1)>>> where A < dimX")
+      generate_comment("each threadblock hands one dimX in coalease size of A, then we have dimZ x dimY threadblocks")
+      generate_comment("this kernel might be inefficient if the dimX is small. TODO")
+
+      // amazing helper function to get flatten offset of tensors
+      def flatten(shape: List[Rep[Int]], index: List[Rep[Int]]): Rep[Int] = {
+        val a: Rep[Int] = (shape.tail zip index.init).foldLeft(unit(0)) {
+          case (z: Rep[Int], (shape: Rep[Int], index: Rep[Int])) => (index + z) * shape
+          }
+        a + index.last
+      }
+
+      // helper function from block indices and thread indices to input reads
+      def in_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int]): Rep[N] = {
+        in(flatten(List(dimZ, dimY, dimX), List(bY, bX, tX)))
+      }
+      // helper function from block indices and thread indices to output writes
+      def out_offset(bX: Rep[Int], bY: Rep[Int], tX: Rep[Int], value: Rep[N]) = {
+        out(flatten(List(dimY, dimZ, dimX), List(bY, bX, tX))) = value
+      }
+      // loop all threads in each thread box for all dimX
+      // note that the block indices for input and output should be transposed
+      for (i <- (0 until (dimX, blockDimX))) {
+        val value = in_offset(blockIdxX, blockIdxY, threadIdxX + i)
+        out_offset(blockIdxY, blockIdxX, threadIdxX + i, value)
+      }
+  }
+
+  // def cudaPermute[N:Numeric:Manifest](shape: List[Rep[Int]], permutation: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
+  //   permutation match {
+  //     // 2D transpose
+  //     case List(1, 0) => _cudaTranspose[N]
+  //     // 3D cases:
+  //     case List(1, 0, 2) => _cudaPermute102[N]
+  //     // 3D cases:
+  //     case _ => throw new Exception("todo")
+  //   }
+  // }
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
