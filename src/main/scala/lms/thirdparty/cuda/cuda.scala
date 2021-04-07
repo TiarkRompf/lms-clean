@@ -915,6 +915,39 @@ trait CudaLibs extends CudaOps {
     }
   }
 
+  def cudaMaskedFillGrad[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
+    (y_d: Rep[Array[N]], x_d: Rep[Array[N]], mask: Rep[Array[Int]],
+    dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
+    input_size: Rep[Int]) => {
+      generate_comment("this is the cuda masked fill gradient kernel.")
+      generate_comment("arg0: gradient of N-d output tensor.")
+      generate_comment("arg1: gradient of N-d input tensor.")
+      generate_comment("Other parameters are same as maskedFill")
+
+      val tid = var_new[Int](blockIdxX * blockDimX + threadIdxX)
+      val stride = blockDimX * gridDimX
+
+      val i = var_new[Int](tid / dim0_stride)
+      val j = var_new[Int]((tid - i * dim0_stride) / dim1_stride)
+      val inner_idx = var_new[Int](tid - i * dim0_stride - j * dim1_stride)
+      val idx = var_new[Int](i * dim0_stride + j * dim1_stride + inner_idx)
+
+      __whileDo(idx < input_size, {
+        val mask_id = if (ijSwapped)
+          (j % dim1_shape) * dim0_shape + (i % dim0_shape) else
+          (i % dim0_shape) * dim1_shape + (j % dim1_shape)
+
+        __ifThenElse(ordering_equiv(mask(mask_id), 0), { x_d(idx) = x_d(idx) + y_d(idx) }, {  })
+
+        __assign(tid, tid + stride)
+        __assign(i, tid / dim0_stride)
+        __assign(j, (tid - i * dim0_stride) / dim1_stride)
+        __assign(inner_idx, tid - i * dim0_stride - j * dim1_stride)
+        __assign(idx, i * dim0_stride + j * dim1_stride + inner_idx)
+      })
+    }
+  }
+
   // Cuda Tranpose Values
   val blockRows = 8
   val tileDim = 32

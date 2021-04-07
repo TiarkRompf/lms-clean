@@ -413,9 +413,31 @@ class CudaTest extends TutorialFunSuite {
         val output = NewArray[Float](n)
         val cuda_output = cudaMalloc2[Float](n)
         val maskedFillKernel = cudaMaskedFill[Float](false)
-        maskedFillKernel(cuda_input, cuda_output, cuda_mask, maskValue, d0, d1, d0, 1, n, dim3((n + 511)/512), dim3(512))
+        maskedFillKernel(cuda_input, cuda_output, cuda_mask, maskValue, 
+          d0,   /* dim0_shape */
+          d1,   /* dim1_shape */
+          d0,   /* dim0_stride */
+          1,    /* dim1_stride */
+          n, dim3((n + 511)/512), dim3(512))
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, n, device2host))
         checkFile[Float]("golden/maskedFill/output.data", output, n)
+
+        val cuda_doutput = cudaMalloc2[Float](n)
+        val cudaFillKernel = cudaFill[Float]
+        cudaFillKernel(cuda_doutput, 1.0f, n, dim3((n + 511)/512), dim3(512))
+
+        val cuda_dinput = cudaMalloc2[Float](n)
+        val maskedFillGradKernel = cudaMaskedFillGrad[Float](false)
+        maskedFillGradKernel(cuda_doutput, cuda_dinput, cuda_mask, 
+          d0,   /* dim0_shape */
+          d1,   /* dim1_shape */
+          d0,   /* dim0_stride */
+          1,    /* dim1_stride */
+          n, dim3((n + 511)/512), dim3(512))
+
+        val dinput =  NewArray[Float](n)
+        cudaCall(cudaMemcpyOfT[Float](dinput, cuda_dinput, n, device2host))
+        checkFile[Float]("golden/maskedFill/input_grad.data", dinput, n)
       }
     }
     check("maskedFill", driver.code, "cu")
