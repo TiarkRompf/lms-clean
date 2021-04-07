@@ -14,6 +14,8 @@ __global__ void x13(int* x14, int* x15, int x16, int x17) {
   // arg1: 2D Output Transposed Matrix (m x n)
   // arg2: number of rows for input matrix
   // arg3: number of columns for input matrix
+  // kernel launch config <<dim3((TILE_DIM * m - 1) / TILE_DIM, (TILE_DIM * n - 1) / TILE_DIM), dim3(TILE_DIM, BLOCK_ROWS)>>
+  // TILE_DIM = 32, BLOCK_ROWS = 8
   __shared__ int x18[1056];
   int x19 = blockIdx.x * 32 + threadIdx.x;
   int x20 = blockIdx.y * 32 + threadIdx.y;

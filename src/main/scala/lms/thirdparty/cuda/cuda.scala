@@ -959,6 +959,8 @@ trait CudaLibs extends CudaOps {
       generate_comment("arg1: 2D Output Transposed Matrix (m x n)")
       generate_comment("arg2: number of rows for input matrix")
       generate_comment("arg3: number of columns for input matrix")
+      generate_comment("kernel launch config <<dim3((TILE_DIM * m - 1) / TILE_DIM, (TILE_DIM * n - 1) / TILE_DIM), dim3(TILE_DIM, BLOCK_ROWS)>>")
+      generate_comment("TILE_DIM = 32, BLOCK_ROWS = 8")
 
       val tile = NewSharedArray[N](tileDim, tileDim + 1)
       val x = var_new(blockIdxX * tileDim + threadIdxX)
