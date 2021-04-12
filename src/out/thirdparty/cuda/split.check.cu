@@ -9,6 +9,12 @@ Emitting C Generated Code
 #include <stdbool.h>
 /************* Functions **************/
 __global__ void x9(int* x10, int* x11, int* x12, int x13, int x14, int x15) {
+  // this is cuda split kernel. It takes a 3D array and split on the innermost dimension.
+  // in: input array
+  // out1: first output array
+  // out2: second output array
+  // d0: dim0 of the input array
+  // split: dim0 of the first output array
   int x16 = blockIdx.x * blockDim.x + threadIdx.x;
   if (x16 < x15) {
     int x17 = x16 % x13;
