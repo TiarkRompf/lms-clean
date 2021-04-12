@@ -9,7 +9,7 @@ Emitting C Generated Code
 #include <stdbool.h>
 /************* Functions **************/
 __global__ void x9(int* x10, int* x11, int* x12, int x13, int x14, int x15) {
-  int x16 = blockIdx.x * blockDim.x * threadIdx.x;
+  int x16 = blockIdx.x * blockDim.x + threadIdx.x;
   if (x16 < x15) {
     int x17 = x16 % x13;
     if (x17 < x14) x11[x16 / x13 * x14 + x17] = x10[x16];
