@@ -646,5 +646,50 @@ class CudaTest extends TutorialFunSuite {
     }
     check("split", driver.code, "cu")
   }
+
+  test("concat_kernel") {
+    val driver = new DslDriverCCuda[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val d1 = 3
+        val d2 = 5
+        val d_other = 3
+        
+        val in1_sz = d1 * d_other
+        val in2_sz = d2 * d_other
+        val out_sz = (d1 + d2) * d_other
+
+        val input1 = NewArray[Int](in1_sz)
+        for (i <- (0 until in1_sz): Rep[Range]) {
+          input1(i) = 100 + i
+        }
+        val cuda_input1 = cudaMalloc2[Int](in1_sz)
+        cudaCall(cudaMemcpyOfT[Int](cuda_input1, input1, in1_sz, host2device))
+
+        val input2 = NewArray[Int](in2_sz)
+        for (i <- (0 until in2_sz): Rep[Range]) {
+          input2(i) = i
+        }
+        val cuda_input2 = cudaMalloc2[Int](in2_sz)
+        cudaCall(cudaMemcpyOfT[Int](cuda_input2, input2, in2_sz, host2device))
+
+        val output = NewArray[Int](out_sz)
+        val cuda_output = cudaMalloc2[Int](out_sz)
+
+        val concatKernel = cudaConcat3D0[Int]
+        concatKernel(cuda_input1, cuda_input2, cuda_output, d1, d2, out_sz, dim3((out_sz + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Int](output, cuda_output, out_sz, device2host))
+
+        printf("output: [")
+        for (i <- (0 until out_sz): Rep[Range]) {
+          printf("%d,", output(i))
+        }
+        printf("]\n")
+      }
+    }
+    check("concat", driver.code, "cu")
+  }
 }
 
