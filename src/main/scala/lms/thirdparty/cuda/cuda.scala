@@ -1093,6 +1093,23 @@ trait CudaLibs extends CudaOps {
         }
       }
   }
+
+  @virtualize
+  def cudaSplit3D0[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out1: Rep[Array[N]], out2: Rep[Array[N]], dim0: Rep[Int], split: Rep[Int], input_size: Rep[Int]) => {
+      val idx = blockIdxX * blockDimX * threadIdxX
+      if (idx < input_size) {
+        val value = in(idx)
+        val x = idx / dim0
+        val y = idx % dim0
+        if (y < split) {
+          out1(x * split + y) = value 
+        } else {
+          out2(x * (dim0 - split) + (y - split)) = value
+        }
+      }
+    }
+  }
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
