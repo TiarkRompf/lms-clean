@@ -512,6 +512,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def expf[N:Numeric:Manifest](x: Rep[N]) =
     libFunction[N]("expf", Unwrap(x))(Seq(), Seq(), Set())
 
+  def log[N:Numeric:Manifest](x: Rep[N]) =
+    libFunction[N]("log", Unwrap(x))(Seq(), Seq(), Set())
+
   class cudaEventT
   def cudaEvent: Rep[cudaEventT] = newStruct[cudaEventT]("cudaEvent_t")
 
@@ -1065,9 +1068,13 @@ trait CudaLibs extends CudaOps {
     cudaSyncThreads
   }
 
-  def softmax[N:Numeric:Manifest](log: Boolean)(implicit  __pos: SourceContext) = cudaGlobalDynamicFun {
+  def softmax[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (input: Rep[Array[N]], output: Rep[Array[N]], lastDimSize: Rep[Int]) =>
-      assert(!log, "log softmax not implemented yet")
+      generate_comment("This is cuda softmax (for larger; >=1024 inputs). Performs softmax on last dim.")
+      generate_comment("arg0: input: <outerSize x lastDimSize>")
+      generate_comment("arg1: output: <outerSize x lastDimSize>")
+      generate_comment("arg2: lastDimSize: size of the last dimension (i.e., the softmax dim)")
+      generate_comment("invocation assumption: <<<dim3(outerSize,1,1), dim3(1024,1,1), 1024*4>>>")
       val buffer = NewDynSharedArray[N]
 
       val input_t = input.slice(lastDimSize * blockIdxX, lastDimSize * blockIdxX + lastDimSize)
@@ -1081,7 +1088,7 @@ trait CudaLibs extends CudaOps {
         val normalized = input_t(i) - buffer(0)
         val expVal = expf[N](normalized)
         localVal += expVal
-        if (log) {
+        if (logSoftmax) {
           output_t(i) = normalized
         } else {
           output_t(i) = expVal
@@ -1096,8 +1103,8 @@ trait CudaLibs extends CudaOps {
       reduceHelper[N](input_t, lastDimSize, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b, skipFirstReduce = true)
 
       for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
-        if (log) {
-          output_t(i) = output_t(i) - buffer(0)
+        if (logSoftmax) {
+          output_t(i) = output_t(i) - log[N](buffer(0))
         } else {
           output_t(i) = output_t(i) / buffer(0)
         }
@@ -1105,9 +1112,15 @@ trait CudaLibs extends CudaOps {
   }
 
   // TODO(Supun): test log Softmax case
-  def softmaxGrad[N:Numeric:Manifest](log: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
+  def softmaxGrad[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (gradInput: Rep[Array[N]], gradOutput: Rep[Array[N]], output: Rep[Array[N]], size: Rep[Int]) =>
-      assert(!log, "log softmax not implemented yet")
+      generate_comment("This is cuda softmax (for larger; >=1024 inputs). Performs softmax on last dim.")
+      generate_comment("arg0: gradInput: the gradient of the original input (i.e., the softmax input) - " +
+        "This is an output of the kernel")
+      generate_comment("arg1: gradOutput: gradient of softmax output, coming from upstream; An Input to the kernel")
+      generate_comment("arg2: output: output of softmax forward pass")
+      generate_comment("arg3: size: last dimension size")
+      generate_comment("invocation assumption: <<<dim3(outerSize,1,1), dim3(1024,1,1), 1024*4>>>")
 
       val buffer = NewDynSharedArray[N]
 
@@ -1122,7 +1135,7 @@ trait CudaLibs extends CudaOps {
       // compute the sum (gradOutput * output sum)
       val threadVal = var_new[N](implicitly[Numeric[N]].zero)
       for(i <- start.until(end, stride)) {
-        if (log) {
+        if (logSoftmax) {
           threadVal += gradOutput_t(i)
         } else {
           threadVal += gradOutput_t(i) * output_t(i)
@@ -1135,13 +1148,15 @@ trait CudaLibs extends CudaOps {
 
       // update the gradient
       for(i <- start.until(end, stride)) {
-        if (log) {
+        if (logSoftmax) {
           gradInput_t(i) = gradOutput_t(i) - buffer(0) * expf[N](output_t(i))
         } else {
           gradInput_t(i) = output_t(i) * (gradOutput_t(i) - buffer(0))
         }
       }
   }
+
+//  def softmaxSmall
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {

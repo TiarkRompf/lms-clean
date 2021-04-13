@@ -382,6 +382,52 @@ class CudaTest extends TutorialFunSuite {
     check("softmax", driver.code, "cu")
   }
 
+  test("logSoftmax_kernel") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        // dim0 and dim1 picked arbitrary
+        val dim0 = 32
+        val dim1 = 533
+        val size = dim0 * dim1
+
+        // inputs to the test
+        val input = NewArray[Float](dim0 * dim1)
+        scanFile[Float]("golden/logSoftmax/input.data", input, size)
+        val outputGrad = NewArray[Float](size)
+        scanFile[Float]("golden/logSoftmax/output_grad.data", outputGrad, size)
+
+        val cudaInput = cudaMalloc2[Float](size)
+        val cudaOutputGrad = cudaMalloc2[Float](size)
+        cudaCall(cudaMemcpyOfT[Float](cudaInput, input, size, host2device))
+        cudaCall(cudaMemcpyOfT[Float](cudaOutputGrad, outputGrad, size, host2device))
+
+        val inputGrad = NewArray[Float](size)
+        val output = NewArray[Float](size)
+        val cudaInputGrad = cudaMalloc2[Float](size)
+        val cudaOutput = cudaMalloc2[Float](size)
+
+        // forward
+        val softmaxKernel = softmax[Float](true)
+        softmaxKernel(cudaInput, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        // backward
+        val softmaxGradKernel = softmaxGrad[Float](true)
+        softmaxGradKernel(cudaInputGrad, cudaOutputGrad, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        // move outputs to the host
+        cudaCall(cudaMemcpyOfT[Float](inputGrad, cudaInputGrad, size, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output, cudaOutput, size, device2host))
+
+        // check with expected output
+        checkFile[Float]("golden/logSoftmax/input_grad.data", inputGrad, size)
+        checkFile[Float]("golden/logSoftmax/output.data", output, size)
+      }
+    }
+    check("logSoftmax", driver.code, "cu")
+  }
+
   test("maskedFill_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
       
