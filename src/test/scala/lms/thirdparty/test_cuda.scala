@@ -601,7 +601,7 @@ class CudaTest extends TutorialFunSuite {
   }
 
   test("split_kernel") {
-    val driver = new DslDriverCCuda[Int, Unit] {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -612,36 +612,25 @@ class CudaTest extends TutorialFunSuite {
         val out1_sz = d1 * split
         val out2_sz = d1 * (d0 - split)
 
-        val input = NewArray[Int](in_sz)
-        for (i <- (0 until in_sz): Rep[Range]) {
-          input(i) = i
-        }
-        val cuda_input = cudaMalloc2[Int](in_sz)
-        cudaCall(cudaMemcpyOfT[Int](cuda_input, input, in_sz, host2device))
+        val input = NewArray[Float](in_sz)
+        scanFile[Float]("golden/split/input.data", input, in_sz)
+        val cuda_input = cudaMalloc2[Float](in_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
 
-        val output1 = NewArray[Int](out1_sz)
-        val cuda_output1 = cudaMalloc2[Int](out1_sz)
+        val output1 = NewArray[Float](out1_sz)
+        val cuda_output1 = cudaMalloc2[Float](out1_sz)
 
-        val output2 = NewArray[Int](out2_sz)
-        val cuda_output2 = cudaMalloc2[Int](out2_sz)
+        val output2 = NewArray[Float](out2_sz)
+        val cuda_output2 = cudaMalloc2[Float](out2_sz)
 
-        val splitKernel = cudaSplit3D0[Int]
+        val splitKernel = cudaSplit3D0[Float]
         splitKernel(cuda_input, cuda_output1, cuda_output2, d0, split, in_sz, dim3((in_sz + 511)/512), dim3(512))
 
-        cudaCall(cudaMemcpyOfT[Int](output1, cuda_output1, out1_sz, device2host))
-        cudaCall(cudaMemcpyOfT[Int](output2, cuda_output2, out2_sz, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output2, cuda_output2, out2_sz, device2host))
 
-        printf("output1: [")
-        for (i <- (0 until out1_sz): Rep[Range]) {
-          printf("%d,", output1(i))
-        }
-        printf("]\n")
-
-        printf("output2: [")
-        for (i <- (0 until out2_sz): Rep[Range]) {
-          printf("%d,", output2(i))
-        }
-        printf("]\n")
+        checkFile[Float]("golden/split/output1.data", output1, out1_sz)
+        checkFile[Float]("golden/split/output2.data", output2, out2_sz)
       }
     }
     check("split", driver.code, "cu")
