@@ -13,12 +13,14 @@ Emitting C Generated Code
 #include "scanner_header.h"
 /************* Functions **************/
 __global__ void x7(float* x8, float* x9, float* x10, int x11, int x12, int x13) {
-  // this is cuda split kernel. It takes a 3D array and split on the innermost dimension.
+  // this is cuda split kernel. It takes a 3D array and splits on the innermost dimension (dim2).
   // in: input array
   // out1: first output array
   // out2: second output array
-  // d0: dim0 of the input array
-  // split: dim0 of the first output array
+  // d0: dim2 of the input array
+  // split: dim2 of the first output array
+  // call constraint: 0 < split < in.dim2
+  // call constraint: out1.dim2 + out2.dim2 = in.dim2
   int x14 = blockIdx.x * blockDim.x + threadIdx.x;
   if (x14 < x13) {
     int x15 = x14 % x11;

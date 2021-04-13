@@ -13,12 +13,13 @@ Emitting C Generated Code
 #include "scanner_header.h"
 /************* Functions **************/
 __global__ void x7(float* x8, float* x9, float* x10, int x11, int x12, int x13) {
-  // this is cuda concat kernel. It concatenates two 3D arrays and concat on the innermost dimension.
+  // this is cuda concat kernel. It concatenates two 3D arrays and concat on the innermost dimension (dim2).
   // in1: first input array
   // in2: second input array
   // out: output array
-  // d1: dim0 of the first input array
-  // d2: dim0 of the second input array
+  // d1: dim2 of the first input array
+  // d2: dim2 of the second input array
+  // call constraint: out1.dim2 + out2.dim2 = in.dim2
   int x14 = blockIdx.x * blockDim.x + threadIdx.x;
   if (x14 < x13) {
     int x15 = x11 + x12;
