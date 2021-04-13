@@ -110,12 +110,14 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
   // When coding kernel functions, we often need some kernel variables
   def gridDimX(implicit __pos: SourceContext): INT = INT(CMACRO("gridDim.x", manifest[Int]))
   def gridDimY(implicit __pos: SourceContext): INT = INT(CMACRO("gridDim.y", manifest[Int]))
+  def gridDimZ(implicit __pos: SourceContext): INT = INT(CMACRO("gridDim.z", manifest[Int]))
   def blockDimX(implicit __pos: SourceContext): INT = INT(CMACRO("blockDim.x", manifest[Int]))
   def blockDimY(implicit __pos: SourceContext): INT = INT(CMACRO("blockDim.y", manifest[Int]))
   def blockDimZ(implicit __pos: SourceContext): INT = INT(CMACRO("blockDim.z", manifest[Int]))
 
   def blockIdxX(implicit __pos: SourceContext): INT = INT(CMACRO("blockIdx.x", manifest[Int]))
   def blockIdxY(implicit __pos: SourceContext): INT = INT(CMACRO("blockIdx.y", manifest[Int]))
+  def blockIdxZ(implicit __pos: SourceContext): INT = INT(CMACRO("blockIdx.z", manifest[Int]))
   def threadIdxX(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.x", manifest[Int]))
   def threadIdxY(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.y", manifest[Int]))
   def threadIdxZ(implicit __pos: SourceContext): INT = INT(CMACRO("threadIdx.z", manifest[Int]))
@@ -745,12 +747,14 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // When coding kernel functions, we often need some kernel variables
   def gridDimX: Rep[Int] = cmacro[Int]("gridDim.x")
   def gridDimY: Rep[Int] = cmacro[Int]("gridDim.y")
+  def gridDimZ: Rep[Int] = cmacro[Int]("gridDim.z")
   def blockDimX: Rep[Int] = cmacro[Int]("blockDim.x")
   def blockDimY: Rep[Int] = cmacro[Int]("blockDim.y")
   def blockDimZ: Rep[Int] = cmacro[Int]("blockDim.z")
 
   def blockIdxX: Rep[Int] = cmacro[Int]("blockIdx.x")
   def blockIdxY: Rep[Int] = cmacro[Int]("blockIdx.y")
+  def blockIdxZ: Rep[Int] = cmacro[Int]("blockIdx.z")
   def threadIdxX: Rep[Int] = cmacro[Int]("threadIdx.x")
   def threadIdxY: Rep[Int] = cmacro[Int]("threadIdx.y")
   def threadIdxZ: Rep[Int] = cmacro[Int]("threadIdx.z")
@@ -1138,7 +1142,106 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  // helper function for 3D permutation of [1, 0, 2]
+  // amazing helper function to get flatten offset of tensors
+  def flatten(shape: List[Rep[Int]], index: List[Rep[Int]])(implicit __pos: SourceContext): Rep[Int] = {
+    val a: Rep[Int] = (shape.tail zip index.init).foldLeft(unit(0)) {
+      case (z: Rep[Int], (shape: Rep[Int], index: Rep[Int])) => (index + z) * shape
+      }
+    a + index.last
+  }
+
+  // kernel function for 3D permute with permutation [2, 1, 0]
+  def cudaPermute210[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], dimZ: Rep[Int], dimY: Rep[Int], dimX: Rep[Int]) =>
+      generate_comment("this is the permutation kernel for [2, 1, 0]")
+      generate_comment("arg0: 3D input tensor (dimZ x dimY x dimX)")
+      generate_comment("arg1: 3D output tensor (dimX x dimY x dimZ)")
+      generate_comment("arg2: dimZ of input")
+      generate_comment("arg3: dimY of input")
+      generate_comment("arg4: dimX of input")
+      generate_comment("caller must use <<<dim3((dimX+31)/32, dimY, (dimZ+31)/32), dim3(32, 8, 1)>>>")
+      generate_comment("each threadblock handles a square at dimX and dimZ")
+      val tile = NewSharedArray[N](tileDim, tileDim + 1)
+
+      generate_comment("read data from input array to shared memory")
+      // helper function from block indices and thread indices to input reads
+      def in_offset(bX: Rep[Int], bY: Rep[Int], bZ: Rep[Int], tX: Rep[Int], tY: Rep[Int], func: Rep[N] => Unit) = {
+        val x = bX * tileDim + tX
+        val y = bY
+        val z = bZ * tileDim + tY
+        __ifThenElse(x < dimX && z < dimZ, func(in(flatten(List(dimZ, dimY, dimX), List(z, y, x)))), {})
+      }
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        in_offset(blockIdxX, blockIdxY, blockIdxZ, threadIdxX, threadIdxY + i, value => {
+          tile(threadIdxY + i, threadIdxX) = value
+        })
+      }
+
+      generate_comment("sync threads")
+      cudaSyncThreads
+
+      generate_comment("write data from shared memory to output array")
+      // helper function from block indices and thread indices to output writes
+      def out_offset(bX: Rep[Int], bY: Rep[Int], bZ: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
+        val x = bX * tileDim + tX
+        val y = bY
+        val z = bZ * tileDim + tY
+        __ifThenElse(x < dimZ && z < dimX, {out(flatten(List(dimX, dimY, dimZ), List(z, y, x))) = value}, {})
+      }
+      // we want to swap block X and block Z, but maintain thread indices (so that the writes are coaleased)
+      // then we must read the tile in a transposed manner (swap read indices)
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out_offset(blockIdxZ, blockIdxY, blockIdxX, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
+      }
+  }
+
+  // kernel function for 3D permute with permutation [1, 2, 0]
+  def cudaPermute120[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], dimZ: Rep[Int], dimY: Rep[Int], dimX: Rep[Int]) =>
+      generate_comment("this is the permutation kernel for [1, 2, 0]")
+      generate_comment("arg0: 3D input tensor (dimZ x dimY x dimX)")
+      generate_comment("arg1: 3D output tensor (dimY x dimX x dimZ)")
+      generate_comment("arg2: dimZ of input")
+      generate_comment("arg3: dimY of input")
+      generate_comment("arg4: dimX of input")
+      generate_comment("caller must use <<<dim3((dimX+31)/32, dimY, (dimZ+31)/32), dim3(32, 8, 1)>>>")
+      generate_comment("each threadblock handles a square at dimX and dimZ")
+      val tile = NewSharedArray[N](tileDim, tileDim + 1)
+
+      generate_comment("read data from input array to shared memory")
+      // helper function from block indices and thread indices to input reads
+      def in_offset(bX: Rep[Int], bY: Rep[Int], bZ: Rep[Int], tX: Rep[Int], tY: Rep[Int], func: Rep[N] => Unit) = {
+        val x = bX * tileDim + tX
+        val y = bY
+        val z = bZ * tileDim + tY
+        __ifThenElse(x < dimX && z < dimZ, func(in(flatten(List(dimZ, dimY, dimX), List(z, y, x)))), {})
+      }
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        in_offset(blockIdxX, blockIdxY, blockIdxZ, threadIdxX, threadIdxY + i, value => {
+          tile(threadIdxY + i, threadIdxX) = value
+        })
+      }
+
+      generate_comment("sync threads")
+      cudaSyncThreads
+
+      generate_comment("write data from shared memory to output array")
+      // helper function from block indices and thread indices to output writes
+      def out_offset(bX: Rep[Int], bY: Rep[Int], bZ: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
+        val x = bX * tileDim + tX
+        val y = bY * tileDim + tY
+        val z = bZ
+        __ifThenElse(x < dimZ && y < dimX, {out(flatten(List(dimY, dimX, dimZ), List(z, y, x))) = value}, {})
+      }
+      // we want to swap block X Y Z dims, but maintain thread indices (so that the writes are coaleased)
+      // then we must read the tile in a transposed manner (swap read indices)
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        out_offset(blockIdxZ, blockIdxX, blockIdxY, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
+      }
+  }
+
+  // kernel function for 3D permutation of [1, 0, 2] when dimX is big
+  // TODO(feiw) permutation of [1, 0, 2] when dimX is not big!
   def cudaPermute102[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], dimZ: Rep[Int], dimY: Rep[Int], dimX: Rep[Int]) =>
       generate_comment("this is the permute kernel for [1, 0, 2]")

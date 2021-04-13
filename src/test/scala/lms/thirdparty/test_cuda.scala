@@ -24,7 +24,7 @@ class CudaTest extends TutorialFunSuite {
     override val executable = s"$curPath/snippet"
   }
 
-  abstract class DslDriverCCudeScan[A: Manifest, B: Manifest] extends DslDriverCCuda[A, B] with ScannerOps { q =>
+  abstract class DslDriverCCudaScan[A: Manifest, B: Manifest] extends DslDriverCCuda[A, B] with ScannerOps { q =>
     override val codegen = new DslGenC with CCodeGenCudaOps with CCodeGenScannerOps {
       val IR: q.type = q
     }
@@ -307,7 +307,7 @@ class CudaTest extends TutorialFunSuite {
   }
 
   test("embedding_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -392,7 +392,7 @@ class CudaTest extends TutorialFunSuite {
   }
 
   test("maskedFill_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -500,8 +500,68 @@ class CudaTest extends TutorialFunSuite {
     check("permute_10", driver.code, "cu")
   }
 
+  test("permute_kernel_210") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val dimX = 100
+        val dimY = 20
+        val dimZ = 130
+        val size = dimX * dimY * dimZ
+        val tileDim = 32
+        val blockRows = 8
+
+        val input = NewArray[Int](size)
+        scanFile[Int]("golden/permute_kernel_210/input.data", input, size)
+        val cuda_input = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT(cuda_input, input, size, host2device))
+
+        val output = NewArray[Int](size)
+        val cuda_output = cudaMalloc2[Int](size)
+
+        val permuteKernel = cudaPermute210[Int]
+        val grid = dim3((dimX+tileDim-1)/tileDim, dimY, (dimZ+tileDim-1)/tileDim)
+        val block = dim3(tileDim, blockRows, 1)
+        permuteKernel(cuda_input, cuda_output, dimZ, dimY, dimX, grid, block)
+        cudaCall(cudaMemcpyOfT(output, cuda_output, size, device2host))
+        checkFile[Int]("golden/permute_kernel_210/output.data", output, size)
+      }
+    }
+    check("permute_210", driver.code, "cu")
+  }
+
+  test("permute_kernel_120") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val dimX = 100
+        val dimY = 20
+        val dimZ = 130
+        val size = dimX * dimY * dimZ
+        val tileDim = 32
+        val blockRows = 8
+
+        val input = NewArray[Int](size)
+        scanFile[Int]("golden/permute_kernel_120/input.data", input, size)
+        val cuda_input = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT(cuda_input, input, size, host2device))
+
+        val output = NewArray[Int](size)
+        val cuda_output = cudaMalloc2[Int](size)
+
+        val permuteKernel = cudaPermute120[Int]
+        val grid = dim3((dimX+tileDim-1)/tileDim, dimY, (dimZ+tileDim-1)/tileDim)
+        val block = dim3(tileDim, blockRows, 1)
+        permuteKernel(cuda_input, cuda_output, dimZ, dimY, dimX, grid, block)
+        cudaCall(cudaMemcpyOfT(output, cuda_output, size, device2host))
+        checkFile[Int]("golden/permute_kernel_120/output.data", output, size)
+      }
+    }
+    check("permute_120", driver.code, "cu")
+  }
+
   test("permute_kernel_102_big") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
         val dimX = 600
