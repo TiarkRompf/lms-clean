@@ -1,61 +1,49 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include "cuda_header.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "scanner_header.h"
 /************* Functions **************/
-__global__ void x11(int* x12, int* x13, int* x14, int x15, int x16, int x17) {
+__global__ void x7(float* x8, float* x9, float* x10, int x11, int x12, int x13) {
   // this is cuda concat kernel. It concatenates two 3D arrays and concat on the innermost dimension.
   // in1: first input array
   // in2: second input array
   // out: output array
   // d1: dim0 of the first input array
   // d2: dim0 of the second input array
-  int x18 = blockIdx.x * blockDim.x + threadIdx.x;
-  if (x18 < x17) {
-    int x19 = x15 + x16;
-    int x20 = x18 % x19;
-    x14[x18] = x20 < x15 ? x12[x18 / x19 * x15 + x20] : x13[x18 / x19 * x16 + (x20 - x15)];
+  int x14 = blockIdx.x * blockDim.x + threadIdx.x;
+  if (x14 < x13) {
+    int x15 = x11 + x12;
+    int x16 = x14 % x15;
+    x10[x14] = x16 < x11 ? x8[x14 / x15 * x11 + x16] : x9[x14 / x15 * x12 + (x16 - x11)];
   }
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  int* x1 = (int*)malloc(9 * sizeof(int));
-  int x2 = 0;
-  while (x2 != 9) {
-    int x3 = x2;
-    x1[x3] = 100 + x3;
-    x2 = x2 + 1;
-  }
-  int* x4 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x4, (size_t)(9 * sizeof(int))));
-  CUDA_CALL(cudaMemcpy(x4, x1, (size_t)(9 * sizeof(int)), cudaMemcpyHostToDevice));
-  int* x5 = (int*)malloc(15 * sizeof(int));
-  int x6 = 0;
-  while (x6 != 15) {
-    int x7 = x6;
-    x5[x7] = x7;
-    x6 = x6 + 1;
-  }
-  int* x8 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x8, (size_t)(15 * sizeof(int))));
-  CUDA_CALL(cudaMemcpy(x8, x5, (size_t)(15 * sizeof(int)), cudaMemcpyHostToDevice));
-  int* x9 = (int*)malloc(24 * sizeof(int));
-  int* x10 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x10, (size_t)(24 * sizeof(int))));
-  x11<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x4, x8, x10, 3, 5, 24);
-  CUDA_CALL(cudaMemcpy(x9, x10, (size_t)(24 * sizeof(int)), cudaMemcpyDeviceToHost));
-  printf("output: [");
-  int x21 = 0;
-  while (x21 != 24) {
-    printf("%d,", x9[x21]);
-    x21 = x21 + 1;
-  }
-  printf("]\n");
+  float* x1 = (float*)malloc(18 * sizeof(float));
+  scan_float("golden/concat/input1.data", x1, 18);
+  float* x2 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x2, (size_t)(18 * sizeof(float))));
+  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(18 * sizeof(float)), cudaMemcpyHostToDevice));
+  float* x3 = (float*)malloc(30 * sizeof(float));
+  scan_float("golden/concat/input2.data", x3, 30);
+  float* x4 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)(30 * sizeof(float))));
+  CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(30 * sizeof(float)), cudaMemcpyHostToDevice));
+  float* x5 = (float*)malloc(48 * sizeof(float));
+  float* x6 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x6, (size_t)(48 * sizeof(float))));
+  x7<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, x4, x6, 3, 5, 48);
+  CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(48 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array("golden/concat/output.data", x5, 48);
 }
 /*****************************************
 End of C Generated Code
