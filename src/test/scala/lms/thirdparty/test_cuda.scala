@@ -414,9 +414,31 @@ class CudaTest extends TutorialFunSuite {
         val output = NewArray[Float](n)
         val cuda_output = cudaMalloc2[Float](n)
         val maskedFillKernel = cudaMaskedFill[Float](false)
-        maskedFillKernel(cuda_input, cuda_output, cuda_mask, maskValue, d0, d1, d0, 1, n, dim3((n + 511)/512), dim3(512))
+        maskedFillKernel(cuda_input, cuda_output, cuda_mask, maskValue,
+          d0,   /* dim0_shape */
+          d1,   /* dim1_shape */
+          d0,   /* dim0_stride */
+          1,    /* dim1_stride */
+          n, dim3((n + 511)/512), dim3(512))
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, n, device2host))
         checkFile[Float]("golden/maskedFill/output.data", output, n)
+
+        val cuda_doutput = cudaMalloc2[Float](n)
+        val cudaFillKernel = cudaFill[Float]
+        cudaFillKernel(cuda_doutput, 1.0f, n, dim3((n + 511)/512), dim3(512))
+
+        val cuda_dinput = cudaMalloc2[Float](n)
+        val maskedFillGradKernel = cudaMaskedFillGrad[Float](false)
+        maskedFillGradKernel(cuda_doutput, cuda_dinput, cuda_mask,
+          d0,   /* dim0_shape */
+          d1,   /* dim1_shape */
+          d0,   /* dim0_stride */
+          1,    /* dim1_stride */
+          n, dim3((n + 511)/512), dim3(512))
+
+        val dinput =  NewArray[Float](n)
+        cudaCall(cudaMemcpyOfT[Float](dinput, cuda_dinput, n, device2host))
+        checkFile[Float]("golden/maskedFill/input_grad.data", dinput, n)
       }
     }
     check("maskedFill", driver.code, "cu")
@@ -427,16 +449,26 @@ class CudaTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val rcount = 64
-        val ccount = 64
+        val rcount = 213
+        val ccount = 56
         val size = rcount * ccount
         val tileDim = 32
         val blockRows = 8
+        val dimGrid = dim3((ccount + tileDim - 1) / tileDim, (rcount + tileDim - 1) / tileDim)
+        val dimBlock = dim3(tileDim, blockRows)
+
         val input = NewArray[Int](size)
         val output = NewArray[Int](size)
+        val golden = NewArray[Int](size)
 
         for (i <- (0 until size): Rep[Range]) {
-          input(i) = i + 1
+          input(i) = i
+        }
+
+        for (j <- (0 until ccount): Rep[Range]) {
+          for (i <- (0 until rcount): Rep[Range]) {
+            golden(j * rcount + i) = input(i * ccount + j)
+          }
         }
 
         val cuda_input = cudaMalloc2[Int](size)
@@ -444,21 +476,19 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
 
         val transposeKernel = cudaTranspose[Int]
-        transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+        transposeKernel(cuda_input, cuda_output, rcount, ccount, dimGrid, dimBlock)
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
-        for (i <- (0 until rcount): Rep[Range]) {
-          for (j <- (0 until ccount): Rep[Range]) {
-            if (input(rcount * i + j) != output(rcount * j + i)) {
-              printf("Transpose Incorrect!\n")
-              exit(1)
-            }
+        for (i <- (0 until size): Rep[Range]) {
+          if (golden(i) != output(i)) {
+            printf("Transpose Incorrect!\n")
+            exit(1)
           }
         }
         printf("Transpose Correct\n")
       }
     }
-    check("transpose", driver.code, "cu")
+  check("transpose", driver.code, "cu")
   }
 
   test("permute_kernel_10") {
@@ -706,7 +736,9 @@ class CudaTest extends TutorialFunSuite {
         val transpose_time = measurement_cuda {
           val transposeKernel = cudaTranspose[Int]
           for (i <- (0 until iter_count): Rep[Range]) {
-            transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
+            val dimGrid = dim3((ccount + tileDim - 1) / tileDim, (rcount + tileDim - 1) / tileDim)
+            val dimBlock = dim3(tileDim, blockRows)
+            transposeKernel(cuda_input, cuda_output, rcount, ccount, dimGrid, dimBlock)
           }
         }
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))

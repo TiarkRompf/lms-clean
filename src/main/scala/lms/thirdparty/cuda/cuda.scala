@@ -919,10 +919,44 @@ trait CudaLibs extends CudaOps {
     }
   }
 
+  def cudaMaskedFillGrad[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
+    (y_d: Rep[Array[N]], x_d: Rep[Array[N]], mask: Rep[Array[Int]],
+    dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
+    input_size: Rep[Int]) => {
+      generate_comment("this is the cuda masked fill gradient kernel.")
+      generate_comment("arg0: gradient of N-d output tensor.")
+      generate_comment("arg1: gradient of N-d input tensor.")
+      generate_comment("Other parameters are same as maskedFill")
+
+      val tid = var_new[Int](blockIdxX * blockDimX + threadIdxX)
+      val stride = blockDimX * gridDimX
+
+      val i = var_new[Int](tid / dim0_stride)
+      val j = var_new[Int]((tid - i * dim0_stride) / dim1_stride)
+      val inner_idx = var_new[Int](tid - i * dim0_stride - j * dim1_stride)
+      val idx = var_new[Int](i * dim0_stride + j * dim1_stride + inner_idx)
+
+      __whileDo(idx < input_size, {
+        val mask_id = if (ijSwapped)
+          (j % dim1_shape) * dim0_shape + (i % dim0_shape) else
+          (i % dim0_shape) * dim1_shape + (j % dim1_shape)
+
+        __ifThenElse(ordering_equiv(mask(mask_id), 0), { x_d(idx) = x_d(idx) + y_d(idx) }, {  })
+
+        __assign(tid, tid + stride)
+        __assign(i, tid / dim0_stride)
+        __assign(j, (tid - i * dim0_stride) / dim1_stride)
+        __assign(inner_idx, tid - i * dim0_stride - j * dim1_stride)
+        __assign(idx, i * dim0_stride + j * dim1_stride + inner_idx)
+      })
+    }
+  }
+
   // Cuda Tranpose Values
   val blockRows = 8
   val tileDim = 32
 
+  // cuda matrix copy function for baseline
   def cudaMatrixCopy[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]]) =>
       generate_comment("Cuda Matrix Copy")
@@ -938,6 +972,7 @@ trait CudaLibs extends CudaOps {
       }
   }
 
+  // naive cuda transpose kernel
   def cudaTransposeNaive[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]]) =>
       generate_comment("Cuda Transpose Naive")
@@ -953,29 +988,41 @@ trait CudaLibs extends CudaOps {
       }
   }
 
+  // cuda transpose using coalesced approach
   def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]]) =>
+    (in: Rep[Array[N]], out: Rep[Array[N]], n: Rep[Int], m: Rep[Int]) =>
       generate_comment("Cuda Coalesced Transpose")
-      (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
-      (generate_comment("arg1: 2D Output Matrix (n x n) where n is a multiple of 32"))
-      val tile = NewSharedArray[N](tileDim, tileDim + 1)
-      val x = blockIdxX * tileDim + threadIdxX
-      val y = blockIdxY * tileDim + threadIdxY
-      val width = gridDimX * tileDim
+      generate_comment("arg0: 2D Input Matrix (n x m)")
+      generate_comment("arg1: 2D Output Transposed Matrix (m x n)")
+      generate_comment("arg2: number of rows for input matrix")
+      generate_comment("arg3: number of columns for input matrix")
+      generate_comment("kernel launch config <<dim3((TILE_DIM * m - 1) / TILE_DIM, (TILE_DIM * n - 1) / TILE_DIM), dim3(TILE_DIM, BLOCK_ROWS)>>")
+      generate_comment("TILE_DIM = 32, BLOCK_ROWS = 8")
 
-      for(i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-          tile(threadIdxY + i, threadIdxX) = in((y + i) * width + x)
+      val tile = NewSharedArray[N](tileDim, tileDim + 1)
+      val x = var_new(blockIdxX * tileDim + threadIdxX)
+      val y = var_new(blockIdxY * tileDim + threadIdxY)
+
+      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+        __ifThenElse((x < m) && (y < n), {
+          tile(threadIdxY + i, threadIdxX) = in(y * m + x)
+        }, {})
+
+        __assign(y, y + blockRows)
       }
 
       cudaSyncThreads
 
-      val row = blockIdxY * tileDim + threadIdxX
-      val col = blockIdxX * tileDim + threadIdxY
+      __assign(x, blockIdxY * tileDim + threadIdxX)
+      __assign(y, blockIdxX * tileDim + threadIdxY)
 
       for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-          out((col + i) * width + row) = tile(threadIdxX, threadIdxY + i)
+        __ifThenElse(x < n && y < m, {
+          out(y * n + x) = tile(threadIdxX, threadIdxY + i)
+        }, {})
+        __assign(y, y + blockRows)
       }
-  }
+    }
 
   /*
     reduce the data input array (from 0 to size) using the given op.
