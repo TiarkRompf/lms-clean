@@ -15,13 +15,13 @@ Emitting C Generated Code
 __global__ void x7(float* x8, int x9, float* x10, int x11, float* x12, int x13) {
   // this is cuda 2-way split kernel.
   // It takes a 3D array and splits on the innermost dimension (dim2) into two arrays.
-  // in: input array
-  // d_other: product of other two dimensions (dim0 * dim1)
-  // out0: first output array
-  // d0: dim2 of out0
-  // out1: second output array
-  // d1: dim2 of out1
-  // call constraint: d0 + d1 = in.dim2
+  // arg0: input array
+  // arg1: product of other two dimensions (dim0 * dim1)
+  // arg2: first output array
+  // arg3: dim2 of first output array
+  // arg4: second output array
+  // arg5: dim2 of second output array
+  // call constraint: arg3 + arg5 = arg0.dim2
   int x14 = blockIdx.x * blockDim.x + threadIdx.x;
   int x15 = x11 + x13;
   if (x14 < x9 * x15) {

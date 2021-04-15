@@ -15,15 +15,15 @@ Emitting C Generated Code
 __global__ void x11(float* x12, int x13, float* x14, int x15, float* x16, int x17, float* x18, int x19) {
   // this is cuda 3-way split kernel.
   // It takes a 3D array and splits on the innermost dimension (dim2) into three arrays.
-  // in: input array
-  // d_other: product of other two dimensions (dim0 * dim1)
-  // out0: first output array
-  // d0: dim2 of out0
-  // out1: second output array
-  // d1: dim2 of out1
-  // out2: third output array
-  // d2: dim2 of out2
-  // call constraint: d0 + d1 + d2 = in.dim2
+  // arg0: input array
+  // arg1: product of other two dimensions (dim0 * dim1)
+  // arg2: first output array
+  // arg3: dim2 of first output array
+  // arg4: second output array
+  // arg5: dim2 of second output array
+  // arg6: third output array
+  // arg7: dim2 of third output array
+  // call constraint: arg3 + arg5 + arg7 = arg0.dim2
   int x20 = blockIdx.x * blockDim.x + threadIdx.x;
   int x21 = x15 + x17;
   int x22 = x21 + x19;

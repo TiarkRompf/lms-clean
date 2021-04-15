@@ -1148,13 +1148,13 @@ trait CudaLibs extends CudaOps {
     (in: Rep[Array[N]], d_other: Rep[Int], out0: Rep[Array[N]], d0: Rep[Int], out1: Rep[Array[N]], d1: Rep[Int]) => {
       generate_comment("this is cuda 2-way split kernel.")
       generate_comment("It takes a 3D array and splits on the innermost dimension (dim2) into two arrays.")
-      generate_comment("in: input array")
-      generate_comment("d_other: product of other two dimensions (dim0 * dim1)")
-      generate_comment("out0: first output array")
-      generate_comment("d0: dim2 of out0")
-      generate_comment("out1: second output array")
-      generate_comment("d1: dim2 of out1")
-      generate_comment("call constraint: d0 + d1 = in.dim2 ")
+      generate_comment("arg0: input array")
+      generate_comment("arg1: product of other two dimensions (dim0 * dim1)")
+      generate_comment("arg2: first output array")
+      generate_comment("arg3: dim2 of first output array")
+      generate_comment("arg4: second output array")
+      generate_comment("arg5: dim2 of second output array")
+      generate_comment("call constraint: arg3 + arg5 = arg0.dim2 ")
 
       val idx = blockIdxX * blockDimX + threadIdxX
       val d = d0 + d1
@@ -1177,15 +1177,15 @@ trait CudaLibs extends CudaOps {
     (in: Rep[Array[N]], d_other: Rep[Int], out0: Rep[Array[N]], d0: Rep[Int], out1: Rep[Array[N]], d1: Rep[Int], out2: Rep[Array[N]], d2: Rep[Int]) => {
       generate_comment("this is cuda 3-way split kernel.")
       generate_comment("It takes a 3D array and splits on the innermost dimension (dim2) into three arrays.")
-      generate_comment("in: input array")
-      generate_comment("d_other: product of other two dimensions (dim0 * dim1)")
-      generate_comment("out0: first output array")
-      generate_comment("d0: dim2 of out0")
-      generate_comment("out1: second output array")
-      generate_comment("d1: dim2 of out1")
-      generate_comment("out2: third output array")
-      generate_comment("d2: dim2 of out2")
-      generate_comment("call constraint: d0 + d1 + d2 = in.dim2 ")
+      generate_comment("arg0: input array")
+      generate_comment("arg1: product of other two dimensions (dim0 * dim1)")
+      generate_comment("arg2: first output array")
+      generate_comment("arg3: dim2 of first output array")
+      generate_comment("arg4: second output array")
+      generate_comment("arg5: dim2 of second output array")
+      generate_comment("arg6: third output array")
+      generate_comment("arg7: dim2 of third output array")
+      generate_comment("call constraint: arg3 + arg5 + arg7 = arg0.dim2 ")
 
       val idx = blockIdxX * blockDimX + threadIdxX
       val d = d0 + d1 + d2
