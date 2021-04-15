@@ -1094,6 +1094,7 @@ trait CudaLibs extends CudaOps {
       }
   }
 
+  // TODO(Luke): remove this
   def cudaSplit3D0[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out1: Rep[Array[N]], out2: Rep[Array[N]], d0: Rep[Int], split: Rep[Int], input_size: Rep[Int]) => {
       generate_comment("this is cuda split kernel. It takes a 3D array and splits on the innermost dimension (dim2).")
@@ -1138,6 +1139,71 @@ trait CudaLibs extends CudaOps {
           in1(x * d1 + y)
         }, {
           in2(x * d2 + (y - d1))
+        })
+      }, {})
+    }
+  }
+
+  def cuda3DSplit2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], d_other: Rep[Int], out0: Rep[Array[N]], d0: Rep[Int], out1: Rep[Array[N]], d1: Rep[Int]) => {
+      generate_comment("this is cuda 2-way split kernel.")
+      generate_comment("It takes a 3D array and splits on the innermost dimension (dim2) into two arrays.")
+      generate_comment("in: input array")
+      generate_comment("d_other: product of other two dimensions (dim0 * dim1)")
+      generate_comment("out0: first output array")
+      generate_comment("d0: dim2 of out0")
+      generate_comment("out1: second output array")
+      generate_comment("d1: dim2 of out1")
+      generate_comment("call constraint: d0 + d1 = in.dim2 ")
+
+      val idx = blockIdxX * blockDimX + threadIdxX
+      val d = d0 + d1
+      __ifThenElse(idx < d_other * d, {
+        val value = in(idx)
+        val x = idx / d
+        val y = idx % d
+        val off0 = 0
+        val off1 = off0 + d0
+        __ifThenElse(y < off1, {
+          out0(x * d0 + (y - off0)) = value 
+        }, {
+          out1(x * d1 + (y - off1)) = value
+        })
+      }, {})
+    }
+  }
+
+  def cuda3DSplit3[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], d_other: Rep[Int], out0: Rep[Array[N]], d0: Rep[Int], out1: Rep[Array[N]], d1: Rep[Int], out2: Rep[Array[N]], d2: Rep[Int]) => {
+      generate_comment("this is cuda 3-way split kernel.")
+      generate_comment("It takes a 3D array and splits on the innermost dimension (dim2) into three arrays.")
+      generate_comment("in: input array")
+      generate_comment("d_other: product of other two dimensions (dim0 * dim1)")
+      generate_comment("out0: first output array")
+      generate_comment("d0: dim2 of out0")
+      generate_comment("out1: second output array")
+      generate_comment("d1: dim2 of out1")
+      generate_comment("out2: third output array")
+      generate_comment("d2: dim2 of out2")
+      generate_comment("call constraint: d0 + d1 + d2 = in.dim2 ")
+
+      val idx = blockIdxX * blockDimX + threadIdxX
+      val d = d0 + d1 + d2
+      __ifThenElse(idx < d_other * d, {
+        val value = in(idx)
+        val x = idx / d
+        val y = idx % d
+        val off0 = 0
+        val off1 = off0 + d0
+        val off2 = off1 + d1
+        __ifThenElse(y < off1, {
+          out0(x * d0 + (y - off0)) = value 
+        }, {
+          __ifThenElse(y < off2, {
+            out1(x * d1 + (y - off1)) = value
+          }, {
+            out2(x * d2 + (y - off2)) = value
+          })
         })
       }, {})
     }

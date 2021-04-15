@@ -600,40 +600,41 @@ class CudaTest extends TutorialFunSuite {
     check("transpose_performance", driver.code, "cu")
   }
 
-  test("split_kernel") {
+  test("split2_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val d0 = 4
-        val d1 = 4
-        val split = 2
-        val in_sz = d1 * d0
-        val out1_sz = d1 * split
-        val out2_sz = d1 * (d0 - split)
+        val d0 = 2
+        val d1 = 2
+        val d_other = 4
+
+        val in_sz = d_other * (d0 + d1)
+        val out0_sz = d_other * d0
+        val out1_sz = d_other * d1
 
         val input = NewArray[Float](in_sz)
-        scanFile[Float]("golden/split/input.data", input, in_sz)
+        scanFile[Float]("golden/split2/input.data", input, in_sz)
         val cuda_input = cudaMalloc2[Float](in_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
+
+        val output0 = NewArray[Float](out0_sz)
+        val cuda_output0 = cudaMalloc2[Float](out0_sz)
 
         val output1 = NewArray[Float](out1_sz)
         val cuda_output1 = cudaMalloc2[Float](out1_sz)
 
-        val output2 = NewArray[Float](out2_sz)
-        val cuda_output2 = cudaMalloc2[Float](out2_sz)
+        val splitKernel = cuda3DSplit2[Float]
+        splitKernel(cuda_input, d_other, cuda_output0, d0, cuda_output1, d1, dim3((in_sz + 511)/512), dim3(512))
 
-        val splitKernel = cudaSplit3D0[Float]
-        splitKernel(cuda_input, cuda_output1, cuda_output2, d0, split, in_sz, dim3((in_sz + 511)/512), dim3(512))
-
+        cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
-        cudaCall(cudaMemcpyOfT[Float](output2, cuda_output2, out2_sz, device2host))
 
-        checkFile[Float]("golden/split/output1.data", output1, out1_sz)
-        checkFile[Float]("golden/split/output2.data", output2, out2_sz)
+        checkFile[Float]("golden/split2/output0.data", output0, out0_sz)
+        checkFile[Float]("golden/split2/output1.data", output1, out1_sz)
       }
     }
-    check("split", driver.code, "cu")
+    check("split2", driver.code, "cu")
   }
 
   test("concat_kernel") {
@@ -671,6 +672,68 @@ class CudaTest extends TutorialFunSuite {
       }
     }
     check("concat", driver.code, "cu")
+  }
+
+  test("split3_kernel") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+
+        val d0 = 2
+        val d1 = 2
+        val d2 = 1
+        val d_other = 3
+
+        val in_sz = d_other * (d0 + d1 + d2)
+        val out0_sz = d_other * d0
+        val out1_sz = d_other * d1
+        val out2_sz = d_other * d2
+
+        val input = NewArray[Float](in_sz)
+        for (i <- (0 until in_sz): Rep[Range]) {
+          input(i) = i
+        }
+        val cuda_input = cudaMalloc2[Float](in_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
+
+        val output0 = NewArray[Float](out0_sz)
+        val cuda_output0 = cudaMalloc2[Float](out0_sz)
+
+        val output1 = NewArray[Float](out1_sz)
+        val cuda_output1 = cudaMalloc2[Float](out1_sz)
+
+        val output2 = NewArray[Float](out2_sz)
+        val cuda_output2 = cudaMalloc2[Float](out2_sz)
+
+        val split3Kernel = cuda3DSplit3[Float]
+        split3Kernel(cuda_input, d_other, cuda_output0, d0, cuda_output1, d1, cuda_output2, d2, dim3((in_sz + 511)/512), dim3(512))
+        
+        cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output2, cuda_output2, out2_sz, device2host))
+
+        // checkFile[Float]("golden/split/output1.data", output1, out1_sz)
+        printf("output0: [")
+        for (i <- (0 until out0_sz): Rep[Range]) {
+          printf("%f,", output0(i))
+        }
+        printf("]\n")
+        // checkFile[Float]("golden/split/output2.data", output2, out2_sz)
+        printf("output1: [")
+        for (i <- (0 until out1_sz): Rep[Range]) {
+          printf("%f,", output1(i))
+        }
+        printf("]\n")
+        
+        printf("output2: [")
+        for (i <- (0 until out2_sz): Rep[Range]) {
+          printf("%f,", output2(i))
+        }
+        printf("]\n")
+      }
+    }
+    check("split3", driver.code, "cu")
   }
 }
 
