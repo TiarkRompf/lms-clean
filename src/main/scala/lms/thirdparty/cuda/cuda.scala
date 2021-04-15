@@ -1120,6 +1120,7 @@ trait CudaLibs extends CudaOps {
     }
   }
 
+  // TODO(Luke): remove this
   def cudaConcat3D0[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in1: Rep[Array[N]], in2: Rep[Array[N]], out: Rep[Array[N]], d1: Rep[Int], d2: Rep[Int], output_size: Rep[Int]) => {
       generate_comment("this is cuda concat kernel. It concatenates two 3D arrays and concat on the innermost dimension (dim2).")
@@ -1168,6 +1169,34 @@ trait CudaLibs extends CudaOps {
           out0(x * d0 + (y - off0)) = value 
         }, {
           out1(x * d1 + (y - off1)) = value
+        })
+      }, {})
+    }
+  }
+
+  def cuda3DConcat2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (in0: Rep[Array[N]], d0: Rep[Int], in1: Rep[Array[N]], d1: Rep[Int], out: Rep[Array[N]], d_other: Rep[Int]) => {
+      generate_comment("this is cuda concat kernel.") 
+      generate_comment("It concatenates two 3D arrays and concat on the innermost dimension (dim2).")
+      generate_comment("arg0: first input array")
+      generate_comment("arg1: dim2 of first input array")
+      generate_comment("arg2: second input array")
+      generate_comment("arg3: dim2 of second input array")
+      generate_comment("arg4: output array")
+      generate_comment("arg5: product of other two dimensions (dim0 * dim1)")
+      generate_comment("call constraint: arg1 + arg3 = out.dim2 ")
+
+      val idx = blockIdxX * blockDimX + threadIdxX
+      val d = d0 + d1
+      __ifThenElse(idx < d_other * d, {
+        val x = idx / d
+        val y = idx % d
+        val off0 = 0
+        val off1 = off0 + d0
+        out(idx) = __ifThenElse(y < off1, {
+          in0(x * d0 + (y - off0))
+        }, {
+          in1(x * d1 + (y - off1))
         })
       }, {})
     }

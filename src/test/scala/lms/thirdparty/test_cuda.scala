@@ -637,41 +637,41 @@ class CudaTest extends TutorialFunSuite {
     check("split2", driver.code, "cu")
   }
 
-  test("concat_kernel") {
+  test("concat2_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val d1 = 3
-        val d2 = 5
+        val d0 = 3
+        val d1 = 5
         val d_other = 3*2
         
+        val in0_sz = d0 * d_other
         val in1_sz = d1 * d_other
-        val in2_sz = d2 * d_other
-        val out_sz = (d1 + d2) * d_other
+        val out_sz = (d0 + d1) * d_other
+
+        val input0 = NewArray[Float](in0_sz)
+        scanFile[Float]("golden/concat2/input0.data", input0, in0_sz)
+        val cuda_input0 = cudaMalloc2[Float](in0_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input0, input0, in0_sz, host2device))
 
         val input1 = NewArray[Float](in1_sz)
-        scanFile[Float]("golden/concat/input1.data", input1, in1_sz)
+        scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
         val cuda_input1 = cudaMalloc2[Float](in1_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input1, input1, in1_sz, host2device))
-
-        val input2 = NewArray[Float](in2_sz)
-        scanFile[Float]("golden/concat/input2.data", input2, in2_sz)
-        val cuda_input2 = cudaMalloc2[Float](in2_sz)
-        cudaCall(cudaMemcpyOfT[Float](cuda_input2, input2, in2_sz, host2device))
 
         val output = NewArray[Float](out_sz)
         val cuda_output = cudaMalloc2[Float](out_sz)
 
-        val concatKernel = cudaConcat3D0[Float]
-        concatKernel(cuda_input1, cuda_input2, cuda_output, d1, d2, out_sz, dim3((out_sz + 511)/512), dim3(512))
+        val concatKernel = cuda3DConcat2[Float]
+        concatKernel(cuda_input0, d0, cuda_input1, d1, cuda_output, d_other, dim3((out_sz + 511)/512), dim3(512))
 
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
-        checkFile[Float]("golden/concat/output.data", output, out_sz)
+        checkFile[Float]("golden/concat2/output.data", output, out_sz)
       }
     }
-    check("concat", driver.code, "cu")
+    check("concat2", driver.code, "cu")
   }
 
   test("split3_kernel") {

@@ -9,14 +9,14 @@ def generate_data(lms_clean_root: str):
     torch.manual_seed(0)
 
     # model
-    input1 = torch.randn(2, 3, 3)
-    input2 = torch.randn(2, 3, 5)
-    output = torch.split((input1, input2), 2)
+    input0 = torch.randn(2, 3, 3)
+    input1 = torch.randn(2, 3, 5)
+    output = torch.cat((input0, input1), 2)
 
     # printer
-    printer = get_printer(lms_clean_root, test_name = "split")
+    printer = get_printer(lms_clean_root, test_name = "concat")
+    printer("input0.data", input0)
     printer("input1.data", input1)
-    printer("input2.data", input2)
     printer("output.data", output)
 
 if __name__ == '__main__':

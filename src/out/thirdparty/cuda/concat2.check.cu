@@ -12,39 +12,41 @@ Emitting C Generated Code
 #include <stdbool.h>
 #include "scanner_header.h"
 /************* Functions **************/
-__global__ void x7(float* x8, float* x9, float* x10, int x11, int x12, int x13) {
-  // this is cuda concat kernel. It concatenates two 3D arrays and concat on the innermost dimension (dim2).
-  // in1: first input array
-  // in2: second input array
-  // out: output array
-  // d1: dim2 of the first input array
-  // d2: dim2 of the second input array
-  // call constraint: out1.dim2 + out2.dim2 = in.dim2
+__global__ void x7(float* x8, int x9, float* x10, int x11, float* x12, int x13) {
+  // this is cuda concat kernel.
+  // It concatenates two 3D arrays and concat on the innermost dimension (dim2).
+  // arg0: first input array
+  // arg1: dim2 of first input array
+  // arg2: second input array
+  // arg3: dim2 of second input array
+  // arg4: output array
+  // arg5: product of other two dimensions (dim0 * dim1)
+  // call constraint: arg1 + arg3 = out.dim2
   int x14 = blockIdx.x * blockDim.x + threadIdx.x;
-  if (x14 < x13) {
-    int x15 = x11 + x12;
+  int x15 = x9 + x11;
+  if (x14 < x13 * x15) {
     int x16 = x14 % x15;
-    x10[x14] = x16 < x11 ? x8[x14 / x15 * x11 + x16] : x9[x14 / x15 * x12 + (x16 - x11)];
+    x12[x14] = x16 < x9 ? x8[x14 / x15 * x9 + x16] : x10[x14 / x15 * x11 + (x16 - x9)];
   }
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(18 * sizeof(float));
-  scan_float("golden/concat/input1.data", x1, 18);
+  scan_float("golden/concat2/input0.data", x1, 18);
   float* x2 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(18 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(18 * sizeof(float)), cudaMemcpyHostToDevice));
   float* x3 = (float*)malloc(30 * sizeof(float));
-  scan_float("golden/concat/input2.data", x3, 30);
+  scan_float("golden/concat2/input1.data", x3, 30);
   float* x4 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x4, (size_t)(30 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(30 * sizeof(float)), cudaMemcpyHostToDevice));
   float* x5 = (float*)malloc(48 * sizeof(float));
   float* x6 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x6, (size_t)(48 * sizeof(float))));
-  x7<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, x4, x6, 3, 5, 48);
+  x7<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, 3, x4, 5, x6, 6);
   CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(48 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array("golden/concat/output.data", x5, 48);
+  check_float_array("golden/concat2/output.data", x5, 48);
 }
 /*****************************************
 End of C Generated Code
