@@ -431,9 +431,17 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       val offset = skip * i + j
       Wrap[T](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(offset))(Unwrap(x)))
     }
+    def apply(is: List[Rep[Int]])(implicit __pos: SourceContext): Rep[T] = {
+      require(is.length == 2)
+      apply(is(0), is(1))
+    }
     def update(i: Rep[Int], j: Rep[Int], y: Rep[T])(implicit __pos: SourceContext): Unit = {
       val offset = skip * i + j
       Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(offset), Unwrap(y))(Unwrap(x))
+    }
+    def update(is: List[Rep[Int]], y: Rep[T])(implicit __pos: SourceContext): Unit = {
+      require(is.length == 2)
+      update(is(0), is(1), y)
     }
   }
   def NewSharedArray[T:Manifest](x: Int, y: Int): Matrix2D[T] = {
@@ -1369,16 +1377,6 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  // def cudaPermute[N:Numeric:Manifest](shape: List[Rep[Int]], permutation: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
-  //   permutation match {
-  //     // 2D transpose
-  //     case List(1, 0) => _cudaTranspose[N]
-  //     // 3D cases:
-  //     case List(1, 0, 2) => _cudaPermute102[N]
-  //     // 3D cases:
-  //     case _ => throw new Exception("todo")
-  //   }
-  // }
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
