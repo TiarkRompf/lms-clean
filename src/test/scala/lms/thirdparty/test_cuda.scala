@@ -530,64 +530,87 @@ class CudaTest extends TutorialFunSuite {
     check("permute_10", driver.code, "cu")
   }
 
-  test("permute_kernel_210") {
+  test("permute3D") {
     val driver = new DslDriverCCudaScan[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val dimX = 100
-        val dimY = 20
-        val dimZ = 130
+        val dimX = 50
+        val dimY = 55
+        val dimZ = 60
         val size = dimX * dimY * dimZ
         val tileDim = 32
         val blockRows = 8
 
-        val input = NewArray[Int](size)
-        scanFile[Int]("golden/permute_kernel_210/input.data", input, size)
-        val cuda_input = cudaMalloc2[Int](size)
-        cudaCall(cudaMemcpyOfT(cuda_input, input, size, host2device))
+        // test 021
+        val input021 = NewArray[Int](size)
+        scanFile[Int]("golden/permute3D_021/input.data", input021, size)
+        val cuda_input021 = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT(cuda_input021, input021, size, host2device))
 
-        val output = NewArray[Int](size)
-        val cuda_output = cudaMalloc2[Int](size)
+        val permuteKernel021 = cudaPermute3D[Int](List(0,2,1))
+        val block021 = dim3(tileDim, blockRows, 1)
+        val grid021 = dim3((dimX+tileDim-1)/tileDim, (dimY+tileDim-1)/tileDim, dimZ)
 
-        val permuteKernel = cudaPermute210[Int]
-        val grid = dim3((dimX+tileDim-1)/tileDim, dimY, (dimZ+tileDim-1)/tileDim)
-        val block = dim3(tileDim, blockRows, 1)
-        permuteKernel(cuda_input, cuda_output, dimZ, dimY, dimX, grid, block)
-        cudaCall(cudaMemcpyOfT(output, cuda_output, size, device2host))
-        checkFile[Int]("golden/permute_kernel_210/output.data", output, size)
+        val cuda_output021 = cudaMalloc2[Int](size)
+        permuteKernel021(cuda_input021, cuda_output021, dimZ, dimY, dimX, grid021, block021)
+
+        val output021 = NewArray[Int](size)
+        cudaCall(cudaMemcpyOfT(output021, cuda_output021, size, device2host))
+        checkFile[Int]("golden/permute3D_021/output.data", output021, size)
+
+        // test 120
+        val input120 = NewArray[Int](size)
+        scanFile[Int]("golden/permute3D_120/input.data", input120, size)
+        val cuda_input120 = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT(cuda_input120, input120, size, host2device))
+
+        val permuteKernel120 = cudaPermute3D[Int](List(1,2,0))
+        val block120 = dim3(tileDim, 1, blockRows)
+        val grid120 = dim3((dimX+tileDim-1)/tileDim, dimY, (dimZ+tileDim-1)/tileDim)
+
+        val cuda_output120 = cudaMalloc2[Int](size)
+        permuteKernel120(cuda_input120, cuda_output120, dimZ, dimY, dimX, grid120, block120)
+
+        val output120 = NewArray[Int](size)
+        cudaCall(cudaMemcpyOfT(output120, cuda_output120, size, device2host))
+        checkFile[Int]("golden/permute3D_120/output.data", output120, size)
+
+        // test 210
+        val input210 = NewArray[Int](size)
+        scanFile[Int]("golden/permute3D_210/input.data", input210, size)
+        val cuda_input210 = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT(cuda_input210, input210, size, host2device))
+
+        val permuteKernel210 = cudaPermute3D[Int](List(2,1,0))
+        val block210 = dim3(tileDim, 1, blockRows)
+        val grid210 = dim3((dimX+tileDim-1)/tileDim, dimY, (dimZ+tileDim-1)/tileDim)
+
+        val cuda_output210 = cudaMalloc2[Int](size)
+        permuteKernel210(cuda_input210, cuda_output210, dimZ, dimY, dimX, grid210, block210)
+
+        val output210 = NewArray[Int](size)
+        cudaCall(cudaMemcpyOfT(output210, cuda_output210, size, device2host))
+        checkFile[Int]("golden/permute3D_210/output.data", output210, size)
+
+        // test 201
+        val input201 = NewArray[Int](size)
+        scanFile[Int]("golden/permute3D_201/input.data", input201, size)
+        val cuda_input201 = cudaMalloc2[Int](size)
+        cudaCall(cudaMemcpyOfT(cuda_input201, input201, size, host2device))
+
+        val permuteKernel201 = cudaPermute3D[Int](List(2,0,1))
+        val block201 = dim3(tileDim, blockRows, 1)
+        val grid201 = dim3((dimX+tileDim-1)/tileDim, (dimY+tileDim-1)/tileDim, dimZ)
+
+        val cuda_output201 = cudaMalloc2[Int](size)
+        permuteKernel201(cuda_input201, cuda_output201, dimZ, dimY, dimX, grid201, block201)
+
+        val output201 = NewArray[Int](size)
+        cudaCall(cudaMemcpyOfT(output201, cuda_output201, size, device2host))
+        checkFile[Int]("golden/permute3D_201/output.data", output201, size)
       }
     }
-    check("permute_210", driver.code, "cu")
-  }
-
-  test("permute_kernel_120") {
-    val driver = new DslDriverCCudaScan[Int, Unit] {
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        val dimX = 100
-        val dimY = 20
-        val dimZ = 130
-        val size = dimX * dimY * dimZ
-        val tileDim = 32
-        val blockRows = 8
-
-        val input = NewArray[Int](size)
-        scanFile[Int]("golden/permute_kernel_120/input.data", input, size)
-        val cuda_input = cudaMalloc2[Int](size)
-        cudaCall(cudaMemcpyOfT(cuda_input, input, size, host2device))
-
-        val output = NewArray[Int](size)
-        val cuda_output = cudaMalloc2[Int](size)
-
-        val permuteKernel = cudaPermute120[Int]
-        val grid = dim3((dimX+tileDim-1)/tileDim, dimY, (dimZ+tileDim-1)/tileDim)
-        val block = dim3(tileDim, blockRows, 1)
-        permuteKernel(cuda_input, cuda_output, dimZ, dimY, dimX, grid, block)
-        cudaCall(cudaMemcpyOfT(output, cuda_output, size, device2host))
-        checkFile[Int]("golden/permute_kernel_120/output.data", output, size)
-      }
-    }
-    check("permute_120", driver.code, "cu")
+    check("permute3D", driver.code, "cu")
   }
 
   test("permute_kernel_102_big") {

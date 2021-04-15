@@ -32,7 +32,7 @@ __global__ void x5(int* x6, int* x7, int x8, int x9, int x10) {
   }
   // sync threads
   __syncthreads();
-  // write date from shared memory to output array
+  // write data from shared memory to output array
   int x15 = 0;
   while (x15 < 32) {
     int x16 = x15;

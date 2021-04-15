@@ -445,9 +445,17 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
       val offset = skip0 * i + skip1 * j + k
       Wrap[T](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(offset))(Unwrap(x)))
     }
+    def apply(is: List[Rep[Int]])(implicit __pos: SourceContext): Rep[T] = {
+      require(is.length == 3)
+      apply(is(0), is(1), is(2))
+    }
     def update(i: Rep[Int], j: Rep[Int], k: Rep[Int], y: Rep[T])(implicit __pos: SourceContext): Unit = {
       val offset = skip0 * i + skip1 * j + k
       Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(offset), Unwrap(y))(Unwrap(x))
+    }
+    def update(is: List[Rep[Int]], y: Rep[T])(implicit __pos: SourceContext): Unit = {
+      require(is.length == 3)
+      update(is(0), is(1), is(2), y)
     }
   }
   def NewSharedArray[T:Manifest](x: Int, y: Int, z: Int): Matrix3D[T] = {
@@ -1197,94 +1205,130 @@ trait CudaLibs extends CudaOps {
     a + index.last
   }
 
-  // kernel function for 3D permute with permutation [2, 1, 0]
-  def cudaPermute210[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]], dimZ: Rep[Int], dimY: Rep[Int], dimX: Rep[Int]) =>
-      generate_comment("this is the permutation kernel for [2, 1, 0]")
-      generate_comment("arg0: 3D input tensor (dimZ x dimY x dimX)")
-      generate_comment("arg1: 3D output tensor (dimX x dimY x dimZ)")
-      generate_comment("arg2: dimZ of input")
-      generate_comment("arg3: dimY of input")
-      generate_comment("arg4: dimX of input")
-      generate_comment("caller must use <<<dim3((dimX+31)/32, dimY, (dimZ+31)/32), dim3(32, 8, 1)>>>")
-      generate_comment("each threadblock handles a square at dimX and dimZ")
-      val tile = NewSharedArray[N](tileDim, tileDim + 1)
+  // kernel function for 3D permute
+  def cudaPermute3D[N:Numeric:Manifest](permutation: List[Int])(implicit __pos: SourceContext) = {
+    require(permutation.length == 3)
+    // we can put all sub-functions of 3D permutation here because the function type is the same
 
-      generate_comment("read data from input array to shared memory")
-      // helper function from block indices and thread indices to input reads
-      def in_offset(bX: Rep[Int], bY: Rep[Int], bZ: Rep[Int], tX: Rep[Int], tY: Rep[Int], func: Rep[N] => Unit) = {
-        val x = bX * tileDim + tX
-        val y = bY
-        val z = bZ * tileDim + tY
-        __ifThenElse(x < dimX && z < dimZ, func(in(flatten(List(dimZ, dimY, dimX), List(z, y, x)))), {})
-      }
-      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        in_offset(blockIdxX, blockIdxY, blockIdxZ, threadIdxX, threadIdxY + i, value => {
-          tile(threadIdxY + i, threadIdxX) = value
-        })
-      }
+    if (permutation == List(0, 1, 2)) {
+      // case 0: permutation is identity
+      throw new Exception("identity permutation is not allowed in permutation kernel")
+    } else if (permutation == List(1, 0, 2)) {
+      // case 1: permutation is not touching the inner most dimension
+      cudaPermute102[N]
+    } else {
+      // case 2: the dimX (inner most dim) is changed to a dim that is not inner most
+      //         another dim (dimY or dimZ) is changed to the inner most dim
+      cudaGlobalFun {(in: Rep[Array[N]], out: Rep[Array[N]], dimZ: Rep[Int], dimY: Rep[Int], dimX: Rep[Int]) =>
 
-      generate_comment("sync threads")
-      cudaSyncThreads
+        // need to have 3D grids and 3D blocks
+        // the 3D blocks handle a block of size (tileDim, tileDim, 1) where one of the tileDim is for dimX
+        //   and the other tileDim is for the dim that becomes the new inner most dim.
+        val blockDim = permutation match {
+          case List(0,2,1) => List(1, tileDim, tileDim)
+          case List(1,2,0) => List(tileDim, 1, tileDim)
+          case List(2,1,0) => List(tileDim, 1, tileDim)
+          case List(2,0,1) => List(1, tileDim, tileDim)
+        }
+        val sharedMemSize = permutation match {
+          // should be the same size as blockDim
+          // except with +1 on the inner most size to avoid bank conflict
+          case List(0,2,1) => List(1, tileDim, tileDim + 1)
+          case List(1,2,0) => List(tileDim, 1, tileDim + 1)
+          case List(2,1,0) => List(tileDim, 1, tileDim + 1)
+          case List(2,0,1) => List(1, tileDim, tileDim + 1)
+        }
+        // the actual block dims is (tileDim, blockRows, 1), where the blockRows is 4 times smaller than tileDim
+        // so that each block has a loop of size 4
+        val actualBlockDim = permutation match {
+          case List(0,2,1) => List(1, blockRows, tileDim)
+          case List(1,2,0) => List(blockRows, 1, tileDim)
+          case List(2,1,0) => List(blockRows, 1, tileDim)
+          case List(2,0,1) => List(1, blockRows, tileDim)
+        }
 
-      generate_comment("write data from shared memory to output array")
-      // helper function from block indices and thread indices to output writes
-      def out_offset(bX: Rep[Int], bY: Rep[Int], bZ: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
-        val x = bX * tileDim + tX
-        val y = bY
-        val z = bZ * tileDim + tY
-        __ifThenElse(x < dimZ && z < dimX, {out(flatten(List(dimX, dimY, dimZ), List(z, y, x))) = value}, {})
-      }
-      // we want to swap block X and block Z, but maintain thread indices (so that the writes are coaleased)
-      // then we must read the tile in a transposed manner (swap read indices)
-      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        out_offset(blockIdxZ, blockIdxY, blockIdxX, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
-      }
-  }
+        // block indices:
+        val blocks = List(blockIdxZ, blockIdxY, blockIdxX)
+        // effective thread indices (+i for the dimension with size blockRows, because it needs to be larger in a loop)
+        val threads = (i: Rep[Int]) => permutation match {
+          case List(0,2,1) => List(threadIdxZ, threadIdxY + i, threadIdxX)
+          case List(1,2,0) => List(threadIdxZ + i, threadIdxY, threadIdxX)
+          case List(2,1,0) => List(threadIdxZ + i, threadIdxY, threadIdxX)
+          case List(2,0,1) => List(threadIdxZ, threadIdxY + i, threadIdxX)
+        }
 
-  // kernel function for 3D permute with permutation [1, 2, 0]
-  def cudaPermute120[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out: Rep[Array[N]], dimZ: Rep[Int], dimY: Rep[Int], dimX: Rep[Int]) =>
-      generate_comment("this is the permutation kernel for [1, 2, 0]")
-      generate_comment("arg0: 3D input tensor (dimZ x dimY x dimX)")
-      generate_comment("arg1: 3D output tensor (dimY x dimX x dimZ)")
-      generate_comment("arg2: dimZ of input")
-      generate_comment("arg3: dimY of input")
-      generate_comment("arg4: dimX of input")
-      generate_comment("caller must use <<<dim3((dimX+31)/32, dimY, (dimZ+31)/32), dim3(32, 8, 1)>>>")
-      generate_comment("each threadblock handles a square at dimX and dimZ")
-      val tile = NewSharedArray[N](tileDim, tileDim + 1)
+        // the output block dim is different from the `blockDim`, since the output is permuted
+        val outBlockDim = permutation.map(blockDim(_))
+        // output block indices: needs to permute block indices
+        val outBlocks = permutation.map(blocks(_))
+        // output thread indices: needs to permute thread indices
+        val outThreads_ = (i: Rep[Int]) => permutation.map(threads(i)(_))
 
-      generate_comment("read data from input array to shared memory")
-      // helper function from block indices and thread indices to input reads
-      def in_offset(bX: Rep[Int], bY: Rep[Int], bZ: Rep[Int], tX: Rep[Int], tY: Rep[Int], func: Rep[N] => Unit) = {
-        val x = bX * tileDim + tX
-        val y = bY
-        val z = bZ * tileDim + tY
-        __ifThenElse(x < dimX && z < dimZ, func(in(flatten(List(dimZ, dimY, dimX), List(z, y, x)))), {})
-      }
-      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        in_offset(blockIdxX, blockIdxY, blockIdxZ, threadIdxX, threadIdxY + i, value => {
-          tile(threadIdxY + i, threadIdxX) = value
-        })
-      }
+        // helper function what swapping a list with 2 indices
+        def swapper[N](l: List[N], i: Int, j: Int) = l.updated(i, l(j)).updated(j, l(i))
 
-      generate_comment("sync threads")
-      cudaSyncThreads
+        // However, if the last element of outThreads_ is not threadIdxX, the access
+        // to output array will be not coaleased. To make it coaleased, we need to swap
+        // the workload of `threadIdxX` with whatever `the last element of outThreads_`
+        // that is to say, we want to swap `threadIdx` with `last element of outThreads_` in `outThreads`
+        // Luckily, the index of `last element of outThreads_` is for sure `2`
+        //     and  the index of `threadIdx` in `outThreads_` is `permutation.indexOf(2)`
+        val outThreads = (i: Rep[Int]) => swapper(outThreads_(i), 2, permutation.indexOf(2))
+        // now we also need to swap the indices when reading from shared memory
+        // specifically, we need to swap the `threadIdx` and `last element of outThreads_` in `threads`
+        // Luckily, the index of `threadIdx` in `threads` is for sure `2`
+        //     and  the index of `last element of outThreads_` in `threads` is just `permutation.last`
+        val swappedThreads = (i: Rep[Int]) => swapper(threads(i), permutation.last, 2)
 
-      generate_comment("write data from shared memory to output array")
-      // helper function from block indices and thread indices to output writes
-      def out_offset(bX: Rep[Int], bY: Rep[Int], bZ: Rep[Int], tX: Rep[Int], tY: Rep[Int], value: Rep[N]) = {
-        val x = bX * tileDim + tX
-        val y = bY * tileDim + tY
-        val z = bZ
-        __ifThenElse(x < dimZ && y < dimX, {out(flatten(List(dimY, dimX, dimZ), List(z, y, x))) = value}, {})
+        // for comments
+        // shape and output shape
+        val shape = List("dimZ", "dimY", "dimX")
+        val outShape = permutation.map(shape(_))
+        // the blocks
+        val blockDimComment = s"dim3(${actualBlockDim(2)}, ${actualBlockDim(1)}, ${actualBlockDim(0)})"
+        // the grids should cover the input tensor, module the blocks
+        val grids = List("dimZ", "dimY", "dimX").zip(blockDim) map { case (s, b) => if (b == 1) s else s"($s+${b-1})/$b" }
+        val gridDimComment = s"dim3(${grids(2)}, ${grids(1)}, ${grids(0)})"
+
+        generate_comment(s"this is the permutation kernel for ${permutation}")
+        generate_comment(s"arg0: 3D input tensor (${shape(0)} x ${shape(1)} x ${shape(2)})")
+        generate_comment(s"arg1: 3D output tensor (${outShape(0)} x ${outShape(1)} x ${outShape(2)})")
+        generate_comment("arg2: dimZ of input")
+        generate_comment("arg3: dimY of input")
+        generate_comment("arg4: dimX of input")
+        generate_comment(s"caller must use <<<$gridDimComment, $blockDimComment>>>")
+        val tile = NewSharedArray[N](sharedMemSize(0), sharedMemSize(1), sharedMemSize(2))
+
+        generate_comment("read data from input array to shared memory")
+        // helper function from block indices and thread indices to input reads
+        def in_offset(blocks: List[Rep[Int]], threads: List[Rep[Int]], func: Rep[N] => Unit) = {
+          val indices = (blocks.zip(blockDim)).zip(threads).map {case ((b, bD), t) => b * bD + t }
+          val guard = (indices(0) < dimZ) && (indices(1) < dimY) && (indices(2) < dimX)
+          val flatten_idx = flatten(List(dimZ, dimY, dimX), indices)
+          __ifThenElse(guard, func(in(flatten_idx)), {})
+        }
+        for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+          in_offset(blocks, threads(i), value => { tile(threads(i)) = value })
+        }
+
+        generate_comment("sync threads")
+        cudaSyncThreads
+
+        generate_comment("write data from shared memory to output array")
+        // helper function from block indices and thread indices to output writes
+        def out_offset(blocks: List[Rep[Int]], threads: List[Rep[Int]], value: Rep[N]) = {
+          val indices = blocks.zip(outBlockDim).zip(threads).map{ case((b, bD), t) => b * bD + t }
+          val originalShape = List(dimZ, dimY, dimX)
+          val permutedShape = permutation.map(originalShape(_))
+          val guard = indices(0) < permutedShape(0) && indices(1) < permutedShape(1) && indices(2) < permutedShape(2)
+          val flatten_idx = flatten(permutedShape, indices)
+          __ifThenElse(guard, {out(flatten_idx) = value}, {})
+        }
+        for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
+          out_offset(outBlocks, outThreads(i), tile(swappedThreads(i)))
+        }
       }
-      // we want to swap block X Y Z dims, but maintain thread indices (so that the writes are coaleased)
-      // then we must read the tile in a transposed manner (swap read indices)
-      for (i <- (0 until (tileDim, blockRows)): Rep[Range]) {
-        out_offset(blockIdxZ, blockIdxX, blockIdxY, threadIdxX, threadIdxY + i, tile(threadIdxX, threadIdxY + i))
-      }
+    }
   }
 
   // kernel function for 3D permutation of [1, 0, 2] when dimX is big
