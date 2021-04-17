@@ -1094,57 +1094,6 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  // TODO(Luke): remove this
-  def cudaSplit3D0[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], out1: Rep[Array[N]], out2: Rep[Array[N]], d0: Rep[Int], split: Rep[Int], input_size: Rep[Int]) => {
-      generate_comment("this is cuda split kernel. It takes a 3D array and splits on the innermost dimension (dim2).")
-      generate_comment("in: input array")
-      generate_comment("out1: first output array")
-      generate_comment("out2: second output array")
-      generate_comment("d0: dim2 of the input array")
-      generate_comment("split: dim2 of the first output array")
-      generate_comment("call constraint: 0 < split < in.dim2 ")
-      generate_comment("call constraint: out1.dim2 + out2.dim2 = in.dim2 ")
-
-      val idx = blockIdxX * blockDimX + threadIdxX
-      __ifThenElse(idx < input_size, {
-        val value = in(idx)
-        val x = idx / d0
-        val y = idx % d0
-        __ifThenElse(y < split, {
-          out1(x * split + y) = value 
-        }, {
-          out2(x * (d0 - split) + (y - split)) = value
-        })
-      }, {})
-    }
-  }
-
-  // TODO(Luke): remove this
-  def cudaConcat3D0[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in1: Rep[Array[N]], in2: Rep[Array[N]], out: Rep[Array[N]], d1: Rep[Int], d2: Rep[Int], output_size: Rep[Int]) => {
-      generate_comment("this is cuda concat kernel. It concatenates two 3D arrays and concat on the innermost dimension (dim2).")
-      generate_comment("in1: first input array")
-      generate_comment("in2: second input array")
-      generate_comment("out: output array")
-      generate_comment("d1: dim2 of the first input array")
-      generate_comment("d2: dim2 of the second input array")
-      generate_comment("call constraint: out1.dim2 + out2.dim2 = in.dim2 ")
-
-      val idx = blockIdxX * blockDimX + threadIdxX
-      __ifThenElse(idx < output_size, {
-        val d = d1 + d2
-        val x = idx / d
-        val y = idx % d
-        out(idx) = __ifThenElse(y < d1, {
-          in1(x * d1 + y)
-        }, {
-          in2(x * d2 + (y - d1))
-        })
-      }, {})
-    }
-  }
-
   def cuda3DSplit2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], d_other: Rep[Int], out0: Rep[Array[N]], d0: Rep[Int], out1: Rep[Array[N]], d1: Rep[Int]) => {
       generate_comment("this is cuda 2-way split kernel.")
