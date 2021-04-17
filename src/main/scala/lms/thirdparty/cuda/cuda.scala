@@ -424,6 +424,10 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
   }
 
+  def CastArray[Original:Manifest, New:Manifest](arr: Rep[Array[Original]]) = {
+    Wrap[Array[New]](Adapter.g.reflectMutable("CastArray", Unwrap(arr)))
+  }
+
   case class Matrix2D[T:Manifest](x: Rep[Array[T]], skip: Int) {
     def apply(i: Rep[Int], j: Rep[Int])(implicit __pos: SourceContext): Rep[T] = {
       val offset = skip * i + j
@@ -1020,6 +1024,25 @@ trait CudaLibs extends CudaOps {
         __assign(y, y + blockRows)
       }
     }
+
+
+  def cudaEmbeddingGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+    (indicies: Rep[Array[Int]], grad: Rep[Array[N]], gradWeight: Rep[Array[N]], n: Rep[Int], size: Rep[Int], paddingIdx: Rep[Int]) =>
+      generate_comment("Cuda Embedding Grad")
+      val buffer = NewDynSharedArray[N]
+      val my_s = buffer.slice(warpSize * threadIdxY, warpSize * threadIdxY)
+//      val indicies_batch = cast_helper[Array[N], Array[Int]](buffer.slice(sizeOf[Float] * warpSize * blockDimY, sizeOf[Float] * warpSize * blockDimY))
+
+      val indicies_batch = CastArray[N, Int](buffer.slice(sizeOf[Float] * warpSize * blockDimY, sizeOf[Float] * warpSize * blockDimY))
+      // val size  = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+
+
+      my_s(n) = grad(n) - gradWeight(n)
+      gradWeight(n) = grad(n) * gradWeight(n) + my_s(n)
+      indicies(n) = indicies_batch(n)
+  }
+
+    
   /*
     reduce the data input array (from 0 to size) using the given op.
     buffer(0) will contain the output of the reduction
@@ -1150,6 +1173,7 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
 
   override def mayInline(n: Node): Boolean = n match {
     case Node(s, "NewSharedArray", _, _) => false
+    case Node(s, "CastArray", _, _) => false 
     case _ => super.mayInline(n)
   }
 
@@ -1181,6 +1205,9 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
+    case n @ Node(s, "CastArray", xs, _) =>
+        val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+        emit(s"$tpe* "); shallow(s); emit(s" = ($tpe *)("); shallow(xs(0)); emitln(");")
     case _ => super.traverse(n)
   }
 }
