@@ -692,9 +692,7 @@ class CudaTest extends TutorialFunSuite {
         val out2_sz = d_other * d2
 
         val input = NewArray[Float](in_sz)
-        for (i <- (0 until in_sz): Rep[Range]) {
-          input(i) = i
-        }
+        scanFile[Float]("golden/split3/input.data", input, in_sz)
         val cuda_input = cudaMalloc2[Float](in_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
 
@@ -714,24 +712,10 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output2, cuda_output2, out2_sz, device2host))
 
-        // checkFile[Float]("golden/split/output1.data", output1, out1_sz)
-        printf("output0: [")
-        for (i <- (0 until out0_sz): Rep[Range]) {
-          printf("%f,", output0(i))
-        }
-        printf("]\n")
-        // checkFile[Float]("golden/split/output2.data", output2, out2_sz)
-        printf("output1: [")
-        for (i <- (0 until out1_sz): Rep[Range]) {
-          printf("%f,", output1(i))
-        }
-        printf("]\n")
-        
-        printf("output2: [")
-        for (i <- (0 until out2_sz): Rep[Range]) {
-          printf("%f,", output2(i))
-        }
-        printf("]\n")
+        // check individual outputs
+        checkFile[Float]("golden/split3/output0.data", output0, out0_sz)
+        checkFile[Float]("golden/split3/output1.data", output1, out1_sz)
+        checkFile[Float]("golden/split3/output2.data", output2, out2_sz)
       }
     }
     check("split3", driver.code, "cu")
