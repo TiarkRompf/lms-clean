@@ -737,7 +737,7 @@ class CudaTest extends TutorialFunSuite {
     check("split3", driver.code, "cu")
   }
 
-    test("split_kernel") {
+  test("split_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
 
       @virtualize
@@ -773,6 +773,65 @@ class CudaTest extends TutorialFunSuite {
           printf("%f,", output(i))
         }
         printf("]\n")
+      }
+    }
+    System.out.println(indent(driver.code))
+  }
+
+  test("concat_kernel") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val d0 = 3
+        val d1 = 2
+        val d2 = 1
+        val d_other = 3*2
+        
+        val in0_sz = d0 * d_other
+        val in1_sz = d1 * d_other
+        val in2_sz = d2 * d_other
+        val out_sz = (d0 + d1) * d_other
+
+        val input0 = NewArray[Float](in0_sz)
+        // scanFile[Float]("golden/concat2/input0.data", input0, in0_sz)
+        for (i <- (0 until in0_sz): Rep[Range]) {
+          input0(i) = i
+        }
+        val cuda_input0 = cudaMalloc2[Float](in0_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input0, input0, in0_sz, host2device))
+
+        val input1 = NewArray[Float](in1_sz)
+        // scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
+        for (i <- (0 until in1_sz): Rep[Range]) {
+          input1(i) = i + 50
+        }
+        val cuda_input1 = cudaMalloc2[Float](in1_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input1, input1, in1_sz, host2device))
+
+        val input2 = NewArray[Float](in2_sz)
+        // scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
+        for (i <- (0 until in2_sz): Rep[Range]) {
+          input2(i) = i + 100
+        }
+        val cuda_input2 = cudaMalloc2[Float](in2_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input2, input2, in2_sz, host2device))
+
+        val output = NewArray[Float](out_sz)
+        val cuda_output = cudaMalloc2[Float](out_sz)
+
+        val concatKernel = cuda3DConcat[Float](3, List(d0, d1, d2, d_other), List(cuda_input0, cuda_input1, cuda_input2))
+        concatKernel(cuda_output, dim3((out_sz + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
+
+        // checkFile[Float]("golden/concat2/output.data", output, out_sz)
+        printf("output: [")
+        for (i <- (0 until out_sz): Rep[Range]) {
+          printf("%f,", output(i))
+        }
+        printf("]\n")
+
       }
     }
     System.out.println(indent(driver.code))
