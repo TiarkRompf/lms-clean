@@ -1237,6 +1237,37 @@ trait CudaLibs extends CudaOps {
       }, {})
     }
   }
+
+  // ds: [d0, d1, d2, ..., dn-1, d_other]
+  def cuda3DSplit[N:Numeric:Manifest](n: Int, ds: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
+    val d = ds.init.reduce((x, y) => x + y)
+    val d_other = ds(n)
+    val input_size = d_other * d
+    val offs = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
+
+    (in: Rep[Array[N]], out: Rep[Array[N]]) => {
+      val idx = blockIdxX * blockDimX + threadIdxX
+
+      __ifThenElse(idx < input_size, {
+        val value = in(idx)
+        val x = idx / d
+        val y = idx % d
+
+        def get_case(t: Int) = {
+          out(offs(t) + x * ds(t) + (y - offs(t))) = value
+        }
+
+        def make_case(t: Int): Unit = {
+          if (t == n-1) {
+            get_case(t)
+          } else {
+            __ifThenElse(y < offs(t+1), { get_case(t) }, { make_case(t+1) })
+          }
+        }
+        make_case(0)
+      }, {})
+    }
+  }
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {

@@ -674,6 +674,7 @@ class CudaTest extends TutorialFunSuite {
     check("concat2", driver.code, "cu")
   }
 
+  // TODO(Luke): change to check against pytorch
   test("split3_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
 
@@ -734,6 +735,47 @@ class CudaTest extends TutorialFunSuite {
       }
     }
     check("split3", driver.code, "cu")
+  }
+
+    test("split_kernel") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+
+        val d0 = 2
+        val d1 = 2
+        val d2 = 1
+        val d_other = 3
+
+        val in_sz = d_other * (d0 + d1 + d2)
+        val out0_sz = d_other * d0
+        val out1_sz = d_other * d1
+        val out2_sz = d_other * d2
+
+        val input = NewArray[Float](in_sz)
+        for (i <- (0 until in_sz): Rep[Range]) {
+          input(i) = i
+        }
+        val cuda_input = cudaMalloc2[Float](in_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
+
+        val output = NewArray[Float](in_sz)
+        val cuda_output = cudaMalloc2[Float](in_sz)
+
+        val splitKernel = cuda3DSplit[Float](3, List(2, 2, 1, 3))
+        splitKernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
+        
+        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, in_sz, device2host))
+
+        printf("output: [")
+        for (i <- (0 until in_sz): Rep[Range]) {
+          printf("%f,", output(i))
+        }
+        printf("]\n")
+      }
+    }
+    System.out.println(indent(driver.code))
   }
 }
 
