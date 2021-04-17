@@ -745,7 +745,7 @@ class CudaTest extends TutorialFunSuite {
         val output = NewArray[Float](in_sz)
         val cuda_output = cudaMalloc2[Float](in_sz)
 
-        val splitKernel = cuda3DSplit[Float](3, List(2, 2, 1, 3))
+        val splitKernel = cuda3DSplit[Float](3, List(d0, d1, d2, d_other))
         splitKernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
         
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, in_sz, device2host))
@@ -753,7 +753,7 @@ class CudaTest extends TutorialFunSuite {
         checkFile[Float]("golden/split3/output.data", output, in_sz)
       }
     }
-    check("split3n", driver.code, "cu")
+    check("split", driver.code, "cu")
   }
 
   test("concat_kernel") {

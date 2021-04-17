@@ -1255,7 +1255,7 @@ trait CudaLibs extends CudaOps {
         val y = idx % d
 
         def get_case(t: Int) = {
-          out(offs(t) + x * ds(t) + (y - offs(t))) = value
+          out(d_other * offs(t) + x * ds(t) + (y - offs(t))) = value
         }
 
         def make_case(t: Int): Unit = {
