@@ -12,7 +12,7 @@ Emitting C Generated Code
 #include <stdbool.h>
 #include "scanner_header.h"
 /************* Functions **************/
-__global__ void x7(float* x8, int x9, float* x10, int x11, float* x12, int x13) {
+__global__ void x9(float* x10, int x11, float* x12, int x13, float* x14, int x15) {
   // this is cuda 2-way split kernel.
   // It takes a 3D array and splits on the innermost dimension (dim2) into two arrays.
   // arg0: input array
@@ -22,12 +22,20 @@ __global__ void x7(float* x8, int x9, float* x10, int x11, float* x12, int x13) 
   // arg4: second output array
   // arg5: dim2 of second output array
   // call constraint: arg3 + arg5 = arg0.dim2
-  int x14 = blockIdx.x * blockDim.x + threadIdx.x;
-  int x15 = x11 + x13;
-  if (x14 < x9 * x15) {
-    int x16 = x14 % x15;
-    if (x16 < x11) x10[x14 / x15 * x11 + x16] = x8[x14];
-    else x12[x14 / x15 * x13 + (x16 - x11)] = x8[x14];
+  int x16 = blockIdx.x * blockDim.x + threadIdx.x;
+  int x17 = x13 + x15;
+  if (x16 < x11 * x17) {
+    int x18 = x16 % x17;
+    if (x18 < x13) x12[x16 / x17 * x13 + x18] = x10[x16];
+    else x14[x16 / x17 * x15 + (x18 - x13)] = x10[x16];
+  }
+}
+__global__ void x19(float* x20, float* x21) {
+  int x22 = blockIdx.x * blockDim.x + threadIdx.x;
+  if (x22 < 16) {
+    int x23 = x22 % 4;
+    if (x23 < 2) x21[x22 / 4 * 2 + x23] = x20[x22];
+    else x21[8 + x22 / 4 * 2 + (x23 - 2)] = x20[x22];
   }
 }
 /**************** Snippet ****************/
@@ -43,11 +51,19 @@ void Snippet(int x0) {
   float* x5 = (float*)malloc(8 * sizeof(float));
   float* x6 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x6, (size_t)(8 * sizeof(float))));
-  x7<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, 4, x4, 2, x6, 2);
+  float* x7 = (float*)malloc(16 * sizeof(float));
+  float* x8 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x8, (size_t)(16 * sizeof(float))));
+  x9<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, 4, x4, 2, x6, 2);
   CUDA_CALL(cudaMemcpy(x3, x4, (size_t)(8 * sizeof(float)), cudaMemcpyDeviceToHost));
   CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(8 * sizeof(float)), cudaMemcpyDeviceToHost));
+  // check cuda3DSplit2 kernel against individual outputs
   check_float_array("golden/split2/output0.data", x3, 8);
   check_float_array("golden/split2/output1.data", x5, 8);
+  x19<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, x8);
+  CUDA_CALL(cudaMemcpy(x7, x8, (size_t)(16 * sizeof(float)), cudaMemcpyDeviceToHost));
+  // check general cuda3DSplit kernel against one-array output
+  check_float_array("golden/split2/output.data", x7, 16);
 }
 /*****************************************
 End of C Generated Code

@@ -624,14 +624,26 @@ class CudaTest extends TutorialFunSuite {
         val output1 = NewArray[Float](out1_sz)
         val cuda_output1 = cudaMalloc2[Float](out1_sz)
 
-        val splitKernel = cuda3DSplit2[Float]
-        splitKernel(cuda_input, d_other, cuda_output0, d0, cuda_output1, d1, dim3((in_sz + 511)/512), dim3(512))
+        val output = NewArray[Float](in_sz)
+        val cuda_output = cudaMalloc2[Float](in_sz)
+
+        val split2Kernel = cuda3DSplit2[Float]
+        split2Kernel(cuda_input, d_other, cuda_output0, d0, cuda_output1, d1, dim3((in_sz + 511)/512), dim3(512))
 
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
 
+        generate_comment("check cuda3DSplit2 kernel against individual outputs")
         checkFile[Float]("golden/split2/output0.data", output0, out0_sz)
         checkFile[Float]("golden/split2/output1.data", output1, out1_sz)
+
+        val splitKernel = cuda3DSplit[Float](2, List(d0, d1, d_other))
+        splitKernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, in_sz, device2host))
+
+        generate_comment("check general cuda3DSplit kernel against one-array output")
+        checkFile[Float]("golden/split2/output.data", output, in_sz)
       }
     }
     check("split2", driver.code, "cu")
