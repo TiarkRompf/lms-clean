@@ -1231,7 +1231,7 @@ trait CudaLibs extends CudaOps {
       __ifThenElse(idx < input_size, {
         val x = idx / d
         val y = idx % d
-        
+
         def get_case(t: Int) = {
           val arr = in(t)
           out(idx) = arr(x * ds(t) + (y - offs(t)))
