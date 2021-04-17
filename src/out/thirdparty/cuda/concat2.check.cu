@@ -29,6 +29,14 @@ __global__ void x7(float* x8, int x9, float* x10, int x11, float* x12, int x13) 
     x12[x14] = x16 < x9 ? x8[x14 / x15 * x9 + x16] : x10[x14 / x15 * x11 + (x16 - x9)];
   }
 }
+__global__ void x17(float* x18) {
+  int x19 = blockIdx.x * blockDim.x + threadIdx.x;
+  if (x19 < 48) {
+    int x20 = x19 % 8;
+    if (x20 < 3) x18[x19] = x2[x19 / 8 * 3 + x20];
+    else x18[x19] = x4[x19 / 8 * 5 + (x20 - 3)];
+  }
+}
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(18 * sizeof(float));
@@ -46,6 +54,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x6, (size_t)(48 * sizeof(float))));
   x7<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, 3, x4, 5, x6, 6);
   CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(48 * sizeof(float)), cudaMemcpyDeviceToHost));
+  // check cuda3DConcat2 kernel
+  check_float_array("golden/concat2/output.data", x5, 48);
+  x17<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x6);
+  CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(48 * sizeof(float)), cudaMemcpyDeviceToHost));
+  // check general cuda3DConcat kernel
   check_float_array("golden/concat2/output.data", x5, 48);
 }
 /*****************************************

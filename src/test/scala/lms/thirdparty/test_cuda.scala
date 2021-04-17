@@ -675,11 +675,20 @@ class CudaTest extends TutorialFunSuite {
         val output = NewArray[Float](out_sz)
         val cuda_output = cudaMalloc2[Float](out_sz)
 
-        val concatKernel = cuda3DConcat2[Float]
-        concatKernel(cuda_input0, d0, cuda_input1, d1, cuda_output, d_other, dim3((out_sz + 511)/512), dim3(512))
+        val concat2Kernel = cuda3DConcat2[Float]
+        concat2Kernel(cuda_input0, d0, cuda_input1, d1, cuda_output, d_other, dim3((out_sz + 511)/512), dim3(512))
 
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
+        generate_comment("check cuda3DConcat2 kernel")
+        checkFile[Float]("golden/concat2/output.data", output, out_sz)
+
+        val concatKernel = cuda3DConcat[Float](2, List(d0, d1, d_other), List(cuda_input0, cuda_input1))
+        concatKernel(cuda_output, dim3((out_sz + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
+
+        generate_comment("check general cuda3DConcat kernel")
         checkFile[Float]("golden/concat2/output.data", output, out_sz)
       }
     }
