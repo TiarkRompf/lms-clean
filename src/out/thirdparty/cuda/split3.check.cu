@@ -36,27 +36,27 @@ __global__ void x9(float* x10, int x11, float* x12, int x13, float* x14, int x15
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  float* x1 = (float*)malloc(15 * sizeof(float));
-  scan_float("golden/split3/input.data", x1, 15);
+  float* x1 = (float*)malloc(20 * sizeof(float));
+  scan_float("golden/split3/input.data", x1, 20);
   float* x2 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x2, (size_t)(15 * sizeof(float))));
-  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(15 * sizeof(float)), cudaMemcpyHostToDevice));
-  float* x3 = (float*)malloc(6 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x2, (size_t)(20 * sizeof(float))));
+  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(20 * sizeof(float)), cudaMemcpyHostToDevice));
+  float* x3 = (float*)malloc(8 * sizeof(float));
   float* x4 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x4, (size_t)(6 * sizeof(float))));
-  float* x5 = (float*)malloc(6 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)(8 * sizeof(float))));
+  float* x5 = (float*)malloc(8 * sizeof(float));
   float* x6 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x6, (size_t)(6 * sizeof(float))));
-  float* x7 = (float*)malloc(3 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x6, (size_t)(8 * sizeof(float))));
+  float* x7 = (float*)malloc(4 * sizeof(float));
   float* x8 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x8, (size_t)(3 * sizeof(float))));
-  x9<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, 3, x4, 2, x6, 2, x8, 1);
-  CUDA_CALL(cudaMemcpy(x3, x4, (size_t)(6 * sizeof(float)), cudaMemcpyDeviceToHost));
-  CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(6 * sizeof(float)), cudaMemcpyDeviceToHost));
-  CUDA_CALL(cudaMemcpy(x7, x8, (size_t)(3 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array("golden/split3/output0.data", x3, 6);
-  check_float_array("golden/split3/output1.data", x5, 6);
-  check_float_array("golden/split3/output2.data", x7, 3);
+  CUDA_CALL(cudaMalloc(&x8, (size_t)(4 * sizeof(float))));
+  x9<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x2, 4, x4, 2, x6, 2, x8, 1);
+  CUDA_CALL(cudaMemcpy(x3, x4, (size_t)(8 * sizeof(float)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(8 * sizeof(float)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x7, x8, (size_t)(4 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array("golden/split3/output0.data", x3, 8);
+  check_float_array("golden/split3/output1.data", x5, 8);
+  check_float_array("golden/split3/output2.data", x7, 4);
 }
 /*****************************************
 End of C Generated Code

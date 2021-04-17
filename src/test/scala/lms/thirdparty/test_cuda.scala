@@ -684,7 +684,7 @@ class CudaTest extends TutorialFunSuite {
         val d0 = 2
         val d1 = 2
         val d2 = 1
-        val d_other = 3
+        val d_other = 2*2
 
         val in_sz = d_other * (d0 + d1 + d2)
         val out0_sz = d_other * d0
@@ -730,7 +730,7 @@ class CudaTest extends TutorialFunSuite {
         val d0 = 2
         val d1 = 2
         val d2 = 1
-        val d_other = 3
+        val d_other = 2*2
 
         val in_sz = d_other * (d0 + d1 + d2)
         val out0_sz = d_other * d0
@@ -738,9 +738,7 @@ class CudaTest extends TutorialFunSuite {
         val out2_sz = d_other * d2
 
         val input = NewArray[Float](in_sz)
-        for (i <- (0 until in_sz): Rep[Range]) {
-          input(i) = i
-        }
+        scanFile[Float]("golden/split3/input.data", input, in_sz)
         val cuda_input = cudaMalloc2[Float](in_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
 
@@ -752,14 +750,10 @@ class CudaTest extends TutorialFunSuite {
         
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, in_sz, device2host))
 
-        printf("output: [")
-        for (i <- (0 until in_sz): Rep[Range]) {
-          printf("%f,", output(i))
-        }
-        printf("]\n")
+        checkFile[Float]("golden/split3/output.data", output, in_sz)
       }
     }
-    System.out.println(indent(driver.code))
+    check("split3n", driver.code, "cu")
   }
 
   test("concat_kernel") {
