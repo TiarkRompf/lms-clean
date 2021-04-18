@@ -428,6 +428,12 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
     Wrap[Array[New]](Adapter.g.reflectMutable("CastArray", Unwrap(arr)))
   }
 
+  def cudaBallotSync[T:Manifest](mask: Rep[Int], predicate: Rep[Int]) =
+    libFunction[Int]("__ballot_sync", Unwrap(mask), Unwrap(predicate))(Seq[Int](), Seq[Int](), Set[Int]())
+  
+  def cudaFfs[T:Manifest](x: Rep[Int]) =
+    libFunction[Int]("__ffs", Unwrap(x))(Seq[Int](), Seq[Int](), Set[Int]())
+
   case class Matrix2D[T:Manifest](x: Rep[Array[T]], skip: Int) {
     def apply(i: Rep[Int], j: Rep[Int])(implicit __pos: SourceContext): Rep[T] = {
       val offset = skip * i + j
@@ -1027,19 +1033,61 @@ trait CudaLibs extends CudaOps {
 
 
   def cudaEmbeddingGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (indicies: Rep[Array[Int]], grad: Rep[Array[N]], gradWeight: Rep[Array[N]], n: Rep[Int], size: Rep[Int], paddingIdx: Rep[Int]) =>
+    (indicies: Rep[Array[Int]], grad: Rep[Array[N]], gradWeight: Rep[Array[N]], n: Rep[Int], stride: Rep[Int], paddingIdx: Rep[Int]) =>
       generate_comment("Cuda Embedding Grad")
       val buffer = NewDynSharedArray[N]
       val my_s = buffer.slice(warpSize * threadIdxY, warpSize * threadIdxY)
-//      val indicies_batch = cast_helper[Array[N], Array[Int]](buffer.slice(sizeOf[Float] * warpSize * blockDimY, sizeOf[Float] * warpSize * blockDimY))
 
       val indicies_batch = CastArray[N, Int](buffer.slice(sizeOf[Float] * warpSize * blockDimY, sizeOf[Float] * warpSize * blockDimY))
-      // val size  = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
+      val feature_dim = threadIdxX + blockIdxX * blockDimX
 
+      def conditional_assign[T:Numeric:Manifest](cond: Rep[Boolean], dst: Rep[Array[T]], in: Rep[Int], src: Rep[Array[T]], out: Rep[Int]) = {
+        __ifThenElse(cond, {dst(in) = src(out)}, {})
+      }
 
-      my_s(n) = grad(n) - gradWeight(n)
-      gradWeight(n) = grad(n) * gradWeight(n) + my_s(n)
-      indicies(n) = indicies_batch(n)
+      def min[T:Numeric:Manifest](x: Rep[T], y: Rep[T]) = {
+        __ifThenElse(x < y, x, y)
+      }
+
+      for (batch_start <- (0 until (n, blockDimX * blockDimY)): Rep[Range]) {
+        val tid = threadIdxX + threadIdxY * blockDimX
+        conditional_assign(batch_start + tid < n, indicies_batch, tid, indicies, batch_start + tid)
+        val batch_end = min(batch_start + blockDimX * blockDimY, n)
+
+        for (chunk_start <- (batch_start until (batch_end, blockDimY)): Rep[Range]) {
+          cudaSyncThreads
+
+          val n_this_chunk = min(batch_end - chunk_start, blockDimY)
+          val src_row = chunk_start + threadIdxY
+          val dst_row = indicies_batch(src_row - batch_start)
+          conditional_assign(src_row < n && feature_dim < stride && dst_row != paddingIdx, my_s, threadIdxX, grad, src_row * stride + feature_dim)
+
+          cudaSyncThreads
+
+          __ifThenElse(src_row < n && (dst_row != paddingIdx), {
+            val match_found_this_thread = var_new(__ifThenElse(dst_row == indicies_batch(chunk_start - batch_start + threadIdxX), 1, 0))
+            __ifThenElse(threadIdxX >= n_this_chunk, {__assign(match_found_this_thread, 0)}, {})
+
+            val matchmask = var_new(cudaBallotSync(0xffffffff, match_found_this_thread))
+            indicies(n_this_chunk) = matchmask 
+            val first_remaining_peer = var_new(cudaFfs(matchmask) - 1)
+
+            __ifThenElse(equals(threadIdxY, readVar(first_remaining_peer)), {
+              __assign(matchmask, matchmask ^ (1 << readVar(first_remaining_peer)))
+              indicies(n_this_chunk) = matchmask 
+              
+              __whileDo(readVar(matchmask) > 0, {
+                __assign(first_remaining_peer, cudaFfs(matchmask) - 1)
+                my_s(threadIdxX) = my_s(threadIdxX) + buffer(threadIdxX + warpSize * first_remaining_peer)
+                __assign(matchmask, matchmask ^ (1 << readVar(first_remaining_peer)))
+              })
+
+              __ifThenElse(feature_dim < stride, {gradWeight(dst_row * stride + feature_dim) += my_s(threadIdxX)}, {})
+              ()
+            }, {})
+          }, {})
+        }
+      }
   }
 
     
