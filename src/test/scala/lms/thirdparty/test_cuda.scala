@@ -337,58 +337,96 @@ class CudaTest extends TutorialFunSuite {
     check("embedding", driver.code, "cu")
   }
 
-  // TODO(Supun): Currently, this just emits the generated code (always passes the test)
-  //  and we need to manually run the generated code to test
   test("softmax_kernel") {
-    val driver = new DslDriverCCuda[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val dataSize = 2*2*3
-        val data = Seq[Rep[Float]](1, 2, 3, 4, 6, 8, 1, 5, 9, 1, 9, 12)
-        val hostInput = Array[Float](data:_*)
-        val devInput = cudaMalloc2[Float](dataSize)
+        // dim0 and dim1 picked arbitrary
+        val dim0 = 20
+        val dim1 = 782
+        val size = dim0 * dim1
 
-        val hostOutput = NewArray[Float](dataSize)
-        val devOutput = cudaMalloc2[Float](dataSize)
+        // inputs to the test
+        val input = NewArray[Float](dim0 * dim1)
+        scanFile[Float]("golden/softmax/input.data", input, size)
+        val outputGrad = NewArray[Float](size)
+        scanFile[Float]("golden/softmax/output_grad.data", outputGrad, size)
 
-        val expectedOutput =
-          Array[Float](Seq[Rep[Float]](0.09f, 0.2447f, 0.6652f, 0.0158f, 0.1173f, 0.8668f,
-                            0.0003f, 0.01798f, 0.9817f, 0.000015f, 0.0474f, 0.9525f):_*)
+        val cudaInput = cudaMalloc2[Float](size)
+        val cudaOutputGrad = cudaMalloc2[Float](size)
+        cudaCall(cudaMemcpyOfT[Float](cudaInput, input, size, host2device))
+        cudaCall(cudaMemcpyOfT[Float](cudaOutputGrad, outputGrad, size, host2device))
 
-        cudaCall(cudaMemcpyOfT(devInput, hostInput, dataSize, host2device))
-        val softmaxKernel = softmax[Float](false)
-        softmaxKernel(devInput, devOutput, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+        val inputGrad = NewArray[Float](size)
+        val output = NewArray[Float](size)
+        val cudaInputGrad = cudaMalloc2[Float](size)
+        val cudaOutput = cudaMalloc2[Float](size)
 
-        cudaCall(cudaMemcpyOfT(hostOutput, devOutput, dataSize, device2host))
+        // forward
+        val softmaxKernel = cudaSoftmax[Float](false)
+        softmaxKernel(cudaInput, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
 
-        // validate the output
-        for(i <- (0 until dataSize): Rep[Range]) {
-          if (Math.abs(hostOutput(i) - expectedOutput(i)) > 0.0001f) {
-            printf("Error! Expected: %.3f got %.3f\n", expectedOutput(i), hostOutput(i))
-          } else {
-            printf("Matched\n")
-          }
-        }
+        // backward
+        val softmaxGradKernel = cudaSoftmaxGrad[Float](false)
+        softmaxGradKernel(cudaInputGrad, cudaOutputGrad, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        // move outputs to the host
+        cudaCall(cudaMemcpyOfT[Float](inputGrad, cudaInputGrad, size, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output, cudaOutput, size, device2host))
+
+        // check with expected output
+        checkFile[Float]("golden/softmax/input_grad.data", inputGrad, size)
+        checkFile[Float]("golden/softmax/output.data", output, size)
       }
     }
     check("softmax", driver.code, "cu")
   }
 
-  // TODO(Supun): Remove. Added just to observe and manually test the kernel
-  // Tested by replacing the generated kernel in cublas_header and running lantern(old) test
-  test("softmaxGrad_kernel") {
-    val driver = new DslDriverCCuda[Int, Unit] {
+  test("logSoftmax_kernel") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val dummy = NewArray[Float](1)
+        // dim0 and dim1 picked arbitrary
+        val dim0 = 32
+        val dim1 = 533
+        val size = dim0 * dim1
 
-        val softmaxGradKernel = softmaxGrad[Float](false)
-        softmaxGradKernel(dummy, dummy, dummy, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+        // inputs to the test
+        val input = NewArray[Float](dim0 * dim1)
+        scanFile[Float]("golden/logSoftmax/input.data", input, size)
+        val outputGrad = NewArray[Float](size)
+        scanFile[Float]("golden/logSoftmax/output_grad.data", outputGrad, size)
+
+        val cudaInput = cudaMalloc2[Float](size)
+        val cudaOutputGrad = cudaMalloc2[Float](size)
+        cudaCall(cudaMemcpyOfT[Float](cudaInput, input, size, host2device))
+        cudaCall(cudaMemcpyOfT[Float](cudaOutputGrad, outputGrad, size, host2device))
+
+        val inputGrad = NewArray[Float](size)
+        val output = NewArray[Float](size)
+        val cudaInputGrad = cudaMalloc2[Float](size)
+        val cudaOutput = cudaMalloc2[Float](size)
+
+        // forward
+        val softmaxKernel = cudaSoftmax[Float](true)
+        softmaxKernel(cudaInput, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        // backward
+        val softmaxGradKernel = cudaSoftmaxGrad[Float](true)
+        softmaxGradKernel(cudaInputGrad, cudaOutputGrad, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        // move outputs to the host
+        cudaCall(cudaMemcpyOfT[Float](inputGrad, cudaInputGrad, size, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output, cudaOutput, size, device2host))
+
+        // check with expected output
+        checkFile[Float]("golden/logSoftmax/input_grad.data", inputGrad, size)
+        checkFile[Float]("golden/logSoftmax/output.data", output, size)
       }
     }
-    // check("kernel_2d_array", driver.code, "cu")
+    check("logSoftmax", driver.code, "cu")
   }
 
   test("maskedFill_kernel") {
