@@ -336,6 +336,38 @@ class CudaTest extends TutorialFunSuite {
     check("embedding", driver.code, "cu")
   }
 
+  test("embedding_grad_kernel") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val n_embeddings = 20
+        val embed_size = 60
+        val paddingIdx = 20
+
+        val embedding = NewArray[Float](n_embeddings * embed_size)
+        // scanFile[Float]("golden/embedding/embedding.data", embedding, n_embeddings * embed_size)
+        val cuda_embedding = cudaMalloc2[Float](n_embeddings * embed_size)
+        cudaCall(cudaMemcpyOfT(cuda_embedding, embedding, n_embeddings * embed_size, host2device))
+
+        val n_indices = 10
+        val indices = NewArray[Int](n_indices)
+        // scanFile[Int]("golden/embedding/indices.data", indices, n_indices)
+        val cuda_indices = cudaMalloc2[Int](n_indices)
+        cudaCall(cudaMemcpyOfT(cuda_indices, indices, n_indices, host2device))
+
+        val output = NewArray[Float](n_indices * embed_size)
+        val cuda_output = cudaMalloc2[Float](n_indices * embed_size)
+        val cudaEmbeddingKernel = cudaEmbeddingGrad[Float] //cudaEmbedding[Float]
+        cudaEmbeddingKernel(cuda_indices, cuda_embedding, cuda_output, n_embeddings, embed_size, paddingIdx, dim3(embed_size), dim3(n_indices))
+        cudaCall(cudaMemcpyOfT(output, cuda_output, n_indices * embed_size, device2host))
+        // checkFile[Float]("golden/embedding/output.data", output, n_indices * embed_size)
+      }
+    }
+    // check("embedding_grad", driver.code, "cu")
+    System.out.println(indent(driver.code))
+  }
+
   // TODO(Supun): Currently, this just emits the generated code (always passes the test)
   //  and we need to manually run the generated code to test
   test("softmax_kernel") {
@@ -443,38 +475,6 @@ class CudaTest extends TutorialFunSuite {
     check("maskedFill", driver.code, "cu")
   }
 
-  test("embedding_grad_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
-
-      @virtualize
-      def snippet(arg: Rep[Int]) = {
-        val n_embeddings = 20
-        val embed_size = 60
-        val paddingIdx = 20
-
-        val embedding = NewArray[Float](n_embeddings * embed_size)
-        // scanFile[Float]("golden/embedding/embedding.data", embedding, n_embeddings * embed_size)
-        val cuda_embedding = cudaMalloc2[Float](n_embeddings * embed_size)
-        cudaCall(cudaMemcpyOfT(cuda_embedding, embedding, n_embeddings * embed_size, host2device))
-
-        val n_indices = 10
-        val indices = NewArray[Int](n_indices)
-        // scanFile[Int]("golden/embedding/indices.data", indices, n_indices)
-        val cuda_indices = cudaMalloc2[Int](n_indices)
-        cudaCall(cudaMemcpyOfT(cuda_indices, indices, n_indices, host2device))
-
-        val output = NewArray[Float](n_indices * embed_size)
-        val cuda_output = cudaMalloc2[Float](n_indices * embed_size)
-        val cudaEmbeddingKernel = cudaEmbeddingGrad[Float] //cudaEmbedding[Float]
-        cudaEmbeddingKernel(cuda_indices, cuda_embedding, cuda_output, n_embeddings, embed_size, paddingIdx, dim3(embed_size), dim3(n_indices))
-        cudaCall(cudaMemcpyOfT(output, cuda_output, n_indices * embed_size, device2host))
-        // checkFile[Float]("golden/embedding/output.data", output, n_indices * embed_size)
-      }
-    }
-    // check("embedding_grad", driver.code, "cu")
-    System.out.println(indent(driver.code))
-  }
-  
   test("transpose_kernel") {
     val driver = new DslDriverCCuda[Int, Unit] {
 

@@ -23,6 +23,7 @@ def generate_data(lms_clean_root: str):
     printer("embedding.data", embedding.weight)
     printer("indices.data", indices)
     printer("output.data", output)
+    printer("input_grad.data", input.grad)
 
 if __name__ == '__main__':
     assert len(sys.argv) > 1, "must provide lms_clean_root dir"
