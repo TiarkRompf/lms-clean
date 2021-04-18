@@ -363,11 +363,11 @@ class CudaTest extends TutorialFunSuite {
         val cudaOutput = cudaMalloc2[Float](size)
 
         // forward
-        val softmaxKernel = softmax[Float](false)
+        val softmaxKernel = cudaSoftmax[Float](false)
         softmaxKernel(cudaInput, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
 
         // backward
-        val softmaxGradKernel = softmaxGrad[Float](false)
+        val softmaxGradKernel = cudaSoftmaxGrad[Float](false)
         softmaxGradKernel(cudaInputGrad, cudaOutputGrad, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
 
         // move outputs to the host
@@ -409,11 +409,11 @@ class CudaTest extends TutorialFunSuite {
         val cudaOutput = cudaMalloc2[Float](size)
 
         // forward
-        val softmaxKernel = softmax[Float](true)
+        val softmaxKernel = cudaSoftmax[Float](true)
         softmaxKernel(cudaInput, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
 
         // backward
-        val softmaxGradKernel = softmaxGrad[Float](true)
+        val softmaxGradKernel = cudaSoftmaxGrad[Float](true)
         softmaxGradKernel(cudaInputGrad, cudaOutputGrad, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
 
         // move outputs to the host

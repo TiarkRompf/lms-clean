@@ -1068,7 +1068,7 @@ trait CudaLibs extends CudaOps {
     cudaSyncThreads
   }
 
-  def softmax[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
+  def cudaSoftmax[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (input: Rep[Array[N]], output: Rep[Array[N]], lastDimSize: Rep[Int]) =>
       generate_comment("This is cuda softmax (for larger; >=1024 inputs). Performs softmax on last dim.")
       generate_comment("arg0: input: <outerSize x lastDimSize>")
@@ -1111,8 +1111,7 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  // TODO(Supun): test log Softmax case
-  def softmaxGrad[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
+  def cudaSoftmaxGrad[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (gradInput: Rep[Array[N]], gradOutput: Rep[Array[N]], output: Rep[Array[N]], size: Rep[Int]) =>
       generate_comment("This is cuda softmax (for larger; >=1024 inputs). Performs softmax on last dim.")
       generate_comment("arg0: gradInput: the gradient of the original input (i.e., the softmax input) - " +
