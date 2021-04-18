@@ -1209,7 +1209,7 @@ trait CudaLibs extends CudaOps {
   def flatten(shape: List[Rep[Int]], index: List[Rep[Int]])(implicit __pos: SourceContext): Rep[Int] = {
     val a: Rep[Int] = (shape.tail zip index.init).foldLeft(unit(0)) {
       case (z: Rep[Int], (shape: Rep[Int], index: Rep[Int])) => (index + z) * shape
-      }
+    }
     a + index.last
   }
 
