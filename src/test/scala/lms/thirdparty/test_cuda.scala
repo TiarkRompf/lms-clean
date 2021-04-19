@@ -649,6 +649,51 @@ class CudaTest extends TutorialFunSuite {
     check("split2", driver.code, "cu")
   }
 
+  test("splitM_kernel") {
+    val driver = new DslDriverCCudeScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val d0 = 2
+        val d1 = 2
+        val d_other = 4
+
+        val in_sz = d_other * (d0 + d1)
+        val out0_sz = d_other * d0
+        val out1_sz = d_other * d1
+
+        val input = NewArray[Float](in_sz)
+        scanFile[Float]("golden/split2/input.data", input, in_sz)
+        val cuda_input = cudaMalloc2[Float](in_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
+
+        val output0 = NewArray[Float](out0_sz)
+        val cuda_output0 = cudaMalloc2[Float](out0_sz)
+
+        val output1 = NewArray[Float](out1_sz)
+        val cuda_output1 = cudaMalloc2[Float](out1_sz)
+
+        val output = NewArray[Array[Float]](2)
+        output(0) = output0
+        output(1) = output1
+        val cuda_output = cudaMalloc2[Array[Float]](2)
+        cuda_output(0) = cuda_output0
+        cuda_output(1) = cuda_output1
+
+        val split2Kernel = cuda3DSplitM[Float](2, List(d0, d1, d_other))
+        split2Kernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](output(0), cuda_output(0), out0_sz, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output(1), cuda_output(1), out1_sz, device2host))
+
+        generate_comment("check cuda3DSplitM kernel against individual outputs")
+        checkFile[Float]("golden/split2/output0.data", output0, out0_sz)
+        checkFile[Float]("golden/split2/output1.data", output1, out1_sz)
+      }
+    }
+    System.out.println(driver.code)
+  }
+
   test("concat2_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
 
