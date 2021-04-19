@@ -1216,6 +1216,19 @@ trait CudaLibs extends CudaOps {
     }
   }
 
+  def cuda3DSplitWrap[N:Numeric:Manifest](in: Rep[Array[N]], outs: List[Rep[Array[N]]], ds: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+    val sec = outs.length
+    val output = NewArray[Array[N]](sec)
+    for (i <- (0 until sec): Range) {
+      output(i) = outs(i)
+    }
+    val cuda_output = cudaMalloc2[Array[N]](sec)
+    cudaCall(cudaMemcpyOfT[Array[N]](cuda_output, output, sec, host2device))
+
+    val splitKernel = cuda3DSplit[N](sec, ds)
+    splitKernel(in, cuda_output, grid, block)
+  }
+
   def cuda3DConcat[N:Numeric:Manifest](n: Int, ds: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
     val d = ds.init.reduce((x, y) => x + y)
     val d_other = ds(n)
@@ -1251,6 +1264,19 @@ trait CudaLibs extends CudaOps {
         make_case(0)
       }, {})
     }
+  }
+
+  def cuda3DConcatWrap[N:Numeric:Manifest](ins: List[Rep[Array[N]]], out: Rep[Array[N]], ds: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+    val sec = ins.length
+    val input = NewArray[Array[N]](sec)
+    for (i <- (0 until sec): Range) {
+      input(i) = ins(i)
+    }
+    val cuda_input = cudaMalloc2[Array[N]](sec)
+    cudaCall(cudaMemcpyOfT[Array[N]](cuda_input, input, sec, host2device))
+
+    val concatKernel = cuda3DConcat[N](sec, ds)
+    concatKernel(cuda_input, out, grid, block)
   }
 
   // kernel function for 2D transpose

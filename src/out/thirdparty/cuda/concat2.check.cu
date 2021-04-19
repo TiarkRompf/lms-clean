@@ -38,19 +38,19 @@ void Snippet(int x0) {
   float* x4 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x4, (size_t)(30 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(30 * sizeof(float)), cudaMemcpyHostToDevice));
-  float** x5 = (float**)malloc(2 * sizeof(float*));
-  x5[0] = x2;
-  x5[1] = x4;
-  float** x6 = (float**)malloc(0 * sizeof(float*));
-  CUDA_CALL(cudaMalloc(&x6, (size_t)(2 * sizeof(float*))));
-  CUDA_CALL(cudaMemcpy(x6, x5, (size_t)(2 * sizeof(float*)), cudaMemcpyHostToDevice));
-  float* x7 = (float*)malloc(48 * sizeof(float));
-  float* x8 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x8, (size_t)(48 * sizeof(float))));
-  x9<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x6, x8);
-  CUDA_CALL(cudaMemcpy(x7, x8, (size_t)(48 * sizeof(float)), cudaMemcpyDeviceToHost));
+  float* x5 = (float*)malloc(48 * sizeof(float));
+  float* x6 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x6, (size_t)(48 * sizeof(float))));
+  float** x7 = (float**)malloc(2 * sizeof(float*));
+  x7[0] = x2;
+  x7[1] = x4;
+  float** x8 = (float**)malloc(0 * sizeof(float*));
+  CUDA_CALL(cudaMalloc(&x8, (size_t)(2 * sizeof(float*))));
+  CUDA_CALL(cudaMemcpy(x8, x7, (size_t)(2 * sizeof(float*)), cudaMemcpyHostToDevice));
+  x9<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x8, x6);
+  CUDA_CALL(cudaMemcpy(x5, x6, (size_t)(48 * sizeof(float)), cudaMemcpyDeviceToHost));
   // check general cuda3DConcat kernel
-  check_float_array("golden/concat2/output.data", x7, 48);
+  check_float_array("golden/concat2/output.data", x5, 48);
 }
 /*****************************************
 End of C Generated Code

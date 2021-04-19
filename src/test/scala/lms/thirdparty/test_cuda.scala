@@ -844,6 +844,7 @@ class CudaTest extends TutorialFunSuite {
         val output1 = NewArray[Float](out1_sz)
         val cuda_output1 = cudaMalloc2[Float](out1_sz)
 
+        /*
         val output = NewArray[Array[Float]](2)
         output(0) = cuda_output0
         output(1) = cuda_output1
@@ -853,7 +854,12 @@ class CudaTest extends TutorialFunSuite {
 
         val split2Kernel = cuda3DSplit[Float](2, List(d0, d1, d_other))
         split2Kernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
-
+        */
+        cuda3DSplitWrap[Float](cuda_input, 
+          List(cuda_output0, cuda_output1), 
+          List(d0, d1, d_other),
+          dim3((in_sz + 511)/512), dim3(512))
+        
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
 
@@ -887,19 +893,24 @@ class CudaTest extends TutorialFunSuite {
         scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
         val cuda_input1 = cudaMalloc2[Float](in1_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input1, input1, in1_sz, host2device))
-
+        /*
         val input = NewArray[Array[Float]](2)
         input(0) = cuda_input0
         input(1) = cuda_input1
         val cuda_input = cudaMalloc2[Array[Float]](2)
         cudaCall(cudaMemcpyOfT[Array[Float]](cuda_input, input, 2, host2device))
-
+        */
         val output = NewArray[Float](out_sz)
         val cuda_output = cudaMalloc2[Float](out_sz)
-
+        /*
         val concatKernel = cuda3DConcat[Float](2, List(d0, d1, d_other))
         concatKernel(cuda_input, cuda_output, dim3((out_sz + 511)/512), dim3(512))
-
+        */
+        cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1),
+          cuda_output,
+          List(d0, d1, d_other),
+          dim3((out_sz + 511)/512), dim3(512))
+          
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
         generate_comment("check general cuda3DConcat kernel")
