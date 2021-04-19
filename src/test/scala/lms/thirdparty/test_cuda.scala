@@ -821,7 +821,7 @@ class CudaTest extends TutorialFunSuite {
   }
 
   test("split2_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -866,7 +866,7 @@ class CudaTest extends TutorialFunSuite {
   }
 
   test("concat2_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -910,7 +910,7 @@ class CudaTest extends TutorialFunSuite {
   }
 
   test("split3_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
