@@ -1182,7 +1182,7 @@ trait CudaLibs extends CudaOps {
     val d = ds.init.reduce((x, y) => x + y)
     val d_other = ds(n)
     val input_size = d_other * d
-    val offs = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
+    val offsets = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
 
     (in: Rep[Array[N]], out: Rep[Array[Array[N]]]) => {
       generate_comment(s"This is cuda $n-section split kernel.")
@@ -1201,14 +1201,14 @@ trait CudaLibs extends CudaOps {
 
         def get_case(t: Int) = {
           val temp = out(t)
-          cudaArrayEffect[N](temp, x * ds(t) + (y - offs(t)), value)
+          cudaArrayEffect[N](temp, x * ds(t) + (y - offsets(t)), value)
         }
 
         def make_case(t: Int): Unit = {
           if (t == n-1) {
             get_case(t)
           } else {
-            __ifThenElse(y < offs(t+1), { get_case(t) }, { make_case(t+1) })
+            __ifThenElse(y < offsets(t+1), { get_case(t) }, { make_case(t+1) })
           }
         }
         make_case(0)
@@ -1220,7 +1220,7 @@ trait CudaLibs extends CudaOps {
     val d = ds.init.reduce((x, y) => x + y)
     val d_other = ds(n)
     val input_size = d_other * d
-    val offs = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
+    val offsets = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
 
     (in: Rep[Array[Array[N]]], out: Rep[Array[N]]) => {
       generate_comment(s"this is cuda $n-section concat kernel.") 
@@ -1238,14 +1238,14 @@ trait CudaLibs extends CudaOps {
 
         def get_case(t: Int) = {
           val arr = in(t)
-          out(idx) = arr(x * ds(t) + (y - offs(t)))
+          out(idx) = arr(x * ds(t) + (y - offsets(t)))
         }
 
         def make_case(t: Int): Unit = {
           if (t == n-1) {
             get_case(t)
           } else {
-            __ifThenElse(y < offs(t+1), { get_case(t) }, { make_case(t+1) })
+            __ifThenElse(y < offsets(t+1), { get_case(t) }, { make_case(t+1) })
           }
         }
         make_case(0)
