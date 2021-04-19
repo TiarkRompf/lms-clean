@@ -1127,8 +1127,6 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-
-
   def cuda3DSplit[N:Numeric:Manifest](n: Int, ds: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
     val d = ds.init.reduce((x, y) => x + y)
     val d_other = ds(n)
@@ -1142,6 +1140,7 @@ trait CudaLibs extends CudaOps {
       generate_comment("arg1: array of output arrays")
       generate_comment(s"call constraint: out.size = $n")
       generate_comment(s"call constraint: sum of out(i).size = in.size for i in [0, $n)")
+
       val idx = blockIdxX * blockDimX + threadIdxX
 
       __ifThenElse(idx < input_size, {
@@ -1166,13 +1165,20 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cuda3DConcat[N:Numeric:Manifest](n: Int, ds: List[Int], in: List[Rep[Array[N]]])(implicit __pos: SourceContext) = cudaGlobalFun {
+  def cuda3DConcat[N:Numeric:Manifest](n: Int, ds: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
     val d = ds.init.reduce((x, y) => x + y)
     val d_other = ds(n)
     val input_size = d_other * d
     val offs = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
 
-    (out: Rep[Array[N]]) => {
+    (in: Rep[Array[Array[N]]], out: Rep[Array[N]]) => {
+      generate_comment(s"this is cuda $n-section concat kernel.") 
+      generate_comment(s"It concatenates $n 3D arrays on the innermost dimension (dim2).")
+      generate_comment("arg0: array of input input arrays")
+      generate_comment("arg1: output array")
+      generate_comment(s"call constraint: in.size = $n")
+      generate_comment(s"call constraint: sum of in(i).size = out.size for i in [0, $n)")
+
       val idx = blockIdxX * blockDimX + threadIdxX
 
       __ifThenElse(idx < input_size, {
