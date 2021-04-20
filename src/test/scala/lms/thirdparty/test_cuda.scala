@@ -868,7 +868,9 @@ class CudaTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]) = {
         val d0 = 3
         val d1 = 5
-        val d_other = 3*2
+        val dimZ = 3
+        val dimY = 2
+        val d_other = dimZ * dimY
 
         val in0_sz = d0 * d_other
         val in1_sz = d1 * d_other
@@ -883,22 +885,13 @@ class CudaTest extends TutorialFunSuite {
         scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
         val cuda_input1 = cudaMalloc2[Float](in1_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input1, input1, in1_sz, host2device))
-        /*
-        val input = NewArray[Array[Float]](2)
-        input(0) = cuda_input0
-        input(1) = cuda_input1
-        val cuda_input = cudaMalloc2[Array[Float]](2)
-        cudaCall(cudaMemcpyOfT[Array[Float]](cuda_input, input, 2, host2device))
-        */
+
         val output = NewArray[Float](out_sz)
         val cuda_output = cudaMalloc2[Float](out_sz)
-        /*
-        val concatKernel = cuda3DConcat[Float](2, List(d0, d1, d_other))
-        concatKernel(cuda_input, cuda_output, dim3((out_sz + 511)/512), dim3(512))
-        */
+
         cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1),
           cuda_output,
-          List(d0, d1, d_other),
+          dimZ, dimY, List(d0, d1),
           dim3((out_sz + 511)/512), dim3(512))
 
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
@@ -961,16 +954,17 @@ class CudaTest extends TutorialFunSuite {
     check("split3", driver.code, "cu")
   }
 
-  /*
-  test("concat_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+  test("concat3_kernel") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
         val d0 = 3
         val d1 = 2
         val d2 = 1
-        val d_other = 3*2
+        val dimZ = 3
+        val dimY = 2
+        val d_other = dimZ * dimY
 
         val in0_sz = d0 * d_other
         val in1_sz = d1 * d_other
@@ -978,47 +972,35 @@ class CudaTest extends TutorialFunSuite {
         val out_sz = (d0 + d1) * d_other
 
         val input0 = NewArray[Float](in0_sz)
-        // scanFile[Float]("golden/concat2/input0.data", input0, in0_sz)
-        for (i <- (0 until in0_sz): Rep[Range]) {
-          input0(i) = i
-        }
+        scanFile[Float]("golden/concat3/input0.data", input0, in0_sz)
         val cuda_input0 = cudaMalloc2[Float](in0_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input0, input0, in0_sz, host2device))
 
         val input1 = NewArray[Float](in1_sz)
-        // scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
-        for (i <- (0 until in1_sz): Rep[Range]) {
-          input1(i) = i + 50
-        }
+        scanFile[Float]("golden/concat3/input1.data", input1, in1_sz)
         val cuda_input1 = cudaMalloc2[Float](in1_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input1, input1, in1_sz, host2device))
 
         val input2 = NewArray[Float](in2_sz)
-        // scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
-        for (i <- (0 until in2_sz): Rep[Range]) {
-          input2(i) = i + 100
-        }
+        scanFile[Float]("golden/concat3/input2.data", input2, in2_sz)
         val cuda_input2 = cudaMalloc2[Float](in2_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input2, input2, in2_sz, host2device))
 
         val output = NewArray[Float](out_sz)
         val cuda_output = cudaMalloc2[Float](out_sz)
 
-        val concatKernel = cuda3DConcat[Float](3, List(d0, d1, d2, d_other), List(cuda_input0, cuda_input1, cuda_input2))
-        concatKernel(cuda_output, dim3((out_sz + 511)/512), dim3(512))
+        cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1, cuda_input2),
+          cuda_output,
+          dimZ, dimY, List(d0, d1, d2),
+          dim3((out_sz + 511)/512), dim3(512))
 
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
-        // checkFile[Float]("golden/concat2/output.data", output, out_sz)
-        printf("output: [")
-        for (i <- (0 until out_sz): Rep[Range]) {
-          printf("%f,", output(i))
-        }
-        printf("]\n")
-
+        checkFile[Float]("golden/concat3/output.data", output, out_sz)
       }
     }
-    System.out.println(indent(driver.code))
-  }*/
+
+    check("concat3", driver.code, "cu")
+  }
 }
 

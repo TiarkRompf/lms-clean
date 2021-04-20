@@ -1178,42 +1178,13 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  def cuda3DConcat2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in0: Rep[Array[N]], d0: Rep[Int], in1: Rep[Array[N]], d1: Rep[Int], out: Rep[Array[N]], d_other: Rep[Int]) => {
-      generate_comment("this is cuda concat kernel.")
-      generate_comment("It concatenates two 3D arrays and concat on the innermost dimension (dim2).")
-      generate_comment("arg0: first input array")
-      generate_comment("arg1: dim2 of first input array")
-      generate_comment("arg2: second input array")
-      generate_comment("arg3: dim2 of second input array")
-      generate_comment("arg4: output array")
-      generate_comment("arg5: product of other two dimensions (dim0 * dim1)")
-      generate_comment("call constraint: arg1 + arg3 = out.dim2 ")
-
-      val idx = blockIdxX * blockDimX + threadIdxX
-      val d = d0 + d1
-      __ifThenElse(idx < d_other * d, {
-        val x = idx / d
-        val y = idx % d
-        val off0 = 0
-        val off1 = off0 + d0
-        out(idx) = __ifThenElse(y < off1, {
-          in0(x * d0 + (y - off0))
-        }, {
-          in1(x * d1 + (y - off1))
-        })
-      }, {})
-    }
-  }
-
-  // ds: [d0, d1, d2, ..., dn-1, d_other]
-  // This is the kernel function for splitting 3D inputs at the inner most axis.
+  // This is the kernel function for splitting 3D input at the inner most axis.
   // the input is of shape (dimZ, dimY, sum(dimXs))
   // the number of outputs is determined by the dimXs, which is a list of outputs' dimX
   def cuda3DSplitAxis2[N:Numeric:Manifest](dimZ: Int, dimY: Int, dimXs: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
-    val dimX = dimXs.reduce((x, y) => x + y)
+    val dimX = dimXs.reduce(_ + _)
     val input_size = dimZ * dimY * dimX
-    val offsets = (dimXs.scanLeft(0) { case (acc, x) => acc + x })
+    val offsets = dimXs.scanLeft(0) { case (acc, x) => acc + x }
     val n = dimXs.length
 
     (in: Rep[Array[N]], out: Rep[Array[Array[N]]]) => {
@@ -1260,14 +1231,18 @@ trait CudaLibs extends CudaOps {
     splitKernel(in, cuda_output, grid, block)
   }
 
-  def cuda3DConcat[N:Numeric:Manifest](n: Int, ds: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
-    val d = ds.init.reduce((x, y) => x + y)
-    val d_other = ds(n)
-    val input_size = d_other * d
-    val offsets = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
+  // This is the kernel function for concatenating 3D inputs at the inner most axis
+  // the input i is of shape (dimZ, dimY, dimXs(i))
+  // the output shape is (dimZ, dimY, sum(dimXs))
+  def cuda3DConcatAxis2[N:Numeric:Manifest](dimZ: Int, dimY: Int, dimXs: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
+    val dimX = dimXs.reduce(_ + _)
+    val d_other = dimZ * dimY
+    val input_size = d_other * dimX
+    val offsets = dimXs.scanLeft(0) { case (acc, x) => acc + x }
+    val n = dimXs.length
 
     (in: Rep[Array[Array[N]]], out: Rep[Array[N]]) => {
-      generate_comment(s"this is cuda $n-section concat kernel.")
+      generate_comment(s"this is cuda $n-section concat kernel for 3D inputs at axis 2.")
       generate_comment(s"It concatenates $n 3D arrays on the innermost dimension (dim2).")
       generate_comment("arg0: array of input input arrays")
       generate_comment("arg1: output array")
@@ -1277,12 +1252,12 @@ trait CudaLibs extends CudaOps {
       val idx = blockIdxX * blockDimX + threadIdxX
 
       __ifThenElse(idx < input_size, {
-        val x = idx / d
-        val y = idx % d
+        val x = idx / dimX
+        val y = idx % dimX
 
         def get_case(t: Int) = {
           val arr = in(t)
-          out(idx) = arr(x * ds(t) + (y - offsets(t)))
+          out(idx) = arr(x * dimXs(t) + (y - offsets(t)))
         }
 
         def make_case(t: Int): Unit = {
@@ -1297,7 +1272,7 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cuda3DConcatWrap[N:Numeric:Manifest](ins: List[Rep[Array[N]]], out: Rep[Array[N]], ds: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+  def cuda3DConcatWrap[N:Numeric:Manifest](ins: List[Rep[Array[N]]], out: Rep[Array[N]], dimZ: Int, dimY: Int, dimXs: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
     val sec = ins.length
     val input = NewArray[Array[N]](sec)
     for (i <- (0 until sec): Range) {
@@ -1306,7 +1281,7 @@ trait CudaLibs extends CudaOps {
     val cuda_input = cudaMalloc2[Array[N]](sec)
     cudaCall(cudaMemcpyOfT[Array[N]](cuda_input, input, sec, host2device))
 
-    val concatKernel = cuda3DConcat[N](sec, ds)
+    val concatKernel = cuda3DConcatAxis2[N](dimZ: Int, dimY: Int, dimXs: List[Int])
     concatKernel(cuda_input, out, grid, block)
   }
 

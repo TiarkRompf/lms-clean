@@ -13,7 +13,7 @@ Emitting C Generated Code
 #include "scanner_header.h"
 /************* Functions **************/
 __global__ void x9(float** x10, float* x11) {
-  // this is cuda 2-section concat kernel.
+  // this is cuda 2-section concat kernel for 3D inputs at axis 2.
   // It concatenates 2 3D arrays on the innermost dimension (dim2).
   // arg0: array of input input arrays
   // arg1: output array
