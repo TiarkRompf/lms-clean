@@ -68,8 +68,8 @@ __global__ void x9(float* x10, float* x11, int x12) {
   int x35 = threadIdx.x;
   while (x35 < x12) {
     int x36 = x35;
-    float x37 = expf(x14[x36] - x13[0]);
-    x33 = x33 + x37;
+    float x37 = x14[x36] - x13[0];
+    x33 = x33 + expf(x37);
     x15[x36] = x37;
     x35 = x35 + x34;
   }
@@ -104,7 +104,7 @@ __global__ void x9(float* x10, float* x11, int x12) {
   int x46 = threadIdx.x;
   while (x46 < x12) {
     int x47 = x46;
-    x15[x47] = x15[x47] / x13[0];
+    x15[x47] = x15[x47] - log(x13[0]);
     x46 = x46 + x45;
   }
 }
@@ -124,68 +124,67 @@ __global__ void x48(float* x49, float* x50, float* x51, int x52) {
   float x59 = 0.0;
   int x60 = x57;
   while (x60 < x52) {
-    int x61 = x60;
-    x59 = x59 + x55[x61] * x56[x61];
+    x59 = x59 + x55[x60];
     x60 = x60 + x58;
   }
   x53[threadIdx.x] = x59;
   __syncthreads();
   // reduce to the first warp
-  float x62 = 0.0;
+  float x61 = 0.0;
   if (threadIdx.x < blockDim.x / NVIDIA_WARP_SIZE) {
-    int x63 = threadIdx.x;
-    int x64 = NVIDIA_WARP_SIZE;
-    int x65 = 0;
-    while (x65 != x64) {
-      x62 = x62 + x53[x63 * NVIDIA_WARP_SIZE + x65];
-      x65 = x65 + 1;
+    int x62 = threadIdx.x;
+    int x63 = NVIDIA_WARP_SIZE;
+    int x64 = 0;
+    while (x64 != x63) {
+      x61 = x61 + x53[x62 * NVIDIA_WARP_SIZE + x64];
+      x64 = x64 + 1;
     }
-    x53[x63] = x62;
+    x53[x62] = x61;
   }
   __syncthreads();
   // reduce to the first thread
   if (threadIdx.x == 0) {
-    float x66 = 0.0;
-    int x67 = blockDim.x / NVIDIA_WARP_SIZE;
-    int x68 = 0;
-    while (x68 != x67) {
-      x66 = x66 + x53[x68];
-      x68 = x68 + 1;
+    float x65 = 0.0;
+    int x66 = blockDim.x / NVIDIA_WARP_SIZE;
+    int x67 = 0;
+    while (x67 != x66) {
+      x65 = x65 + x53[x67];
+      x67 = x67 + 1;
     }
-    x53[0] = x66;
+    x53[0] = x65;
   }
   __syncthreads();
-  int x69 = x57;
-  while (x69 < x52) {
-    int x70 = x69;
-    x54[x70] = x56[x70] * (x55[x70] - x53[0]);
-    x69 = x69 + x58;
+  int x68 = x57;
+  while (x68 < x52) {
+    int x69 = x68;
+    x54[x69] = x55[x69] - x53[0] * expf(x56[x69]);
+    x68 = x68 + x58;
   }
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  float* x1 = (float*)malloc(15640 * sizeof(float));
-  scan_float("golden/softmax/input.data", x1, 15640);
-  float* x2 = (float*)malloc(15640 * sizeof(float));
-  scan_float("golden/softmax/output_grad.data", x2, 15640);
+  float* x1 = (float*)malloc(17056 * sizeof(float));
+  scan_float("golden/logSoftmax/input.data", x1, 17056);
+  float* x2 = (float*)malloc(17056 * sizeof(float));
+  scan_float("golden/logSoftmax/output_grad.data", x2, 17056);
   float* x3 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x3, (size_t)(15640 * sizeof(float))));
+  CUDA_CALL(cudaMalloc(&x3, (size_t)(17056 * sizeof(float))));
   float* x4 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x4, (size_t)(15640 * sizeof(float))));
-  CUDA_CALL(cudaMemcpy(x3, x1, (size_t)(15640 * sizeof(float)), cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMemcpy(x4, x2, (size_t)(15640 * sizeof(float)), cudaMemcpyHostToDevice));
-  float* x5 = (float*)malloc(15640 * sizeof(float));
-  float* x6 = (float*)malloc(15640 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x4, (size_t)(17056 * sizeof(float))));
+  CUDA_CALL(cudaMemcpy(x3, x1, (size_t)(17056 * sizeof(float)), cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(x4, x2, (size_t)(17056 * sizeof(float)), cudaMemcpyHostToDevice));
+  float* x5 = (float*)malloc(17056 * sizeof(float));
+  float* x6 = (float*)malloc(17056 * sizeof(float));
   float* x7 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x7, (size_t)(15640 * sizeof(float))));
+  CUDA_CALL(cudaMalloc(&x7, (size_t)(17056 * sizeof(float))));
   float* x8 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x8, (size_t)(15640 * sizeof(float))));
-  x9<<<dim3(20, 1, 1), dim3(1024, 1, 1), 4096>>>(x3, x8, 782);
-  x48<<<dim3(20, 1, 1), dim3(1024, 1, 1), 4096>>>(x7, x4, x8, 782);
-  CUDA_CALL(cudaMemcpy(x5, x7, (size_t)(15640 * sizeof(float)), cudaMemcpyDeviceToHost));
-  CUDA_CALL(cudaMemcpy(x6, x8, (size_t)(15640 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array("golden/softmax/input_grad.data", x5, 15640);
-  check_float_array("golden/softmax/output.data", x6, 15640);
+  CUDA_CALL(cudaMalloc(&x8, (size_t)(17056 * sizeof(float))));
+  x9<<<dim3(32, 1, 1), dim3(1024, 1, 1), 4096>>>(x3, x8, 533);
+  x48<<<dim3(32, 1, 1), dim3(1024, 1, 1), 4096>>>(x7, x4, x8, 533);
+  CUDA_CALL(cudaMemcpy(x5, x7, (size_t)(17056 * sizeof(float)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMemcpy(x6, x8, (size_t)(17056 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array("golden/logSoftmax/input_grad.data", x5, 17056);
+  check_float_array("golden/logSoftmax/output.data", x6, 17056);
 }
 /*****************************************
 End of C Generated Code

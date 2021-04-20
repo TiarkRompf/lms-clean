@@ -337,58 +337,96 @@ class CudaTest extends TutorialFunSuite {
     check("embedding", driver.code, "cu")
   }
 
-  // TODO(Supun): Currently, this just emits the generated code (always passes the test)
-  //  and we need to manually run the generated code to test
   test("softmax_kernel") {
-    val driver = new DslDriverCCuda[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val dataSize = 2*2*3
-        val data = Seq[Rep[Float]](1, 2, 3, 4, 6, 8, 1, 5, 9, 1, 9, 12)
-        val hostInput = Array[Float](data:_*)
-        val devInput = cudaMalloc2[Float](dataSize)
+        // dim0 and dim1 picked arbitrary
+        val dim0 = 20
+        val dim1 = 782
+        val size = dim0 * dim1
 
-        val hostOutput = NewArray[Float](dataSize)
-        val devOutput = cudaMalloc2[Float](dataSize)
+        // inputs to the test
+        val input = NewArray[Float](dim0 * dim1)
+        scanFile[Float]("golden/softmax/input.data", input, size)
+        val outputGrad = NewArray[Float](size)
+        scanFile[Float]("golden/softmax/output_grad.data", outputGrad, size)
 
-        val expectedOutput =
-          Array[Float](Seq[Rep[Float]](0.09f, 0.2447f, 0.6652f, 0.0158f, 0.1173f, 0.8668f,
-                            0.0003f, 0.01798f, 0.9817f, 0.000015f, 0.0474f, 0.9525f):_*)
+        val cudaInput = cudaMalloc2[Float](size)
+        val cudaOutputGrad = cudaMalloc2[Float](size)
+        cudaCall(cudaMemcpyOfT[Float](cudaInput, input, size, host2device))
+        cudaCall(cudaMemcpyOfT[Float](cudaOutputGrad, outputGrad, size, host2device))
 
-        cudaCall(cudaMemcpyOfT(devInput, hostInput, dataSize, host2device))
-        val softmaxKernel = softmax[Float](false)
-        softmaxKernel(devInput, devOutput, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+        val inputGrad = NewArray[Float](size)
+        val output = NewArray[Float](size)
+        val cudaInputGrad = cudaMalloc2[Float](size)
+        val cudaOutput = cudaMalloc2[Float](size)
 
-        cudaCall(cudaMemcpyOfT(hostOutput, devOutput, dataSize, device2host))
+        // forward
+        val softmaxKernel = cudaSoftmax[Float](false)
+        softmaxKernel(cudaInput, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
 
-        // validate the output
-        for(i <- (0 until dataSize): Rep[Range]) {
-          if (Math.abs(hostOutput(i) - expectedOutput(i)) > 0.0001f) {
-            printf("Error! Expected: %.3f got %.3f\n", expectedOutput(i), hostOutput(i))
-          } else {
-            printf("Matched\n")
-          }
-        }
+        // backward
+        val softmaxGradKernel = cudaSoftmaxGrad[Float](false)
+        softmaxGradKernel(cudaInputGrad, cudaOutputGrad, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        // move outputs to the host
+        cudaCall(cudaMemcpyOfT[Float](inputGrad, cudaInputGrad, size, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output, cudaOutput, size, device2host))
+
+        // check with expected output
+        checkFile[Float]("golden/softmax/input_grad.data", inputGrad, size)
+        checkFile[Float]("golden/softmax/output.data", output, size)
       }
     }
     check("softmax", driver.code, "cu")
   }
 
-  // TODO(Supun): Remove. Added just to observe and manually test the kernel
-  // Tested by replacing the generated kernel in cublas_header and running lantern(old) test
-  test("softmaxGrad_kernel") {
-    val driver = new DslDriverCCuda[Int, Unit] {
+  test("logSoftmax_kernel") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val dummy = NewArray[Float](1)
+        // dim0 and dim1 picked arbitrary
+        val dim0 = 32
+        val dim1 = 533
+        val size = dim0 * dim1
 
-        val softmaxGradKernel = softmaxGrad[Float](false)
-        softmaxGradKernel(dummy, dummy, dummy, 3, dim3(2*2, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+        // inputs to the test
+        val input = NewArray[Float](dim0 * dim1)
+        scanFile[Float]("golden/logSoftmax/input.data", input, size)
+        val outputGrad = NewArray[Float](size)
+        scanFile[Float]("golden/logSoftmax/output_grad.data", outputGrad, size)
+
+        val cudaInput = cudaMalloc2[Float](size)
+        val cudaOutputGrad = cudaMalloc2[Float](size)
+        cudaCall(cudaMemcpyOfT[Float](cudaInput, input, size, host2device))
+        cudaCall(cudaMemcpyOfT[Float](cudaOutputGrad, outputGrad, size, host2device))
+
+        val inputGrad = NewArray[Float](size)
+        val output = NewArray[Float](size)
+        val cudaInputGrad = cudaMalloc2[Float](size)
+        val cudaOutput = cudaMalloc2[Float](size)
+
+        // forward
+        val softmaxKernel = cudaSoftmax[Float](true)
+        softmaxKernel(cudaInput, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        // backward
+        val softmaxGradKernel = cudaSoftmaxGrad[Float](true)
+        softmaxGradKernel(cudaInputGrad, cudaOutputGrad, cudaOutput, dim1, dim3(dim0, 1, 1), dim3(1024, 1, 1), 1024 * 4)
+
+        // move outputs to the host
+        cudaCall(cudaMemcpyOfT[Float](inputGrad, cudaInputGrad, size, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output, cudaOutput, size, device2host))
+
+        // check with expected output
+        checkFile[Float]("golden/logSoftmax/input_grad.data", inputGrad, size)
+        checkFile[Float]("golden/logSoftmax/output.data", output, size)
       }
     }
-    // check("kernel_2d_array", driver.code, "cu")
+    check("logSoftmax", driver.code, "cu")
   }
 
   test("maskedFill_kernel") {
@@ -783,7 +821,7 @@ class CudaTest extends TutorialFunSuite {
   }
 
   test("split2_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -806,33 +844,35 @@ class CudaTest extends TutorialFunSuite {
         val output1 = NewArray[Float](out1_sz)
         val cuda_output1 = cudaMalloc2[Float](out1_sz)
 
-        val output = NewArray[Float](in_sz)
-        val cuda_output = cudaMalloc2[Float](in_sz)
+        /*
+        val output = NewArray[Array[Float]](2)
+        output(0) = cuda_output0
+        output(1) = cuda_output1
 
-        val split2Kernel = cuda3DSplit2[Float]
-        split2Kernel(cuda_input, d_other, cuda_output0, d0, cuda_output1, d1, dim3((in_sz + 511)/512), dim3(512))
+        val cuda_output = cudaMalloc2[Array[Float]](2)
+        cudaCall(cudaMemcpyOfT[Array[Float]](cuda_output, output, 2, host2device))
 
+        val split2Kernel = cuda3DSplit[Float](2, List(d0, d1, d_other))
+        split2Kernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
+        */
+        cuda3DSplitWrap[Float](cuda_input, 
+          List(cuda_output0, cuda_output1), 
+          List(d0, d1, d_other),
+          dim3((in_sz + 511)/512), dim3(512))
+        
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
 
-        generate_comment("check cuda3DSplit2 kernel against individual outputs")
+        generate_comment("check cuda3DSplit kernel of section 2 against individual outputs")
         checkFile[Float]("golden/split2/output0.data", output0, out0_sz)
         checkFile[Float]("golden/split2/output1.data", output1, out1_sz)
-
-        val splitKernel = cuda3DSplit[Float](2, List(d0, d1, d_other))
-        splitKernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
-
-        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, in_sz, device2host))
-
-        generate_comment("check general cuda3DSplit kernel against one-array output")
-        checkFile[Float]("golden/split2/output.data", output, in_sz)
       }
     }
     check("split2", driver.code, "cu")
   }
 
   test("concat2_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -853,21 +893,24 @@ class CudaTest extends TutorialFunSuite {
         scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
         val cuda_input1 = cudaMalloc2[Float](in1_sz)
         cudaCall(cudaMemcpyOfT[Float](cuda_input1, input1, in1_sz, host2device))
-
+        /*
+        val input = NewArray[Array[Float]](2)
+        input(0) = cuda_input0
+        input(1) = cuda_input1
+        val cuda_input = cudaMalloc2[Array[Float]](2)
+        cudaCall(cudaMemcpyOfT[Array[Float]](cuda_input, input, 2, host2device))
+        */
         val output = NewArray[Float](out_sz)
         val cuda_output = cudaMalloc2[Float](out_sz)
-
-        val concat2Kernel = cuda3DConcat2[Float]
-        concat2Kernel(cuda_input0, d0, cuda_input1, d1, cuda_output, d_other, dim3((out_sz + 511)/512), dim3(512))
-
-        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
-
-        generate_comment("check cuda3DConcat2 kernel")
-        checkFile[Float]("golden/concat2/output.data", output, out_sz)
-
-        val concatKernel = cuda3DConcat[Float](2, List(d0, d1, d_other), List(cuda_input0, cuda_input1))
-        concatKernel(cuda_output, dim3((out_sz + 511)/512), dim3(512))
-
+        /*
+        val concatKernel = cuda3DConcat[Float](2, List(d0, d1, d_other))
+        concatKernel(cuda_input, cuda_output, dim3((out_sz + 511)/512), dim3(512))
+        */
+        cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1),
+          cuda_output,
+          List(d0, d1, d_other),
+          dim3((out_sz + 511)/512), dim3(512))
+          
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
         generate_comment("check general cuda3DConcat kernel")
@@ -878,7 +921,7 @@ class CudaTest extends TutorialFunSuite {
   }
 
   test("split3_kernel") {
-    val driver = new DslDriverCCudeScan[Int, Unit] {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
@@ -907,33 +950,30 @@ class CudaTest extends TutorialFunSuite {
         val output2 = NewArray[Float](out2_sz)
         val cuda_output2 = cudaMalloc2[Float](out2_sz)
 
-        val output = NewArray[Float](in_sz)
-        val cuda_output = cudaMalloc2[Float](in_sz)
+        val output = NewArray[Array[Float]](3)
+        output(0) = cuda_output0
+        output(1) = cuda_output1
+        output(2) = cuda_output2
+        val cuda_output = cudaMalloc2[Array[Float]](3)
+        cudaCall(cudaMemcpyOfT[Array[Float]](cuda_output, output, 3, host2device))
 
-        val split3Kernel = cuda3DSplit3[Float]
-        split3Kernel(cuda_input, d_other, cuda_output0, d0, cuda_output1, d1, cuda_output2, d2, dim3((in_sz + 511)/512), dim3(512))
+        val split3Kernel = cuda3DSplit[Float](3, List(d0, d1, d2, d_other))
+        split3Kernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
         
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output2, cuda_output2, out2_sz, device2host))
 
-        generate_comment("check cuda3DSplit3 kernel against individual outputs")
+        generate_comment("check cuda3DSplit kernel of section 3 against individual outputs")
         checkFile[Float]("golden/split3/output0.data", output0, out0_sz)
         checkFile[Float]("golden/split3/output1.data", output1, out1_sz)
         checkFile[Float]("golden/split3/output2.data", output2, out2_sz)
-
-        val splitKernel = cuda3DSplit[Float](3, List(d0, d1, d2, d_other))
-        splitKernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
-
-        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, in_sz, device2host))
-
-        generate_comment("check general cuda3DSplit kernel against one-array output")
-        checkFile[Float]("golden/split3/output.data", output, in_sz)
       }
     }
     check("split3", driver.code, "cu")
   }
 
+  /*
   test("concat_kernel") {
     val driver = new DslDriverCCudeScan[Int, Unit] {
 
@@ -991,6 +1031,6 @@ class CudaTest extends TutorialFunSuite {
       }
     }
     System.out.println(indent(driver.code))
-  }
+  }*/
 }
 

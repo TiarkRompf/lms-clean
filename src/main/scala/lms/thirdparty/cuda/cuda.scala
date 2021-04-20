@@ -391,6 +391,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaCall(status: Rep[CudaErrorT]) =
     libFunction[Unit]("CUDA_CALL", Unwrap(status))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
+  def cudaArrayEffect[T](arr: Rep[Array[T]], idx: Rep[Int], rhs: Rep[T]) =
+    Wrap[Unit](Adapter.g.reflectEffect("cudaArrayEffect", Unwrap(arr), Unwrap(idx), Unwrap(rhs))(Unwrap(arr), Unwrap(idx), Unwrap(rhs))(Adapter.CTRL))
+
   def cudaSyncThreads =
     libFunction[Unit]("__syncthreads")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
@@ -529,6 +532,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // expf - single precision (float) exponential function
   def expf[N:Numeric:Manifest](x: Rep[N]) =
     libFunction[N]("expf", Unwrap(x))(Seq(), Seq(), Set())
+
+  def log[N:Numeric:Manifest](x: Rep[N]) =
+    libFunction[N]("log", Unwrap(x))(Seq(), Seq(), Set())
 
   class cudaEventT
   def cudaEvent: Rep[cudaEventT] = newStruct[cudaEventT]("cudaEvent_t")
@@ -1085,9 +1091,13 @@ trait CudaLibs extends CudaOps {
     cudaSyncThreads
   }
 
-  def softmax[N:Numeric:Manifest](log: Boolean)(implicit  __pos: SourceContext) = cudaGlobalDynamicFun {
+  def cudaSoftmax[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (input: Rep[Array[N]], output: Rep[Array[N]], lastDimSize: Rep[Int]) =>
-      assert(!log, "log softmax not implemented yet")
+      generate_comment("This is cuda softmax (for larger; >=1024 inputs). Performs softmax on last dim.")
+      generate_comment("arg0: input: <outerSize x lastDimSize>")
+      generate_comment("arg1: output: <outerSize x lastDimSize>")
+      generate_comment("arg2: lastDimSize: size of the last dimension (i.e., the softmax dim)")
+      generate_comment("invocation assumption: <<<dim3(outerSize,1,1), dim3(1024,1,1), 1024*4>>>")
       val buffer = NewDynSharedArray[N]
 
       val input_t = input.slice(lastDimSize * blockIdxX, lastDimSize * blockIdxX + lastDimSize)
@@ -1101,7 +1111,7 @@ trait CudaLibs extends CudaOps {
         val normalized = input_t(i) - buffer(0)
         val expVal = expf[N](normalized)
         localVal += expVal
-        if (log) {
+        if (logSoftmax) {
           output_t(i) = normalized
         } else {
           output_t(i) = expVal
@@ -1116,18 +1126,23 @@ trait CudaLibs extends CudaOps {
       reduceHelper[N](input_t, lastDimSize, buffer, implicitly[Numeric[N]].zero, (a: Rep[N], b: Rep[N]) => a+b, skipFirstReduce = true)
 
       for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
-        if (log) {
-          output_t(i) = output_t(i) - buffer(0)
+        if (logSoftmax) {
+          output_t(i) = output_t(i) - log[N](buffer(0))
         } else {
           output_t(i) = output_t(i) / buffer(0)
         }
       }
   }
 
-  // TODO(Supun): test log Softmax case
-  def softmaxGrad[N:Numeric:Manifest](log: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
+  def cudaSoftmaxGrad[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (gradInput: Rep[Array[N]], gradOutput: Rep[Array[N]], output: Rep[Array[N]], size: Rep[Int]) =>
-      assert(!log, "log softmax not implemented yet")
+      generate_comment("This is cuda softmax (for larger; >=1024 inputs). Performs softmax on last dim.")
+      generate_comment("arg0: gradInput: the gradient of the original input (i.e., the softmax input) - " +
+        "This is an output of the kernel")
+      generate_comment("arg1: gradOutput: gradient of softmax output, coming from upstream; An Input to the kernel")
+      generate_comment("arg2: output: output of softmax forward pass")
+      generate_comment("arg3: size: last dimension size")
+      generate_comment("invocation assumption: <<<dim3(outerSize,1,1), dim3(1024,1,1), 1024*4>>>")
 
       val buffer = NewDynSharedArray[N]
 
@@ -1142,7 +1157,7 @@ trait CudaLibs extends CudaOps {
       // compute the sum (gradOutput * output sum)
       val threadVal = var_new[N](implicitly[Numeric[N]].zero)
       for(i <- start.until(end, stride)) {
-        if (log) {
+        if (logSoftmax) {
           threadVal += gradOutput_t(i)
         } else {
           threadVal += gradOutput_t(i) * output_t(i)
@@ -1155,7 +1170,7 @@ trait CudaLibs extends CudaOps {
 
       // update the gradient
       for(i <- start.until(end, stride)) {
-        if (log) {
+        if (logSoftmax) {
           gradInput_t(i) = gradOutput_t(i) - buffer(0) * expf[N](output_t(i))
         } else {
           gradInput_t(i) = output_t(i) * (gradOutput_t(i) - buffer(0))
@@ -1262,9 +1277,16 @@ trait CudaLibs extends CudaOps {
     val d = ds.init.reduce((x, y) => x + y)
     val d_other = ds(n)
     val input_size = d_other * d
-    val offs = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
+    val offsets = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
 
-    (in: Rep[Array[N]], out: Rep[Array[N]]) => {
+    (in: Rep[Array[N]], out: Rep[Array[Array[N]]]) => {
+      generate_comment(s"This is cuda $n-section split kernel.")
+      generate_comment(s"It takes a 3D array and splits on the innermost dimension (dim2) into $n arrays.")
+      generate_comment("arg0: input array")
+      generate_comment("arg1: array of output arrays")
+      generate_comment(s"call constraint: out.size = $n")
+      generate_comment(s"call constraint: sum of out(i).size = in.size for i in [0, $n)")
+
       val idx = blockIdxX * blockDimX + threadIdxX
 
       __ifThenElse(idx < input_size, {
@@ -1273,14 +1295,15 @@ trait CudaLibs extends CudaOps {
         val y = idx % d
 
         def get_case(t: Int) = {
-          out(d_other * offs(t) + x * ds(t) + (y - offs(t))) = value
+          val temp = out(t)
+          cudaArrayEffect[N](temp, x * ds(t) + (y - offsets(t)), value)
         }
 
         def make_case(t: Int): Unit = {
           if (t == n-1) {
             get_case(t)
           } else {
-            __ifThenElse(y < offs(t+1), { get_case(t) }, { make_case(t+1) })
+            __ifThenElse(y < offsets(t+1), { get_case(t) }, { make_case(t+1) })
           }
         }
         make_case(0)
@@ -1288,13 +1311,33 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cuda3DConcat[N:Numeric:Manifest](n: Int, ds: List[Int], in: List[Rep[Array[N]]])(implicit __pos: SourceContext) = cudaGlobalFun {
+  def cuda3DSplitWrap[N:Numeric:Manifest](in: Rep[Array[N]], outs: List[Rep[Array[N]]], ds: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+    val sec = outs.length
+    val output = NewArray[Array[N]](sec)
+    for (i <- (0 until sec): Range) {
+      output(i) = outs(i)
+    }
+    val cuda_output = cudaMalloc2[Array[N]](sec)
+    cudaCall(cudaMemcpyOfT[Array[N]](cuda_output, output, sec, host2device))
+
+    val splitKernel = cuda3DSplit[N](sec, ds)
+    splitKernel(in, cuda_output, grid, block)
+  }
+
+  def cuda3DConcat[N:Numeric:Manifest](n: Int, ds: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
     val d = ds.init.reduce((x, y) => x + y)
     val d_other = ds(n)
     val input_size = d_other * d
-    val offs = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
+    val offsets = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
 
-    (out: Rep[Array[N]]) => {
+    (in: Rep[Array[Array[N]]], out: Rep[Array[N]]) => {
+      generate_comment(s"this is cuda $n-section concat kernel.")
+      generate_comment(s"It concatenates $n 3D arrays on the innermost dimension (dim2).")
+      generate_comment("arg0: array of input input arrays")
+      generate_comment("arg1: output array")
+      generate_comment(s"call constraint: in.size = $n")
+      generate_comment(s"call constraint: sum of in(i).size = out.size for i in [0, $n)")
+
       val idx = blockIdxX * blockDimX + threadIdxX
 
       __ifThenElse(idx < input_size, {
@@ -1303,14 +1346,14 @@ trait CudaLibs extends CudaOps {
 
         def get_case(t: Int) = {
           val arr = in(t)
-          out(idx) = arr(x * ds(t) + (y - offs(t)))
+          out(idx) = arr(x * ds(t) + (y - offsets(t)))
         }
 
         def make_case(t: Int): Unit = {
           if (t == n-1) {
             get_case(t)
           } else {
-            __ifThenElse(y < offs(t+1), { get_case(t) }, { make_case(t+1) })
+            __ifThenElse(y < offsets(t+1), { get_case(t) }, { make_case(t+1) })
           }
         }
         make_case(0)
@@ -1318,6 +1361,21 @@ trait CudaLibs extends CudaOps {
     }
   }
 
+<<<<<<< HEAD
+=======
+  def cuda3DConcatWrap[N:Numeric:Manifest](ins: List[Rep[Array[N]]], out: Rep[Array[N]], ds: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+    val sec = ins.length
+    val input = NewArray[Array[N]](sec)
+    for (i <- (0 until sec): Range) {
+      input(i) = ins(i)
+    }
+    val cuda_input = cudaMalloc2[Array[N]](sec)
+    cudaCall(cudaMemcpyOfT[Array[N]](cuda_input, input, sec, host2device))
+
+    val concatKernel = cuda3DConcat[N](sec, ds)
+    concatKernel(cuda_input, out, grid, block)
+  }
+>>>>>>> e0a2069febfd6790b7a276a50731cfe0e7bb37b8
 
   // kernel function for 2D transpose
   def cudaTranspose2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
@@ -1532,7 +1590,10 @@ trait CudaLibs extends CudaOps {
         out_offset(blockIdxY, blockIdxX, threadIdxX + i, value)
       }
   }
+<<<<<<< HEAD
 
+=======
+>>>>>>> e0a2069febfd6790b7a276a50731cfe0e7bb37b8
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
@@ -1572,6 +1633,8 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
+    case n @ Node(s, "cudaArrayEffect", arr::lhs::rhs::_, _) =>
+      shallow(arr); emit("["); shallow(lhs); emit("] = "); shallow(rhs); emitln(";")
     case _ => super.traverse(n)
   }
 }
