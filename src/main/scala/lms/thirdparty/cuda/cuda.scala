@@ -730,6 +730,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]) =
     Wrap[(A,B,C,D,Dim3,Dim3,Int)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), "__global__"))
+  
+  def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]) =
+    Wrap[(A,B,C,D,E,F,Dim3,Dim3,Int)=>G](__topFun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), "__global__"))
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]) =
     Wrap[(A,B,C,D,E,Dim3,Dim3)=>F](__topFun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)))), "__global__"))
@@ -1032,7 +1035,7 @@ trait CudaLibs extends CudaOps {
     }
 
 
-  def cudaEmbeddingGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+  def cudaEmbeddingGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (indicies: Rep[Array[Int]], grad: Rep[Array[N]], gradWeight: Rep[Array[N]], n: Rep[Int], stride: Rep[Int], paddingIdx: Rep[Int]) =>
       generate_comment("Cuda Embedding Grad")
       val buffer = NewDynSharedArray[N]
@@ -1050,6 +1053,7 @@ trait CudaLibs extends CudaOps {
       }
 
       for (batch_start <- (0 until (n, blockDimX * blockDimY)): Rep[Range]) {
+        printf("%d %d %d\n", batch_start, n, blockDimX * blockDimY)
         val tid = threadIdxX + threadIdxY * blockDimX
         conditional_assign(batch_start + tid < n, indicies_batch, tid, indicies, batch_start + tid)
         val batch_end = min(batch_start + blockDimX * blockDimY, n)
