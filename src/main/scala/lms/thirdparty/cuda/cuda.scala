@@ -1178,35 +1178,6 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  def cuda3DSplit2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], d_other: Rep[Int], out0: Rep[Array[N]], d0: Rep[Int], out1: Rep[Array[N]], d1: Rep[Int]) => {
-      generate_comment("this is cuda 2-way split kernel.")
-      generate_comment("It takes a 3D array and splits on the innermost dimension (dim2) into two arrays.")
-      generate_comment("arg0: input array")
-      generate_comment("arg1: product of other two dimensions (dim0 * dim1)")
-      generate_comment("arg2: first output array")
-      generate_comment("arg3: dim2 of first output array")
-      generate_comment("arg4: second output array")
-      generate_comment("arg5: dim2 of second output array")
-      generate_comment("call constraint: arg3 + arg5 = arg0.dim2 ")
-
-      val idx = blockIdxX * blockDimX + threadIdxX
-      val d = d0 + d1
-      __ifThenElse(idx < d_other * d, {
-        val value = in(idx)
-        val x = idx / d
-        val y = idx % d
-        val off0 = 0
-        val off1 = off0 + d0
-        __ifThenElse(y < off1, {
-          out0(x * d0 + (y - off0)) = value
-        }, {
-          out1(x * d1 + (y - off1)) = value
-        })
-      }, {})
-    }
-  }
-
   def cuda3DConcat2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in0: Rep[Array[N]], d0: Rep[Int], in1: Rep[Array[N]], d1: Rep[Int], out: Rep[Array[N]], d_other: Rep[Int]) => {
       generate_comment("this is cuda concat kernel.")
@@ -1235,68 +1206,33 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cuda3DSplit3[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
-    (in: Rep[Array[N]], d_other: Rep[Int], out0: Rep[Array[N]], d0: Rep[Int], out1: Rep[Array[N]], d1: Rep[Int], out2: Rep[Array[N]], d2: Rep[Int]) => {
-      generate_comment("this is cuda 3-way split kernel.")
-      generate_comment("It takes a 3D array and splits on the innermost dimension (dim2) into three arrays.")
-      generate_comment("arg0: input array")
-      generate_comment("arg1: product of other two dimensions (dim0 * dim1)")
-      generate_comment("arg2: first output array")
-      generate_comment("arg3: dim2 of first output array")
-      generate_comment("arg4: second output array")
-      generate_comment("arg5: dim2 of second output array")
-      generate_comment("arg6: third output array")
-      generate_comment("arg7: dim2 of third output array")
-      generate_comment("call constraint: arg3 + arg5 + arg7 = arg0.dim2 ")
-
-      val idx = blockIdxX * blockDimX + threadIdxX
-      val d = d0 + d1 + d2
-      __ifThenElse(idx < d_other * d, {
-        val value = in(idx)
-        val x = idx / d
-        val y = idx % d
-        val off0 = 0
-        val off1 = off0 + d0
-        val off2 = off1 + d1
-        __ifThenElse(y < off1, {
-          out0(x * d0 + (y - off0)) = value
-        }, {
-          __ifThenElse(y < off2, {
-            out1(x * d1 + (y - off1)) = value
-          }, {
-            out2(x * d2 + (y - off2)) = value
-          })
-        })
-      }, {})
-    }
-  }
-
   // ds: [d0, d1, d2, ..., dn-1, d_other]
-  // TODO (Luke): comments and better names
-  def cuda3DSplit[N:Numeric:Manifest](n: Int, ds: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
-    val d = ds.init.reduce((x, y) => x + y)
-    val d_other = ds(n)
-    val input_size = d_other * d
-    val offsets = (ds.init.scanLeft(0) { case (acc, x) => acc + x }).init
+  // This is the kernel function for splitting 3D inputs at the inner most axis.
+  // the input is of shape (dimZ, dimY, sum(dimXs))
+  // the number of outputs is determined by the dimXs, which is a list of outputs' dimX
+  def cuda3DSplitAxis2[N:Numeric:Manifest](dimZ: Int, dimY: Int, dimXs: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
+    val dimX = dimXs.reduce((x, y) => x + y)
+    val input_size = dimZ * dimY * dimX
+    val offsets = (dimXs.scanLeft(0) { case (acc, x) => acc + x })
+    val n = dimXs.length
 
     (in: Rep[Array[N]], out: Rep[Array[Array[N]]]) => {
-      generate_comment(s"This is cuda $n-section split kernel.")
+      generate_comment(s"This is cuda $n-section split kernel for 3D input at axis 2.")
       generate_comment(s"It takes a 3D array and splits on the innermost dimension (dim2) into $n arrays.")
       generate_comment("arg0: input array")
       generate_comment("arg1: array of output arrays")
-      generate_comment(s"call constraint: out.size = $n")
       generate_comment(s"call constraint: sum of out(i).size = in.size for i in [0, $n)")
 
       val idx = blockIdxX * blockDimX + threadIdxX
 
       __ifThenElse(idx < input_size, {
         val value = in(idx)
-        val x = idx / d
-        val y = idx % d
+        val x = idx / dimX
+        val y = idx % dimX
 
         def get_case(t: Int) = {
           val temp = out(t)
-          cudaArrayEffect[N](temp, x * ds(t) + (y - offsets(t)), value)
+          cudaArrayEffect[N](temp, x * dimXs(t) + (y - offsets(t)), value)
         }
 
         def make_case(t: Int): Unit = {
@@ -1311,7 +1247,7 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cuda3DSplitWrap[N:Numeric:Manifest](in: Rep[Array[N]], outs: List[Rep[Array[N]]], ds: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+  def cuda3DSplitWrap[N:Numeric:Manifest](in: Rep[Array[N]], outs: List[Rep[Array[N]]], dimZ: Int, dimY: Int, dimXs: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
     val sec = outs.length
     val output = NewArray[Array[N]](sec)
     for (i <- (0 until sec): Range) {
@@ -1320,7 +1256,7 @@ trait CudaLibs extends CudaOps {
     val cuda_output = cudaMalloc2[Array[N]](sec)
     cudaCall(cudaMemcpyOfT[Array[N]](cuda_output, output, sec, host2device))
 
-    val splitKernel = cuda3DSplit[N](sec, ds)
+    val splitKernel = cuda3DSplitAxis2[N](dimZ, dimY, dimXs)
     splitKernel(in, cuda_output, grid, block)
   }
 

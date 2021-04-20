@@ -825,13 +825,14 @@ class CudaTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val d0 = 2
-        val d1 = 2
-        val d_other = 4
+        val dimZ = 1
+        val dimY = 4
+        val dimX = 4
+        val dimXs = List(2, 2)
 
-        val in_sz = d_other * (d0 + d1)
-        val out0_sz = d_other * d0
-        val out1_sz = d_other * d1
+        val in_sz = dimZ * dimY * dimX
+        val out0_sz = dimZ * dimY * dimXs(0)
+        val out1_sz = dimZ * dimY * dimXs(1)
 
         val input = NewArray[Float](in_sz)
         scanFile[Float]("golden/split2/input.data", input, in_sz)
@@ -844,22 +845,11 @@ class CudaTest extends TutorialFunSuite {
         val output1 = NewArray[Float](out1_sz)
         val cuda_output1 = cudaMalloc2[Float](out1_sz)
 
-        /*
-        val output = NewArray[Array[Float]](2)
-        output(0) = cuda_output0
-        output(1) = cuda_output1
-
-        val cuda_output = cudaMalloc2[Array[Float]](2)
-        cudaCall(cudaMemcpyOfT[Array[Float]](cuda_output, output, 2, host2device))
-
-        val split2Kernel = cuda3DSplit[Float](2, List(d0, d1, d_other))
-        split2Kernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
-        */
-        cuda3DSplitWrap[Float](cuda_input, 
-          List(cuda_output0, cuda_output1), 
-          List(d0, d1, d_other),
+        cuda3DSplitWrap[Float](cuda_input,
+          List(cuda_output0, cuda_output1),
+          dimZ, dimY, dimXs,
           dim3((in_sz + 511)/512), dim3(512))
-        
+
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
 
@@ -879,7 +869,7 @@ class CudaTest extends TutorialFunSuite {
         val d0 = 3
         val d1 = 5
         val d_other = 3*2
-        
+
         val in0_sz = d0 * d_other
         val in1_sz = d1 * d_other
         val out_sz = (d0 + d1) * d_other
@@ -910,7 +900,7 @@ class CudaTest extends TutorialFunSuite {
           cuda_output,
           List(d0, d1, d_other),
           dim3((out_sz + 511)/512), dim3(512))
-          
+
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
         generate_comment("check general cuda3DConcat kernel")
@@ -929,7 +919,9 @@ class CudaTest extends TutorialFunSuite {
         val d0 = 2
         val d1 = 2
         val d2 = 1
-        val d_other = 2*2
+        val dimZ = 1
+        val dimY = 4
+        val d_other = dimZ * dimY
 
         val in_sz = d_other * (d0 + d1 + d2)
         val out0_sz = d_other * d0
@@ -950,16 +942,12 @@ class CudaTest extends TutorialFunSuite {
         val output2 = NewArray[Float](out2_sz)
         val cuda_output2 = cudaMalloc2[Float](out2_sz)
 
-        val output = NewArray[Array[Float]](3)
-        output(0) = cuda_output0
-        output(1) = cuda_output1
-        output(2) = cuda_output2
-        val cuda_output = cudaMalloc2[Array[Float]](3)
-        cudaCall(cudaMemcpyOfT[Array[Float]](cuda_output, output, 3, host2device))
+        cuda3DSplitWrap[Float](
+          cuda_input, List(cuda_output0, cuda_output1, cuda_output2),
+          dimZ, dimY, List(d0, d1, d2),
+          dim3((in_sz + 511)/512), dim3(512)
+        )
 
-        val split3Kernel = cuda3DSplit[Float](3, List(d0, d1, d2, d_other))
-        split3Kernel(cuda_input, cuda_output, dim3((in_sz + 511)/512), dim3(512))
-        
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output2, cuda_output2, out2_sz, device2host))
@@ -983,7 +971,7 @@ class CudaTest extends TutorialFunSuite {
         val d1 = 2
         val d2 = 1
         val d_other = 3*2
-        
+
         val in0_sz = d0 * d_other
         val in1_sz = d1 * d_other
         val in2_sz = d2 * d_other

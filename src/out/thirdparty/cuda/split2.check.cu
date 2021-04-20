@@ -13,11 +13,10 @@ Emitting C Generated Code
 #include "scanner_header.h"
 /************* Functions **************/
 __global__ void x9(float* x10, float** x11) {
-  // This is cuda 2-section split kernel.
+  // This is cuda 2-section split kernel for 3D input at axis 2.
   // It takes a 3D array and splits on the innermost dimension (dim2) into 2 arrays.
   // arg0: input array
   // arg1: array of output arrays
-  // call constraint: out.size = 2
   // call constraint: sum of out(i).size = in.size for i in [0, 2)
   int x12 = blockIdx.x * blockDim.x + threadIdx.x;
   if (x12 < 16) {
