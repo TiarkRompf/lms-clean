@@ -14,7 +14,7 @@ def generate_data(lms_clean_root: str):
     output = torch.cat((input0, input1), 2)
 
     # printer
-    printer = get_printer(lms_clean_root, test_name = "concat")
+    printer = get_printer(lms_clean_root, test_name = "concat2")
     printer("input0.data", input0)
     printer("input1.data", input1)
     printer("output.data", output)

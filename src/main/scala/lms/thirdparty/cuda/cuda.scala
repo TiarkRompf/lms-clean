@@ -1361,8 +1361,6 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-<<<<<<< HEAD
-=======
   def cuda3DConcatWrap[N:Numeric:Manifest](ins: List[Rep[Array[N]]], out: Rep[Array[N]], ds: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
     val sec = ins.length
     val input = NewArray[Array[N]](sec)
@@ -1375,7 +1373,6 @@ trait CudaLibs extends CudaOps {
     val concatKernel = cuda3DConcat[N](sec, ds)
     concatKernel(cuda_input, out, grid, block)
   }
->>>>>>> e0a2069febfd6790b7a276a50731cfe0e7bb37b8
 
   // kernel function for 2D transpose
   def cudaTranspose2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
@@ -1590,10 +1587,6 @@ trait CudaLibs extends CudaOps {
         out_offset(blockIdxY, blockIdxX, threadIdxX + i, value)
       }
   }
-<<<<<<< HEAD
-
-=======
->>>>>>> e0a2069febfd6790b7a276a50731cfe0e7bb37b8
 }
 
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
