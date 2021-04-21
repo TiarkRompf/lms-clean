@@ -1069,7 +1069,7 @@ trait CudaLibs extends CudaOps {
           cudaSyncThreads
 
           __ifThenElse(src_row < n && (dst_row != paddingIdx), {
-            val match_found_this_thread = var_new(__ifThenElse(dst_row == indicies_batch(chunk_start - batch_start + threadIdxX), 1, 0))
+            val match_found_this_thread = var_new(__ifThenElse(equals(dst_row, indicies_batch(chunk_start - batch_start + threadIdxX)), 1, 0))
             __ifThenElse(threadIdxX >= n_this_chunk, {__assign(match_found_this_thread, 0)}, {})
 
             val matchmask = var_new(cudaBallotSync(0xffffffff, match_found_this_thread))
