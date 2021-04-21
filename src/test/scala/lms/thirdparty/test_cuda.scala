@@ -345,7 +345,7 @@ class CudaTest extends TutorialFunSuite {
         val embed_size = 60
         val n_indices = 10
         val paddingIdx = -1
-        val gridSize = embed_size + (31 / 32)
+        val gridSize = (embed_size + 31) / 32
 
         // val embedding = NewArray[Float](n_embeddings * embed_size)
         // scanFile[Float]("golden/embedding/embedding.data", embedding, n_embeddings * embed_size)
@@ -366,7 +366,7 @@ class CudaTest extends TutorialFunSuite {
         val cuda_embedding_grad = cudaMalloc2[Float](n_embeddings * embed_size)
 
         val cudaEmbeddingGradKernel = cudaEmbeddingGrad[Float]
-        cudaEmbeddingGradKernel(cuda_indices, cuda_output_grad, cuda_embedding_grad, n_indices, embed_size, paddingIdx, dim3(gridSize), dim3(32 * 32), 32 * 32 * sizeOf[Int] + 32 * 32 * sizeOf[Float])
+        cudaEmbeddingGradKernel(cuda_indices, cuda_output_grad, cuda_embedding_grad, n_indices, embed_size, paddingIdx, dim3(gridSize), dim3(32, 32), 32 * 32 * sizeOf[Int] + 32 * 32 * sizeOf[Float])
 
         cudaCall(cudaMemcpyOfT(embeddingGrad, cuda_embedding_grad, n_embeddings * embed_size, device2host))
         checkFile[Float]("golden/embedding/embedding_grad.data", embeddingGrad, n_embeddings * embed_size)
