@@ -1201,19 +1201,19 @@ trait CudaLibs extends CudaOps {
         val x = idx / dimX
         val y = idx % dimX
 
-        def get_case(t: Int) = {
+        def recursive_branch(t: Int): Unit =
+          if (t == n-1) {
+            write_array_element(t)
+          } else {
+            __ifThenElse(y < offsets(t+1), { write_array_element(t) }, { recursive_branch(t+1) })
+          }
+
+        def write_array_element(t: Int) = {
           val temp = out(t)
           cudaArrayEffect[N](temp, x * dimXs(t) + (y - offsets(t)), value)
         }
 
-        def make_case(t: Int): Unit = {
-          if (t == n-1) {
-            get_case(t)
-          } else {
-            __ifThenElse(y < offsets(t+1), { get_case(t) }, { make_case(t+1) })
-          }
-        }
-        make_case(0)
+        recursive_branch(0)
       }, {})
     }
   }
@@ -1255,19 +1255,19 @@ trait CudaLibs extends CudaOps {
         val x = idx / dimX
         val y = idx % dimX
 
-        def get_case(t: Int) = {
+        def recursive_branch(t: Int): Unit =
+          if (t == n-1) {
+            write_array_element(t)
+          } else {
+            __ifThenElse(y < offsets(t+1), { write_array_element(t) }, { recursive_branch(t+1) })
+          }
+
+        def write_array_element(t: Int) = {
           val arr = in(t)
           out(idx) = arr(x * dimXs(t) + (y - offsets(t)))
         }
 
-        def make_case(t: Int): Unit = {
-          if (t == n-1) {
-            get_case(t)
-          } else {
-            __ifThenElse(y < offsets(t+1), { get_case(t) }, { make_case(t+1) })
-          }
-        }
-        make_case(0)
+        recursive_branch(0)
       }, {})
     }
   }
