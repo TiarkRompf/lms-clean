@@ -1053,7 +1053,6 @@ trait CudaLibs extends CudaOps {
       }
 
       for (batch_start <- (0 until (n, blockDimX * blockDimY)): Rep[Range]) {
-        printf("%d %d %d\n", batch_start, n, blockDimX * blockDimY)
         val tid = threadIdxX + threadIdxY * blockDimX
         conditional_assign(batch_start + tid < n, indicies_batch, tid, indicies, batch_start + tid)
         val batch_end = min(batch_start + blockDimX * blockDimY, n)
