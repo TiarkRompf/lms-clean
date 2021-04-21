@@ -1063,11 +1063,11 @@ trait CudaLibs extends CudaOps {
           val n_this_chunk = min(batch_end - chunk_start, blockDimY)
           val src_row = chunk_start + threadIdxY
           val dst_row = indicies_batch(src_row - batch_start)
-          conditional_assign(src_row < n && feature_dim < stride && dst_row != paddingIdx, my_s, threadIdxX, grad, src_row * stride + feature_dim)
+          conditional_assign((src_row < n) && (feature_dim < stride) && notequals(dst_row, paddingIdx), my_s, threadIdxX, grad, src_row * stride + feature_dim)
 
           cudaSyncThreads
 
-          __ifThenElse(src_row < n && (dst_row != paddingIdx), {
+          __ifThenElse(src_row < n && notequals(dst_row, paddingIdx), {
             val match_found_this_thread = var_new(__ifThenElse(equals(dst_row, indicies_batch(chunk_start - batch_start + threadIdxX)), 1, 0))
             __ifThenElse(threadIdxX >= n_this_chunk, {__assign(match_found_this_thread, 0)}, {})
 
