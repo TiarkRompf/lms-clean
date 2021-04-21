@@ -819,5 +819,188 @@ class CudaTest extends TutorialFunSuite {
     }
     check("transpose_performance", driver.code, "cu")
   }
+
+  test("split2_kernel") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val dimZ = 1
+        val dimY = 4
+        val dimX = 4
+        val dimXs = List(2, 2)
+
+        val in_sz = dimZ * dimY * dimX
+        val out0_sz = dimZ * dimY * dimXs(0)
+        val out1_sz = dimZ * dimY * dimXs(1)
+
+        val input = NewArray[Float](in_sz)
+        scanFile[Float]("golden/split2/input.data", input, in_sz)
+        val cuda_input = cudaMalloc2[Float](in_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
+
+        val output0 = NewArray[Float](out0_sz)
+        val cuda_output0 = cudaMalloc2[Float](out0_sz)
+
+        val output1 = NewArray[Float](out1_sz)
+        val cuda_output1 = cudaMalloc2[Float](out1_sz)
+
+        cuda3DSplitWrap[Float](cuda_input,
+          List(cuda_output0, cuda_output1),
+          dimZ, dimY, dimXs,
+          dim3((in_sz + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
+
+        generate_comment("check cuda3DSplit kernel of section 2 against individual outputs")
+        checkFile[Float]("golden/split2/output0.data", output0, out0_sz)
+        checkFile[Float]("golden/split2/output1.data", output1, out1_sz)
+      }
+    }
+    check("split2", driver.code, "cu")
+  }
+
+  test("concat2_kernel") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val d0 = 3
+        val d1 = 5
+        val dimZ = 3
+        val dimY = 2
+        val d_other = dimZ * dimY
+
+        val in0_sz = d0 * d_other
+        val in1_sz = d1 * d_other
+        val out_sz = (d0 + d1) * d_other
+
+        val input0 = NewArray[Float](in0_sz)
+        scanFile[Float]("golden/concat2/input0.data", input0, in0_sz)
+        val cuda_input0 = cudaMalloc2[Float](in0_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input0, input0, in0_sz, host2device))
+
+        val input1 = NewArray[Float](in1_sz)
+        scanFile[Float]("golden/concat2/input1.data", input1, in1_sz)
+        val cuda_input1 = cudaMalloc2[Float](in1_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input1, input1, in1_sz, host2device))
+
+        val output = NewArray[Float](out_sz)
+        val cuda_output = cudaMalloc2[Float](out_sz)
+
+        cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1),
+          cuda_output,
+          dimZ, dimY, List(d0, d1),
+          dim3((out_sz + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
+
+        generate_comment("check general cuda3DConcat kernel")
+        checkFile[Float]("golden/concat2/output.data", output, out_sz)
+      }
+    }
+    check("concat2", driver.code, "cu")
+  }
+
+  test("split3_kernel") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+
+        val d0 = 2
+        val d1 = 2
+        val d2 = 1
+        val dimZ = 1
+        val dimY = 4
+        val d_other = dimZ * dimY
+
+        val in_sz = d_other * (d0 + d1 + d2)
+        val out0_sz = d_other * d0
+        val out1_sz = d_other * d1
+        val out2_sz = d_other * d2
+
+        val input = NewArray[Float](in_sz)
+        scanFile[Float]("golden/split3/input.data", input, in_sz)
+        val cuda_input = cudaMalloc2[Float](in_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input, input, in_sz, host2device))
+
+        val output0 = NewArray[Float](out0_sz)
+        val cuda_output0 = cudaMalloc2[Float](out0_sz)
+
+        val output1 = NewArray[Float](out1_sz)
+        val cuda_output1 = cudaMalloc2[Float](out1_sz)
+
+        val output2 = NewArray[Float](out2_sz)
+        val cuda_output2 = cudaMalloc2[Float](out2_sz)
+
+        cuda3DSplitWrap[Float](
+          cuda_input, List(cuda_output0, cuda_output1, cuda_output2),
+          dimZ, dimY, List(d0, d1, d2),
+          dim3((in_sz + 511)/512), dim3(512)
+        )
+
+        cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
+        cudaCall(cudaMemcpyOfT[Float](output2, cuda_output2, out2_sz, device2host))
+
+        generate_comment("check cuda3DSplit kernel of section 3 against individual outputs")
+        checkFile[Float]("golden/split3/output0.data", output0, out0_sz)
+        checkFile[Float]("golden/split3/output1.data", output1, out1_sz)
+        checkFile[Float]("golden/split3/output2.data", output2, out2_sz)
+      }
+    }
+    check("split3", driver.code, "cu")
+  }
+
+  test("concat3_kernel") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val d0 = 3
+        val d1 = 2
+        val d2 = 1
+        val dimZ = 3
+        val dimY = 2
+        val d_other = dimZ * dimY
+
+        val in0_sz = d0 * d_other
+        val in1_sz = d1 * d_other
+        val in2_sz = d2 * d_other
+        val out_sz = (d0 + d1) * d_other
+
+        val input0 = NewArray[Float](in0_sz)
+        scanFile[Float]("golden/concat3/input0.data", input0, in0_sz)
+        val cuda_input0 = cudaMalloc2[Float](in0_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input0, input0, in0_sz, host2device))
+
+        val input1 = NewArray[Float](in1_sz)
+        scanFile[Float]("golden/concat3/input1.data", input1, in1_sz)
+        val cuda_input1 = cudaMalloc2[Float](in1_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input1, input1, in1_sz, host2device))
+
+        val input2 = NewArray[Float](in2_sz)
+        scanFile[Float]("golden/concat3/input2.data", input2, in2_sz)
+        val cuda_input2 = cudaMalloc2[Float](in2_sz)
+        cudaCall(cudaMemcpyOfT[Float](cuda_input2, input2, in2_sz, host2device))
+
+        val output = NewArray[Float](out_sz)
+        val cuda_output = cudaMalloc2[Float](out_sz)
+
+        cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1, cuda_input2),
+          cuda_output,
+          dimZ, dimY, List(d0, d1, d2),
+          dim3((out_sz + 511)/512), dim3(512))
+
+        cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
+
+        checkFile[Float]("golden/concat3/output.data", output, out_sz)
+      }
+    }
+
+    check("concat3", driver.code, "cu")
+  }
 }
 

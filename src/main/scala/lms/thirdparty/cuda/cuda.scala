@@ -391,6 +391,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaCall(status: Rep[CudaErrorT]) =
     libFunction[Unit]("CUDA_CALL", Unwrap(status))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
+  def cudaArrayEffect[T](arr: Rep[Array[T]], idx: Rep[Int], rhs: Rep[T]) =
+    Wrap[Unit](Adapter.g.reflectEffect("cudaArrayEffect", Unwrap(arr), Unwrap(idx), Unwrap(rhs))(Unwrap(arr), Unwrap(idx), Unwrap(rhs))(Adapter.CTRL))
+
   def cudaSyncThreads =
     libFunction[Unit]("__syncthreads")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
@@ -1175,6 +1178,113 @@ trait CudaLibs extends CudaOps {
       }
   }
 
+  // This is the kernel function for splitting 3D input at the inner most axis.
+  // the input is of shape (dimZ, dimY, sum(dimXs))
+  // the number of outputs is determined by the dimXs, which is a list of outputs' dimX
+  def cuda3DSplitAxis2[N:Numeric:Manifest](dimZ: Int, dimY: Int, dimXs: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
+    val dimX = dimXs.reduce(_ + _)
+    val input_size = dimZ * dimY * dimX
+    val offsets = dimXs.scanLeft(0) { case (acc, x) => acc + x }
+    val n = dimXs.length
+
+    (in: Rep[Array[N]], out: Rep[Array[Array[N]]]) => {
+      generate_comment(s"This is cuda $n-section split kernel for 3D input at axis 2.")
+      generate_comment(s"It takes a 3D array and splits on the innermost dimension (dim2) into $n arrays.")
+      generate_comment("arg0: input array")
+      generate_comment("arg1: array of output arrays")
+      generate_comment(s"call constraint: sum of out(i).size = in.size for i in [0, $n)")
+
+      val idx = blockIdxX * blockDimX + threadIdxX
+
+      __ifThenElse(idx < input_size, {
+        val value = in(idx)
+        val x = idx / dimX
+        val y = idx % dimX
+
+        def recursive_branch(t: Int): Unit =
+          if (t == n-1) {
+            write_array_element(t)
+          } else {
+            __ifThenElse(y < offsets(t+1), { write_array_element(t) }, { recursive_branch(t+1) })
+          }
+
+        def write_array_element(t: Int) = {
+          val temp = out(t)
+          cudaArrayEffect[N](temp, x * dimXs(t) + (y - offsets(t)), value)
+        }
+
+        recursive_branch(0)
+      }, {})
+    }
+  }
+
+  def cuda3DSplitWrap[N:Numeric:Manifest](in: Rep[Array[N]], outs: List[Rep[Array[N]]], dimZ: Int, dimY: Int, dimXs: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+    val sec = outs.length
+    val output = NewArray[Array[N]](sec)
+    for (i <- (0 until sec): Range) {
+      output(i) = outs(i)
+    }
+    val cuda_output = cudaMalloc2[Array[N]](sec)
+    cudaCall(cudaMemcpyOfT[Array[N]](cuda_output, output, sec, host2device))
+
+    val splitKernel = cuda3DSplitAxis2[N](dimZ, dimY, dimXs)
+    splitKernel(in, cuda_output, grid, block)
+  }
+
+  // This is the kernel function for concatenating 3D inputs at the inner most axis
+  // the input i is of shape (dimZ, dimY, dimXs(i))
+  // the output shape is (dimZ, dimY, sum(dimXs))
+  def cuda3DConcatAxis2[N:Numeric:Manifest](dimZ: Int, dimY: Int, dimXs: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
+    val dimX = dimXs.reduce(_ + _)
+    val d_other = dimZ * dimY
+    val input_size = d_other * dimX
+    val offsets = dimXs.scanLeft(0) { case (acc, x) => acc + x }
+    val n = dimXs.length
+
+    (in: Rep[Array[Array[N]]], out: Rep[Array[N]]) => {
+      generate_comment(s"this is cuda $n-section concat kernel for 3D inputs at axis 2.")
+      generate_comment(s"It concatenates $n 3D arrays on the innermost dimension (dim2).")
+      generate_comment("arg0: array of input input arrays")
+      generate_comment("arg1: output array")
+      generate_comment(s"call constraint: in.size = $n")
+      generate_comment(s"call constraint: sum of in(i).size = out.size for i in [0, $n)")
+
+      val idx = blockIdxX * blockDimX + threadIdxX
+
+      __ifThenElse(idx < input_size, {
+        val x = idx / dimX
+        val y = idx % dimX
+
+        def recursive_branch(t: Int): Unit =
+          if (t == n-1) {
+            write_array_element(t)
+          } else {
+            __ifThenElse(y < offsets(t+1), { write_array_element(t) }, { recursive_branch(t+1) })
+          }
+
+        def write_array_element(t: Int) = {
+          val arr = in(t)
+          out(idx) = arr(x * dimXs(t) + (y - offsets(t)))
+        }
+
+        recursive_branch(0)
+      }, {})
+    }
+  }
+
+  def cuda3DConcatWrap[N:Numeric:Manifest](ins: List[Rep[Array[N]]], out: Rep[Array[N]], dimZ: Int, dimY: Int, dimXs: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+    val sec = ins.length
+    val input = NewArray[Array[N]](sec)
+    for (i <- (0 until sec): Range) {
+      input(i) = ins(i)
+    }
+    val cuda_input = cudaMalloc2[Array[N]](sec)
+    cudaCall(cudaMemcpyOfT[Array[N]](cuda_input, input, sec, host2device))
+
+    val concatKernel = cuda3DConcatAxis2[N](dimZ: Int, dimY: Int, dimXs: List[Int])
+    concatKernel(cuda_input, out, grid, block)
+  }
+
   // kernel function for 2D transpose
   def cudaTranspose2[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], dimY: Rep[Int], dimX: Rep[Int]) =>
@@ -1427,6 +1537,8 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
+    case n @ Node(s, "cudaArrayEffect", arr::lhs::rhs::_, _) =>
+      shallow(arr); emit("["); shallow(lhs); emit("] = "); shallow(rhs); emitln(";")
     case _ => super.traverse(n)
   }
 }
