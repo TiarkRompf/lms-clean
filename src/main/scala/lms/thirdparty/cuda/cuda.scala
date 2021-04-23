@@ -397,9 +397,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   // macro for infinity
   def infinity[N:Numeric:Manifest]: Rep[N] = manifest[N] match {
-    case _:Manifest[Float] => cmacro[N]("INFINITY")
-    case _:Manifest[Int] => cmacro[N]("INT_MAX")
-    case _:Manifest[Long] => cmacro[N]("LONG_MAX")
+    case a if a == manifest[Float] => cmacro[N]("INFINITY")
+    case a if a == manifest[Int] => cmacro[N]("INT_MAX")
+    case a if a == manifest[Long] => cmacro[N]("LONG_MAX")
     case _ => ???
   }
 
@@ -1040,8 +1040,7 @@ trait CudaLibs extends CudaOps {
       generate_comment("Cuda Embedding Grad")
       val buffer = NewDynSharedArray[N]
       val my_s = buffer.slice(warpSize * threadIdxY, warpSize * threadIdxY)
-
-      val indicies_batch = CastArray[N, Int](buffer.slice(sizeOf[Float] * warpSize * blockDimY, sizeOf[Float] * warpSize * blockDimY))
+      val indicies_batch = CastArray[N, Int](buffer.slice(warpSize * blockDimY, warpSize * blockDimY))
       val feature_dim = threadIdxX + blockIdxX * blockDimX
 
       def conditional_assign[T:Numeric:Manifest](cond: Rep[Boolean], dst: Rep[Array[T]], in: Rep[Int], src: Rep[Array[T]], out: Rep[Int]) = {
@@ -1077,8 +1076,6 @@ trait CudaLibs extends CudaOps {
 
             __ifThenElse(equals(threadIdxY, readVar(first_remaining_peer)), {
               __assign(matchmask, matchmask ^ (1 << readVar(first_remaining_peer)))
-              indicies(n_this_chunk) = matchmask 
-              
               __whileDo(readVar(matchmask) > 0, {
                 __assign(first_remaining_peer, cudaFfs(matchmask) - 1)
                 my_s(threadIdxX) = my_s(threadIdxX) + buffer(threadIdxX + warpSize * first_remaining_peer)

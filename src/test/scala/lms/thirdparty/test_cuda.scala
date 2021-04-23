@@ -372,8 +372,7 @@ class CudaTest extends TutorialFunSuite {
         checkFile[Float]("golden/embedding/embedding_grad.data", embeddingGrad, n_embeddings * embed_size)
       }
     }
-    // check("embedding_grad", driver.code, "cu")
-    System.out.println(indent(driver.code))
+     check("embedding_grad", driver.code, "cu")
   }
 
   // TODO(Supun): Currently, this just emits the generated code (always passes the test)
