@@ -347,11 +347,6 @@ class CudaTest extends TutorialFunSuite {
         val paddingIdx = -1
         val gridSize = (embed_size + 31) / 32
 
-        // val embedding = NewArray[Float](n_embeddings * embed_size)
-        // scanFile[Float]("golden/embedding/embedding.data", embedding, n_embeddings * embed_size)
-        // val cuda_embedding = cudaMalloc2[Float](n_embeddings * embed_size)
-        // cudaCall(cudaMemcpyOfT(cuda_embedding, embedding, n_embeddings * embed_size, host2device))
-
         val indices = NewArray[Int](n_indices)
         scanFile[Int]("golden/embedding/indices.data", indices, n_indices)
         val cuda_indices = cudaMalloc2[Int](n_indices)
