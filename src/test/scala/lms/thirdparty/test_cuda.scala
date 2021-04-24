@@ -337,6 +337,41 @@ class CudaTest extends TutorialFunSuite {
     check("embedding", driver.code, "cu")
   }
 
+  test("embeddin_grad_kernel") {
+    val driver = new DslDriverCCudaScan[Int, Unit] {
+
+      @virtualize
+      def snippet(arg: Rep[Int]) = {
+        val n_embeddings = 20
+        val embed_size = 60
+        val n_indices = 10
+        val paddingIdx = -1
+        val gridSize = (embed_size + 31) / 32
+
+        val indices = NewArray[Int](n_indices)
+        scanFile[Int]("golden/embedding/indices.data", indices, n_indices)
+        val cuda_indices = cudaMalloc2[Int](n_indices)
+        cudaCall(cudaMemcpyOfT(cuda_indices, indices, n_indices, host2device))
+
+        val outputGrad = NewArray[Float](n_indices * embed_size)
+        scanFile[Float]("golden/embedding/output_grad.data", outputGrad, n_indices * embed_size)
+        val cuda_output_grad = cudaMalloc2[Float](n_indices * embed_size)
+        cudaCall(cudaMemcpyOfT(cuda_output_grad, outputGrad, n_indices * embed_size, host2device))
+
+        val embeddingGrad = NewArray[Float](n_embeddings * embed_size)
+        val cuda_embedding_grad = cudaMalloc2[Float](n_embeddings * embed_size)
+
+        val cudaEmbeddingGradKernel = cudaEmbeddingGrad[Float]
+        cudaEmbeddingGradKernel(cuda_indices, cuda_output_grad, cuda_embedding_grad, n_indices, embed_size, paddingIdx, dim3(gridSize), dim3(32, 32), 32 * 32 * sizeOf[Int] + 32 * 32 * sizeOf[Float])
+
+        cudaCall(cudaMemcpyOfT(embeddingGrad, cuda_embedding_grad, n_embeddings * embed_size, device2host))
+        checkFile[Float]("golden/embedding/embedding_grad.data", embeddingGrad, n_embeddings * embed_size)
+      }
+    }    
+
+    check("embedding_grad", driver.code, "cu")
+  }
+
   test("softmax_kernel") {
     val driver = new DslDriverCCudaScan[Int, Unit] {
 
@@ -526,7 +561,7 @@ class CudaTest extends TutorialFunSuite {
         printf("Transpose Correct\n")
       }
     }
-  check("transpose", driver.code, "cu")
+    check("transpose", driver.code, "cu")
   }
 
   test("permute_kernel_10") {

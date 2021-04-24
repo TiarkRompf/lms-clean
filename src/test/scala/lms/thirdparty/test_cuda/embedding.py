@@ -17,12 +17,16 @@ def generate_data(lms_clean_root: str):
     indices = torch.randint(0, n_embedding, (n_indices,))
 
     output = embedding(indices)
+    output.retain_grad()
+    output.mean().backward()
 
     # printer
     printer = get_printer(lms_clean_root, test_name = "embedding")
     printer("embedding.data", embedding.weight)
     printer("indices.data", indices)
     printer("output.data", output)
+    printer("embedding_grad.data", embedding.weight.grad) 
+    printer("output_grad.data", output.grad)
 
 if __name__ == '__main__':
     assert len(sys.argv) > 1, "must provide lms_clean_root dir"

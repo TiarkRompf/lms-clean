@@ -402,9 +402,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   // macro for infinity
   def infinity[N:Numeric:Manifest]: Rep[N] = manifest[N] match {
-    case _:Manifest[Float] => cmacro[N]("INFINITY")
-    case _:Manifest[Int] => cmacro[N]("INT_MAX")
-    case _:Manifest[Long] => cmacro[N]("LONG_MAX")
+    case a if a == manifest[Float] => cmacro[N]("INFINITY")
+    case a if a == manifest[Int] => cmacro[N]("INT_MAX")
+    case a if a == manifest[Long] => cmacro[N]("LONG_MAX")
     case _ => ???
   }
 
@@ -428,6 +428,16 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def NewSharedArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewSharedArray", Unwrap(x)))
   }
+
+  def CastArray[Original:Manifest, New:Manifest](arr: Rep[Array[Original]]) = {
+    Wrap[Array[New]](Adapter.g.reflectMutable("CastArray", Unwrap(arr)))
+  }
+
+  def cudaBallotSync[T:Manifest](mask: Rep[Int], predicate: Rep[Int]) =
+    libFunction[Int]("__ballot_sync", Unwrap(mask), Unwrap(predicate))(Seq[Int](), Seq[Int](), Set[Int]())
+  
+  def cudaFfs[T:Manifest](x: Rep[Int]) =
+    libFunction[Int]("__ffs", Unwrap(x))(Seq[Int](), Seq[Int](), Set[Int]())
 
   case class Matrix2D[T:Manifest](x: Rep[Array[T]], skip: Int) {
     def apply(i: Rep[Int], j: Rep[Int])(implicit __pos: SourceContext): Rep[T] = {
@@ -744,6 +754,9 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]) =
     Wrap[(A,B,C,D,Dim3,Dim3,Int)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), "__global__"))
+  
+  def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]) =
+    Wrap[(A,B,C,D,E,F,Dim3,Dim3,Int)=>G](__topFun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), "__global__"))
 
   def cudaGlobalFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E]) => Rep[F]) =
     Wrap[(A,B,C,D,E,Dim3,Dim3)=>F](__topFun(f, 5, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)))), "__global__"))
@@ -902,6 +915,77 @@ trait CudaLibs extends CudaOps {
     }
   }
 
+  def cudaEmbeddingGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalDynamicFun {
+    (indicies: Rep[Array[Int]], grad: Rep[Array[N]], gradWeight: Rep[Array[N]], n: Rep[Int], stride: Rep[Int], paddingIdx: Rep[Int]) => {
+      generate_comment("Cuda Embedding Grad")
+      generate_comment("arg0: embedding indicies")
+      generate_comment("arg1: embedding output gradient")
+      generate_comment("arg2: embedding gradient")
+      generate_comment("arg3: indicies size")
+      generate_comment("arg4: padding index (-1 if unsure)")
+      val buffer = NewDynSharedArray[N]
+      val my_s = buffer.slice(warpSize * threadIdxY, warpSize * threadIdxY)
+      val indicies_batch = CastArray[N, Int](buffer.slice(warpSize * blockDimY, warpSize * blockDimY))
+      val feature_dim = threadIdxX + blockIdxX * blockDimX
+
+      def conditional_assign[T:Numeric:Manifest](cond: Rep[Boolean], dst: Rep[Array[T]], in: Rep[Int], src: Rep[Array[T]], out: Rep[Int]) = {
+        __ifThenElse(cond, {dst(in) = src(out)}, {})
+      }
+
+      def min[T:Numeric:Manifest](x: Rep[T], y: Rep[T]) = {
+        __ifThenElse(x < y, x, y)
+      }
+
+      for (batch_start <- (0 until (n, blockDimX * blockDimY)): Rep[Range]) {
+        // Entire block cooperates to load a batch of 1024 indices to process
+        val tid = threadIdxX + threadIdxY * blockDimX
+        conditional_assign(batch_start + tid < n, indicies_batch, tid, indicies, batch_start + tid)
+        val batch_end = min(batch_start + blockDimX * blockDimY, n)
+
+        // Loop over the batch of <= 1024 loaded indices in chunks of blockDim.y = 32
+        for (chunk_start <- (batch_start until (batch_end, blockDimY)): Rep[Range]) {
+          // Sync to make sure that indicies_batch is ready and to ensure that
+          // match-group leaders are done with their accumulates before other warps
+          // start loading again
+          cudaSyncThreads
+
+          val n_this_chunk = min(batch_end - chunk_start, blockDimY)
+          val src_row = chunk_start + threadIdxY
+          val dst_row = indicies_batch(src_row - batch_start)
+          conditional_assign((src_row < n) && (feature_dim < stride) && notequals(dst_row, paddingIdx), my_s, threadIdxX, grad, src_row * stride + feature_dim)
+
+          cudaSyncThreads
+          
+          // To ensure determinism, we can't just have each warp add its grad data to its dst_row.
+          // We need to check if any other warps pulled grad data targeting dst_row.
+          // If so, we elect the first warp in each matching group as the leader.
+          // Each leader warp serializes the accumulates targeting dst_row in shared memory,
+          // then finishes by adding the accumulated buffer to dst_row in grad_weight.
+          __ifThenElse(src_row < n && notequals(dst_row, paddingIdx), {
+            val match_found_this_thread = var_new(__ifThenElse(equals(dst_row, indicies_batch(chunk_start - batch_start + threadIdxX)), 1, 0))
+            __ifThenElse(threadIdxX >= n_this_chunk, {__assign(match_found_this_thread, 0)}, {})
+
+            val matchmask = var_new(cudaBallotSync(0xffffffff, match_found_this_thread))
+            indicies(n_this_chunk) = matchmask 
+            val first_remaining_peer = var_new(cudaFfs(matchmask) - 1)
+
+            __ifThenElse(equals(threadIdxY, readVar(first_remaining_peer)), {
+              __assign(matchmask, matchmask ^ (1 << readVar(first_remaining_peer)))
+              __whileDo(readVar(matchmask) > 0, {
+                __assign(first_remaining_peer, cudaFfs(matchmask) - 1)
+                my_s(threadIdxX) = my_s(threadIdxX) + buffer(threadIdxX + warpSize * first_remaining_peer)
+                __assign(matchmask, matchmask ^ (1 << readVar(first_remaining_peer)))
+              })
+
+              __ifThenElse(feature_dim < stride, {gradWeight(dst_row * stride + feature_dim) += my_s(threadIdxX)}, {})
+              ()
+            }, {})
+          }, {})
+        }
+      }
+    }
+  }
+
   def cudaMaskedFill[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N],
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
@@ -1045,6 +1129,7 @@ trait CudaLibs extends CudaOps {
         __assign(y, y + blockRows)
       }
     }
+
 
   /*
     reduce the data input array (from 0 to size) using the given op.
@@ -1506,6 +1591,7 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
 
   override def mayInline(n: Node): Boolean = n match {
     case Node(s, "NewSharedArray", _, _) => false
+    case Node(s, "CastArray", _, _) => false 
     case _ => super.mayInline(n)
   }
 
@@ -1537,6 +1623,9 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
     case n @ Node(s, "NewDynSharedArray", List(), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit("extern __shared__ "); emit(s"$tpe "); shallow(s); emitln("[];")
+    case n @ Node(s, "CastArray", xs, _) =>
+        val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
+        emit(s"$tpe* "); shallow(s); emit(s" = ($tpe *)("); shallow(xs(0)); emitln(");")
     case n @ Node(s, "cudaArrayEffect", arr::lhs::rhs::_, _) =>
       shallow(arr); emit("["); shallow(lhs); emit("] = "); shallow(rhs); emitln(";")
     case _ => super.traverse(n)
