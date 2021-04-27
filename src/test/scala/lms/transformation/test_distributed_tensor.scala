@@ -2,6 +2,7 @@ package lms
 package transformation.tensor
 
 import scala.annotation.implicitNotFound
+import scala.collection.immutable.Seq
 import lms.core.virtualize
 import macros.SourceContext
 
@@ -233,7 +234,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   test("softmax") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
@@ -255,7 +255,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   test("sigmoid") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
@@ -275,7 +274,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   test("elu") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
@@ -295,7 +293,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   test("dropout") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
@@ -318,7 +315,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   test("maxpool") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
@@ -339,7 +335,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   test("avgpool") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
@@ -360,7 +355,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   test("conv") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
@@ -381,7 +375,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   test("conv_train") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
-      import scala.collection.immutable.Seq
 
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
