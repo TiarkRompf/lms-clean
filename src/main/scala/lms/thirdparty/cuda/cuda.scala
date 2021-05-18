@@ -986,6 +986,12 @@ trait CudaLibs extends CudaOps {
     }
   }
 
+  def cudaTemp[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], x: Rep[Int]) = ???
+
+  def cudaTemp1[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
+    (in: Rep[Array[N]], out: Rep[Array[N]], x: Rep[Int]) => 0
+  }
+
   def cudaMaskedFill[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N],
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],

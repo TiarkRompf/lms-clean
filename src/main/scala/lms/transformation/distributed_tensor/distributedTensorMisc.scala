@@ -28,8 +28,22 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
   }
 
+  def MaskedFillForward[T](input: TENSOR, mask: TENSOR, value: Float, anno: Anno, __pos: SourceContext): TENSOR = {
+    require(input.shapeSize == mask.shapeSize, "shape of mask must be equal to shape of the tensor")
+    val res_tt = input.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_maskedfill", C(res_tt), C(anno), input.x, mask.x,
+      C(value))(input.x)).withSrcType(__pos, input.et))
+  }
+
+  def MaskedFillBackward(doutput: TENSOR, mask: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = doutput.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_maskedfill_bwd", C(res_tt), C(anno), doutput.x, mask.x)
+      (doutput.x)).withSrcType(__pos, doutput.et))
+  }
+
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_softmax", _, _) => List()
+    case Node(s, "tensor_maskedfill", _, _) => List()
     case _ => super.mergable_dims(node)
   }
 
@@ -45,6 +59,13 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
             val x = new TENSOR(transform(s))
             val grad = SoftmaxBackward(x, gradMap(s), params, anno, pos)
             Accumulate(gradMap(a), grad, anno); ()
+        }) +=: backwardNodes
+      case Node(s, "tensor_maskedfill", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val grad = MaskedFillBackward(gradMap(s), new TENSOR(mask), anno, pos)
+            Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
@@ -66,6 +87,11 @@ trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBas
 
     def softmax(params: SoftmaxParam, anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val t = SoftmaxForward(self, params, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def maskedFill(mask: Rep[Tensor[Int]], value: Float)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = MaskedFillForward(self, tensor(mask), value, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }
