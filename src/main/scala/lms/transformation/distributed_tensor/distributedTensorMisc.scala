@@ -29,7 +29,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
   }
 
   def MaskedFillForward[T](input: TENSOR, mask: TENSOR, value: Float, anno: Anno, __pos: SourceContext): TENSOR = {
-    require(input.shapeSize == mask.shapeSize, "shape of mask must be equal to shape of the tensor")
+    // require(input.shapeSize == mask.shapeSize, "shape of mask must be equal to shape of the tensor")
     val res_tt = input.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_maskedfill", C(res_tt), C(anno), input.x, mask.x,
       C(value))(input.x)).withSrcType(__pos, input.et))
