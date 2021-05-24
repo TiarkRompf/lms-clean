@@ -18,13 +18,13 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
 
   def SoftmaxForward(input: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = input.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_softmax", C(res_tt), C(anno), input.x, 
+    (new TENSOR(Adapter.g.reflectRead("tensor_softmax", C(res_tt), C(anno), input.x,
       C(params))(input.x)).withSrcType(__pos, input.et))
   }
 
   def SoftmaxBackward(output: TENSOR, doutput: TENSOR, params: SoftmaxParam, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = doutput.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_softmax_bwd", C(res_tt), C(anno), output.x, doutput.x, 
+    (new TENSOR(Adapter.g.reflectRead("tensor_softmax_bwd", C(res_tt), C(anno), output.x, doutput.x,
       C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
   }
 
@@ -43,7 +43,10 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_softmax", _, _) => List()
-    case Node(s, "tensor_maskedfill", _, _) => List()
+    case Node(s, "tensor_maskedfill", tt::anno::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
+      val input_type = (new TENSOR(input, useOldMetadata=true)).resultType
+      val mask_type = (new TENSOR(mask, useOldMetadata=true)).resultType
+      (input_type.shape.reverse zip mask_type.shape.reverse).toList map { case (a:Size, b:Size) => (a.dim, b.dim)}
     case _ => super.mergable_dims(node)
   }
 
