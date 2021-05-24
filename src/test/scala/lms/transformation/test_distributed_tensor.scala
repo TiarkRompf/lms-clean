@@ -401,6 +401,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val model = module {
           val input = Tensor.input[Float](shape=Seq(2,1,9,9), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
+          // val mask = Tensor.input[Int](shape=Seq(2,1,9,9), name="mask", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           val mask = Tensor.weight[Int](Seq(2,1,9,9), tensorName=Some("mask"))
           val weight = Tensor.weight[Float](Seq(2,1,9,9), tensorName=Some("weight"))
 

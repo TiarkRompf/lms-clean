@@ -143,26 +143,26 @@ void Snippet(int x0) {
   CUDA_CALL(cudaStreamCreateWithFlags(&x5, cudaStreamNonBlocking));
   int x6 = x2;
   // end setting up the MPI/NCCL environment
-  // begin initializing GPU array of size 162 and type Int at device (pre-rename) x39 from binary file mask
-  int* x7 = (int*)malloc(162 * sizeof(int));
+  // begin initializing GPU array of size 81 and type Int at device (pre-rename) x39 from binary file mask
+  int* x7 = (int*)malloc(81 * sizeof(int));
   CUDA_CALL(cudaSetDevice(x6));
   int* x8 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x8, (size_t)(162 * sizeof(int))));
-  scan_int_rank("golden/mask", x6, x7, 162);
-  CUDA_CALL(cudaMemcpy(x8, x7, (size_t)(162 * sizeof(int)), cudaMemcpyHostToDevice));
-  // end initializing GPU array of size 162 and type Int at device (pre-rename) x39 from binary file mask
-  // begin initializing fixed GPU array of size 162 and type Int and device (pre-rename) x39
+  CUDA_CALL(cudaMalloc(&x8, (size_t)(81 * sizeof(int))));
+  scan_int_rank("golden/mask", x6, x7, 81);
+  CUDA_CALL(cudaMemcpy(x8, x7, (size_t)(81 * sizeof(int)), cudaMemcpyHostToDevice));
+  // end initializing GPU array of size 81 and type Int at device (pre-rename) x39 from binary file mask
+  // begin initializing fixed GPU array of size 81 and type Int and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   int* x9 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x9, (size_t)(162 * sizeof(int))));
-  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, 0, 162);
-  // end initializing fixed GPU array of size 162 and type Int and device (pre-rename) x39
-  // begin initializing fixed GPU array of size 162 and type Int and device (pre-rename) x39
+  CUDA_CALL(cudaMalloc(&x9, (size_t)(81 * sizeof(int))));
+  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, 0, 81);
+  // end initializing fixed GPU array of size 81 and type Int and device (pre-rename) x39
+  // begin initializing fixed GPU array of size 81 and type Int and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   int* x16 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x16, (size_t)(162 * sizeof(int))));
-  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x16, 0, 162);
-  // end initializing fixed GPU array of size 162 and type Int and device (pre-rename) x39
+  CUDA_CALL(cudaMalloc(&x16, (size_t)(81 * sizeof(int))));
+  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x16, 0, 81);
+  // end initializing fixed GPU array of size 81 and type Int and device (pre-rename) x39
   // begin initializing GPU array of size 81 and type Float at device (pre-rename) x39 from binary file weight
   float* x17 = (float*)malloc(81 * sizeof(float));
   CUDA_CALL(cudaSetDevice(x6));
@@ -234,13 +234,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   x69<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x19, x76, 81);
   // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x133 and addition_operand x414
-  if (x6 == 0) {
-    // begin checking GPU array of size 162 and type Int at device (pre-name) x39 again binary file mask_grad
-    int* x103 = (int*)malloc(162 * sizeof(int));
-    CUDA_CALL(cudaMemcpy(x103, x9, (size_t)(162 * sizeof(int)), cudaMemcpyDeviceToHost));
-    check_int_array_rank("golden/mask_grad", x6, x103, 162);
-    // end checking GPU array of size 162 and type Int at device (pre-name) x39 again binary file mask_grad
-  }
+  // begin checking GPU array of size 81 and type Int at device (pre-name) x39 again binary file mask_grad
+  int* x103 = (int*)malloc(81 * sizeof(int));
+  CUDA_CALL(cudaMemcpy(x103, x9, (size_t)(81 * sizeof(int)), cudaMemcpyDeviceToHost));
+  check_int_array_rank("golden/mask_grad", x6, x103, 81);
+  // end checking GPU array of size 81 and type Int at device (pre-name) x39 again binary file mask_grad
   // begin checking GPU array of size 81 and type Float at device (pre-name) x39 again binary file weight_grad
   float* x104 = (float*)malloc(81 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x104, x19, (size_t)(81 * sizeof(float)), cudaMemcpyDeviceToHost));
