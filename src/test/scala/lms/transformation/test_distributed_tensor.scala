@@ -392,7 +392,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("conv_train", driver.code, "cu", driver.setLogPath)
   }
 
-  test("masked_fill") {
+  test("masked_fill") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
 
@@ -402,7 +402,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val input = Tensor.input[Float](shape=Seq(2,1,9,9), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
           val mask = Tensor.input[Int](shape=Seq(2,1,9,9), name="mask", splitDim=0, splitTo=List(GPU(0), GPU(1)))
-          // val mask = Tensor.weight[Int](Seq(2,1,9,9), tensorName=Some("mask"))
           val weight = Tensor.weight[Float](Seq(2,1,9,9), tensorName=Some("weight"))
 
           input + weight.maskedFill(mask, 1.0)
@@ -411,6 +410,25 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("masked_fill", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("logSoftmax") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(2,1,32,533), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(2,1,32,533), tensorName=Some("weight"))
+
+          input + weight.logSoftmax
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("logSoftmax", driver.code, "cu", driver.setLogPath)
   }
 }
 
