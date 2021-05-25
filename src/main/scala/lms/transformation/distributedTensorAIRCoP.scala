@@ -79,8 +79,12 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
     // collect all weight syms and all forward syms
     val weightSyms = weightNodes.map(s => s.n)
     val forwardSyms = forwardNodes.map(s => s.n)
+    // remove input Syms that are int type
     val inputSyms = forwardNodes.filter {
-      case Node(s, "tensor_input", _, _) => true
+      case Node(s, "tensor_input", Backend.Const(tt: TensorType)::_, _) => tt.et match {
+        case a if a == manifest[Int] => false
+        case _ => true
+      }
       case _ => false
     }.map(s => s.n)
 
