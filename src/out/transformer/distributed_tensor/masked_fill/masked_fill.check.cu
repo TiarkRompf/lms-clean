@@ -27,7 +27,7 @@ __global__ void x10(float* x11, float x12, int x13) {
   }
   // end generating kernel function for FILL of type Float
 }
-__global__ void x22(float* x23, float* x24, int* x25, float x26, int x27, int x28, int x29, int x30, int x31) {
+__global__ void x21(float* x22, float* x23, int* x24, float x25, int x26, int x27, int x28, int x29, int x30) {
   // this is the cuda masked fill kernel.
   // The kernel takes an N-d input tensor `in` and selects two dimensions `i` and `j` to work with.
   // `ijSwapped` is true if and only if i > j.
@@ -37,81 +37,81 @@ __global__ void x22(float* x23, float* x24, int* x25, float x26, int x27, int x2
   // The kernel also takes a 2-d `mask` tensor, of shape (dim0_shape, dim1_shape). This mask tensor
   // contains only zeros and ones. The kernel fills elements of input tensor with `value` where mask is
   // zero and stores the result to `out`.
-  int x32 = blockIdx.x * blockDim.x + threadIdx.x;
-  int x33 = x32;
-  int x34 = blockDim.x * gridDim.x;
-  int x35 = x32 / x29;
-  int x36 = x35;
-  int x37 = x35 * x29;
-  int x38 = x32 - x37;
-  int x39 = x38 / x30;
-  int x40 = x39;
-  int x41 = x39 * x30;
-  int x42 = x37 + x41 + (x38 - x41);
-  while (x42 < x31) {
-    x24[x42] = x25[x36 % x27 * x28 + x40 % x28] == 0 ? x23[x42] : x26;
-    int x43 = x33 + x34;
-    x33 = x43;
-    int x44 = x43 / x29;
-    x36 = x44;
-    int x45 = x44 * x29;
-    int x46 = x43 - x45;
-    int x47 = x46 / x30;
-    x40 = x47;
-    int x48 = x47 * x30;
-    x42 = x45 + x48 + (x46 - x48);
+  int x31 = blockIdx.x * blockDim.x + threadIdx.x;
+  int x32 = x31;
+  int x33 = blockDim.x * gridDim.x;
+  int x34 = x31 / x28;
+  int x35 = x34;
+  int x36 = x34 * x28;
+  int x37 = x31 - x36;
+  int x38 = x37 / x29;
+  int x39 = x38;
+  int x40 = x38 * x29;
+  int x41 = x36 + x40 + (x37 - x40);
+  while (x41 < x30) {
+    x23[x41] = x24[x35 % x26 * x27 + x39 % x27] == 0 ? x22[x41] : x25;
+    int x42 = x32 + x33;
+    x32 = x42;
+    int x43 = x42 / x28;
+    x35 = x43;
+    int x44 = x43 * x28;
+    int x45 = x42 - x44;
+    int x46 = x45 / x29;
+    x39 = x46;
+    int x47 = x46 * x29;
+    x41 = x44 + x47 + (x45 - x47);
   }
 }
-__global__ void x50(float* x51, float* x52, float* x53, int x54) {
+__global__ void x49(float* x50, float* x51, float* x52, int x53) {
   // begin generating kernel function for ADD of type Float
-  int x55 = gridDim.x * blockDim.x;
-  int x56 = threadIdx.x + blockIdx.x * blockDim.x;
-  while (x56 < x54) {
-    int x57 = x56;
-    x53[x57] = x51[x57] + x52[x57];
-    x56 = x56 + x55;
+  int x54 = gridDim.x * blockDim.x;
+  int x55 = threadIdx.x + blockIdx.x * blockDim.x;
+  while (x55 < x53) {
+    int x56 = x55;
+    x52[x56] = x50[x56] + x51[x56];
+    x55 = x55 + x54;
   }
   // end generating kernel function for ADD of type Float
 }
-__global__ void x62(float* x63, float* x64, int x65) {
+__global__ void x61(float* x62, float* x63, int x64) {
   // begin generating kernel function for ACCUM of type Float
-  int x66 = gridDim.x * blockDim.x;
-  int x67 = threadIdx.x + blockIdx.x * blockDim.x;
-  while (x67 < x65) {
-    int x68 = x67;
-    x63[x68] = x63[x68] + x64[x68];
-    x67 = x67 + x66;
+  int x65 = gridDim.x * blockDim.x;
+  int x66 = threadIdx.x + blockIdx.x * blockDim.x;
+  while (x66 < x64) {
+    int x67 = x66;
+    x62[x67] = x62[x67] + x63[x67];
+    x66 = x66 + x65;
   }
   // end generating kernel function for ACCUM of type Float
 }
-__global__ void x70(float* x71, float* x72, int* x73, int x74, int x75, int x76, int x77, int x78) {
+__global__ void x69(float* x70, float* x71, int* x72, int x73, int x74, int x75, int x76, int x77) {
   // this is the cuda masked fill gradient kernel.
   // arg0: gradient of N-d output tensor.
   // arg1: gradient of N-d input tensor.
   // Other parameters are same as maskedFill
-  int x79 = blockIdx.x * blockDim.x + threadIdx.x;
-  int x80 = x79;
-  int x81 = blockDim.x * gridDim.x;
-  int x82 = x79 / x76;
-  int x83 = x82;
-  int x84 = x82 * x76;
-  int x85 = x79 - x84;
-  int x86 = x85 / x77;
-  int x87 = x86;
-  int x88 = x86 * x77;
-  int x89 = x84 + x88 + (x85 - x88);
-  while (x89 < x78) {
-    if (x73[x83 % x74 * x75 + x87 % x75] == 0) x72[x89] = x72[x89] + x71[x89];
-    int x90 = x80 + x81;
-    x80 = x90;
-    int x91 = x90 / x76;
-    x83 = x91;
-    int x92 = x91 * x76;
-    int x93 = x90 - x92;
-    int x94 = x93 / x77;
-    x87 = x94;
-    int x95 = x94 * x77;
-    x89 = x92 + x95 + (x93 - x95);
+  int x78 = blockIdx.x * blockDim.x + threadIdx.x;
+  int x79 = x78;
+  int x80 = blockDim.x * gridDim.x;
+  int x81 = x78 / x75;
+  int x82 = x81;
+  int x83 = x81 * x75;
+  int x84 = x78 - x83;
+  int x85 = x84 / x76;
+  int x86 = x85;
+  int x87 = x85 * x76;
+  int x88 = x83 + x87 + (x84 - x87);
+  while (x88 < x77) {
+    if (x72[x82 % x73 * x74 + x86 % x74] == 0) x71[x88] = x71[x88] + x70[x88];
+    int x89 = x79 + x80;
+    x79 = x89;
+    int x90 = x89 / x75;
+    x82 = x90;
+    int x91 = x90 * x75;
+    int x92 = x89 - x91;
+    int x93 = x92 / x76;
+    x86 = x93;
+    int x94 = x93 * x76;
+    x88 = x91 + x94 + (x92 - x94);
   }
 }
 /**************** Snippet ****************/
@@ -147,86 +147,80 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x9, (size_t)(81 * sizeof(float))));
   x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, 0, 81);
   // end initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
-  // begin initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
-  CUDA_CALL(cudaSetDevice(x6));
-  float* x16 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x16, (size_t)(81 * sizeof(float))));
-  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x16, 0, 81);
-  // end initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
   // begin initializing GPU array of size 81 and type Float at device (pre-rename) x39 from binary file input
-  float* x17 = (float*)malloc(81 * sizeof(float));
+  float* x16 = (float*)malloc(81 * sizeof(float));
   CUDA_CALL(cudaSetDevice(x6));
-  float* x18 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x18, (size_t)(81 * sizeof(float))));
-  scan_float_rank("golden/input", x6, x17, 81);
-  CUDA_CALL(cudaMemcpy(x18, x17, (size_t)(81 * sizeof(float)), cudaMemcpyHostToDevice));
+  float* x17 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x17, (size_t)(81 * sizeof(float))));
+  scan_float_rank("golden/input", x6, x16, 81);
+  CUDA_CALL(cudaMemcpy(x17, x16, (size_t)(81 * sizeof(float)), cudaMemcpyHostToDevice));
   // end initializing GPU array of size 81 and type Float at device (pre-rename) x39 from binary file input
   // begin initializing GPU array of size 81 and type Int at device (pre-rename) x39 from binary file mask
-  int* x19 = (int*)malloc(81 * sizeof(int));
+  int* x18 = (int*)malloc(81 * sizeof(int));
   CUDA_CALL(cudaSetDevice(x6));
-  int* x20 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x20, (size_t)(81 * sizeof(int))));
-  scan_int_rank("golden/mask", x6, x19, 81);
-  CUDA_CALL(cudaMemcpy(x20, x19, (size_t)(81 * sizeof(int)), cudaMemcpyHostToDevice));
+  int* x19 = (int*)malloc(0 * sizeof(int));
+  CUDA_CALL(cudaMalloc(&x19, (size_t)(81 * sizeof(int))));
+  scan_int_rank("golden/mask", x6, x18, 81);
+  CUDA_CALL(cudaMemcpy(x19, x18, (size_t)(81 * sizeof(int)), cudaMemcpyHostToDevice));
   // end initializing GPU array of size 81 and type Int at device (pre-rename) x39 from binary file mask
   CUDA_CALL(cudaSetDevice(x6));
-  float* x21 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x21, (size_t)(162 * sizeof(float))));
-  x22<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x8, x21, x20, 1.0, 9, 9, 9, 1, 162);
-  // begin computing ADD on GPU for size 81 and type Float at device (pre-rename) x39 with left_operand x116 and right_operand x150
+  float* x20 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x20, (size_t)(162 * sizeof(float))));
+  x21<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x8, x20, x19, 1.0, 9, 9, 9, 1, 162);
+  // begin computing ADD on GPU for size 81 and type Float at device (pre-rename) x39 with left_operand x103 and right_operand x137
   CUDA_CALL(cudaSetDevice(x6));
-  float* x49 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x49, (size_t)(81 * sizeof(float))));
-  x50<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x18, x21, x49, 81);
-  // end computing ADD on GPU for size 81 and type Float at device (pre-rename) x39 with left_operand x116 and right_operand x150
+  float* x48 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x48, (size_t)(81 * sizeof(float))));
+  x49<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x17, x20, x48, 81);
+  // end computing ADD on GPU for size 81 and type Float at device (pre-rename) x39 with left_operand x103 and right_operand x137
+  // begin initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
+  CUDA_CALL(cudaSetDevice(x6));
+  float* x57 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x57, (size_t)(81 * sizeof(float))));
+  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x57, 0, 81);
+  // end initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
   // begin initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x58 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x58, (size_t)(81 * sizeof(float))));
   x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x58, 0, 81);
   // end initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
-  // begin initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
-  CUDA_CALL(cudaSetDevice(x6));
-  float* x59 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x59, (size_t)(81 * sizeof(float))));
-  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x59, 0, 81);
-  // end initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
   // begin checking GPU array of size 81 and type Float at device (pre-name) x39 again binary file loss
-  float* x60 = (float*)malloc(81 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x60, x49, (size_t)(81 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/loss", x6, x60, 81);
+  float* x59 = (float*)malloc(81 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x59, x48, (size_t)(81 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array_rank("golden/loss", x6, x59, 81);
   // end checking GPU array of size 81 and type Float at device (pre-name) x39 again binary file loss
   // begin initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
-  float* x61 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x61, (size_t)(81 * sizeof(float))));
-  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x61, 1, 81);
+  float* x60 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x60, (size_t)(81 * sizeof(float))));
+  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x60, 1, 81);
   // end initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
-  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x295 and addition_operand x318
+  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x282 and addition_operand x305
   CUDA_CALL(cudaSetDevice(x6));
-  x62<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x59, x61, 81);
-  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x295 and addition_operand x318
-  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x282 and addition_operand x318
+  x61<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x58, x60, 81);
+  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x282 and addition_operand x305
+  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x269 and addition_operand x305
   CUDA_CALL(cudaSetDevice(x6));
-  x62<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x58, x61, 81);
-  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x282 and addition_operand x318
+  x61<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x57, x60, 81);
+  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x269 and addition_operand x305
   CUDA_CALL(cudaSetDevice(x6));
-  float* x69 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x69, (size_t)(162 * sizeof(float))));
-  x70<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x59, x69, x16, 9, 9, 9, 1, 162);
-  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x374
+  float* x68 = (float*)malloc(0 * sizeof(float));
+  CUDA_CALL(cudaMalloc(&x68, (size_t)(162 * sizeof(float))));
+  x69<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x58, x68, x19, 9, 9, 9, 1, 162);
+  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x361
   CUDA_CALL(cudaSetDevice(x6));
-  x62<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x69, 81);
-  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x374
+  x61<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x68, 81);
+  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x361
   // begin checking GPU array of size 81 and type Float at device (pre-name) x39 again binary file weight_grad
-  float* x96 = (float*)malloc(81 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x96, x9, (size_t)(81 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/weight_grad", x6, x96, 81);
+  float* x95 = (float*)malloc(81 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x95, x9, (size_t)(81 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array_rank("golden/weight_grad", x6, x95, 81);
   // end checking GPU array of size 81 and type Float at device (pre-name) x39 again binary file weight_grad
   // begin checking GPU array of size 81 and type Float at device (pre-name) x39 again binary file input_grad
-  float* x97 = (float*)malloc(81 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x97, x58, (size_t)(81 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/input_grad", x6, x97, 81);
+  float* x96 = (float*)malloc(81 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x96, x57, (size_t)(81 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array_rank("golden/input_grad", x6, x96, 81);
   // end checking GPU array of size 81 and type Float at device (pre-name) x39 again binary file input_grad
   MPICHECK(MPI_Finalize());
   NCCLCHECK(ncclCommDestroy(x4));

@@ -41,6 +41,8 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       (doutput.x)).withSrcType(__pos, doutput.et))
   }
 
+  // def LogSoftmaxForward(input: TENSOR, )
+
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_softmax", _, _) => List()
     case Node(s, "tensor_maskedfill", tt::anno::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
@@ -67,7 +69,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
         (() => {
-            val grad = MaskedFillBackward(gradMap(s), new TENSOR(mask), anno, pos)
+            val grad = MaskedFillBackward(gradMap(s), new TENSOR(transform(mask)), anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
 
