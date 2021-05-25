@@ -41,7 +41,20 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       (doutput.x)).withSrcType(__pos, doutput.et))
   }
 
-  // def LogSoftmaxForward(input: TENSOR, )
+  
+  def LogSoftmaxForward(input: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = input.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_logsoftmax", C(res_tt), C(anno), input.x)(input.x))
+      .withSrcType(__pos, input.et))
+  }
+  
+  def LogSoftmaxBackward(output: TENSOR, doutput: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = output.resultType
+    (new TENSOR(Adapter.g.reflectRead("tensor_logsoftmax_bwd", C(res_tt), C(anno), output.x, doutput.x)(output.x))
+      .withSrcType(__pos, output.et))
+  }
+
+  def PermuteForward = ???
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_softmax", _, _) => List()
@@ -49,6 +62,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       val input_type = (new TENSOR(input, useOldMetadata=true)).resultType
       val mask_type = (new TENSOR(mask, useOldMetadata=true)).resultType
       (input_type.shape.reverse zip mask_type.shape.reverse).toList map { case (a:Size, b:Size) => (a.dim, b.dim)}
+    case Node(s, "tensor_logsoftmax", _, _) => List()
     case _ => super.mergable_dims(node)
   }
 
@@ -70,6 +84,14 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
         forwardNodes += node
         (() => {
             val grad = MaskedFillBackward(gradMap(s), new TENSOR(transform(mask)), anno, pos)
+            Accumulate(gradMap(input), grad, anno); ()
+        }) +=: backwardNodes
+      case Node(s, "tensor_logsoftmax", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val x = new TENSOR(transform(s))
+            val grad = LogSoftmaxBackward(x, gradMap(s), anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
 
@@ -97,6 +119,16 @@ trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBas
 
     def maskedFill(mask: Rep[Tensor[Int]], value: Float)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
       val t = MaskedFillForward(self, tensor(mask), value, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def logSoftmax(anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = LogSoftmaxForward(self, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def logSoftmax(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = LogSoftmaxForward(self, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }

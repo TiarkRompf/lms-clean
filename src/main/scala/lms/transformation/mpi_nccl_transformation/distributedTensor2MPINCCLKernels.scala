@@ -99,6 +99,61 @@ trait DistributeTensor2MPI_NCCLKernels extends DistributeTensor2MPI_NCCLBase wit
       )
 
       dinput.x
+    
+    case Node(s, "tensor_logsoftmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // get input info and transform input tensors
+      val input_shape = tensor_shape(input, useOldMetadata = true)
+      val input_tensor = get_operand(input, anno)
+
+      val outer_size = input_shape.init.fold(1) { _ * _ }
+      val last_dim_size = input_shape.last
+      val input_size = outer_size * last_dim_size
+
+      val output = gpu_array(input_size, manifest[Float], myNCCLRank)
+
+      val softmaxKernel = cudaSoftmax[Float](true)
+
+      FunOps6(softmaxKernel).apply(
+        Wrap[Array[Float]](input_tensor), 
+        Wrap[Array[Float]](output.x),
+        unit[Int](last_dim_size),
+        dim3(unit[Int](outer_size)),
+        dim3(unit[Int](1024)),
+        unit[Int](1024 * 4)
+      )
+
+      output.x
+    
+    case Node(s, "tensor_logsoftmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      // get input info and transform input tensors
+      val output_shape = tensor_shape(output, useOldMetadata = true)
+      val output_tensor = get_operand(output, anno)
+      val doutput_tensor = get_operand(doutput, anno)
+
+      val outer_size = output_shape.init.fold(1) { _ * _ }
+      val last_dim_size = output_shape.last
+      val input_size = outer_size * last_dim_size
+
+      val dinput = gpu_array(input_size, manifest[Float], myNCCLRank)
+
+      val softmaxGradKernel = cudaSoftmaxGrad[Float](true) /* Default is taking log */
+
+      FunOps7(softmaxGradKernel).apply(
+        Wrap[Array[Float]](dinput.x), 
+        Wrap[Array[Float]](doutput_tensor),
+        Wrap[Array[Float]](output_tensor),
+        unit[Int](last_dim_size),
+        dim3(unit[Int](outer_size)),
+        dim3(unit[Int](1024)),
+        unit[Int](1024 * 4)
+      )
+
+      dinput.x
+
 
     case _ => super.transform(n)
   }
