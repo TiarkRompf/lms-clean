@@ -41,16 +41,16 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       (doutput.x)).withSrcType(__pos, doutput.et))
   }
 
-  
+
   def LogSoftmaxForward(input: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = input.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_logsoftmax", C(res_tt), C(anno), input.x)(input.x))
       .withSrcType(__pos, input.et))
   }
-  
+
   def LogSoftmaxBackward(output: TENSOR, doutput: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = output.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_logsoftmax_bwd", C(res_tt), C(anno), output.x, doutput.x)(output.x))
+    (new TENSOR(Adapter.g.reflectRead("tensor_logsoftmax_bwd", C(res_tt), C(anno), output.x, doutput.x)(output.x, doutput.x))
       .withSrcType(__pos, output.et))
   }
 
