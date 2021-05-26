@@ -272,6 +272,10 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x70, (size_t)(17056 * sizeof(float))));
   x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x70, 1, 17056);
   // end initializing fixed GPU array of size 17056 and type Float and device (pre-rename) x39
+  // begin computing ACCUM on GPU for size 17056 and type Float at device (pre-rename) x39 with base_operand x413 and addition_operand x436
+  CUDA_CALL(cudaSetDevice(x6));
+  x71<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x68, x70, 17056);
+  // end computing ACCUM on GPU for size 17056 and type Float at device (pre-rename) x39 with base_operand x413 and addition_operand x436
   // begin computing ACCUM on GPU for size 17056 and type Float at device (pre-rename) x39 with base_operand x400 and addition_operand x436
   CUDA_CALL(cudaSetDevice(x6));
   x71<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x67, x70, 17056);
@@ -280,10 +284,10 @@ void Snippet(int x0) {
   float* x78 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x78, (size_t)(34112 * sizeof(float))));
   x79<<<dim3(64, 1, 1), dim3(1024, 1, 1), 4096>>>(x78, x68, x18, 533);
-  // begin computing ACCUM on GPU for size 17056 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x485
+  // begin computing ACCUM on GPU for size 17056 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x492
   CUDA_CALL(cudaSetDevice(x6));
   x71<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x78, 17056);
-  // end computing ACCUM on GPU for size 17056 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x485
+  // end computing ACCUM on GPU for size 17056 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x492
   // begin checking GPU array of size 17056 and type Float at device (pre-name) x39 again binary file weight_grad
   float* x101 = (float*)malloc(17056 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x101, x9, (size_t)(17056 * sizeof(float)), cudaMemcpyDeviceToHost));

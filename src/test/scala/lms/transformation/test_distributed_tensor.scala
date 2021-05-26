@@ -412,7 +412,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("masked_fill", driver.code, "cu", driver.setLogPath)
   }
 
-  test("logSoftmax") {
+  test("logSoftmax") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
 
