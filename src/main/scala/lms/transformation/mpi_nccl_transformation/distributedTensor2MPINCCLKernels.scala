@@ -153,6 +153,71 @@ trait DistributeTensor2MPI_NCCLKernels extends DistributeTensor2MPI_NCCLBase wit
       )
 
       dinput.x
+    
+    case Node(s, "tensor_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _) =>
+      val sourceTensor = new TENSOR(s, useOldMetadata = true)
+
+      implicit val sc_ : SourceContext = sourceTensor.pos
+      val m = sourceTensor.et
+
+      val input_shape = tensor_shape(operand, useOldMetadata = true)
+      val input_tensor = get_operand(operand, anno)
+
+      val n_rows = input_shape(0) / 2 // Luke: HARDCODE!
+      val n_cols = input_shape(1)
+      
+      val size = input_shape.fold(1) { _ * _ }
+      val output = gpu_array(size, manifest[Float], myNCCLRank)
+
+      val tileDim = 32
+      val blockRows = 8
+      
+      val transposeKernel = cudaTranspose[Float]
+      FunOps6(transposeKernel).apply(
+        Wrap[Array[Float]](input_tensor),
+        Wrap[Array[Float]](output.x),
+        unit[Int](n_rows),
+        unit[Int](n_cols),
+        dim3(unit[Int]((n_cols + tileDim - 1) / tileDim), unit[Int]((n_rows + tileDim - 1) / tileDim)),
+        dim3(unit[Int](tileDim), unit[Int](blockRows)))
+      
+      output.x
+
+
+    case Node(s, "tensors_split2", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
+      val oldSplitOp = new TENSORS(s, useOldMetadata = true)
+      implicit val sc_ : SourceContext = oldSplitOp.p
+      val m = (new TENSOR(input, useOldMetadata = true)).et
+
+      val inuput_tensor = get_operand(input, anno)
+      val input_shape = tensor_shape(input, useOldMetadata = true)
+
+      val num_outputs = tts.length
+      require(tts(0).shape.length == 3)
+      require(axis == 2)
+      // require(tts.fold(0) { (acc, i) => acc + i.shape(2).size } == input_shape(2).size)
+      
+      val dimXs = tts map { _.shape(2).size }
+      val dimY = tts(0).shape(1).size
+      val dimZ = tts(0).shape(0).size
+      val output_sizes = dimXs map { _ * dimY * dimZ }
+      val outputs = output_sizes map {sz =>
+        gpu_array(sz, manifest[Float], myNCCLRank)
+      }
+      // TODO: dim checks
+
+      /*
+      cuda3DSplitWrap[Float](
+        Wrap[Array[Float]](input_tensor),
+        outputs,
+        unit[Int](dimZ), 
+        unit[Int](dimY), 
+        dimXs,
+        dim3((in_sz + 511)/512), 
+        dim3(512)
+      )*/
+      
+      TENSORS.tupleView(outputs.map(_.x))
 
 
     case _ => super.transform(n)
