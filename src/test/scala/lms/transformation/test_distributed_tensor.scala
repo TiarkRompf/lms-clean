@@ -431,7 +431,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("logSoftmax", driver.code, "cu", driver.setLogPath)
   }
 
-  test("transpose") {
+  test("transpose") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
 
