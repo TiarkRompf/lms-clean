@@ -522,8 +522,8 @@ class CudaTest extends TutorialFunSuite {
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
-        val rcount = 32 // 213
-        val ccount = 32 // 56
+        val rcount = 213
+        val ccount = 56
         val size = rcount * ccount
         val tileDim = 32
         val blockRows = 8
