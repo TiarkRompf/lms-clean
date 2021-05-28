@@ -162,7 +162,7 @@ trait DistributeTensor2MPI_NCCLKernels extends DistributeTensor2MPI_NCCLBase wit
 
       val input_shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
-
+      /*
       val n_rows = input_shape(0) / 2 // Luke: HARDCODE!
       val n_cols = input_shape(1)
       
@@ -182,6 +182,31 @@ trait DistributeTensor2MPI_NCCLKernels extends DistributeTensor2MPI_NCCLBase wit
         dim3(unit[Int](tileDim), unit[Int](blockRows)))
       
       output.x
+      */
+      anno match {
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
+        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
+          val shape = tt.shapeSizeAfterSplit(dim, devices.size)
+          val count = numeral(shape)
+          val n_rows = shape(1)
+          val n_cols = shape(0)
+          val output = gpu_array(count, manifest[Float], myNCCLRank)
+          val tileDim = 32
+          val blockRows = 8
+          val transposeKernel = cudaTranspose[Float]
+          FunOps6(transposeKernel).apply(
+            Wrap[Array[Float]](input_tensor),
+            Wrap[Array[Float]](output.x),
+            unit[Int](n_rows),
+            unit[Int](n_cols),
+            dim3(unit[Int]((n_cols + tileDim - 1) / tileDim), unit[Int]((n_rows + tileDim - 1) / tileDim)),
+            dim3(unit[Int](tileDim), unit[Int](blockRows)))
+      
+          output.x
+
+        case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled")
+      }
 
 
     case Node(s, "tensors_split2", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
