@@ -39,36 +39,36 @@ __global__ void x13(int* x14, int* x15, int x16, int x17) {
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  int* x1 = (int*)malloc(1024 * sizeof(int));
-  int* x2 = (int*)malloc(1024 * sizeof(int));
-  int* x3 = (int*)malloc(1024 * sizeof(int));
+  int* x1 = (int*)malloc(11928 * sizeof(int));
+  int* x2 = (int*)malloc(11928 * sizeof(int));
+  int* x3 = (int*)malloc(11928 * sizeof(int));
   int x4 = 0;
-  while (x4 != 1024) {
+  while (x4 != 11928) {
     int x5 = x4;
     x1[x5] = x5;
     x4 = x4 + 1;
   }
   int x6 = 0;
-  while (x6 != 32) {
+  while (x6 != 56) {
     int x7 = x6;
     int x8 = 0;
-    int x9 = x7 * 32;
-    while (x8 != 32) {
+    int x9 = x7 * 213;
+    while (x8 != 213) {
       int x10 = x8;
-      x3[x9 + x10] = x1[x10 * 32 + x7];
+      x3[x9 + x10] = x1[x10 * 56 + x7];
       x8 = x8 + 1;
     }
     x6 = x6 + 1;
   }
   int* x11 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x11, (size_t)(1024 * sizeof(int))));
+  CUDA_CALL(cudaMalloc(&x11, (size_t)(11928 * sizeof(int))));
   int* x12 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x12, (size_t)(1024 * sizeof(int))));
-  CUDA_CALL(cudaMemcpy(x11, x1, (size_t)(1024 * sizeof(int)), cudaMemcpyHostToDevice));
-  x13<<<dim3(1, 1, 1), dim3(32, 8, 1)>>>(x11, x12, 32, 32);
-  CUDA_CALL(cudaMemcpy(x2, x12, (size_t)(1024 * sizeof(int)), cudaMemcpyDeviceToHost));
+  CUDA_CALL(cudaMalloc(&x12, (size_t)(11928 * sizeof(int))));
+  CUDA_CALL(cudaMemcpy(x11, x1, (size_t)(11928 * sizeof(int)), cudaMemcpyHostToDevice));
+  x13<<<dim3(2, 7, 1), dim3(32, 8, 1)>>>(x11, x12, 213, 56);
+  CUDA_CALL(cudaMemcpy(x2, x12, (size_t)(11928 * sizeof(int)), cudaMemcpyDeviceToHost));
   int x25 = 0;
-  while (x25 != 1024) {
+  while (x25 != 11928) {
     int x26 = x25;
     if (x3[x26] != x2[x26]) {
       printf("Transpose Incorrect!\n");
