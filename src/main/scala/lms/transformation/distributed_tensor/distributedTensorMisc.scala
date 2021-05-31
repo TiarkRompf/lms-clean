@@ -28,17 +28,17 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       C(params))(output.x, doutput.x)).withSrcType(__pos, doutput.et))
   }
 
-  def MaskedFillForward[T](input: TENSOR, mask: TENSOR, value: Float, anno: Anno, __pos: SourceContext): TENSOR = {
-    // require(input.shapeSize == mask.shapeSize, "shape of mask must be equal to shape of the tensor")
+  def MaskedFillForward[T](input: TENSOR, mask: TENSOR, value: T, anno: Anno, __pos: SourceContext): TENSOR = {
+    require(input.shapeSize == mask.shapeSize, "shape of mask must be equal to shape of the tensor")
     val res_tt = input.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_maskedfill", C(res_tt), C(anno), input.x, mask.x,
-      C(value))(input.x)).withSrcType(__pos, input.et))
+      C(value))(input.x, mask.x)).withSrcType(__pos, input.et))
   }
 
   def MaskedFillBackward(doutput: TENSOR, mask: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = doutput.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_maskedfill_bwd", C(res_tt), C(anno), doutput.x, mask.x)
-      (doutput.x)).withSrcType(__pos, doutput.et))
+      (doutput.x, mask.x)).withSrcType(__pos, doutput.et))
   }
 
 
