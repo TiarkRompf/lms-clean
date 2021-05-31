@@ -57,7 +57,7 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
 
   override def transform(n: Node): Backend.Exp = n match {
 
-    case Node(s, "tensors_split", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
+    case Node(s, "tensors_split2D", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
       val oldSplitOp = new TENSORS(s, useOldMetadata = true)
       implicit val sc_ : SourceContext = oldSplitOp.p
       val m = (new TENSOR(input, useOldMetadata = true)).et
@@ -81,7 +81,7 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_mult")
       }
 
-    case Node(s, "tensor_concat", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::Backend.Const(axis:Int)::(inputs:List[Backend.Sym]), _) =>
+    case Node(s, "tensor_concat2D", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::Backend.Const(axis:Int)::(inputs:List[Backend.Sym]), _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
 
       implicit val sc_ : SourceContext = sourceTensor.pos

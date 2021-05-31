@@ -142,6 +142,24 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("split_small", driver.code, "cu", driver.setLogPath)
   }
 
+  test("split_small3D") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(32,32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val splits = input.split(2, List(16,16))
+          splits(0)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("split_small3D", driver.code, "cu", driver.setLogPath)
+  }
+
   test("split") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
@@ -161,6 +179,27 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
   }
 
+  test("split3D") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(32,32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(32,32,16), tensorName=Some("weight"))
+          val splits = input.split(2, List(16,16))
+          splits(0) * weight
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("split3D", driver.code, "cu", driver.setLogPath)
+  }
+
+  
+
   test("split2") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
@@ -178,6 +217,25 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("split2", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("split2_3D") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(32,32,16), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          val weight = Tensor.weight[Float](Seq(32,32,32), tensorName=Some("weight"))
+          val splits = weight.split(2, List(16,16))
+          input * splits(0)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("split2_3D", driver.code, "cu", driver.setLogPath)
   }
 
   test("relu") {
