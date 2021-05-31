@@ -189,12 +189,12 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       }
 
 
-    case Node(s, "tensors_split2", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
+    case Node(s, "tensors_split3D", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
       val oldSplitOp = new TENSORS(s, useOldMetadata = true)
       implicit val sc_ : SourceContext = oldSplitOp.p
       val m = (new TENSOR(input, useOldMetadata = true)).et
 
-      val inuput_tensor = get_operand(input, anno)
+      val input_tensor = get_operand(input, anno)
       val input_shape = tensor_shape(input, useOldMetadata = true)
 
       val num_outputs = tts.length
@@ -209,20 +209,52 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val outputs = output_sizes map {sz =>
         gpu_array(sz, manifest[Float], myNCCLRank)
       }
-      // TODO: dim checks
 
-      /*
+      val in_sz = dimZ * dimY * dimXs.reduce(_ + _)
       cuda3DSplitWrap[Float](
         Wrap[Array[Float]](input_tensor),
-        outputs,
-        unit[Int](dimZ), 
-        unit[Int](dimY), 
+        outputs map { t => Wrap[Array[Float]](t.x) },
+        dimZ, 
+        dimY, 
         dimXs,
-        dim3((in_sz + 511)/512), 
-        dim3(512)
-      )*/
-      
+        dim3(unit[Int]((in_sz + 511)/512)), 
+        dim3(unit[Int](512))
+      )
       TENSORS.tupleView(outputs.map(_.x))
+
+    case Node(s, "tensor_concat3D", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::Backend.Const(axis:Int)::(inputs:List[Backend.Sym]), _) =>
+      val sourceTensor = new TENSOR(s, useOldMetadata = true)
+
+      implicit val sc_ : SourceContext = sourceTensor.pos
+      val m = sourceTensor.et
+
+      val input_tensors = inputs.map(x => new TENSOR(x, useOldMetadata=true))
+      require(input_tensors(0).shapeSize.length == 3)
+      require(axis == 2)
+
+
+      // load the inputs
+      val input_operands = inputs.map(get_operand(_, anno))
+      val input_shapes = inputs.map(tensor_shape(_, useOldMetadata = true))
+
+      val dimXs = input_shapes map { _(2) }
+      val dimY = input_shapes(0)(1)
+      val dimZ = input_shapes(0)(0)
+      val out_sz = dimXs.reduce(_ + _) * dimY * dimZ
+
+      val output = gpu_array(out_sz, manifest[Float], myNCCLRank)
+
+      cuda3DConcatWrap[Float](
+        input_operands map { t =>  Wrap[Array[Float]](t) },
+        Wrap[Array[Float]](output.x),
+        dimZ, 
+        dimY, 
+        dimXs,
+        dim3(unit[Int]((out_sz + 511)/512)), 
+        dim3(unit[Int](512))
+      )
+
+      output.x
 
 
     case _ => super.transform(n)
