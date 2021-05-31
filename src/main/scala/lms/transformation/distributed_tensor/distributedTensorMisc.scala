@@ -97,6 +97,16 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
     }
+
+  override def printTensor(node: Node, graph: Graph): String = node match {
+    case Node(s, "tensor_softmax", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_softmax($a) (${symTensorShape(a, graph)})->${tt.toString}"
+    case Node(s, "tensor_maskedfill", Backend.Const(tt:TensorType)::anno::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
+      s"$s = tensor_maskedfill($input, $mask) (${symTensorShape(input, graph)}, ${symTensorShape(mask, graph)})->${tt.toString}"
+    case Node(s, "tensor_logsoftmax", Backend.Const(tt:TensorType)::anno::(input:Backend.Sym)::_, _) =>
+      s"$s = tensor_logsoftmax($input) (${symTensorShape(input, graph)})->${tt.toString}"
+    case _ => super.printTensor(node, graph)
+  }
 }
 
 trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBase {
