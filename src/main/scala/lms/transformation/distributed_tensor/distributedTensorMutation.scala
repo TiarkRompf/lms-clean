@@ -36,6 +36,14 @@ trait FixedSizeDistributedTensorMutationTypeLess extends FixedSizeDistributedTen
       mergable_a ++ mergable_b
     case _ => super.mergable_dims(node)
   }
+
+  override def printTensor(node: Node, graph: Graph): String = node match {
+    case Node(s, "accum_tensor", anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      s"$s = accum_tensor($x, $y) (${symTensorShape(x, graph)}, ${symTensorShape(y, graph)})"
+    case Node(s, "optimizer_tensor", anno::(x:Backend.Sym)::(g:Backend.Sym)::(m:Backend.Sym)::_, _) =>
+      s"$s = optimizer_tensor($x, $g, $m) (${symTensorShape(x, graph)}, ${symTensorShape(g, graph)}, ${symTensorShape(m, graph)})"
+    case _ => super.printTensor(node, graph)
+  }
 }
 
 
