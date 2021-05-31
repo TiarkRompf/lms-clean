@@ -123,7 +123,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
     checkWithLogPath("negate", driver.code, "cu", driver.setLogPath)
   }
-
+  /*
   test("split_small") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
@@ -140,7 +140,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("split_small", driver.code, "cu", driver.setLogPath)
-  }
+  }*/
 
   test("split_small3D") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
@@ -159,7 +159,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
     checkWithLogPath("split_small3D", driver.code, "cu", driver.setLogPath)
   }
-
+  /*
   test("split") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
@@ -177,7 +177,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
-  }
+  }*/
 
   test("split3D") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
@@ -199,7 +199,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
   }
 
   
-
+  /*
   test("split2") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
@@ -217,7 +217,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("split2", driver.code, "cu", driver.setLogPath)
-  }
+  }*/
 
   test("split2_3D") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
