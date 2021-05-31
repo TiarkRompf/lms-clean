@@ -15,7 +15,7 @@ import lms.transformation.util.{DataStructure, CudnnUtils}
 import Backend._
 
 
-trait DistributeTensor2MPI_NCCLKernels extends DistributeTensor2MPI_NCCLBase with CudnnUtils with CudaLibs {
+trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with CudnnUtils with CudaLibs {
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -162,27 +162,7 @@ trait DistributeTensor2MPI_NCCLKernels extends DistributeTensor2MPI_NCCLBase wit
 
       val input_shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
-      /*
-      val n_rows = input_shape(0) / 2 // Luke: HARDCODE!
-      val n_cols = input_shape(1)
-      
-      val size = input_shape.fold(1) { _ * _ }
-      val output = gpu_array(size, manifest[Float], myNCCLRank)
 
-      val tileDim = 32
-      val blockRows = 8
-      
-      val transposeKernel = cudaTranspose[Float]
-      FunOps6(transposeKernel).apply(
-        Wrap[Array[Float]](input_tensor),
-        Wrap[Array[Float]](output.x),
-        unit[Int](n_rows),
-        unit[Int](n_cols),
-        dim3(unit[Int]((n_cols + tileDim - 1) / tileDim), unit[Int]((n_rows + tileDim - 1) / tileDim)),
-        dim3(unit[Int](tileDim), unit[Int](blockRows)))
-      
-      output.x
-      */
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
@@ -247,6 +227,4 @@ trait DistributeTensor2MPI_NCCLKernels extends DistributeTensor2MPI_NCCLBase wit
 
     case _ => super.transform(n)
   }
-
-
 }
