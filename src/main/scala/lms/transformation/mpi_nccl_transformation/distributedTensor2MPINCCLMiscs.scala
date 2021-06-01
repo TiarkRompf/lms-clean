@@ -188,7 +188,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         case a => throw new Exception(s"TODO: annotation $a is not yet handled")
       }
 
-
+    /*
     case Node(s, "tensors_split", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
       val oldSplitOp = new TENSORS(s, useOldMetadata = true)
       implicit val sc_ : SourceContext = oldSplitOp.p
@@ -200,8 +200,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val num_outputs = tts.length
       require(tts(0).shape.length == 3)
       require(axis == 2)
-      // require(tts.fold(0) { (acc, i) => acc + i.shape(2).size } == input_shape(2).size)
-      
+
       val dimXs = tts map { _.shape(2).size }
       val dimY = tts(0).shape(1).size
       val dimZ = tts(0).shape(0).size
@@ -229,8 +228,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val m = sourceTensor.et
 
       val input_tensors = inputs.map(x => new TENSOR(x, useOldMetadata=true))
-      require(input_tensors(0).shapeSize.length == 3)
-      require(axis == 2)
+      
 
 
       // load the inputs
@@ -255,7 +253,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       )
 
       output.x
-
+    */
 
     case _ => super.transform(n)
   }
