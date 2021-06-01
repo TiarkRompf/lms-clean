@@ -39,15 +39,27 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     def setLogPath(path: String) { log_path = path }
 
     override def transform(graph: Graph): Graph = {
-      logGraph(graph.toString, log_path)
+      logGraph(show_graph(graph), log_path)
       super.transform(graph)
     }
 
     override def transformOnePass(pass: Transformer, index: Int, graph: Graph) = {
       val new_graph = pass.transform(graph)
       if (log_path == "") throw new Exception("should set log_path first")
-      logGraph(new_graph.toString, log_path, index, pass.name)
+      logGraph(show_graph(new_graph), log_path, index, pass.name)
       new_graph
+    }
+
+    def show_graph(graph: Graph): String = {
+      // return a string representation of the graph
+      val source = new java.io.ByteArrayOutputStream()
+      val stream = new java.io.PrintStream(source)
+      stream.println("==================")
+      for (node <- graph.nodes)
+        stream.println(showTensor(node, graph))
+      stream.println(graph.block)
+      stream.println("==================")
+      source.toString
     }
   }
 

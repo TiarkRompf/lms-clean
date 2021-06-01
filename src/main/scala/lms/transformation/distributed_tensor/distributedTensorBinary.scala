@@ -30,7 +30,7 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
 
   def Div(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
     ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_div")
-  
+
   def TanhGrad(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
     ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_tanh_grad")
 
@@ -111,6 +111,12 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
       }) +=: backwardNodes
 
     case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+  }
+
+  override def printTensor(node: Node, graph: Graph): String = node match {
+    case Node(s, op, Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::(b:Backend.Sym)::_, _) if binaryOps.contains(op) =>
+      s"$s = $op($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}"
+    case n => super.printTensor(n, graph)
   }
 }
 
