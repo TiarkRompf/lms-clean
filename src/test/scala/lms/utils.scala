@@ -73,7 +73,7 @@ trait TutorialFunSuite extends LibSuite {
     fileprefix
   }
   def logGraph(graph: String, logPath: String, index: Int = -1, passName: String = "") =
-    writeFile(s"$logPath/GraphLog${if (index == -1) "--InitialGraph.txt" else s"-$index-$passName"}", graph)
+    writeFile(s"$logPath/GraphLog${if (index == -1) "--InitialGraph.log" else s"-$index-$passName.log"}", graph)
   def checkWithLogPath(label: String, raw_code: => String, suffix: String = "scala", setPath: String => Unit) = {
     setPath(log_path(label, suffix))
     check(label + "/" + label, raw_code, suffix)

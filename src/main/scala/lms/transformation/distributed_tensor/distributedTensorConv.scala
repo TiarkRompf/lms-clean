@@ -84,6 +84,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       doutput.x, reserveSpace.x, C(params))(doutput.x, reserveSpace.x)).withSrcType(__pos, doutput.et))
   }
 
+  // FIXME(feiw): should some mode of Pooling (such as max pooling) have 2 outputs?
   def PoolingForward(input: TENSOR, params: PoolingParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = PoolingForwardOutTensorType(input, params, anno)
     (new TENSOR(Adapter.g.reflectRead("tensor_pooling", C(res_tt), C(anno),
@@ -198,6 +199,16 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
     }
+
+  override def printTensor(node: Node, graph: Graph) = node match {
+    case Node(s, "tensor_conv", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
+      s"$s = tensor_conv($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}"
+    case Node(s, "tensors_dropout", Backend.Const(List(output_tt:TensorType, dummy_tt:TensorType))::anno::(a:Backend.Sym)::_, _) =>
+      s"$s:2 = tensors_dropout($a) (${symTensorShape(a, graph)})->(${output_tt.toString}, ${dummy_tt.toString})"
+    case Node(s, "tensor_pooling", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::params::Backend.Const(mode:String)::_, _) =>
+      s"$s = tensor_pooling($a, mode=$mode) (${symTensorShape(a, graph)})->${tt.toString}"
+    case _ => super.printTensor(node, graph)
+  }
 }
 
 trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBase {

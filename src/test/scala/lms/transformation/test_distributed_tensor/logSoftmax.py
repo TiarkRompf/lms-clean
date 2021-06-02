@@ -8,15 +8,24 @@ from utils import extend, get_printer
 def generate_data(lms_clean_root: str):
     torch.manual_seed(0)
 
-    input = torch.randn(214, 56)
+    # compute softmax forward and backward
+    shape = (2, 1, 32, 533)
+    input = torch.randn(shape)
     input.requires_grad = True
-    loss = torch.transpose(input, 0, 1)
+
+    weight = torch.randn(shape)
+    weight.requires_grad = True
+
+    m = torch.nn.LogSoftmax(dim=3)
+    loss = input + m(weight)
     loss.sum().backward()
 
     # printer
-    printer = get_printer(lms_clean_root, test_name = "transpose")
+    printer = get_printer(lms_clean_root, test_name = "logSoftmax")
     printer("input", input, dim=0, degree=2)
-    printer("loss", loss, dim=1, degree=2)
+    printer("weight", weight, dim=0, degree=2)
+    printer("loss", loss, dim=0, degree=2)
+    printer("weight_grad", weight.grad, dim=0, degree=2)
     printer("input_grad", input.grad, dim=0, degree=2)
 
 if __name__ == '__main__':

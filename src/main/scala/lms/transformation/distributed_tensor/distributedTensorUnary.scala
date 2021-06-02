@@ -11,7 +11,7 @@ import lms.thirdparty.array_computation.{ArrayCPUOps, CUDATypeLess, CudaOps}
 
 import Backend._
 
-trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess 
+trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensorMutationTypeLess
   with FixedSizeDistributedTensorBinaryTypeLess with FixedSizeDistributedTensorConvTypeLess {
 
   def Transpose(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
@@ -42,13 +42,13 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
 
   def ActivationForward(input: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = input.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_activation", C(res_tt), C(anno), input.x, 
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation", C(res_tt), C(anno), input.x,
       C(params), C(mode))(input.x)).withSrcType(__pos, input.et))
   }
 
   def ActivationBackward(input: TENSOR, output: TENSOR, doutput: TENSOR, params: ActivationParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = doutput.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), input.x, output.x, doutput.x, 
+    (new TENSOR(Adapter.g.reflectRead("tensor_activation_bwd", C(res_tt), C(anno), input.x, output.x, doutput.x,
       C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, doutput.et))
   }
 
@@ -105,7 +105,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         (() => {
           Accumulate(gradMap(a), ReluGrad(gradMap(s), new TENSOR(transform(a)), anno), anno); ()
         }) +=: backwardNodes
-    
+
     case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::Backend.Const(mode:String)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
@@ -117,6 +117,22 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
         }) +=: backwardNodes
 
     case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+  }
+
+  override def printTensor(node: Node, graph: Graph): String = node match {
+    case Node(s, "tensor_transpose", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_transpose($a) (${symTensorShape(a, graph)})->${tt.toString}"
+    case Node(s, "tensor_negate", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_negate($a) (${symTensorShape(a, graph)})->${tt.toString}"
+    case Node(s, "tensor_invert", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_invert($a) (${symTensorShape(a, graph)})->${tt.toString}"
+    case Node(s, "tensor_tanh", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_tanh($a) (${symTensorShape(a, graph)})->${tt.toString}"
+    case Node(s, "tensor_relu", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_relu($a) (${symTensorShape(a, graph)})->${tt.toString}"
+    case Node(s, "tensor_activation", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::params::Backend.Const(mode:String)::_, _) =>
+      s"$s = tensor_activation($a, mode=$mode) (${symTensorShape(a, graph)})->${tt.toString}"
+    case _ => super.printTensor(node, graph)
   }
 }
 
@@ -208,7 +224,7 @@ trait FixedSizeDistributedTensorOpsUnary extends FixedSizeDistributedTensorOpsBa
       val t = ActivationForward(self, p, "sigmoid", anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
-    
+
     def cudnn_tanh()(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
       val p = ActivationParam(1.0f, 0.0f, 0.0f)
       val t = ActivationForward(self, p, "tanh", anno, __pos)

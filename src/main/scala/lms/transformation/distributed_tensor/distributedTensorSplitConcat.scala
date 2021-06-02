@@ -54,7 +54,7 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensors_split", _, _) => List()
-    case Node(s, "tensor_concat", tt::anno::Backend.Const(axis:Int)::(inputs:List[Backend.Sym]), _) =>
+    case Node(s, "tensor_concat", tt::anno::Backend.Const(axis:Int)::(inputs:List[Backend.Sym])::_, _) =>
       val input_types: List[Seq[Dim]] = inputs.map(x => (new TENSOR(x, useOldMetadata=true)).resultType.shapeDim)
       input_types.transpose.zipWithIndex.flatMap { case (dims: List[Dim], index) =>
         if (index != axis) dims.init zip dims.tail else List()
@@ -82,6 +82,14 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
 
     case _ =>
       super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+  }
+
+  override def printTensor(node: Node, graph: Graph): String = node match {
+    case Node(s, "tensors_split", Backend.Const(tts:List[TensorType])::anno::(x:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
+      s"$s:${tts.length} = tensors_split($x, axis=$axis) (${symTensorShape(x, graph)})->(${tts.map(_.toString).mkString(", ")})"
+    case Node(s, "tensor_concat", Backend.Const(tt:TensorType)::anno::Backend.Const(axis:Int)::(inputs:List[Backend.Sym])::_, _) =>
+      s"$s = tensor_concat(${inputs.mkString(",")}) (${inputs.map(symTensorShape(_, graph)).mkString(", ")})->${tt.toString}"
+    case _ => super.printTensor(node, graph)
   }
 
 }

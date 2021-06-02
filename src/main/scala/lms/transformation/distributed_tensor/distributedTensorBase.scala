@@ -47,9 +47,22 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def namedDim(x: Int) = shape(x).dim
     def contains(d: Dim) = shape.map(_.dim).contains(d)
     def shapeSize = shape.map(_.size)
+    def shapeSizeToString = shape.map(ss=> s"${ss.size}d${ss.dim.x}").toList.mkString("x")
+    // FIXME(feiw): can this be done better??
+    // def shapeSizeToString = shape.map(ss=> s"${ss.size}<sub>${ss.dim.x}</sub>").toList.mkString("x")
     def shapeDim = shape.map(_.dim)
     def shapeSizeAfterSplit(d: Dim, degree: Int) = shape.map(s => if (s.dim == d) s.size / degree else s.size)
     def map(f: String => String) = TensorType(shape, et, anno, tensorName.map(f))
+    def etToString = et match {
+      case et if et == manifest[Boolean] => "b8"
+      case et if et == manifest[Char] => "i8"
+      case et if et == manifest[Int] => "i32"
+      case et if et == manifest[Long] => "i64"
+      case et if et == manifest[Float] => "f32"
+      case et if et == manifest[Double] => "f64"
+      case et => throw new Exception(s"implement the string representation of ${et}")
+    }
+    override def toString = s"<${shapeSizeToString}x${etToString}>"
   }
 
   abstract class Anno extends Serializable // Annotation class
@@ -221,12 +234,29 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     case Node(s, "tensor_result", _, _) => forwardNodes += node
     case Node(s, op, _, _) => throw new Exception(s"op $op is not yet handled in aircopCollect \n$node")
   }
+
+  def printTensor(node: Node, graph: Graph): String = node match {
+    case Node(s, "tensor_input", Backend.Const(tt:TensorType)::_, _) =>
+      s"$s = tensor_input(${tt.tensorName.getOrElse("")}) -> ${tt.toString}"
+    case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::_, _) =>
+      s"$s = tensor_weight(${tt.tensorName.getOrElse("")}) -> ${tt.toString}"
+    case Node(s, "tensor_result", Backend.Const(tt:TensorType)::anno::(x:Backend.Sym)::Backend.Const(i:Int)::_, _) =>
+      s"$s = ${x}#${i} -> ${tt.toString}"
+    case n => n.toString
+  }
+
+  def symTensorShape(x: Backend.Sym, graph: Graph): String = graph.globalDefsCache.get(x) match {
+    case Some(Node(s, op, Backend.Const(tt:TensorType)::_, _)) if op.startsWith("tensor_") => tt.toString
+    case _ => throw new Exception(s"sym $x is not a Tensor in the given graph ${graph}")
+  }
 }
 
 trait FixedSizeDistributedTensorOpsBase extends Dsl {
 
   import PrimitiveTypeLess._
   import FixedSizeDistributedTensorTypeLess._
+
+  def showTensor(node: Node, graph: Graph): String = printTensor(node, graph)
 
   def module[T](f: => Rep[Tensor[T]])(implicit __pos: SourceContext) = {
     MODULE(new TENSOR(Unwrap(f)))
@@ -250,8 +280,8 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def input[T:Manifest](shape: Seq[Int], name: String, splitDim: Int, splitTo: List[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensorType = resultType[Float](shape, tensorName=Some(name))
+    def input[T:Manifest:Numeric](shape: Seq[Int], name: String, splitDim: Int, splitTo: List[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensorType = resultType[T](shape, tensorName=Some(name))
       val sAnno = SAnno(tensorType.shape(splitDim).dim, splitTo)
       val tensor = INPUT(tensorType, sAnno)
       Wrap[Tensor[T]](tensor.x)
