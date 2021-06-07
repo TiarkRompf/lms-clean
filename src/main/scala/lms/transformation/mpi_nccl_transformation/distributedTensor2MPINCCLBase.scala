@@ -388,6 +388,9 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   def tensor_shape(tensor: Backend.Exp, useOldMetadata: Boolean = false): Seq[Int] =
     (new TENSOR(tensor, useOldMetadata)).shapeSize
 
+  def tensor_et(tensor: Backend.Exp, useOldMetadata: Boolean = false): Manifest[_] =
+    (new TENSOR(tensor, useOldMetadata)).et
+
   def get_operand(operand: Backend.Exp, anno: Anno, assertSame: Boolean = false) = {
     val operand_tensor = new TENSOR(operand, useOldMetadata = true)
     val operand_anno = operand_tensor.annotation

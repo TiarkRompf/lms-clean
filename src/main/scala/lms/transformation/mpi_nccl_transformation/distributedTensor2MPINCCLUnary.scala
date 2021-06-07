@@ -78,7 +78,8 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
 		array
   }
 
-  val unaryOps = List("tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu", "tensor_transpose")
+  // val unaryOps = List("tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu", "tensor_transpose")
+  val unaryOps = List("tensor_negate", "tensor_invert", "tensor_tanh", "tensor_relu")
 
   override def transform(n: Node): Backend.Exp = n match {
 

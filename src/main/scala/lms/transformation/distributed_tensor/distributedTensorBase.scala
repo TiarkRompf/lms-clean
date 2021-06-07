@@ -313,8 +313,8 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def input[T:Manifest](shape: Seq[Int], name: String, splitDim: Int, splitTo: List[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensorType = resultType[Float](shape)
+    def input[T:Manifest:Numeric](shape: Seq[Int], name: String, splitDim: Int, splitTo: List[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensorType = resultType[T](shape)
       val sAnno = SAnno(tensorType.shape(splitDim).dim, splitTo)
       val tensor = INPUT(tensorType, sAnno, name)
       Wrap[Tensor[T]](tensor.x)

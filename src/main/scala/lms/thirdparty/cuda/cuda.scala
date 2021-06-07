@@ -1094,7 +1094,7 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  // cuda transpose using coalesced approach
+  // cuda 2D transpose using coalesced approach
   def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], n: Rep[Int], m: Rep[Int]) =>
       generate_comment("Cuda Coalesced Transpose")

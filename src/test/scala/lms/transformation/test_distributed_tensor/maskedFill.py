@@ -12,9 +12,9 @@ def generate_data(lms_clean_root: str):
     input.requires_grad = True
     weight = torch.randn(2, 1, 9, 9)
     weight.requires_grad = True
-    mask = torch.randint(0, 2, (2, 1, 9, 9))
+    mask = torch.randint(0, 2, (9, 9))
 
-    loss = input + weight.masked_fill(mask, 1.0)
+    loss = input + weight.masked_fill_(mask, 1.0)
     loss.sum().backward()
 
     # printer
