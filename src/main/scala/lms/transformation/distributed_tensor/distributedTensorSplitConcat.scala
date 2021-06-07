@@ -85,10 +85,10 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
   }
 
   override def printTensor(node: Node, graph: Graph): String = node match {
-    case Node(s, "tensors_split", Backend.Const(tts:List[TensorType])::anno::(x:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
-      s"$s:${tts.length} = tensors_split($x, axis=$axis) (${symTensorShape(x, graph)})->(${tts.map(_.toString).mkString(", ")})"
-    case Node(s, "tensor_concat", Backend.Const(tt:TensorType)::anno::Backend.Const(axis:Int)::(inputs:List[Backend.Sym])::_, _) =>
-      s"$s = tensor_concat(${inputs.mkString(",")}) (${inputs.map(symTensorShape(_, graph)).mkString(", ")})->${tt.toString}"
+    case Node(s, "tensors_split", Backend.Const(tts:List[TensorType])::Backend.Const(anno:Anno)::(x:Backend.Sym)::Backend.Const(axis:Int)::_, _) =>
+      s"$s:${tts.length} = tensors_split($x, axis=$axis) (${symTensorShape(x, graph)})->(${tts.map(_.toString).mkString(", ")})${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_concat", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(axis:Int)::(inputs:List[Backend.Sym])::_, _) =>
+      s"$s = tensor_concat(${inputs.mkString(",")}) (${inputs.map(symTensorShape(_, graph)).mkString(", ")})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case _ => super.printTensor(node, graph)
   }
 

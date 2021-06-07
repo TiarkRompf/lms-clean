@@ -53,28 +53,10 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
 
     case Node(s, "accum_tensor", Backend.Const(anno:Anno)::(base:Backend.Exp)::(addition:Backend.Exp)::_, _) =>
       val sourceTensor = new TENSOR(base, useOldMetadata = true)
-
       implicit val pos = Adapter.oldSourceMap(s)
-      val tt = sourceTensor.resultType
-      val m = sourceTensor.et
-
-      // Load the `base` and `addition`, and maybe add communication ops to resolve split annotation conflicts
-      val base_operand = get_operand(base, anno, assertSame=true)
-      val addition_operand = get_operand(addition, anno)
-      // then we should run this accumulation op in all devices in the `anno`
-      // FIXME(feiw) for now, let's assum that `anno` is for all devices
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in accum op")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          gpu_accum_array(count2, m, myNCCLRank, base_operand, addition_operand)
-          Backend.Const(())
-        case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          val count = numeral(sourceTensor.shapeSize)
-          gpu_accum_array(count, m, myNCCLRank, base_operand, addition_operand)
-          Backend.Const(())
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in accum_tensor")
-      }
+      val count = numeral(sourceTensor.resultType.shapeSize)
+      gpu_accum_array(count, sourceTensor.et, myNCCLRank, transform(base), transform(addition))
+      Backend.Const(())
 
     case Node(s, "optimize_tensor", Backend.Const(anno:Anno)::(weight:Backend.Exp)::(grad:Backend.Exp)::(momentum:Backend.Exp)::_, _) =>
       val sourceTensor = new TENSOR(weight, useOldMetadata = true)
