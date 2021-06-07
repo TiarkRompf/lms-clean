@@ -292,10 +292,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
       val count = numeral(sourceTensor.shapeSize)
-      tt.tensorName match {
-        case Some(name) => gpu_scanner_array(name, count, sourceTensor.et, myNCCLRank).x
-        case None => gpu_random_array(count, sourceTensor.et, myNCCLRank).x
-      }
+      gpu_random_array(count, sourceTensor.et, myNCCLRank).x
 
     case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
@@ -307,10 +304,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
       val count = numeral(sourceTensor.shapeSize)
-      tt.tensorName match {
-        case Some(name) => gpu_scanner_array(name, count, sourceTensor.et, myNCCLRank).x
-        case None => gpu_random_array(count, sourceTensor.et, myNCCLRank).x
-      }
+      gpu_random_array(count, sourceTensor.et, myNCCLRank).x
 
     case Node(s, "tensor_zeros", Backend.Const(tt: TensorType)::Backend.Const(anno: Anno)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
