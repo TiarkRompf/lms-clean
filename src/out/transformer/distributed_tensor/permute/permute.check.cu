@@ -74,7 +74,7 @@ void Snippet(int x0) {
   // begin setting up the MPI/NCCL environment
   int x1 = 0;
   int x2 = 0;
-  lms.transformation.tensor.fixedsizedistributedtensortest$compilercdistributedtensor$$anon$5@5859620b.type#lms.thirdparty.mpiops$cnull x3 = NULL;
+  lms.transformation.tensor.fixedsizedistributedtensortest$compilercdistributedtensor$$anon$5@42de1260.type#lms.thirdparty.mpiops$cnull x3 = NULL;
   MPICHECK(MPI_Init(NULL, x3));
   MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &x2));
   MPICHECK(MPI_Comm_size(MPI_COMM_WORLD, &x1));
