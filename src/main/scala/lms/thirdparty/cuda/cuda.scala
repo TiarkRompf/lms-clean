@@ -1303,7 +1303,7 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cuda3DSplitWrap[N:Numeric:Manifest](in: Rep[Array[N]], outs: List[Rep[Array[N]]], dimZ: Int, dimY: Int, dimXs: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+  def cuda3DSplitWrap[N:Numeric:Manifest](in: Rep[Array[N]], outs: List[Rep[Array[N]]], dimZ: Int, dimY: Int, dimXs: List[Int])(implicit __pos: SourceContext) = {
     val sec = outs.length
     val output = NewArray[Array[N]](sec)
     for (i <- (0 until sec): Range) {
@@ -1311,6 +1311,10 @@ trait CudaLibs extends CudaOps {
     }
     val cuda_output = cudaMalloc2[Array[N]](sec)
     cudaCall(cudaMemcpyOfT[Array[N]](cuda_output, output, sec, host2device))
+
+    val in_sz = dimZ * dimY * dimXs.reduce(_ + _)
+    val grid = dim3((in_sz + 511)/512)
+    val block = dim3(512)
 
     val splitKernel = cuda3DSplitAxis2[N](dimZ, dimY, dimXs)
     splitKernel(in, cuda_output, grid, block)
@@ -1357,7 +1361,7 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cuda3DConcatWrap[N:Numeric:Manifest](ins: List[Rep[Array[N]]], out: Rep[Array[N]], dimZ: Int, dimY: Int, dimXs: List[Int], grid: Rep[Dim3], block: Rep[Dim3])(implicit __pos: SourceContext) = {
+  def cuda3DConcatWrap[N:Numeric:Manifest](ins: List[Rep[Array[N]]], out: Rep[Array[N]], dimZ: Int, dimY: Int, dimXs: List[Int])(implicit __pos: SourceContext) = {
     val sec = ins.length
     val input = NewArray[Array[N]](sec)
     for (i <- (0 until sec): Range) {
@@ -1365,6 +1369,10 @@ trait CudaLibs extends CudaOps {
     }
     val cuda_input = cudaMalloc2[Array[N]](sec)
     cudaCall(cudaMemcpyOfT[Array[N]](cuda_input, input, sec, host2device))
+
+    val out_sz = dimXs.reduce(_ + _) * dimY * dimZ
+    val grid = dim3((out_sz + 511)/512)
+    val block = dim3(512)
 
     val concatKernel = cuda3DConcatAxis2[N](dimZ: Int, dimY: Int, dimXs: List[Int])
     concatKernel(cuda_input, out, grid, block)

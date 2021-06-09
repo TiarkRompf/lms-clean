@@ -882,8 +882,7 @@ class CudaTest extends TutorialFunSuite {
 
         cuda3DSplitWrap[Float](cuda_input,
           List(cuda_output0, cuda_output1),
-          dimZ, dimY, dimXs,
-          dim3((in_sz + 511)/512), dim3(512))
+          dimZ, dimY, dimXs)
 
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
@@ -926,8 +925,7 @@ class CudaTest extends TutorialFunSuite {
 
         cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1),
           cuda_output,
-          dimZ, dimY, List(d0, d1),
-          dim3((out_sz + 511)/512), dim3(512))
+          dimZ, dimY, List(d0, d1))
 
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
@@ -972,9 +970,7 @@ class CudaTest extends TutorialFunSuite {
 
         cuda3DSplitWrap[Float](
           cuda_input, List(cuda_output0, cuda_output1, cuda_output2),
-          dimZ, dimY, List(d0, d1, d2),
-          dim3((in_sz + 511)/512), dim3(512)
-        )
+          dimZ, dimY, List(d0, d1, d2))
 
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
@@ -1026,8 +1022,7 @@ class CudaTest extends TutorialFunSuite {
 
         cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1, cuda_input2),
           cuda_output,
-          dimZ, dimY, List(d0, d1, d2),
-          dim3((out_sz + 511)/512), dim3(512))
+          dimZ, dimY, List(d0, d1, d2))
 
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
