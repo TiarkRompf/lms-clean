@@ -58,7 +58,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
     val res_tt = input.resultType
     require(dims.sortWith(_ < _) == List.range(0, input.shapeSize.size), "dims must be a permutation of input dimensions")
     assert(input.shapeSize.size == 3, "input to permute must be a 3-D matrix")
-    (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x)(input.x))
+    (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x/*, C(dims)*/)(input.x))
       .withSrcType(__pos, input.et))
   }
 
