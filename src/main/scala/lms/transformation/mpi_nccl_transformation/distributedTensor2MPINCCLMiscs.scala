@@ -47,7 +47,8 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val dim0_stride = dim0_shape
       val dim1_stride = 1
 
-      val input_size = input_shape.fold(1) { _ * _ }
+      // val input_size = input_shape.fold(1) { _ * _ }
+      val input_size = numeral(input_shape)
       val output = gpu_array(input_size, manifest[Float], myNCCLRank)
 
       val maskedFillKernel = cudaMaskedFill[Float](false)
@@ -81,7 +82,8 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val dim0_stride = dim0_shape
       val dim1_stride = 1
 
-      val doutput_size = doutput_shape.fold(1) { _ * _ }
+      // val doutput_size = doutput_shape.fold(1) { _ * _ }
+      val doutput_size = numeral(doutput_shape)
       val dinput = gpu_array(doutput_size, manifest[Float], myNCCLRank)
 
       val maskedFillGradKernel = cudaMaskedFillGrad[Float](false)
@@ -107,7 +109,8 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val input_shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
 
-      val outer_size = input_shape.init.fold(1) { _ * _ }
+      // val outer_size = input_shape.init.fold(1) { _ * _ }
+      val outer_size = numeral(input_shape.init)
       val last_dim_size = input_shape.last
       val input_size = outer_size * last_dim_size
 
@@ -134,7 +137,8 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val output_tensor = get_operand(output, anno)
       val doutput_tensor = get_operand(doutput, anno)
 
-      val outer_size = output_shape.init.fold(1) { _ * _ }
+      // val outer_size = output_shape.init.fold(1) { _ * _ }
+      val outer_size = numeral(output_shape.init)
       val last_dim_size = output_shape.last
       val input_size = outer_size * last_dim_size
 
@@ -189,7 +193,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       }
 
     case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::(dims:List[Int])::_, _) =>
-    val sourceTensor = new TENSOR(s, useOldMetadata = true)
+      val sourceTensor = new TENSOR(s, useOldMetadata = true)
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
