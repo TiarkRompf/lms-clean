@@ -192,13 +192,11 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         case a => throw new Exception(s"TODO: annotation $a is not yet handled")
       }
 
-    case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _) =>
+    case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::Backend.Const(dims:List[Int])::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
-
-      val dims = List(2,0,1) // TODO: change back
 
       val input_shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
@@ -217,7 +215,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         
           val kernel = cudaPermute3D[Float](dims)
           FunOps7(kernel).apply(
-            Wrap[Array[Float]](operand),
+            Wrap[Array[Float]](input_tensor),
             Wrap[Array[Float]](output.x),
             unit[Int](dimZ), 
             unit[Int](dimY), 
