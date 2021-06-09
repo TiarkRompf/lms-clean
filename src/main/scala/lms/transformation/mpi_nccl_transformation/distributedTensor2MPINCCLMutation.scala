@@ -85,6 +85,20 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in optimize_tensor")
       }
 
+    case Node(s, "all_reduce_tensor", Backend.Const(devices:Seq[Device])::(x:Backend.Sym)::Backend.Const(mode:String)::_, _) =>
+      val sourceTensor = new TENSOR(x, useOldMetadata = true)
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      val inputArray = new ARRAY(transform(x))
+      val count = numeral(sourceTensor.resultType.shapeSize)
+      val nccl_mode = mode match {
+        case "sum" => NCCL_SUM
+        case a => throw new Exception(s"nccl mode $a is not yet handled")
+      }
+      NCCL_ALLREDUCE(sourceTensor.et, inputArray, inputArray, SIZE_T(count), nccl_mode, myNCCLComm, myNCCLStream)
+      CUDA_STREAM_SYNCHRONIZE(myNCCLStream)
+      Backend.Const(())
+
     case _ => super.transform(n)
   }
 }

@@ -69,11 +69,8 @@ abstract class DistributeTensorAIRCoPSpatialBase extends Transformer with MPIOps
         case NAnno => if (myMPIRank == 0) WEIGHT(tt, NAnno, newFilenameFormat, newFilenameArgs:_*).x else Backend.Const(())
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           // FIXME(feiw) how do we know which rank should have this weight?
-          val weight = WEIGHT(tt.splitBy(anno), NAnno, newFilenameFormat, newFilenameArgs:_*)
-          if (!tt.contains(dim)) {
-            AllReduceInPlace(weight, devices, mode="mean")
-          }
-          weight.x
+          WEIGHT(tt.splitBy(anno), NAnno, newFilenameFormat, newFilenameArgs:_*).x
+          // no need to allreduce the weight, because the values are initialized by files
         case a => throw new Exception(s"annotation $a is not yet handled in tensor_weight")
       }
 
