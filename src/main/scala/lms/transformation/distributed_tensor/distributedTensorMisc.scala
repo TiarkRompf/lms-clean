@@ -58,7 +58,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
     val res_tt = input.resultType
     require(dims.sortWith(_ < _) == List.range(0, input.shapeSize.size), "dims must be a permutation of input dimensions")
     assert(input.shapeSize.size == 3, "input to permute must be a 3-D matrix")
-    (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x, C(dims))(input.x))
+    (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x)(input.x))
       .withSrcType(__pos, input.et))
   }
 
@@ -101,12 +101,12 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
             val grad = LogSoftmaxBackward(x, gradMap(s), anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
-      case Node(s, "tensor_permute", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::(dims:List[Int])::_, _) =>
+      case Node(s, "tensor_permute", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>  // TODO: change back
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
         (() => {
             val x = new TENSOR(transform(s))
-            val grad = Permute(gradMap(s), dims, anno, pos)
+            val grad = Permute(gradMap(s), List(2,0,1), anno, pos) // TODO: change back
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
 

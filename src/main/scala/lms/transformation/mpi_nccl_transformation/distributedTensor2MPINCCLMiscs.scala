@@ -192,11 +192,13 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         case a => throw new Exception(s"TODO: annotation $a is not yet handled")
       }
 
-    case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::(dims:List[Int])::_, _) =>
+    case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
+
+      val dims = List(2,0,1) // TODO: change back
 
       val input_shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
@@ -204,14 +206,15 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
+
           val shape = tt.shapeSizeAfterSplit(dim, devices.size)
           val count = numeral(shape)
-          val output = gpu_array(count, manifest[Float], myNCCLRank)
+          val output = gpu_array(10, manifest[Float], myNCCLRank)
 
           val dimX = tt.shape(2).size
           val dimY = tt.shape(1).size
           val dimZ = tt.shape(0).size
-
+        
           val kernel = cudaPermute3D[Float](dims)
           FunOps7(kernel).apply(
             Wrap[Array[Float]](operand),
