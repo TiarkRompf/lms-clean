@@ -20,4 +20,4 @@ abstract class DistributeTensorAIRCoPSpatial extends DistributeTensorAIRCoPSpati
     // with DistributeTensor2MPI_NCCLMutation
     // with DistributeTensor2MPI_NCCLSplitConcat
     with DistributeTensorAIRCoPSpatialUnary
-    // with DistributeTensor2MPI_NCCLConv
+    with DistributeTensorAIRCoPSpatialConv
