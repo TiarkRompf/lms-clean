@@ -102,7 +102,7 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
           dimZ, 
           dimY, 
           dimXs,
-          dim3(unit[Int]((in_sz + 511)/512)), 
+          dim3(unit[Int]((in_sz + 511)/512)),
           dim3(unit[Int](512))
         )
         TENSORS.tupleView(outputs.map(_.x))

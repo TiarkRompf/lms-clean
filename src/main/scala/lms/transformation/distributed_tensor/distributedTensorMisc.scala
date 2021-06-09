@@ -54,7 +54,13 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       .withSrcType(__pos, output.et))
   }
 
-  def PermuteForward = ???
+  def Permute(input: TENSOR, dims: List[Int], anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = input.resultType
+    require(dims.sortWith(_ < _) == List.range(0, input.shapeSize.size), "dims must be a permutation of input dimensions")
+    assert(input.shapeSize.size == 3, "input to permute must be a 3-D matrix")
+    (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x, C(dims))(input.x))
+      .withSrcType(__pos, input.et))
+  }
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_softmax", _, _) => List()
@@ -63,6 +69,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       val mask_type = (new TENSOR(mask, useOldMetadata=true)).resultType
       (input_type.shape.reverse zip mask_type.shape.reverse).toList map { case (a:Size, b:Size) => (a.dim, b.dim)}
     case Node(s, "tensor_logsoftmax", _, _) => List()
+    case Node(s, "tensor_permute", _, _) => List()
     case _ => super.mergable_dims(node)
   }
 
@@ -92,6 +99,14 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
         (() => {
             val x = new TENSOR(transform(s))
             val grad = LogSoftmaxBackward(x, gradMap(s), anno, pos)
+            Accumulate(gradMap(input), grad, anno); ()
+        }) +=: backwardNodes
+      case Node(s, "tensor_permute", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::(dims:List[Int])::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val x = new TENSOR(transform(s))
+            val grad = Permute(gradMap(s), dims, anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
 
@@ -139,6 +154,16 @@ trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBas
 
     def logSoftmax(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
       val t = LogSoftmaxForward(self, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def permute(dims: List[Int])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Permute(self, dims, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def permute(dims: List[Int], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = Permute(self, dims, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }
