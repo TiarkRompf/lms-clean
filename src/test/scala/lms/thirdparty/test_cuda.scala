@@ -584,7 +584,7 @@ class CudaTest extends TutorialFunSuite {
         val cuda_output = cudaMalloc2[Int](size)
         cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
 
-        val transposeKernel = cudaTranspose2[Int]
+        val transposeKernel = cuda2DTranspose[Int]
         transposeKernel(cuda_input, cuda_output, ccount, rcount,
           dim3((rcount+tileDim-1)/tileDim, (ccount+tileDim-1)/tileDim), dim3(tileDim, blockRows))
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
