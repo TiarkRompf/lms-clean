@@ -542,7 +542,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val model = module {
-        val input = Tensor.input[Float](shape=Seq(4,9,9), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          val input = Tensor.input[Float](shape=Seq(120,55,50), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = input.anno
           input.permute(List(2,0,1))
         }
