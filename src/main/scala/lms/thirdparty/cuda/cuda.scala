@@ -1025,6 +1025,20 @@ trait CudaLibs extends CudaOps {
     }
   }
 
+  def cudaMaskedFillWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], shape: Seq[Int], size: Int, value: N)(implicit __pos: SourceContext) = {
+    // choose the last two dimensions as dim0 and dim1
+    val dim0_shape = shape(shape.size - 2)
+    val dim1_shape = shape(shape.size - 1)
+    val dim0_stride = dim0_shape
+    val dim1_stride = 1
+
+    val grid = dim3((size + 511) / 512)
+    val block = dim3(512)
+
+    val kernel = cudaMaskedFill[N](false)
+    kernel(in, out, mask, value, dim0_shape, dim1_shape, dim0_stride, dim1_stride, size, grid, block)
+  }
+
   def cudaMaskedFillGrad[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (y_d: Rep[Array[N]], x_d: Rep[Array[N]], mask: Rep[Array[Int]],
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
@@ -1056,6 +1070,20 @@ trait CudaLibs extends CudaOps {
         __assign(idx, i * dim0_stride + j * dim1_stride + inner_idx)
       })
     }
+  }
+
+  def cudaMaskedFillGradWrap[N:Numeric:Manifest](dout: Rep[Array[N]], din: Rep[Array[N]], mask: Rep[Array[Int]], shape: Seq[Int], size: Int)(implicit __pos: SourceContext) = {
+    // choose the last two dimensions as dim0 and dim1
+    val dim0_shape = shape(shape.size - 2)
+    val dim1_shape = shape(shape.size - 1)
+    val dim0_stride = dim0_shape
+    val dim1_stride = 1
+
+    val grid = dim3((size + 511) / 512)
+    val block = dim3(512)
+    
+    val kernel = cudaMaskedFillGrad[N](false)
+    kernel(dout, din, mask, dim0_shape, dim1_shape, dim0_stride, dim1_stride, size, grid, block)
   }
 
   // Cuda Tranpose Values

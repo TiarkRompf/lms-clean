@@ -37,34 +37,17 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       implicit val pos = Adapter.oldSourceMap(s)
 
       // get input info and transform input tensors
-      val input_shape = tensor_shape(input, useOldMetadata = true)
+      val shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
       val mask_tensor = get_operand(mask, anno)
 
-      // choose the last two dimensions as dim0 and dim1
-      val dim0_shape = input_shape(input_shape.size - 2)
-      val dim1_shape = input_shape(input_shape.size - 1)
-      val dim0_stride = dim0_shape
-      val dim1_stride = 1
-
-      // val input_size = input_shape.fold(1) { _ * _ }
-      val input_size = numeral(input_shape)
-      val output = gpu_array(input_size, manifest[Float], myNCCLRank)
-
-      val maskedFillKernel = cudaMaskedFill[Float](false)
-      FunOps11(maskedFillKernel).apply(
+      val size = numeral(shape)
+      val output = gpu_array(size, manifest[Float], myNCCLRank)
+      cudaMaskedFillWrap[Float](
         Wrap[Array[Float]](input_tensor), 
         Wrap[Array[Float]](output.x),
-        Wrap[Array[Int]](mask_tensor),
-        unit[Float](value),
-        unit[Int](dim0_shape),
-        unit[Int](dim1_shape),
-        unit[Int](dim0_stride),
-        unit[Int](dim1_stride),
-        unit[Int](input_size),
-        dim3(unit[Int]((input_size + 511)/512)),
-        dim3(unit[Int](512))
-      )
+        Wrap[Array[Int]](mask_tensor), 
+        shape, size, value)
 
       output.x
 
@@ -72,33 +55,17 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       implicit val pos = Adapter.oldSourceMap(s)
 
       // get input info and transform input tensors
-      val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
+      val shape = tensor_shape(doutput, useOldMetadata = true)
       val doutput_tensor = get_operand(doutput, anno)
       val mask_tensor = get_operand(mask, anno)
 
-      // choose the last two dimensions as dim0 and dim1
-      val dim0_shape = doutput_shape(doutput_shape.size - 2)
-      val dim1_shape = doutput_shape(doutput_shape.size - 1)
-      val dim0_stride = dim0_shape
-      val dim1_stride = 1
-
-      // val doutput_size = doutput_shape.fold(1) { _ * _ }
-      val doutput_size = numeral(doutput_shape)
-      val dinput = gpu_array(doutput_size, manifest[Float], myNCCLRank)
-
-      val maskedFillGradKernel = cudaMaskedFillGrad[Float](false)
-      FunOps10(maskedFillGradKernel).apply(
+      val size = numeral(shape)
+      val dinput = gpu_array(size, manifest[Float], myNCCLRank)
+      cudaMaskedFillGradWrap[Float](
         Wrap[Array[Float]](doutput_tensor), 
         Wrap[Array[Float]](dinput.x),
         Wrap[Array[Int]](mask_tensor),
-        unit[Int](dim0_shape),
-        unit[Int](dim1_shape),
-        unit[Int](dim0_stride),
-        unit[Int](dim1_stride),
-        unit[Int](doutput_size),
-        dim3(unit[Int]((doutput_size + 511)/512)),
-        dim3(unit[Int](512))
-      )
+        shape, size)
 
       dinput.x
     
