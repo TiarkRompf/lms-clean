@@ -551,5 +551,22 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
     checkWithLogPath("permute", driver.code, "cu", driver.setLogPath)
   }
+
+  test("permute_102_big") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(8,2,8), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          input.permute(List(1,0,2))
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("permute_102_big", driver.code, "cu", driver.setLogPath)
+  }
 }
 

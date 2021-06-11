@@ -76,7 +76,6 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val input_shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
 
-      // val outer_size = input_shape.init.fold(1) { _ * _ }
       val outer_size = numeral(input_shape.init)
       val last_dim_size = input_shape.last
       val input_size = outer_size * last_dim_size
@@ -104,7 +103,6 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val output_tensor = get_operand(output, anno)
       val doutput_tensor = get_operand(doutput, anno)
 
-      // val outer_size = output_shape.init.fold(1) { _ * _ }
       val outer_size = numeral(output_shape.init)
       val last_dim_size = output_shape.last
       val input_size = outer_size * last_dim_size
@@ -175,23 +173,9 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
           val shape = tt.shapeSizeAfterSplit(dim, devices.size)
           val size = numeral(shape)
           val output = gpu_array(size, manifest[Float], myNCCLRank)
-          /*
-          val dimX = tt.shape(2).size
-          val dimY = tt.shape(1).size
-          val dimZ = tt.shape(0).size
-        
-          val kernel = cudaPermute3D[Float](dims)
-          FunOps7(kernel).apply(
-            Wrap[Array[Float]](input_tensor),
-            Wrap[Array[Float]](output.x),
-            unit[Int](dimZ), 
-            unit[Int](dimY), 
-            unit[Int](dimX),
-            dim3(unit[Int](0)),  // dummy values for now
-            dim3(unit[Int](0))
-          )*/
+
           val perm = dims
-          cudaPermute3DWrap[Float](
+          cuda3DPermuteWrap[Float](
             Wrap[Array[Float]](input_tensor),
             Wrap[Array[Float]](output.x), 
             shape, size, perm)
@@ -201,7 +185,6 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
         case a => throw new Exception(s"TODO: annotation $a is not yet handled")
       }
-
 
     case _ => super.transform(n)
   }

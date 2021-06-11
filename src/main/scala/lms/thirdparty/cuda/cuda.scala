@@ -1335,6 +1335,12 @@ trait CudaLibs extends CudaOps {
       }
   }
 
+  /** Kernel Functions for 3D split/concat
+    * cuda3DSplitAxis2 and cuda3DConcatAxis2 are split/concat kernels for a
+    * 3D input tensor splitting/concatting at the innermost axis (dim2)
+    * cuda3DSplitWrap and cuda3DConcat wrap are wrappers to these two kernels
+    */
+
   // This is the kernel function for splitting 3D input at the inner most axis.
   // the input is of shape (dimZ, dimY, sum(dimXs))
   // the number of outputs is determined by the dimXs, which is a list of outputs' dimX
@@ -1450,15 +1456,16 @@ trait CudaLibs extends CudaOps {
     concatKernel(cuda_input, out, grid, block)
   }
 
-  // amazing helper function to get flatten offset of tensors
-  def flatten(shape: List[Rep[Int]], index: List[Rep[Int]])(implicit __pos: SourceContext): Rep[Int] = {
-    val a: Rep[Int] = (shape.tail zip index.init).foldLeft(unit(0)) {
-      case (z: Rep[Int], (shape: Rep[Int], index: Rep[Int])) => (index + z) * shape
-    }
-    a + index.last
-  }
+  
 
-  // kernel function for 3D permute
+  /** Kernel Functions for 3D permute
+    * cudaPermute3D is a general kernel for 3D permutation
+    * cudaPermute102 provides better performance for 3D permutation of [1, 0, 2]
+    * and when dimX of input is big.
+    * cudaPermute3DWrap is a wrapper to these two kernels
+    */
+
+  
   def cudaPermute3D[N:Numeric:Manifest](permutation: List[Int])(implicit __pos: SourceContext) = {
     require(permutation.length == 3)
     // we can put all sub-functions of 3D permutation here because the function type is the same
@@ -1584,7 +1591,15 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cudaPermute3D1[N:Numeric:Manifest](permutation: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
+  // amazing helper function to get flatten offset of tensors
+  def flatten(shape: List[Rep[Int]], index: List[Rep[Int]])(implicit __pos: SourceContext): Rep[Int] = {
+    val a: Rep[Int] = (shape.tail zip index.init).foldLeft(unit(0)) {
+      case (z: Rep[Int], (shape: Rep[Int], index: Rep[Int])) => (index + z) * shape
+    }
+    a + index.last
+  }
+
+  def cuda3DPermute[N:Numeric:Manifest](permutation: List[Int])(implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], dimZ: Rep[Int], dimY: Rep[Int], dimX: Rep[Int]) =>
       // need to have 3D grids and 3D blocks
       // the 3D blocks handle a block of size (tileDim, tileDim, 1) where one of the tileDim is for dimX
@@ -1732,7 +1747,7 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  def cudaPermute3DWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int], size: Int, perm: List[Int])(implicit __pos: SourceContext) = {
+  def cuda3DPermuteWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int], size: Int, perm: List[Int])(implicit __pos: SourceContext) = {
     if (perm == List(0, 1, 2)) {
       // case 0: permutation is identity
       throw new Exception("identity permutation is not allowed in permutation kernel")
@@ -1744,14 +1759,13 @@ trait CudaLibs extends CudaOps {
       val tileDim = 32
       val blockRows = 8
 
-      val block = dim3(tileDim, blockRows, 1)
-      val grid = dim3((dimX+tileDim-1)/tileDim, (dimY+tileDim-1)/tileDim, dimZ)
+      val block = dim3(dimX - 1, 1, 1) // this may not be correct
+      val grid = dim3(dimY, dimZ, 1)
       val kernel = cudaPermute102[N]
       kernel(in, out, dimZ, dimY, dimX, grid, block)
     } else {
       // case 2: the dimX (inner most dim) is changed to a dim that is not inner most
       //         another dim (dimY or dimZ) is changed to the inner most dim
-
       val dimZ = shape(0)
       val dimY = shape(1)
       val dimX = shape(2)
@@ -1776,7 +1790,7 @@ trait CudaLibs extends CudaOps {
 
       val block = dim3(actualBlockDim(2), actualBlockDim(1), actualBlockDim(0))
       val grid = dim3(grids(2), grids(1), grids(0))
-      val kernel = cudaPermute3D1[N](perm)
+      val kernel = cuda3DPermute[N](perm)
       kernel(in, out, dimZ, dimY, dimX, grid, block)
     }
   }
