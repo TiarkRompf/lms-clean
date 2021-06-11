@@ -197,8 +197,11 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   def myNCCLComm(implicit __pos: SourceContext) = TOP(Unwrap(myNCCLCommRep), manifest[ncclCommT])
   def myNCCLStream(implicit __pos: SourceContext) = TOP(Unwrap(myNCCLStreamRep), manifest[cudaStreamT])
 
-  def set_up_mpi_nccl(implicit __pos: SourceContext) = { val dummy = myNCCLSize }
-  def finalize_mpi_nccl(implicit __pos: SourceContext) = {
+  def set_up_mpi_nccl(implicit pos: SourceContext) = {
+    val dummy = myNCCLSize
+    setupCublasCudnn(pos)
+  }
+  def finalize_mpi_nccl(implicit pos: SourceContext) = {
     MPI_CHECK(mpi_finalize())
     ncclCheck(ncclCommDestroy(myNCCLCommRep))
   }
@@ -206,7 +209,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   var hasCublas = false
   var hasCudnn = false
 
-  def setupCublasCudnn: Unit = {
+  def setupCublasCudnn(implicit pos: SourceContext): Unit = {
     if (hasCublas) set_up_cublas
     if (hasCudnn) set_up_cudnn
   }
@@ -269,16 +272,19 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   override def transform(n: Node): Backend.Exp = n match {
     // track the world_rank to set up MPI_NCCL
     case Node(s, "world_rank", _, _) =>
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
       set_up_mpi_nccl
       myNCCLRank.x
 
     // track the world_size to set up MPI_NCCL
     case Node(s, "world_size", _, _) =>
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
       set_up_mpi_nccl
       myNCCLSize.x
 
     // track the world_finalize to finalize the MPI_NCCL
     case Node(s, "world_finalize", _, _) =>
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
       finalize_mpi_nccl
       Backend.Const(())
 
