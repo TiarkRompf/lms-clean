@@ -135,6 +135,38 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
         case a => throw new Exception(s"TODO: annotation $a is not yet handled")
       }
+    
+    case Node(s, "tensor_embedding", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::(indices:Backend.Sym)::Backend.Const(n_embed:Int)::Backend.Const(embed_size:Int)::_, _) =>
+      val sourceTensor = new TENSOR(s, useOldMetadata = true)
+
+      implicit val sc_ : SourceContext = sourceTensor.pos
+      val m = sourceTensor.et
+      val input_tensor = get_operand(input, anno)
+      val indices_array = get_operand(indices, anno)
+
+      // val input_shape = tensor_shape(input, useOldMetadata = true)
+      val indices_shape = tensor_shape(indices, useOldMetadata = true)
+      val output_shape = tensor_shape(s, useOldMetadata = true)
+
+      val indices_size = numeral(indices_shape)
+      val output_size = numeral(output_shape)
+
+      anno match {
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
+        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
+          val output = gpu_array(output_size, manifest[Float], myNCCLRank)
+
+          cudaEmbeddingWrap[Float](
+            Wrap[Array[Float]](input_tensor),
+            Wrap[Array[Float]](output.x),
+            Wrap[Array[Int]](indices_array),
+            unit[Int](embed_size), 
+            unit[Int](indices_size))
+          output.x
+
+        case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled")
+      }
 
     case _ => super.transform(n)
   }

@@ -917,7 +917,12 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cudaEmbeddingWrap = ???
+  def cudaEmbeddingWrap[T:Numeric:Manifest](in: Rep[Array[T]], out: Rep[Array[T]], indices: Rep[Array[Int]], embed_size: Rep[Int], indices_size: Rep[Int])(implicit __pos: SourceContext) = {
+    val grid = dim3(embed_size, 1, 1)
+    val block = dim3(indices_size, 1, 1)
+    val kernel = cudaEmbedding[T]
+    kernel(in, indices, out, embed_size, grid, block)
+  }
 
   def cudaEmbeddingGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (indicies: Rep[Array[Int]], grad: Rep[Array[N]], gradWeight: Rep[Array[N]], n: Rep[Int], stride: Rep[Int], paddingIdx: Rep[Int]) => {
@@ -989,8 +994,10 @@ trait CudaLibs extends CudaOps {
       }
     }
   }
+   /*
+  def cudaEmbeddingGradWrapT:Numeric:Manifest](dout, din, indices) = {
 
-  def cudaEmbeddingGradWrap = ???
+  }*/
 
   /** Kernel Functions for ND Masked Fill
     */
