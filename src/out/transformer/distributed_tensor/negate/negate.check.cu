@@ -164,8 +164,8 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMemcpy(x48, x35, (size_t)(512 * sizeof(float)), cudaMemcpyDeviceToHost));
   check_float_array(x48, 512, "golden/input_grad_rank_%d.data", x6);
   // end checking GPU array of size 512 and type Float
-  MPICHECK(MPI_Finalize());
   NCCLCHECK(ncclCommDestroy(x4));
+  MPICHECK(MPI_Finalize());
 }
 /*****************************************
 End of C Generated Code
