@@ -25,26 +25,22 @@ abstract class DistributeTensorAIRCoPSpatialBase extends Transformer with MPIOps
 
   def numeral(size: Seq[Int]) = size.foldLeft(1)(_ * _)
 
-  lazy val (worldSize, worldRank) =
-    (Wrap[Int](g.reflectEffect("world_size")()(Adapter.CTRL)), Wrap[Int](g.reflectEffect("world_rank")()(Adapter.CTRL)))
-
-  // lazy local functions that initialize the MPI
-  lazy val (myMPISizeRep, myMPIRankRep) = withComment("setting up the MPI environment") {
-    val size = var_new(unit(0))
-    val rank = var_new(unit(0))
-    MPI_CHECK(mpi_init())
-    MPI_CHECK(mpi_comm_rank(mpi_comm_world, rank))
-    MPI_CHECK(mpi_comm_size(mpi_comm_world, size))
-    MPI_CHECK(mpi_barrier(mpi_comm_world))
-    (readVar(size), readVar(rank))
+  lazy val (worldSize, worldRank) = {
+    val (s, r) = (Wrap[Int](g.reflectEffect("world_size")()(Adapter.CTRL)), Wrap[Int](g.reflectEffect("world_rank")()(Adapter.CTRL)))
+    Adapter.sourceMap(Unwrap(s)) = SourceContext("", "", 0, 0, "", Some("")) // FIXME(feiw): pos??
+    Adapter.sourceMap(Unwrap(r)) = SourceContext("", "", 0, 0, "", Some(""))
+    (s, r)
   }
 
-  def myMPISize(implicit __pos: SourceContext) = INT(Unwrap(worldSize))
-  def myMPIRank(implicit __pos: SourceContext) = INT(Unwrap(worldRank))
+  def myMPISize(implicit pos: SourceContext) = INT(Unwrap(worldSize))
+  def myMPIRank(implicit pos: SourceContext) = INT(Unwrap(worldRank))
 
-  def setup_mpi(implicit __pos: SourceContext) = { val dummy = worldSize }
-  def finalize_mpi(implicit __pos: SourceContext) =
-    Wrap[Unit](g.reflectEffect("world_finalize")()(Adapter.CTRL))
+  def setup_mpi(implicit pos: SourceContext) = { val dummy = worldSize }
+  def finalize_mpi(implicit pos: SourceContext) = {
+    val wf = g.reflectEffect("world_finalize")()(Adapter.CTRL)
+    Adapter.sourceMap(wf) = pos
+    Wrap[Unit](wf)
+  }
 
   def get_operand(operand: Backend.Exp, anno: Anno, assertSame: Boolean = false): TENSOR = {
     val operand_tensor = new TENSOR(operand, useOldMetadata = true)

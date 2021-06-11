@@ -16,7 +16,7 @@ import Backend._
 
 abstract class DistributeTensorAIRCoPSpatial extends DistributeTensorAIRCoPSpatialBase
     with DistributeTensorAIRCoPSpatialBinary
-    // with DistributeTensor2MPI_NCCLGemm
+    with DistributeTensorAIRCoPSpatialGemm
     // with DistributeTensor2MPI_NCCLMutation
     // with DistributeTensor2MPI_NCCLSplitConcat
     with DistributeTensorAIRCoPSpatialUnary

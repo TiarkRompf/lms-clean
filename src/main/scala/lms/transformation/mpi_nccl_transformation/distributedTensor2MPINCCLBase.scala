@@ -202,8 +202,9 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     setupCublasCudnn(pos)
   }
   def finalize_mpi_nccl(implicit pos: SourceContext) = {
-    MPI_CHECK(mpi_finalize())
     ncclCheck(ncclCommDestroy(myNCCLCommRep))
+    finalizeCublasCudnn(pos)
+    MPI_CHECK(mpi_finalize())
   }
 
   var hasCublas = false
@@ -212,6 +213,10 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   def setupCublasCudnn(implicit pos: SourceContext): Unit = {
     if (hasCublas) set_up_cublas
     if (hasCudnn) set_up_cudnn
+  }
+  def finalizeCublasCudnn(implicit pos: SourceContext): Unit = {
+    if (hasCublas) finalize_cublas
+    if (hasCudnn) finalize_cudnn
   }
 
   // lazy local function that initializes CUDNN

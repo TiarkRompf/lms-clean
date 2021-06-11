@@ -59,28 +59,28 @@ void Snippet(int x0) {
   // end setting up the MPI/NCCL environment
   cublasHandle_t x7;
   CUBLAS_CALL(cublasCreate(&x7));
-  // begin initializing GPU array of size 208 and type Float at device (pre-rename) x39 from binary file weight
+  // begin initializing GPU array of size 208 and type Float
   float* x8 = (float*)malloc(208 * sizeof(float));
   CUDA_CALL(cudaSetDevice(x6));
   float* x9 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x9, (size_t)(208 * sizeof(float))));
-  scan_float_rank("golden/weight", x6, x8, 208);
+  scan_float_array(x8, 208, "golden/weight_rank_%d.data", x6);
   CUDA_CALL(cudaMemcpy(x9, x8, (size_t)(208 * sizeof(float)), cudaMemcpyHostToDevice));
-  // end initializing GPU array of size 208 and type Float at device (pre-rename) x39 from binary file weight
+  // end initializing GPU array of size 208 and type Float
   // begin initializing fixed GPU array of size 208 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x10 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x10, (size_t)(208 * sizeof(float))));
   x11<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, 0, 208);
   // end initializing fixed GPU array of size 208 and type Float and device (pre-rename) x39
-  // begin initializing GPU array of size 208 and type Float at device (pre-rename) x39 from binary file input
+  // begin initializing GPU array of size 208 and type Float
   float* x17 = (float*)malloc(208 * sizeof(float));
   CUDA_CALL(cudaSetDevice(x6));
   float* x18 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x18, (size_t)(208 * sizeof(float))));
-  scan_float_rank("golden/input", x6, x17, 208);
+  scan_float_array(x17, 208, "golden/input_rank_%d.data", x6);
   CUDA_CALL(cudaMemcpy(x18, x17, (size_t)(208 * sizeof(float)), cudaMemcpyHostToDevice));
-  // end initializing GPU array of size 208 and type Float at device (pre-rename) x39 from binary file input
+  // end initializing GPU array of size 208 and type Float
   // begin computing DOT on GPU for size 256 and type Float at device (pre-rename) x39 with left_operand x106 and right_operand x48
   CUDA_CALL(cudaSetDevice(x6));
   float* x19 = (float*)malloc(0 * sizeof(float));
@@ -95,11 +95,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x22, (size_t)(208 * sizeof(float))));
   x11<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x22, 0, 208);
   // end initializing fixed GPU array of size 208 and type Float and device (pre-rename) x39
-  // begin checking GPU array of size 256 and type Float at device (pre-name) x39 again binary file loss
+  // begin checking GPU array of size 256 and type Float
   float* x23 = (float*)malloc(256 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x23, x19, (size_t)(256 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/loss", x6, x23, 256);
-  // end checking GPU array of size 256 and type Float at device (pre-name) x39 again binary file loss
+  check_float_array(x23, 256, "golden/loss_rank_%d.data", x6);
+  // end checking GPU array of size 256 and type Float
   // begin initializing fixed GPU array of size 256 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x24 = (float*)malloc(0 * sizeof(float));
@@ -132,21 +132,19 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   x28<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x22, x35, 208);
   // end computing ACCUM on GPU for size 208 and type Float at device (pre-rename) x39 with base_operand x139 and addition_operand x234
-  if (x6 == 0) {
-    // begin checking GPU array of size 208 and type Float at device (pre-name) x39 again binary file weight_grad
-    float* x38 = (float*)malloc(208 * sizeof(float));
-    CUDA_CALL(cudaMemcpy(x38, x10, (size_t)(208 * sizeof(float)), cudaMemcpyDeviceToHost));
-    check_float_array_rank("golden/weight_grad", x6, x38, 208);
-    // end checking GPU array of size 208 and type Float at device (pre-name) x39 again binary file weight_grad
-  }
-  // begin checking GPU array of size 208 and type Float at device (pre-name) x39 again binary file input_grad
+  // begin checking GPU array of size 208 and type Float
+  float* x38 = (float*)malloc(208 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x38, x10, (size_t)(208 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array(x38, 208, "golden/weight_grad_rank_%d.data", x6);
+  // end checking GPU array of size 208 and type Float
+  // begin checking GPU array of size 208 and type Float
   float* x39 = (float*)malloc(208 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x39, x22, (size_t)(208 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_rank("golden/input_grad", x6, x39, 208);
-  // end checking GPU array of size 208 and type Float at device (pre-name) x39 again binary file input_grad
+  check_float_array(x39, 208, "golden/input_grad_rank_%d.data", x6);
+  // end checking GPU array of size 208 and type Float
+  NCCLCHECK(ncclCommDestroy(x4));
   CUBLAS_CALL(cublasDestroy(x7));
   MPICHECK(MPI_Finalize());
-  NCCLCHECK(ncclCommDestroy(x4));
 }
 /*****************************************
 End of C Generated Code
