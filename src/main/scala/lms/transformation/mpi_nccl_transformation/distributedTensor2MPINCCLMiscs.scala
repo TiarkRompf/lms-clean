@@ -103,7 +103,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           val shape = tt.shapeSizeAfterSplit(dim, devices.size)
           val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
-          cuda2DTransposeWrap[Float](
+          cudaTransposeWrap[Float](
             Wrap[Array[Float]](input_tensor),
             Wrap[Array[Float]](output.x),
             shape)
@@ -127,7 +127,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
           val size = numeral(shape)
           val output = gpu_array(size, manifest[Float], myNCCLRank)
           val perm = dims
-          cuda3DPermuteWrap[Float](
+          cudaPermuteWrap[Float](
             Wrap[Array[Float]](input_tensor),
             Wrap[Array[Float]](output.x), 
             shape, size, perm)

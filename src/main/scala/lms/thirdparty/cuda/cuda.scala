@@ -897,6 +897,8 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 }
 
 trait CudaLibs extends CudaOps {
+  /** Kernel Functions for 2D Embedding
+    */
   def cudaEmbedding[T:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (embedding: Rep[Array[T]], indices: Rep[Array[Int]], output: Rep[Array[T]], embed_size: Rep[Int]) => {
       generate_comment("this is cuda embedding kernel.")
@@ -914,6 +916,8 @@ trait CudaLibs extends CudaOps {
       }
     }
   }
+
+  def cudaEmbeddingWrap = ???
 
   def cudaEmbeddingGrad[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (indicies: Rep[Array[Int]], grad: Rep[Array[N]], gradWeight: Rep[Array[N]], n: Rep[Int], stride: Rep[Int], paddingIdx: Rep[Int]) => {
@@ -985,6 +989,8 @@ trait CudaLibs extends CudaOps {
       }
     }
   }
+
+  def cudaEmbeddingGradWrap = ???
 
   /** Kernel Functions for ND Masked Fill
     */
@@ -1092,7 +1098,7 @@ trait CudaLibs extends CudaOps {
   /** Kernel Functions for 2D Transpose
     * cuda2DTransposeNaive performs transpose naively without shared memory
     * cuda2DTransposeCoalesced performs transpose using shared memory and coalesced approach
-    * cuda2DTransposeWrap is a wrapper on top of cuda2DTransposeCoalesced
+    * cudaTransposeWrap is a wrapper on top of cuda2DTransposeCoalesced
     */
 
   // cuda matrix copy function for baseline
@@ -1166,8 +1172,8 @@ trait CudaLibs extends CudaOps {
         __assign(y, y + blockRows)
       }
     }
-  
-  def cuda2DTransposeWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int])(implicit  __pos: SourceContext) = {
+
+  def cudaTransposeWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int])(implicit  __pos: SourceContext) = {
     val n_rows = shape(1)
     val n_cols = shape(0)
     val grid = dim3((n_cols + tileDim - 1) / tileDim, (n_rows + tileDim -1 ) / tileDim)
@@ -1176,10 +1182,8 @@ trait CudaLibs extends CudaOps {
     kernel(in, out, n_rows, n_cols, grid, block)
   }
 
-  /*
-    reduce the data input array (from 0 to size) using the given op.
-    buffer(0) will contain the output of the reduction
-   */
+  // reduce the data input array (from 0 to size) using the given op.
+  // buffer(0) will contain the output of the reduction
   def reduceHelper[N:Numeric:Manifest](input: Rep[Array[N]], size: Rep[Int], buffer: Rep[Array[N]], z: Rep[N], op: (Rep[N], Rep[N]) => Rep[N], skipFirstReduce:Boolean = false)(implicit  __pos: SourceContext) = {
     val start = threadIdxX
     val end = size
@@ -1785,7 +1789,7 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  def cuda3DPermuteWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int], size: Int, perm: List[Int])(implicit __pos: SourceContext) = {
+  def cudaPermuteWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int], size: Int, perm: List[Int])(implicit __pos: SourceContext) = {
     if (perm == List(0, 1, 2)) {
       // case 0: permutation is identity
       throw new Exception("identity permutation is not allowed in permutation kernel")
