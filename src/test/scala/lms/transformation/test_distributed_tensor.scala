@@ -535,7 +535,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("transpose", driver.code, "cu", driver.setLogPath)
   }
 
-  test("permute") {
+  test("permute") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
 
