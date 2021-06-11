@@ -1174,6 +1174,7 @@ trait CudaLibs extends CudaOps {
     }
 
   def cudaTransposeWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int])(implicit  __pos: SourceContext) = {
+    assert(shape.size == 2, "input of transpose must be a 2-D matrix")
     val n_rows = shape(1)
     val n_cols = shape(0)
     val grid = dim3((n_cols + tileDim - 1) / tileDim, (n_rows + tileDim -1 ) / tileDim)
@@ -1790,6 +1791,7 @@ trait CudaLibs extends CudaOps {
   }
 
   def cudaPermuteWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int], size: Int, perm: List[Int])(implicit __pos: SourceContext) = {
+    assert(shape.size == 3, "input to permute must be a 3-D tensor")
     if (perm == List(0, 1, 2)) {
       // case 0: permutation is identity
       throw new Exception("identity permutation is not allowed in permutation kernel")

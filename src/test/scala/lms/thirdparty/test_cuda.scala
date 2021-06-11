@@ -337,7 +337,7 @@ class CudaTest extends TutorialFunSuite {
     check("embedding", driver.code, "cu")
   }
 
-  test("embeddin_grad_kernel") {
+  test("embedding_grad_kernel") {
     val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize

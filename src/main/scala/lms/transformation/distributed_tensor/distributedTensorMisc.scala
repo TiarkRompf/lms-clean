@@ -41,7 +41,6 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       (doutput.x, mask.x)).withSrcType(__pos, doutput.et))
   }
 
-
   def LogSoftmaxForward(input: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = input.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_logsoftmax", C(res_tt), C(anno), input.x)(input.x))
@@ -54,11 +53,10 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       .withSrcType(__pos, output.et))
   }
 
-  def Permute(input: TENSOR, dims: List[Int], anno: Anno, __pos: SourceContext): TENSOR = {
+  def Permute(input: TENSOR, perm: List[Int], anno: Anno, __pos: SourceContext): TENSOR = {
+    require(perm.sortWith(_ < _) == List.range(0, input.shapeSize.size), "dims must be a valid permutation of input dimensions")
     val res_tt = input.resultType
-    require(dims.sortWith(_ < _) == List.range(0, input.shapeSize.size), "dims must be a permutation of input dimensions")
-    assert(input.shapeSize.size == 3, "input to permute must be a 3-D matrix")
-    (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x, C(dims))(input.x))
+    (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x, C(perm))(input.x))
       .withSrcType(__pos, input.et))
   }
 
@@ -157,13 +155,13 @@ trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBas
       Wrap[Tensor[T]](t.x)
     }
 
-    def permute(dims: List[Int])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
-      val t = Permute(self, dims, anno, __pos)
+    def permute(perm: List[Int])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Permute(self, perm, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
 
-    def permute(dims: List[Int], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = Permute(self, dims, anno, __pos)
+    def permute(perm: List[Int], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = Permute(self, perm, anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }
