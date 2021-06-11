@@ -548,7 +548,7 @@ class CudaTest extends TutorialFunSuite {
         val cuda_output = cudaMalloc2[Int](size)
         cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
 
-        val transposeKernel = cudaTranspose[Int]
+        val transposeKernel = cuda2DTransposeCoalesced[Int]
         transposeKernel(cuda_input, cuda_output, rcount, ccount, dimGrid, dimBlock)
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
@@ -743,7 +743,7 @@ class CudaTest extends TutorialFunSuite {
         val cuda_output = cudaMalloc2[Int](size)
         cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
 
-        val transposeKernel = cudaTransposeNaive[Int]
+        val transposeKernel = cuda2DTransposeNaive[Int]
         transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
@@ -831,7 +831,7 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
         val naive_transpose_time = measurement_cuda {
-          val naiveTransposeKernel = cudaTransposeNaive[Int]
+          val naiveTransposeKernel = cuda2DTransposeNaive[Int]
           for (i <- (0 until iter_count): Rep[Range]) {
             naiveTransposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
           }
@@ -839,7 +839,7 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
         val transpose_time = measurement_cuda {
-          val transposeKernel = cudaTranspose[Int]
+          val transposeKernel = cuda2DTransposeCoalesced[Int]
           for (i <- (0 until iter_count): Rep[Range]) {
             val dimGrid = dim3((ccount + tileDim - 1) / tileDim, (rcount + tileDim - 1) / tileDim)
             val dimBlock = dim3(tileDim, blockRows)

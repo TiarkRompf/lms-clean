@@ -986,7 +986,11 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  // Cuda Masked Fill Kernels
+  /** Kernel Functions for Masked Fill
+    * The cudaSoftmax and cudaSoftmaxGrad kernel are used for large (>=1024) input tensors.
+    * Perform softmax on last dim
+    * The wrappers call kernels with logsoftmax
+    */
   def cudaMaskedFill[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N],
     dim0_shape: Rep[Int], dim1_shape: Rep[Int], dim0_stride: Rep[Int], dim1_stride: Rep[Int],
@@ -1087,9 +1091,12 @@ trait CudaLibs extends CudaOps {
     kernel(dout, din, mask, dim0_shape, dim1_shape, dim0_stride, dim1_stride, size, grid, block)
   }
 
-  // Cuda Tranpose Kernels
-  val blockRows = 8
-  val tileDim = 32
+
+  /** Kernel Functions for Transpose
+    * 
+    * Perform softmax on last dim
+    * The wrappers call kernels with logsoftmax
+    */
 
   // cuda matrix copy function for baseline
   def cudaMatrixCopy[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
@@ -1107,8 +1114,12 @@ trait CudaLibs extends CudaOps {
       }
   }
 
+  // Cuda Tranpose Kernels
+  val blockRows = 8
+  val tileDim = 32
+
   // naive cuda transpose kernel
-  def cudaTransposeNaive[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+  def cuda2DTransposeNaive[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]]) =>
       generate_comment("Cuda Transpose Naive")
       (generate_comment("arg0: 2D Input Matrix (n x n) where n is a multiple of 32"))
@@ -1124,7 +1135,7 @@ trait CudaLibs extends CudaOps {
   }
 
   // cuda 2D transpose using coalesced approach
-  def cudaTranspose[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
+  def cuda2DTransposeCoalesced[N:Numeric:Manifest](implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], n: Rep[Int], m: Rep[Int]) =>
       generate_comment("Cuda Coalesced Transpose")
       generate_comment("arg0: 2D Input Matrix (n x m)")
@@ -1158,6 +1169,15 @@ trait CudaLibs extends CudaOps {
         __assign(y, y + blockRows)
       }
     }
+  
+  def cuda2DTransposeWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], shape: Seq[Int])(implicit  __pos: SourceContext) = {
+    val n_rows = shape(1)
+    val n_cols = shape(0)
+    val grid = dim3((n_cols + tileDim - 1) / tileDim, (n_rows + tileDim -1 ) / tileDim)
+    val block = dim3(tileDim, blockRows)
+    val kernel = cuda2DTransposeCoalesced[N]
+    kernel(in, out, n_rows, n_cols, grid, block)
+  }
 
 
   /*
@@ -1247,7 +1267,12 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  // Cuda Softmax Kernels
+
+  /** Kernel Functions for ND Softmax/LogSoftmax
+    * The cudaSoftmax and cudaSoftmaxGrad kernel are used for large (>=1024) input tensors.
+    * Perform softmax on last dim
+    * The wrappers call kernels with logsoftmax
+    */
   def cudaSoftmax[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
     (input: Rep[Array[N]], output: Rep[Array[N]], lastDimSize: Rep[Int]) =>
       generate_comment("This is cuda softmax (for larger; >=1024 inputs). Performs softmax on last dim.")
@@ -1264,7 +1289,7 @@ trait CudaLibs extends CudaOps {
       reduceHelper[N](input_t, lastDimSize, buffer, -infinity[N], (a: Rep[N], b: Rep[N]) => __ifThenElse(a < b, b, a))
 
       val localVal = var_new[N](implicitly[Numeric[N]].zero)
-      for(i <- threadIdxX.until(lastDimSize, blockDimX)) {
+      for (i <- threadIdxX.until(lastDimSize, blockDimX)) {
         val normalized = input_t(i) - buffer(0)
         val expVal = expf[N](normalized)
         localVal += expVal
@@ -1289,6 +1314,15 @@ trait CudaLibs extends CudaOps {
           output_t(i) = output_t(i) / buffer(0)
         }
       }
+  }
+  
+  // init is the size of outer dims (outerSize)
+  // last is the size of the last dim (lastDimSize)
+  def cudaLogSoftmaxWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], init: Int, last: Int)(implicit __pos: SourceContext) = {
+    val block = dim3(1024, 1, 1)
+    val grid = dim3(init, 1, 1)
+    val kernel = cudaSoftmax[N](true)
+    kernel(in, out, last, grid, block, 1024*4)
   }
 
   def cudaSoftmaxGrad[N:Numeric:Manifest](logSoftmax: Boolean)(implicit __pos: SourceContext) = cudaGlobalDynamicFun {
@@ -1335,7 +1369,17 @@ trait CudaLibs extends CudaOps {
       }
   }
 
-  /** Kernel Functions for 3D split/concat
+  // init is the size of outer dims (outerSize)
+  // last is the size of the last dim (lastDimSize)
+  def cudaLogSoftmaxGradWrap[N:Numeric:Manifest](din: Rep[Array[N]], dout: Rep[Array[N]], out: Rep[Array[N]], init: Int, last: Int)(implicit __pos: SourceContext) = {
+    val block = dim3(1024, 1, 1)
+    val grid = dim3(init, 1, 1)
+    val kernel = cudaSoftmaxGrad[N](true)
+    kernel(din, dout, out, last, grid, block, 1024*4)
+  }
+
+
+  /** Kernel Functions for 3D Split/Concat
     * cuda3DSplitAxis2 and cuda3DConcatAxis2 are split/concat kernels for a
     * 3D input tensor splitting/concatting at the innermost axis (dim2)
     * cuda3DSplitWrap and cuda3DConcat wrap are wrappers to these two kernels
@@ -1456,16 +1500,14 @@ trait CudaLibs extends CudaOps {
     concatKernel(cuda_input, out, grid, block)
   }
 
-  
 
-  /** Kernel Functions for 3D permute
+  /** Kernel Functions for 3D Permute
     * cudaPermute3D is a general kernel for 3D permutation
     * cudaPermute102 provides better performance for 3D permutation of [1, 0, 2]
     * and when dimX of input is big.
     * cudaPermute3DWrap is a wrapper to these two kernels
     */
 
-  
   def cudaPermute3D[N:Numeric:Manifest](permutation: List[Int])(implicit __pos: SourceContext) = {
     require(permutation.length == 3)
     // we can put all sub-functions of 3D permutation here because the function type is the same

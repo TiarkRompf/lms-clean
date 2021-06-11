@@ -36,11 +36,9 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       Backend.Const(value:Float)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // get input info and transform input tensors
       val shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
       val mask_tensor = get_operand(mask, anno)
-
       val size = numeral(shape)
       val output = gpu_array(size, manifest[Float], myNCCLRank)
       cudaMaskedFillWrap[Float](
@@ -48,17 +46,14 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         Wrap[Array[Float]](output.x),
         Wrap[Array[Int]](mask_tensor), 
         shape, size, value)
-
       output.x
 
     case Node(s, "tensor_maskedfill_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // get input info and transform input tensors
       val shape = tensor_shape(doutput, useOldMetadata = true)
       val doutput_tensor = get_operand(doutput, anno)
       val mask_tensor = get_operand(mask, anno)
-
       val size = numeral(shape)
       val dinput = gpu_array(size, manifest[Float], myNCCLRank)
       cudaMaskedFillGradWrap[Float](
@@ -66,61 +61,34 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         Wrap[Array[Float]](dinput.x),
         Wrap[Array[Int]](mask_tensor),
         shape, size)
-
       dinput.x
     
     case Node(s, "tensor_logsoftmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // get input info and transform input tensors
-      val input_shape = tensor_shape(input, useOldMetadata = true)
+      val shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
-
-      val outer_size = numeral(input_shape.init)
-      val last_dim_size = input_shape.last
-      val input_size = outer_size * last_dim_size
-
-      val output = gpu_array(input_size, manifest[Float], myNCCLRank)
-
-      val softmaxKernel = cudaSoftmax[Float](true)
-
-      FunOps6(softmaxKernel).apply(
+      val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
+      cudaLogSoftmaxWrap[Float](
         Wrap[Array[Float]](input_tensor), 
         Wrap[Array[Float]](output.x),
-        unit[Int](last_dim_size),
-        dim3(unit[Int](outer_size)),
-        dim3(unit[Int](1024)),
-        unit[Int](1024 * 4)
-      )
-
+        numeral(shape.init),
+        shape.last)
       output.x
     
     case Node(s, "tensor_logsoftmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // get input info and transform input tensors
-      val output_shape = tensor_shape(output, useOldMetadata = true)
+      val shape = tensor_shape(output, useOldMetadata = true)
       val output_tensor = get_operand(output, anno)
       val doutput_tensor = get_operand(doutput, anno)
-
-      val outer_size = numeral(output_shape.init)
-      val last_dim_size = output_shape.last
-      val input_size = outer_size * last_dim_size
-
-      val dinput = gpu_array(input_size, manifest[Float], myNCCLRank)
-
-      val softmaxGradKernel = cudaSoftmaxGrad[Float](true) /* Default is taking log */
-
-      FunOps7(softmaxGradKernel).apply(
+      val dinput = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
+      cudaLogSoftmaxGradWrap[Float](
         Wrap[Array[Float]](dinput.x), 
         Wrap[Array[Float]](doutput_tensor),
         Wrap[Array[Float]](output_tensor),
-        unit[Int](last_dim_size),
-        dim3(unit[Int](outer_size)),
-        dim3(unit[Int](1024)),
-        unit[Int](1024 * 4)
-      )
-
+        numeral(shape.init),
+        shape.last)
       dinput.x
     
     case Node(s, "tensor_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _) =>
@@ -129,28 +97,17 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
 
-      val input_shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
 
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           val shape = tt.shapeSizeAfterSplit(dim, devices.size)
-          val count = numeral(shape)
-          val n_rows = shape(1)
-          val n_cols = shape(0)
-          val output = gpu_array(count, manifest[Float], myNCCLRank)
-          val tileDim = 32
-          val blockRows = 8
-          val transposeKernel = cudaTranspose[Float]
-          FunOps6(transposeKernel).apply(
+          val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
+          cuda2DTransposeWrap[Float](
             Wrap[Array[Float]](input_tensor),
             Wrap[Array[Float]](output.x),
-            unit[Int](n_rows),
-            unit[Int](n_cols),
-            dim3(unit[Int]((n_cols + tileDim - 1) / tileDim), unit[Int]((n_rows + tileDim - 1) / tileDim)),
-            dim3(unit[Int](tileDim), unit[Int](blockRows)))
-      
+            shape)
           output.x
 
         case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
@@ -163,23 +120,19 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
 
-      val input_shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
 
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-
           val shape = tt.shapeSizeAfterSplit(dim, devices.size)
           val size = numeral(shape)
           val output = gpu_array(size, manifest[Float], myNCCLRank)
-
           val perm = dims
           cuda3DPermuteWrap[Float](
             Wrap[Array[Float]](input_tensor),
             Wrap[Array[Float]](output.x), 
             shape, size, perm)
-
           output.x
 
         case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
