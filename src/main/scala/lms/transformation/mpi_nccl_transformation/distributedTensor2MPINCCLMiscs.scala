@@ -96,7 +96,6 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
-
       val input_tensor = get_operand(operand, anno)
 
       anno match {
@@ -119,7 +118,6 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
-
       val input_tensor = get_operand(operand, anno)
 
       anno match {

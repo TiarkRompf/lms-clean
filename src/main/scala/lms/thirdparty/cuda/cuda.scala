@@ -986,10 +986,7 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  /** Kernel Functions for Masked Fill
-    * The cudaSoftmax and cudaSoftmaxGrad kernel are used for large (>=1024) input tensors.
-    * Perform softmax on last dim
-    * The wrappers call kernels with logsoftmax
+  /** Kernel Functions for ND Masked Fill
     */
   def cudaMaskedFill[N:Numeric:Manifest](ijSwapped: Boolean)(implicit __pos: SourceContext) = cudaGlobalFun {
     (in: Rep[Array[N]], out: Rep[Array[N]], mask: Rep[Array[Int]], value: Rep[N],
@@ -1092,10 +1089,10 @@ trait CudaLibs extends CudaOps {
   }
 
 
-  /** Kernel Functions for Transpose
-    * 
-    * Perform softmax on last dim
-    * The wrappers call kernels with logsoftmax
+  /** Kernel Functions for 2D Transpose
+    * cuda2DTransposeNaive performs transpose naively without shared memory
+    * cuda2DTransposeCoalesced performs transpose using shared memory and coalesced approach
+    * cuda2DTransposeWrap is a wrapper on top of cuda2DTransposeCoalesced
     */
 
   // cuda matrix copy function for baseline
@@ -1178,7 +1175,6 @@ trait CudaLibs extends CudaOps {
     val kernel = cuda2DTransposeCoalesced[N]
     kernel(in, out, n_rows, n_cols, grid, block)
   }
-
 
   /*
     reduce the data input array (from 0 to size) using the given op.
