@@ -91,7 +91,6 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
       s"$s = tensor_concat(${inputs.mkString(",")}) (${inputs.map(symTensorShape(_, graph)).mkString(", ")})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case _ => super.printTensor(node, graph)
   }
-
 }
 
 

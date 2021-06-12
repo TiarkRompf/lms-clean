@@ -71,18 +71,10 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         require(tts.length == 2, "2D split can only handle split section of 2")
         require(tts(0).shape(1).size == tts(1).shape(1).size, "2D split can only handle equal-sized split")
 
-        // then we should run this split op in all devices in the `anno`
-        // FIXME(feiw) for now, let's assume that `anno` is for all devices
-        anno match {
-          case NAnno => throw new Exception(s"TODO: not yet handling NAnno in mult op")
-          case SAnno(dim: Dim, devices: Seq[Device], _) if tts(0).contains(dim) && dim != axis =>
-            val shape = tts(0).shapeSizeAfterSplit(dim, devices.size)
-            val arrays = gpu_split2_2d1_equal_array(shape(0), shape(1), m, myNCCLRank, operand)
-            TENSORS.tupleView(arrays.map(_.x))
-          case SAnno(dim: Dim, devices: Seq[Device], _) =>
-            throw new Exception(s"TODO: not yet handling SAnno with AllReduce in split")
-          case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_mult")
-        }
+        val shape = tts(0).shapeSize
+        val arrays = gpu_split2_2d1_equal_array(shape(0), shape(1), m, myNCCLRank, operand)
+        TENSORS.tupleView(arrays.map(_.x))
+
       } else if (in_dims == 3) {
         val input_shape = tensor_shape(input, useOldMetadata = true)
         val num_outputs = tts.length
@@ -99,10 +91,10 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         cuda3DSplitWrap[Float](
           Wrap[Array[Float]](operand),
           outputs map { t => Wrap[Array[Float]](t.x) },
-          dimZ, 
-          dimY, 
+          dimZ,
+          dimY,
           dimXs,
-          dim3(unit[Int]((in_sz + 511)/512)), 
+          dim3(unit[Int]((in_sz + 511)/512)),
           dim3(unit[Int](512))
         )
         TENSORS.tupleView(outputs.map(_.x))
@@ -127,18 +119,10 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
       if (in_dims == 2) {
         require(inputs.length == 2)
         require(input_tensors(0).shapeSize(1) == input_tensors(1).shapeSize(1))
+        val count2 = numeral(tt.shapeSize)
+          gpu_concat2_2d1_equal_array(input_tensors(0).shapeSize(0), input_tensors(0).shapeSize(1),
+            m, myNCCLRank, input_operands(0), input_operands(1)).x
 
-        anno match {
-          case NAnno => throw new Exception(s"TODO: not yet handling NAnno in concat op")
-          case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-            val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-            gpu_concat2_2d1_equal_array(input_tensors(0).shapeSize(0), input_tensors(0).shapeSize(1),
-              m, myNCCLRank, input_operands(0), input_operands(1)).x
-          case SAnno(dim: Dim, devices: Seq[Device], _) =>
-            System.out.println(s"tt $tt dim $dim")
-            throw new Exception(s"TODO: not yet handling SAnno with AllReduce in concat")
-          case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_concat")
-        }
       } else if (in_dims == 3) {
         val input_shapes = inputs.map(tensor_shape(_, useOldMetadata = true))
 
@@ -152,10 +136,10 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         cuda3DConcatWrap[Float](
           input_operands map { t =>  Wrap[Array[Float]](t) },
           Wrap[Array[Float]](output.x),
-          dimZ, 
-          dimY, 
+          dimZ,
+          dimY,
           dimXs,
-          dim3(unit[Int]((out_sz + 511)/512)), 
+          dim3(unit[Int]((out_sz + 511)/512)),
           dim3(unit[Int](512))
         )
         output.x
