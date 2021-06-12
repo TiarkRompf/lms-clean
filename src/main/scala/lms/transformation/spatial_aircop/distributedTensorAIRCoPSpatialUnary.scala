@@ -21,8 +21,7 @@ trait DistributeTensorAIRCoPSpatialUnary extends DistributeTensorAIRCoPSpatialBa
   override def transform(n: Node): Backend.Exp = n match {
     case Node(s, op, Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _)
       if unaryOps.contains(op) =>
-      val sourceTensor = new TENSOR(s, useOldMetadata = true)
-      implicit val pos: SourceContext = sourceTensor.pos
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
 
       // load the `left` and `right`, maybe add communication ops to resolve split annotation conflicts
       val input = get_operand(operand, anno)

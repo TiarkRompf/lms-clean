@@ -18,6 +18,6 @@ abstract class DistributeTensorAIRCoPSpatial extends DistributeTensorAIRCoPSpati
     with DistributeTensorAIRCoPSpatialBinary
     with DistributeTensorAIRCoPSpatialGemm
     // with DistributeTensor2MPI_NCCLMutation
-    // with DistributeTensor2MPI_NCCLSplitConcat
+    with DistributeTensorAIRCoPSplitConcat
     with DistributeTensorAIRCoPSpatialUnary
     with DistributeTensorAIRCoPSpatialConv
