@@ -103,7 +103,7 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       implicit val pos = Adapter.oldSourceMap(s)
 
       val input_operand = get_operand(input, anno)
-
+      System.out.println("test")
       anno match {
         case NAnno => throw new Exception("todo")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
@@ -130,7 +130,7 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
         case a => throw new Exception(s"not yet handling annotation $a")
       }
 
-    case Node(s, op@"tensor_softmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
+    case Node(s, "tensor_softmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
 
@@ -138,15 +138,15 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       val operand = get_operand(a, anno)
 
       anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op ${op}")
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op tensor_softmax")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           SoftmaxForward(operand, params.asInstanceOf[SoftmaxParam], anno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in op ${op}")
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled in op tensor_softmax")
       }
 
-    case Node(s, op@"tensor_softmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::
+    case Node(s, "tensor_softmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::
       Backend.Const(params)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
@@ -156,15 +156,15 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       val doutput_operand = get_operand(doutput, anno)
 
       anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op ${op}")
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op tensor_softmax_bwd")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           SoftmaxBackward(output_operand, doutput_operand, params.asInstanceOf[SoftmaxParam], anno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in op ${op}")
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled in op tensor_softmax_bwd")
       }
 
-    case Node(s, op@"tensor_activation", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::
+    case Node(s, "tensor_activation", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::
       Backend.Const(mode:String)::_, _) =>
 
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
@@ -174,15 +174,15 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       val operand = get_operand(a, anno)
 
       anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op ${op}")
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op tensor_activation")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           ActivationForward(operand, params.asInstanceOf[ActivationParam], mode, anno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in op ${op}")
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled in op tensor_activation")
       }
 
-    case Node(s, op@"tensor_activation_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
+    case Node(s, "tensor_activation_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
       (output:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::Backend.Const(mode:String)::_, _) =>
 
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
@@ -194,12 +194,12 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       val doutput_operand = get_operand(doutput, anno)
 
       anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op ${op}")
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op tensor_activation_bwd")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
           ActivationBackward(input_operand, output_operand, doutput_operand, params.asInstanceOf[ActivationParam], mode, anno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in op ${op}")
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled in op tensor_activation_bwd")
       }
 
     case _ => super.transform(n)
