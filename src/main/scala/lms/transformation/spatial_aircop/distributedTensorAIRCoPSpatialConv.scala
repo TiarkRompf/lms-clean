@@ -167,8 +167,7 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
     case Node(s, "tensor_activation", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::
       Backend.Const(mode:String)::_, _) =>
 
-      val sourceTensor = new TENSOR(s, useOldMetadata = true)
-      implicit val pos: SourceContext = sourceTensor.pos
+      implicit val pos = Adapter.oldSourceMap(s)
 
       // load the `left` and `right`, maybe add communication ops to resolve split annotation conflicts
       val operand = get_operand(a, anno)
@@ -176,7 +175,7 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op tensor_activation")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          ActivationForward(operand, params.asInstanceOf[ActivationParam], mode, anno, pos).x
+          ActivationForward(operand, params.asInstanceOf[ActivationParam], mode, NAnno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in op tensor_activation")
@@ -196,7 +195,7 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op tensor_activation_bwd")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          ActivationBackward(input_operand, output_operand, doutput_operand, params.asInstanceOf[ActivationParam], mode, anno, pos).x
+          ActivationBackward(input_operand, output_operand, doutput_operand, params.asInstanceOf[ActivationParam], mode, NAnno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in op tensor_activation_bwd")
