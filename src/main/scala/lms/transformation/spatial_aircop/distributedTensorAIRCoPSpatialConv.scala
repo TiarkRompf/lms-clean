@@ -124,7 +124,7 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       anno match {
         case NAnno => throw new Exception("todo")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          PoolingBackward(input_operand, output_operand, doutput_operand, params.asInstanceOf[FixedSizeDistributedTensorTypeLess.PoolingParam], mode, anno, pos).x
+          PoolingBackward(input_operand, output_operand, doutput_operand, params.asInstanceOf[FixedSizeDistributedTensorTypeLess.PoolingParam], mode, NAnno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception("todo")
         case a => throw new Exception(s"not yet handling annotation $a")
@@ -140,7 +140,7 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op tensor_softmax")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          SoftmaxForward(operand, params.asInstanceOf[SoftmaxParam], anno, pos).x
+          SoftmaxForward(operand, params.asInstanceOf[SoftmaxParam], NAnno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in op tensor_softmax")
@@ -158,7 +158,7 @@ trait DistributeTensorAIRCoPSpatialConv extends DistributeTensorAIRCoPSpatialBas
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in op tensor_softmax_bwd")
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          SoftmaxBackward(output_operand, doutput_operand, params.asInstanceOf[SoftmaxParam], anno, pos).x
+          SoftmaxBackward(output_operand, doutput_operand, params.asInstanceOf[SoftmaxParam], NAnno, pos).x
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
         case a => throw new Exception(s"TODO: annotation $a is not yet handled in op tensor_softmax_bwd")
