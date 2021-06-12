@@ -917,10 +917,12 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cudaEmbeddingWrap[T:Numeric:Manifest](in: Rep[Array[T]], out: Rep[Array[T]], indices: Rep[Array[Int]], embed_size: Rep[Int], indices_size: Rep[Int])(implicit __pos: SourceContext) = {
+  def cudaEmbeddingWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], indices: Rep[Array[Int]], 
+    embed_size: Rep[Int], indices_size: Rep[Int])(implicit __pos: SourceContext) = {
+
     val grid = dim3(embed_size, 1, 1)
     val block = dim3(indices_size, 1, 1)
-    val kernel = cudaEmbedding[T]
+    val kernel = cudaEmbedding[N]
     kernel(in, indices, out, embed_size, grid, block)
   }
 
@@ -994,10 +996,17 @@ trait CudaLibs extends CudaOps {
       }
     }
   }
-   /*
-  def cudaEmbeddingGradWrapT:Numeric:Manifest](dout, din, indices) = {
 
-  }*/
+  def cudaEmbeddingGradWrap[N:Numeric:Manifest](dout: Rep[Array[N]], din: Rep[Array[N]], indices: Rep[Array[Int]], 
+    embed_size: Rep[Int], indices_size: Rep[Int])(implicit __pos: SourceContext) = {
+    
+    val paddingIdx = -1
+    val grid_size = (embed_size + 31) / 32
+    val grid = dim3(gridSize)
+    val block = dim3(32, 32)
+    val kernel = cudaEmbeddingGrad[N]
+    kernel(indices, dout, din, indices_size, embed_size, paddingIdx, grid, block, 32 * 32 * sizeOf[Int] + 32 * 32 * sizeOf[Float])
+  }
 
   /** Kernel Functions for ND Masked Fill
     */

@@ -568,5 +568,29 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     }
     checkWithLogPath("permute_102_big", driver.code, "cu", driver.setLogPath)
   }
+
+  test("embedding") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val n_embeddings = 20
+          val embed_size = 60
+
+          val input = Tensor.input[Float](shape=Seq(n_embeddings, embed_size), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+
+          val n_indices = 10
+          val indices = Tensor.input[Int](shape=Seq(n_indices), name="indices", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+
+          input.embedding(indices, n_embeddings, embed_size)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("embedding", driver.code, "cu", driver.setLogPath)
+  }
 }
 
