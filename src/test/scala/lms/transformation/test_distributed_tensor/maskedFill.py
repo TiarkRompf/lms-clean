@@ -1,7 +1,7 @@
 import os
 import torch
 import sys
-from utils import extend, get_printer
+from utils import extend, get_printer, get_int_printer
 
 
 def generate_data(lms_clean_root: str):
@@ -12,16 +12,17 @@ def generate_data(lms_clean_root: str):
     input.requires_grad = True
     weight = torch.randn(2, 1, 9, 9)
     weight.requires_grad = True
-    mask = torch.randint(0, 2, (9, 9))
+    mask = torch.randint(0, 2, (2, 1, 9, 9))
 
-    loss = input + weight.masked_fill_(mask, 1.0)
+    loss = input + weight.masked_fill(mask, 1.0)
     loss.sum().backward()
 
     # printer
-    printer = get_printer(lms_clean_root, test_name = "maskedFill")
+    printer = get_printer(lms_clean_root, test_name = "masked_fill")
+    int_printer = get_int_printer(lms_clean_root, test_name = "masked_fill")
     printer("input", input, dim=0, degree=2)
     printer("weight", weight, dim=0, degree=2)
-    printer("mask", mask, dim=0, degree=2)
+    int_printer("mask", mask, dim=0, degree=2)
     printer("loss", loss, dim=0, degree=2)
     printer("weight_grad", weight.grad, dim=0, degree=2)
     printer("input_grad", input.grad, dim=0, degree=2)
