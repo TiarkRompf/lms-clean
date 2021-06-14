@@ -70,20 +70,10 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
       val weight_operand = get_operand(weight, anno, assertSame=true)
       val grad_operand = get_operand(grad, anno)
       val momentum_operand = get_operand(momentum, anno, assertSame=true)
-      // then we should run this optimization op in all devices in the `anno`
-      // FIXME(feiw) for now, let's assum that `anno` is for all devices
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in optimize_tensor")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          gpu_sgd_array(count2, m, myNCCLRank, weight_operand, grad_operand, momentum_operand)
-          Backend.Const(())
-        case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          val count = numeral(sourceTensor.shapeSize)
-          gpu_sgd_array(count, m, myNCCLRank, weight_operand, grad_operand, momentum_operand)
-          Backend.Const(())
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in optimize_tensor")
-      }
+
+      val count2 = numeral(tt.shapeSize)
+      gpu_sgd_array(count2, m, myNCCLRank, weight_operand, grad_operand, momentum_operand)
+      Backend.Const(())
 
     case Node(s, "all_reduce_tensor", Backend.Const(devices:Seq[Device])::(x:Backend.Sym)::Backend.Const(mode:String)::_, _) =>
       val sourceTensor = new TENSOR(x, useOldMetadata = true)

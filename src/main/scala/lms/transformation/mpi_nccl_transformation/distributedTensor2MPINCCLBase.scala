@@ -337,48 +337,9 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       val tt = sourceTensor.resultType
       val anno = sourceTensor.annotation
 
-      // here we need to communicate the GPU `tensor` to CPU
-      // FIXME(feiw) should we just view CPU and CPU memory as one unit (CPU0 only and one CPU memory)?
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in save_tensor")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          // collect the tensors from all GPUs in `anno` and concat them as the final result
-
-          val root = 0
-          val count = numeral(sourceTensor.shapeSize)
-          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-
-          // declare recv buffer
-          generate_comment("Only declare recv buffer if this is the root")
-          val recvbuf = ARRAY(IF (EQUAL(myNCCLRank, INT(root))) { CUDA_MALLOC(count, m) } { CUDA_MALLOC(0, m) })
-
-          // Gather + Concat + Print
-          generate_comment("Gather by groups of NCCL send/recv")
-          NCCL_CHECK(NCCL_GROUP_START)
-          NCCL_CHECK(NCCL_SEND(m, new ARRAY(transform(tensor)), SIZE_T(count), root, myNCCLComm, myNCCLStream))
-          IF (EQUAL(myNCCLRank, INT(root))) {
-            for (r <- RANGE_UNTIL(0, myNCCLSize)) {
-              NCCL_CHECK(NCCL_RECV(m, recvbuf.slice(INT(r * count2), INT((r + 1) * count2)), SIZE_T(count), r, myNCCLComm, myNCCLStream))
-            }
-          } { UNIT(Backend.Const(())) }
-          NCCL_CHECK(NCCL_GROUP_END)
-
-          generate_comment("print the array only if this is the root")
-          IF (EQUAL(myNCCLRank, INT(root))) {
-            gpu_to_cpu_and_print(count, m, recvbuf.x); UNIT(Backend.Const(()))
-          } { UNIT(Backend.Const(())) }
-
-          Backend.Const(())
-
-        case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          // copy the tensor from GPU(0) is enough
-          IF (EQUAL(myNCCLRank, INT(0))) {
-            val count = numeral(sourceTensor.shapeSize)
-            gpu_to_cpu_and_print(count, m, transform(tensor))
-            UNIT(Backend.Const(()))
-          } { UNIT(Backend.Const(())) }
-          Backend.Const(())
-      }
+      val count = numeral(sourceTensor.shapeSize)
+      gpu_to_cpu_and_print(count, m, transform(tensor))
+      Backend.Const(())
 
     case Node(s, "check_tensor", (tensor:Backend.Exp)::Backend.Const(name:String)::(xs:List[Backend.Exp]), _) =>
       implicit val pos = Adapter.oldSourceMap(s)

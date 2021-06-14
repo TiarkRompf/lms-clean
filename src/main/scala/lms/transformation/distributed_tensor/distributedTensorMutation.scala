@@ -45,8 +45,8 @@ trait FixedSizeDistributedTensorMutationTypeLess extends FixedSizeDistributedTen
   override def printTensor(node: Node, graph: Graph): String = node match {
     case Node(s, "accum_tensor", Backend.Const(anno:Anno)::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       s"$s = accum_tensor($x, $y) (${symTensorShape(x, graph)}, ${symTensorShape(y, graph)})${if (anno != NAnno) s"\nAnno: $anno" else ""}"
-    case Node(s, "optimizer_tensor", Backend.Const(anno:Anno)::(x:Backend.Sym)::(g:Backend.Sym)::(m:Backend.Sym)::_, _) =>
-      s"$s = optimizer_tensor($x, $g, $m) (${symTensorShape(x, graph)}, ${symTensorShape(g, graph)}, ${symTensorShape(m, graph)})${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "optimize_tensor", Backend.Const(anno:Anno)::(x:Backend.Sym)::(g:Backend.Sym)::(m:Backend.Sym)::_, _) =>
+      s"$s = optimize_tensor($x, $g, $m) (${symTensorShape(x, graph)}, ${symTensorShape(g, graph)}, ${symTensorShape(m, graph)})${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case Node(s, "all_reduce_tensor", Backend.Const(devices:Seq[Device])::(x:Backend.Sym)::Backend.Const(mode:String)::_, _) =>
       s"$s = all_reduce_tensor($x, mode=$mode, devices=$devices) (${symTensorShape(x, graph)})"
     case _ => super.printTensor(node, graph)

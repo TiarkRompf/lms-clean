@@ -144,7 +144,21 @@ abstract class DistributeTensorAIRCoPSpatialBase extends Transformer with MPIOps
         case a => throw new Exception(s"annotation $a is not yet handled in tensor_ones")
       }
 
-    case Node(s, "save_tensor", (tensor:Backend.Exp)::_, _) => throw new Exception(s"TODO handle save_tensor")
+    case Node(s, "save_tensor", (tensor:Backend.Exp)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+      val sourceTensor = new TENSOR(tensor, useOldMetadata = true)
+      val tt = sourceTensor.resultType
+      val anno = sourceTensor.annotation
+
+      anno match {
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in save_tensor")
+        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) => throw new Exception(s"todo, gather tensor to GPU0")
+        case SAnno(dim: Dim, devices: Seq[Device], _) =>
+          IF (EQUAL(myMPIRank, INT(0))) {
+            (new TENSOR(transform(tensor))).save
+          } { UNIT(Backend.Const(())) }
+          Backend.Const(())
+      }
 
     case Node(s, "check_tensor", (tensor:Backend.Exp)::Backend.Const(name:String)::Nil, _) =>
       implicit val pos = Adapter.oldSourceMap(s)

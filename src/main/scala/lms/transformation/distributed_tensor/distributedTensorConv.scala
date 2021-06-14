@@ -203,6 +203,9 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
   override def printTensor(node: Node, graph: Graph) = node match {
     case Node(s, "tensor_conv", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
       s"$s = tensor_conv($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_conv_bwd_filter", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
+      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
+      s"$s = tensor_conv_bwd_filter($weight, $filter, $doutput) (${symTensorShape(weight, graph)}, ${symTensorShape(filter, graph)}, ${symTensorShape(doutput, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case Node(s, "tensors_dropout", Backend.Const(List(output_tt:TensorType, dummy_tt:TensorType))::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
       s"$s:2 = tensors_dropout($a) (${symTensorShape(a, graph)})->(${output_tt.toString}, ${dummy_tt.toString})${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case Node(s, "tensor_pooling", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::params::Backend.Const(mode:String)::_, _) =>
