@@ -21,3 +21,4 @@ abstract class DistributeTensorAIRCoPSpatial extends DistributeTensorAIRCoPSpati
     with DistributeTensorAIRCoPSplitConcat
     with DistributeTensorAIRCoPSpatialUnary
     with DistributeTensorAIRCoPSpatialConv
+    with DistributeTensorAIRCoPSpatialMiscs
