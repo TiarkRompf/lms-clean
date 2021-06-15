@@ -77,7 +77,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
     System.out.println("doutput: " + doutput.resultType.shape)
     System.out.println("indices: " + indices.resultType.shape)
     val res_tt = TensorType(Seq(input.resultType.shape(0), doutput.resultType.shape(1)), doutput.et)
-    (new TENSOR(Adapter.g.reflectRead("tensor_embedding_bwd", C(res_tt), C(anno), doutput.x, indices.x)
+    (new TENSOR(Adapter.g.reflectRead("tensor_embedding_bwd", C(res_tt), C(anno), input.x, doutput.x, indices.x)
       (doutput.x, indices.x)).withSrcType(__pos, doutput.et))
   }
 
@@ -137,7 +137,8 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
         (() => {
-            val grad = EmbeddingBackward(new TENSOR(transform(input)), gradMap(s), new TENSOR(transform(indices)), anno, pos); ()
+            val grad = EmbeddingBackward(new TENSOR(transform(input)), gradMap(s), new TENSOR(transform(indices)), anno, pos) 
+            Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
