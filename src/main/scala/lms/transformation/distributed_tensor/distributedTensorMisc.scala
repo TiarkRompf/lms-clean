@@ -60,15 +60,24 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       .withSrcType(__pos, input.et))
   }
 
-  def EmbeddingForward(input: TENSOR, indices: TENSOR, n_embed: Int, embed_size: Int, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = input.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_embedding", C(res_tt), C(anno), input.x, indices.x, C(n_embed), C(embed_size))
+  def EmbeddingForward(input: TENSOR, indices: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
+    require(input.shapeSize.size == 2, "input must be a 2-D matrix")
+    require(indices.shapeSize.size == 1, "indices must be an 1-D array")
+    System.out.println("fwd pass")
+    System.out.println("input: " + input.resultType.shape)
+    System.out.println("indices: " + indices.resultType.shape)
+    val res_tt = TensorType(Seq(indices.resultType.shape(0), input.resultType.shape(1)), input.et)
+    (new TENSOR(Adapter.g.reflectRead("tensor_embedding", C(res_tt), C(anno), input.x, indices.x)
       (input.x, indices.x)).withSrcType(__pos, input.et))
   }
 
-  def EmbeddingBackward(doutput: TENSOR, indices: TENSOR, n_embed: Int, embed_size: Int, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = doutput.resultType
-    (new TENSOR(Adapter.g.reflectRead("tensor_embedding_bwd", C(res_tt), C(anno), doutput.x, indices.x, C(n_embed), C(embed_size))
+  def EmbeddingBackward(input: TENSOR, doutput: TENSOR, indices: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
+    System.out.println("bwd pass")
+    System.out.println("input: " + input.resultType.shape)
+    System.out.println("doutput: " + doutput.resultType.shape)
+    System.out.println("indices: " + indices.resultType.shape)
+    val res_tt = TensorType(Seq(input.resultType.shape(0), doutput.resultType.shape(1)), doutput.et)
+    (new TENSOR(Adapter.g.reflectRead("tensor_embedding_bwd", C(res_tt), C(anno), doutput.x, indices.x)
       (doutput.x, indices.x)).withSrcType(__pos, doutput.et))
   }
 
@@ -81,9 +90,10 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
     case Node(s, "tensor_logsoftmax", _, _) => List()
     case Node(s, "tensor_permute", _, _) => List()
     case Node(s, "tensor_embedding", tt::anno::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) => // todo: fixme
+      /*
       val input_type = (new TENSOR(input, useOldMetadata=true)).resultType
       val mask_type = (new TENSOR(mask, useOldMetadata=true)).resultType
-      (input_type.shape.reverse zip mask_type.shape.reverse).toList map { case (a:Size, b:Size) => (a.dim, b.dim)}
+      (input_type.shape.reverse zip mask_type.shape.reverse).toList map { case (a:Size, b:Size) => (a.dim, b.dim)}*/
       List()
     case _ => super.mergable_dims(node)
   }
@@ -123,12 +133,11 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
             val grad = Permute(gradMap(s), dims, anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
-      case Node(s, "tensor_embedding", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::(indices:Backend.Sym)::
-        Backend.Const(embed_size:Int)::Backend.Const(n_embed:Int)::_, _) =>
+      case Node(s, "tensor_embedding", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::(indices:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
         (() => {
-            val grad = EmbeddingBackward(gradMap(s), new TENSOR(transform(indices)), embed_size, n_embed, anno, pos); ()
+            val grad = EmbeddingBackward(new TENSOR(transform(input)), gradMap(s), new TENSOR(transform(indices)), anno, pos); ()
         }) +=: backwardNodes
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
@@ -188,8 +197,8 @@ trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBas
       Wrap[Tensor[T]](t.x)
     }
 
-    def embedding(indices: Rep[Tensor[Int]], n_embed: Int, embed_size: Int)(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
-      val t = EmbeddingForward(self, tensor(indices), n_embed, embed_size, anno, __pos)
+    def embedding(indices: Rep[Tensor[Int]])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = EmbeddingForward(self, tensor(indices), anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }

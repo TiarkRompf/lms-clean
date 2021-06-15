@@ -578,14 +578,14 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
         val model = module {
           val n_embeddings = 20
           val embed_size = 60
-
-          val input = Tensor.input[Float](shape=Seq(n_embeddings, embed_size), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
-          implicit val anno = input.anno
-
           val n_indices = 10
-          val indices = Tensor.input[Int](shape=Seq(n_indices), name="indices", splitDim=0, splitTo=List(GPU(0), GPU(1)))
 
-          input.embedding(indices, n_embeddings, embed_size)
+          val indices = Tensor.input[Int](shape=Seq(n_indices), name="indices", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = indices.anno
+          System.out.println(anno)
+          val embed = Tensor.weight[Float](Seq(n_embeddings, embed_size), tensorName=Some("embed"))
+
+          embed.embedding(indices)
         }
         model.test("loss"); ()
       }
