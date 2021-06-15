@@ -17,7 +17,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
   import BaseTypeLess._
 
   def ConvForward(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = ConvForwardOutTensorType(input, filter, params, anno)
+    val res_tt = ConvForwardOutTensorType(input, filter, params)
     (new TENSOR(Adapter.g.reflectRead("tensor_conv", C(res_tt), C(anno),
       input.x, filter.x, C(params))(input.x, filter.x))).withSrcType(__pos, input.et)
   }
@@ -36,7 +36,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       input.x, filter.x, doutput.x, C(params))(input.x, filter.x, doutput.x)).withSrcType(__pos, input.et))
   }
 
-  def ConvForwardOutTensorType(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno): TensorType = {
+  def ConvForwardOutTensorType(input: TENSOR, filter: TENSOR, params: ConvParam): TensorType = {
     val ConvParam(alpha, beta, padding, strides, dilation) = params
 
     require(input.shapeSize.size == CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D, found: " + input.shapeSize.size)
@@ -66,7 +66,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       Size(dim, output_H),
       Size(dim, output_W))
 
-    TensorType(output_shape, input.et, anno)
+    TensorType(output_shape, input.et)
   }
 
   def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSORS = {
@@ -86,7 +86,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
   // FIXME(feiw): should some mode of Pooling (such as max pooling) have 2 outputs?
   def PoolingForward(input: TENSOR, params: PoolingParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = PoolingForwardOutTensorType(input, params, anno)
+    val res_tt = PoolingForwardOutTensorType(input, params)
     (new TENSOR(Adapter.g.reflectRead("tensor_pooling", C(res_tt), C(anno),
       input.x, C(params), C(mode))(input.x)).withSrcType(__pos, input.et))
   }
@@ -97,7 +97,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       input.x, output.x, doutput.x, C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, input.et))
   }
 
-  def PoolingForwardOutTensorType(input: TENSOR, params: PoolingParam, anno: Anno): TensorType = {
+  def PoolingForwardOutTensorType(input: TENSOR, params: PoolingParam): TensorType = {
     val PoolingParam(alpha, beta, window, padding, strides) = params
 
     require(window.size == CUDNN_PARAM_DIM, "window must be sequence of integer of length 2, found: " + window.size)
@@ -124,7 +124,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       Size(dim, output_H),          // new dim (fresh)
       Size(dim, output_W))          // new dim (fresh)
 
-    TensorType(output_shape, input.et, anno)
+    TensorType(output_shape, input.et)
   }
 
 
