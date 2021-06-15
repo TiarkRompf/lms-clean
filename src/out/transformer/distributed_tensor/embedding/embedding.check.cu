@@ -89,8 +89,6 @@ void Snippet(int x0) {
   float* x18 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x18, (size_t)(300 * sizeof(float))));
   x19<<<dim3(60, 1, 1), dim3(5, 1, 1)>>>(x8, x17, x18, 60);
-  ncclAllReduce(x18, x18, (size_t)300, ncclFloat32, ncclSum, x4, x5);
-  CUDA_CALL(cudaStreamSynchronize(x5));
   // begin checking GPU array of size 300 and type Float at device (pre-name) x39 again binary file loss
   float* x28 = (float*)malloc(300 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x28, x18, (size_t)(300 * sizeof(float)), cudaMemcpyDeviceToHost));
