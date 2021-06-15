@@ -43,9 +43,9 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val size = numeral(shape)
       val output = gpu_array(size, manifest[Float], myNCCLRank)
       cudaMaskedFillWrap[Float](
-        Wrap[Array[Float]](input_tensor), 
+        Wrap[Array[Float]](input_tensor),
         Wrap[Array[Float]](output.x),
-        Wrap[Array[Int]](mask_tensor), 
+        Wrap[Array[Int]](mask_tensor),
         shape, size, value)
       output.x
 
@@ -58,7 +58,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val size = numeral(shape)
       val dinput = gpu_array(size, manifest[Float], myNCCLRank)
       cudaMaskedFillGradWrap[Float](
-        Wrap[Array[Float]](doutput_tensor), 
+        Wrap[Array[Float]](doutput_tensor),
         Wrap[Array[Float]](dinput.x),
         Wrap[Array[Int]](mask_tensor),
         shape, size)
@@ -72,7 +72,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
       cudaLogSoftmaxWrap[Float](
-        Wrap[Array[Float]](input_tensor), 
+        Wrap[Array[Float]](input_tensor),
         Wrap[Array[Float]](output.x),
         numeral(shape.init),
         shape.last)
@@ -87,7 +87,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       val dinput = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
       cudaLogSoftmaxGradWrap[Float](
-        Wrap[Array[Float]](dinput.x), 
+        Wrap[Array[Float]](dinput.x),
         Wrap[Array[Float]](doutput_tensor),
         Wrap[Array[Float]](output_tensor),
         numeral(shape.init),
@@ -123,7 +123,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val output = gpu_array(size, manifest[Float], myNCCLRank)
       cudaPermuteWrap[Float](
         Wrap[Array[Float]](input_tensor),
-        Wrap[Array[Float]](output.x), 
+        Wrap[Array[Float]](output.x),
         shape, size, perm)
       output.x
 

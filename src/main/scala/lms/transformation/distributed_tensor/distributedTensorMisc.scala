@@ -137,7 +137,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
         (() => {
-            val grad = EmbeddingBackward(new TENSOR(transform(input)), gradMap(s), new TENSOR(transform(indices)), anno, pos) 
+            val grad = EmbeddingBackward(new TENSOR(transform(input)), gradMap(s), new TENSOR(transform(indices)), anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
 
@@ -151,6 +151,8 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       s"$s = tensor_maskedfill($input, $mask) (${symTensorShape(input, graph)}, ${symTensorShape(mask, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case Node(s, "tensor_logsoftmax", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
       s"$s = tensor_logsoftmax($input) (${symTensorShape(input, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(dims:List[Int])::_, _) =>
+      s"$s = tensor_permute($input) (${symTensorShape(input, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case _ => super.printTensor(node, graph)
   }
 }
