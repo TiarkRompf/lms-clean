@@ -75,6 +75,16 @@ trait DistributeTensorAIRCoPSpatialMiscs extends DistributeTensorAIRCoPSpatialBa
         case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
         case a => throw new Exception(s"TODO: annotation $a is not yet handled")
       }
+    
+    case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::Backend.Const(perm:List[Int])::_, _) =>
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
+      val input = get_operand(operand, anno)
+      anno match {
+        case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
+        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) => Permute(input, perm, NAnno, pos).x
+        case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
+        case a => throw new Exception(s"TODO: annotation $a is not yet handled")
+      }
 
     case _ => super.transform(n)
   }

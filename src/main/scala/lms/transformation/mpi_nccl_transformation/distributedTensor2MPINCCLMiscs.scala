@@ -99,45 +99,33 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
+
+      val shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
 
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val shape = tt.shapeSizeAfterSplit(dim, devices.size)
-          val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
-          cudaTransposeWrap[Float](
-            Wrap[Array[Float]](input_tensor),
-            Wrap[Array[Float]](output.x),
-            shape)
-          output.x
-
-        case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled")
-      }
+      val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
+      cudaTransposeWrap[Float](
+        Wrap[Array[Float]](input_tensor),
+        Wrap[Array[Float]](output.x),
+        shape)
+      output.x
 
     case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::Backend.Const(perm:List[Int])::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
+
+      val shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
+      val size = numeral(shape)
 
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val shape = tt.shapeSizeAfterSplit(dim, devices.size)
-          val size = numeral(shape)
-          val output = gpu_array(size, manifest[Float], myNCCLRank)
-          cudaPermuteWrap[Float](
-            Wrap[Array[Float]](input_tensor),
-            Wrap[Array[Float]](output.x), 
-            shape, size, perm)
-          output.x
-
-        case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled")
-      }
+      val output = gpu_array(size, manifest[Float], myNCCLRank)
+      cudaPermuteWrap[Float](
+        Wrap[Array[Float]](input_tensor),
+        Wrap[Array[Float]](output.x), 
+        shape, size, perm)
+      output.x
 
     case Node(s, "tensor_embedding", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::(indices:Backend.Sym)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
