@@ -154,7 +154,7 @@ void check_int_array_rank(const char *filename, int rank, int *check, int size) 
   check_int_array(buf, check, size);
 }
 
-void check_float_array(float *check, int size, const char* filenameFormat, int rank) {
+void check_float_array_with_file(float *check, int size, const char* filenameFormat, int rank) {
   char buf[2000];
   snprintf(buf, 2000, filenameFormat, rank);
   check_float_array(buf, check, size);
@@ -168,7 +168,7 @@ void check_float_array(float *check, int size, const char* filenameFormat, int r
 //   check_float_array(buf, check, size);
 // }
 
-void check_int_array(int* check, int size, const char* filenameFormat, int rank) {
+void check_int_array_with_file(int* check, int size, const char* filenameFormat, int rank) {
   char buf[2000];
   snprintf(buf, 2000, filenameFormat, rank);
   check_int_array(buf, check, size);

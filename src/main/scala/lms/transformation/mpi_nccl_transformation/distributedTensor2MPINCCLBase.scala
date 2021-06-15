@@ -107,8 +107,8 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
 
   def CheckFile(check: ARRAY, count: Int, filenameFormat: Rep[String], filenameArgs: Rep[Any]*)(implicit pos: SourceContext) = {
     val function = check.et match {
-      case m if m == manifest[Float] => "check_float_array"
-      case m if m == manifest[Int] => "check_int_array"
+      case m if m == manifest[Float] => "check_float_array_with_file"
+      case m if m == manifest[Int] => "check_int_array_with_file"
       case m => throw new Exception(s"not yet supporting manifest ${m}")
     }
     LIB_FUNCTION(manifest[Unit], function, (check.x)::Backend.Const(count)::Unwrap(filenameFormat)::filenameArgs.map(Unwrap).toList:_*)(Seq[Int](0), Seq[Int](), Set[Int](), Adapter.CTRL)
