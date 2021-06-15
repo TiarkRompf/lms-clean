@@ -2,6 +2,7 @@
 #define SCANNER_HEADER_H
 
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -29,10 +30,12 @@ long hash(char *str0, int len) {
   return hash;
 }
 
-void scan_float(const char *filename, float *array, int size) {
+void scan_floats(const char *filename, float *array, int size) {
   FILE *pFile = fopen(filename, "r");
-  if (pFile == NULL ) {
-    perror("Error opening file");
+  if (pFile == NULL) {
+    char buffer[2000];
+    snprintf(buffer, 2000, "Error opening file %s\n", filename);
+    perror(buffer);
   }
   for (int i = 0; i < size; i++) {
     if (fscanf(pFile, "%f", array + i) != 1)
@@ -41,7 +44,7 @@ void scan_float(const char *filename, float *array, int size) {
   fclose(pFile);
 }
 
-void scan_int(const char *filename, int *array, int size) {
+void scan_ints(const char *filename, int *array, int size) {
   FILE *pFile = fopen(filename, "r");
   if (pFile == NULL) {
     perror("Error opening file");
@@ -66,7 +69,7 @@ bool check_floats(float *gold, float *check, int size, float eta) {
 
 void check_float_array(const char *filename, float *check, int size) {
   float gold[size];
-  scan_float(filename, gold, size);
+  scan_floats(filename, gold, size);
   if (check_floats(gold, check, size, 0.0005))
     fprintf(stdout, "Checking value with %s passed!\n", filename);
   else
@@ -86,7 +89,7 @@ bool check_ints(int *gold, int *check, int size) {
 
 void check_int_array(const char *filename, int *check, int size) {
   int gold[size];
-  scan_int(filename, gold, size);
+  scan_ints(filename, gold, size);
   if (check_ints(gold, check, size))
     fprintf(stdout, "Checking value with %s passed!\n", filename);
   else
@@ -98,16 +101,44 @@ void scan_float_rank(const char *filename, int rank, float *array, int size) {
   // need to build new filename based on rank and some hacky conventions
   char buf[2000];
   snprintf(buf, 2000, "%s_rank_%d.data", filename, rank);
-  scan_float(buf, array, size);
+  scan_floats(buf, array, size);
 }
+
+void scan_float_array(float *array, int size, const char *filenameFormat, int rank) {
+  char buf[2000];
+  snprintf(buf, 2000, filenameFormat, rank);
+  scan_floats(buf, array, size);
+}
+
+// void scan_float_array(float *array, int size, const char *filenameFormat, ...) {
+//   char buf[2000];
+//   va_list vl;
+//   va_start( vl, filenameFormat );
+//   snprintf(buf, 2000, filenameFormat, vl);
+//   scan_floats(buf, array, size);
+// }
 
 // hacky helper functions that should be handled by codegen instead
 void scan_int_rank(const char *filename, int rank, int *array, int size) {
   // need to build new filename based on rank and some hacky conventions
   char buf[2000];
   snprintf(buf, 2000, "%s_rank_%d.data", filename, rank);
-  scan_int(buf, array, size);
+  scan_ints(buf, array, size);
 }
+
+void scan_int_array(int* array, int size, const char *filenameFormat, int rank) {
+  char buf[2000];
+  snprintf(buf, 2000, filenameFormat, rank);
+  scan_ints(buf, array, size);
+}
+
+// void scan_int_array(int* array, int size, const char *filenameFormat, ...) {
+//   char buf[2000];
+//   va_list vl;
+//   va_start( vl, filenameFormat);
+//   snprintf(buf, 2000, filenameFormat, vl);
+//   scan_ints(buf, array, size);
+// }
 
 void check_float_array_rank(const char *filename, int rank, float *check, int size) {
   // need to build new filename based on rank and some hacky conventions
@@ -122,5 +153,33 @@ void check_int_array_rank(const char *filename, int rank, int *check, int size) 
   snprintf(buf, 2000, "%s_rank_%d.data", filename, rank);
   check_int_array(buf, check, size);
 }
+
+void check_float_array_with_file(float *check, int size, const char* filenameFormat, int rank) {
+  char buf[2000];
+  snprintf(buf, 2000, filenameFormat, rank);
+  check_float_array(buf, check, size);
+}
+
+// void check_float_array(float *check, int size, const char* filenameFormat, ...) {
+//   char buf[2000];
+//   va_list vl;
+//   va_start( vl, filenameFormat );
+//   snprintf(buf, 2000, filenameFormat, vl);
+//   check_float_array(buf, check, size);
+// }
+
+void check_int_array_with_file(int* check, int size, const char* filenameFormat, int rank) {
+  char buf[2000];
+  snprintf(buf, 2000, filenameFormat, rank);
+  check_int_array(buf, check, size);
+}
+
+// void check_int_array(int* check, int size, const char* filenameFormat, ...) {
+//   char buf[2000];
+//   va_list vl;
+//   va_start( vl, filenameFormat );
+//   snprintf(buf, 2000, filenameFormat, vl);
+//   check_int_array(buf, check, size);
+// }
 
 #endif

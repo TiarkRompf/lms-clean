@@ -120,18 +120,18 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
   }
 
   override def printTensor(node: Node, graph: Graph): String = node match {
-    case Node(s, "tensor_transpose", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
-      s"$s = tensor_transpose($a) (${symTensorShape(a, graph)})->${tt.toString}"
-    case Node(s, "tensor_negate", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
-      s"$s = tensor_negate($a) (${symTensorShape(a, graph)})->${tt.toString}"
-    case Node(s, "tensor_invert", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
-      s"$s = tensor_invert($a) (${symTensorShape(a, graph)})->${tt.toString}"
-    case Node(s, "tensor_tanh", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
-      s"$s = tensor_tanh($a) (${symTensorShape(a, graph)})->${tt.toString}"
-    case Node(s, "tensor_relu", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
-      s"$s = tensor_relu($a) (${symTensorShape(a, graph)})->${tt.toString}"
-    case Node(s, "tensor_activation", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::params::Backend.Const(mode:String)::_, _) =>
-      s"$s = tensor_activation($a, mode=$mode) (${symTensorShape(a, graph)})->${tt.toString}"
+    case Node(s, "tensor_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_transpose($a) (${symTensorShape(a, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_negate", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_negate($a) (${symTensorShape(a, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_invert", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_invert($a) (${symTensorShape(a, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_tanh", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_tanh($a) (${symTensorShape(a, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_relu", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_relu($a) (${symTensorShape(a, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_activation", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::params::Backend.Const(mode:String)::_, _) =>
+      s"$s = tensor_activation($a, mode=$mode) (${symTensorShape(a, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case _ => super.printTensor(node, graph)
   }
 }

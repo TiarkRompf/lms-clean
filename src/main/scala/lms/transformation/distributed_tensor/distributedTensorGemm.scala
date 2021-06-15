@@ -107,10 +107,10 @@ trait FixedSizeDistributedTensorGemmTypeLess extends FixedSizeDistributedTensorM
   }
 
   override def printTensor(node: Node, graph: Graph): String = node match {
-    case Node(s, "tensor_dot", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
-      s"$s = tensor_dot($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}"
-    case Node(s, "tensor_dot_with_transpose", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(transL:Boolean)::Backend.Const(transR:Boolean)::_, _) =>
-      s"$s = tensor_dot($a${if(transL)"^T"else""}, $b${if(transR)"^T"else""}) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}"
+    case Node(s, "tensor_dot", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
+      s"$s = tensor_dot($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_dot_with_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::Backend.Const(transL:Boolean)::Backend.Const(transR:Boolean)::_, _) =>
+      s"$s = tensor_dot($a${if(transL)"^T"else""}, $b${if(transR)"^T"else""}) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case _ => super.printTensor(node, graph)
   }
 }

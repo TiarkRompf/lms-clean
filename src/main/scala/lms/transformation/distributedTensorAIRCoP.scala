@@ -16,6 +16,7 @@ import Backend._
 abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
   override val name = "DistributeTensorAIRCoP"
 
+  import BaseTypeLess._
   import PrimitiveTypeLess._
   import ArrayTypeLess._
   import ArrayCPUTypeLess._
@@ -145,10 +146,10 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
   def checkGradients(weightSyms: => mutable.ArrayBuffer[Backend.Sym]) = {
     for (w <- weightSyms) {
       val weight = new TENSOR(transform(w))
-      implicit val __pos = weight.pos
-      weight.resultType.tensorName match {
-        case Some(name) => gradMap(w).check(name + "_grad") // FIXME(feiw) unfortunately hard-coded
-        case None => throw new Exception("Missing checked file names for tensor")
+      implicit val pos: SourceContext = weight.pos
+      (weight.filenameFormat, weight.filenameArgs) match {
+        case (Some(name), args) => gradMap(w).check(name + "_grad", args:_*) // FIXME(feiw) unfortunately hard-coded
+        case (None, _) => throw new Exception(s"Missing checked file names for tensor $weight")
       }
     }
   }
@@ -170,6 +171,13 @@ abstract class DistributeTensorAIRCoP extends Transformer with DataStructure {
         case Node(s, "module", (b @ Block(in, y, ein, eff))::_, _) => scheduleBlock(b)(traverseModule(loss))
         case _ => super.transform(n)
       }
+
+    case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
+      val new_weight = WEIGHT(tt, anno, filenameFormat, filenameArgs.map(new TOP(_)):_*)
+      gradMap(s) = ZEROS(tt.map(_+"_grad"), anno)
+      momentumMap(s) = ZEROS(tt.map(_+"_momentum"), anno)
+      new_weight.x
 
     case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)

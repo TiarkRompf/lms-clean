@@ -87,28 +87,19 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
       if unaryOps.contains(op) =>
 
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
-
-      implicit val sc_ : SourceContext = sourceTensor.pos
+      implicit val pos: SourceContext = sourceTensor.pos
       val m = sourceTensor.et
+      val count = numeral(tt.shapeSize)
 
-      // Load the operand, and maybe add communication ops to resolve split annotation conflicts
-      val loaded_operand = get_operand(operand, anno)
-
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val count = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          op match {
-            case "tensor_negate" => gpu_neg_array(count, m, myNCCLRank, loaded_operand).x
-            case "tensor_invert" => gpu_inv_array(count, m, myNCCLRank, loaded_operand).x
-            case "tensor_tanh" => gpu_tanh_array(count, m, myNCCLRank, loaded_operand).x
-            case "tensor_relu" => gpu_relu_array(count, m, myNCCLRank, loaded_operand).x
-            case "tensor_transpose" => gpu_transpose_array(count, m, myNCCLRank, loaded_operand).x
-            case _ => throw new Exception(s"op $op is not unary op")
-          }
-        case SAnno(dim: Dim, devices: Seq[Device], _) => throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled")
+      op match {
+        case "tensor_negate" => gpu_neg_array(count, m, myNCCLRank, transform(operand)).x
+        case "tensor_invert" => gpu_inv_array(count, m, myNCCLRank, transform(operand)).x
+        case "tensor_tanh" => gpu_tanh_array(count, m, myNCCLRank, transform(operand)).x
+        case "tensor_relu" => gpu_relu_array(count, m, myNCCLRank, transform(operand)).x
+        case "tensor_transpose" => gpu_transpose_array(count, m, myNCCLRank, transform(operand)).x
+        case _ => throw new Exception(s"op $op is not unary op")
       }
+
     case _ => super.transform(n)
   }
 }

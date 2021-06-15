@@ -1,28 +1,25 @@
 import os
 import torch
 import sys
-from utils import extend, get_printer, get_int_printer
+from utils import extend, get_printer
 
 
 def generate_data(lms_clean_root: str):
     torch.manual_seed(0)
 
     # model
-    input = torch.randn(2, 1, 9, 9)
+    input = torch.randn(32, 32, 8)
     input.requires_grad = True
-    weight = torch.randn(2, 1, 9, 9)
+    weight = torch.randn(32, 32, 32)
     weight.requires_grad = True
-    mask = torch.randint(0, 2, (2, 1, 9, 9))
-
-    loss = input + weight.masked_fill(mask, 1.0)
+    splits = torch.split(weight, 8, dim=2)
+    loss = input * splits[0]
     loss.sum().backward()
 
     # printer
-    printer = get_printer(lms_clean_root, test_name = "masked_fill")
-    int_printer = get_int_printer(lms_clean_root, test_name = "masked_fill")
+    printer = get_printer(lms_clean_root, test_name = "split2")
     printer("input", input, dim=0, degree=2)
     printer("weight", weight, dim=0, degree=2)
-    int_printer("mask", mask, dim=0, degree=2)
     printer("loss", loss, dim=0, degree=2)
     printer("weight_grad", weight.grad, dim=0, degree=2)
     printer("input_grad", input.grad, dim=0, degree=2)

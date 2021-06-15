@@ -88,7 +88,7 @@ abstract class DevicedTensorLowering extends Transformer {
       }
       res.x
 
-    case Node(s, "tensor_mult", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+    case Node(s, "tensor_mul", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
         (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       val m = Adapter.oldTypeMap(s)
