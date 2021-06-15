@@ -144,12 +144,12 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
     }
 
   override def printTensor(node: Node, graph: Graph): String = node match {
-    case Node(s, "tensor_softmax", Backend.Const(tt:TensorType)::anno::(a:Backend.Sym)::_, _) =>
-      s"$s = tensor_softmax($a) (${symTensorShape(a, graph)})->${tt.toString}"
-    case Node(s, "tensor_maskedfill", Backend.Const(tt:TensorType)::anno::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
-      s"$s = tensor_maskedfill($input, $mask) (${symTensorShape(input, graph)}, ${symTensorShape(mask, graph)})->${tt.toString}"
-    case Node(s, "tensor_logsoftmax", Backend.Const(tt:TensorType)::anno::(input:Backend.Sym)::_, _) =>
-      s"$s = tensor_logsoftmax($input) (${symTensorShape(input, graph)})->${tt.toString}"
+    case Node(s, "tensor_softmax", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+      s"$s = tensor_softmax($a) (${symTensorShape(a, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_maskedfill", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
+      s"$s = tensor_maskedfill($input, $mask) (${symTensorShape(input, graph)}, ${symTensorShape(mask, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_logsoftmax", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
+      s"$s = tensor_logsoftmax($input) (${symTensorShape(input, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case _ => super.printTensor(node, graph)
   }
 }

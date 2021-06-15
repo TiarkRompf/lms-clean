@@ -33,6 +33,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       new DistributeTensorDimName {},
       new DistributeTensorAIRCoP {},
       new Canonicalize {},
+      new DistributeTensorAIRCoPSpatial {},
       new DistributeTensor2MPI_NCCL {})
 
     var log_path: String = ""

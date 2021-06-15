@@ -43,16 +43,16 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   case class Dim(x: Int) // named dimension
   def dim = Dim(next_dim_name) // fresh dim
   case class Size(dim: Dim, size: Int) // dim and length
-  case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno, tensorName: Option[String] = None) { // tensor type
+  case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno) { // tensor type
     def namedDim(x: Int) = shape(x).dim
     def contains(d: Dim) = shape.map(_.dim).contains(d)
     def shapeSize = shape.map(_.size)
     def shapeSizeToString = shape.map(ss=> s"${ss.size}d${ss.dim.x}").toList.mkString("x")
-    // FIXME(feiw): can this be done better??
+    // FIXME(feiw): can this be done better, such as using super/subscript for dim name??
     // def shapeSizeToString = shape.map(ss=> s"${ss.size}<sub>${ss.dim.x}</sub>").toList.mkString("x")
     def shapeDim = shape.map(_.dim)
     def shapeSizeAfterSplit(d: Dim, degree: Int) = shape.map(s => if (s.dim == d) s.size / degree else s.size)
-    def map(f: String => String) = TensorType(shape, et, anno, tensorName.map(f))
+    def map(f: String => String) = TensorType(shape, et, anno)
     def etToString = et match {
       case et if et == manifest[Boolean] => "b8"
       case et if et == manifest[Char] => "i8"
@@ -63,13 +63,22 @@ trait FixedSizeDistributedTensorBaseTypeLess {
       case et => throw new Exception(s"implement the string representation of ${et}")
     }
     override def toString = s"<${shapeSizeToString}x${etToString}>"
+    def splitBy(anno:Anno) = anno match {
+      case NAnno => this
+      case SAnno(dim: Dim, devices: Seq[Device], _) if contains(dim) =>
+        TensorType(shape.map(s=>if(s.dim==dim) Size(dim, s.size/devices.length) else s), et, NAnno)
+      case SAnno(dim: Dim, devices: Seq[Device], _) if !contains(dim) => this
+    }
   }
 
   abstract class Anno extends Serializable // Annotation class
   object NAnno extends Anno { // Null Annotation
     override def toString = "NAnno"
   }
-  case class SAnno(dim: Dim, devices: Seq[Device], stable: Boolean = true) extends Anno // spatial splitting annotation
+  // spatial splitting annotation
+  case class SAnno(dim: Dim, devices: Seq[Device], stable: Boolean = true) extends Anno {
+    override def toString = s"Split d${dim.x} at devices=[${devices.mkString(", ")}]"
+  }
   case class KAnno(pipeline: Int) extends Anno // stacked pipelines
   case class QAnno(pipeline: Int) extends Anno // queued pipelines
 
@@ -83,6 +92,10 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(tt), C(anno)))).withSrcType(__pos, tt.et)
   }
 
+  def INPUT(tt: TensorType, anno: Anno, filenameFormat: String, filenameArgs: TOP*)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(tt)::C(anno)::Backend.Const(filenameFormat)::filenameArgs.map(_.x).toList:_*))).withSrcType(__pos, tt.et)
+  }
+
   def WEIGHT(shape: Seq[Int], et: Manifest[_], index: Int, devices: Seq[Device])(implicit __pos: SourceContext): TENSOR = {
     val tensorType = TensorType(shape.map(s => Size(dim, s)), et) // this is using default NAnno
     val anno = SAnno(tensorType.namedDim(index), devices)
@@ -91,6 +104,10 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
   def WEIGHT(tt: TensorType, anno: Anno)(implicit __pos: SourceContext): TENSOR = {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_weight", C(tt), C(anno)))).withSrcType(__pos, tt.et)
+  }
+
+  def WEIGHT(tt: TensorType, anno: Anno, filenameFormat: String, filenameArgs: TOP*)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_weight", C(tt)::C(anno)::Backend.Const(filenameFormat)::filenameArgs.map(_.x).toList:_*))).withSrcType(__pos, tt.et)
   }
 
   def ONES(tt: TensorType, anno: Anno)(implicit __pos: SourceContext): TENSOR = {
@@ -134,11 +151,17 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
     // FIXME(feiw) save to where?
     def save(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("save", x)(x)(Adapter.CTRL))
+      UNIT(Adapter.g.reflectEffect("save_tensor", x)(x)(Adapter.CTRL))
     }
 
-    def check(filename: String)(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("check_tensor", x, lms.core.Backend.Const(filename))(x)(Adapter.CTRL))
+    def check(filenameFormat: String, xs: TOP*)(implicit __pos: SourceContext): UNIT = {
+      UNIT(Adapter.g.reflectEffect("check_tensor", x::Backend.Const(filenameFormat)::xs.map(_.x).toList:_*)(x)(Adapter.CTRL))
+    }
+
+    lazy val (filenameFormat: Option[String], filenameArgs: List[TOP]) = gc.get(x.asInstanceOf[Backend.Sym]) match {
+      case Some(Node(_, s, Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(format:String)::(args:List[Backend.Exp]), _))
+        if (s == "tensor_input" || s == "tensor_weight") => (Some(format), args.map(new TOP(_)))
+      case _ => (None, Nil)
     }
   }
 
@@ -236,12 +259,22 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   }
 
   def printTensor(node: Node, graph: Graph): String = node match {
-    case Node(s, "tensor_input", Backend.Const(tt:TensorType)::_, _) =>
-      s"$s = tensor_input(${tt.tensorName.getOrElse("")}) -> ${tt.toString}"
-    case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::_, _) =>
-      s"$s = tensor_weight(${tt.tensorName.getOrElse("")}) -> ${tt.toString}"
-    case Node(s, "tensor_result", Backend.Const(tt:TensorType)::anno::(x:Backend.Sym)::Backend.Const(i:Int)::_, _) =>
-      s"$s = ${x}#${i} -> ${tt.toString}"
+    case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
+      s"$s = tensor_input(filenameFormat=${filenameFormat}, filenameArgs=[${filenameArgs.mkString(", ")}]) -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
+      s"$s = tensor_input() -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
+      s"$s = tensor_weight(filenameFormat=${filenameFormat}, filenameArgs=[${filenameArgs.mkString(", ")}]) -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
+      s"$s = tensor_weight() -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_result", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::Backend.Const(i:Int)::_, _) =>
+      s"$s = ${x}#${i} -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_zeros", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
+      s"$s = tensor_zeros() -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_ones", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
+      s"$s = tensor_ones() -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "check_tensor", (x:Backend.Sym)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
+      s"$s = check_tensor($x, filenameFormat=$filenameFormat, filenameArgs=[${filenameArgs.mkString(", ")}]) ${symTensorShape(x, graph)}"
     case n => n.toString
   }
 
@@ -281,9 +314,9 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
     }
 
     def input[T:Manifest:Numeric](shape: Seq[Int], name: String, splitDim: Int, splitTo: List[Device])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensorType = resultType[T](shape, tensorName=Some(name))
+      val tensorType = resultType[T](shape)
       val sAnno = SAnno(tensorType.shape(splitDim).dim, splitTo)
-      val tensor = INPUT(tensorType, sAnno)
+      val tensor = INPUT(tensorType, sAnno, name)
       Wrap[Tensor[T]](tensor.x)
     }
 
@@ -293,7 +326,10 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
     }
 
     def weight[T:Manifest](shape: Seq[Int], tensorName: Option[String] = None)(implicit anno: Anno, __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = WEIGHT(TensorType(shape.map(s => Size(dim, s)), manifest[T], tensorName = tensorName), anno)
+      val tensor = tensorName match {
+        case Some(name) => WEIGHT(TensorType(shape.map(s => Size(dim, s)), manifest[T]), anno, name)
+        case None => WEIGHT(TensorType(shape.map(s => Size(dim, s)), manifest[T]), anno)
+      }
       Wrap[Tensor[T]](tensor.x)
     }
 
@@ -309,7 +345,7 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
   }
 
   def resultType[T:Numeric:Manifest](shape: Seq[Int], tensorName: Option[String] = None): TensorType =
-    TensorType(shape.map(s => Size(dim, s)), manifest[T], tensorName=tensorName)
+    TensorType(shape.map(s => Size(dim, s)), manifest[T])
 
   def tensor[T:Numeric:Manifest](x: Rep[Tensor[T]]): TENSOR = new TENSOR(Unwrap(x))
 

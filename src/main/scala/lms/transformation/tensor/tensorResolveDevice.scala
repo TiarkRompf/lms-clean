@@ -36,7 +36,7 @@ abstract class TensorResolvingDevice extends Transformer {
       val res_tensor = (new TENSOR(transform(x))).to(d) - (new TENSOR(transform(y))).to(d)
       res_tensor.x
 
-    case Node(s, "tensor_mult", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
+    case Node(s, "tensor_mul", Backend.Const(size:Seq[Int])::Backend.Const(d:Device)::
         (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
 
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)

@@ -74,14 +74,14 @@ void Snippet(int x0) {
   cudnnHandle_t x7;
   CUDNNCHECK(cudnnCreate(&x7));
   // end setting up the CUDNN environment
-  // begin initializing GPU array of size 18 and type Float at device (pre-rename) x39 from binary file weight
+  // begin initializing GPU array of size 18 and type Float
   float* x8 = (float*)malloc(18 * sizeof(float));
   CUDA_CALL(cudaSetDevice(x6));
   float* x9 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x9, (size_t)(18 * sizeof(float))));
-  scan_float_rank("golden/weight", x6, x8, 18);
+  scan_float_array(x8, 18, "golden/weight_rank_%d.data", x6);
   CUDA_CALL(cudaMemcpy(x9, x8, (size_t)(18 * sizeof(float)), cudaMemcpyHostToDevice));
-  // end initializing GPU array of size 18 and type Float at device (pre-rename) x39 from binary file weight
+  // end initializing GPU array of size 18 and type Float
   // begin initializing fixed GPU array of size 18 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x10 = (float*)malloc(0 * sizeof(float));
@@ -96,18 +96,18 @@ void Snippet(int x0) {
   // end initializing fixed GPU array of size 18 and type Float and device (pre-rename) x39
   int x18 = 0;
   while (x18 != 10) {
-    // begin initializing GPU array of size 81 and type Float at device (pre-rename) x39 from binary file input
+    // begin initializing GPU array of size 81 and type Float
     float* x35 = (float*)malloc(81 * sizeof(float));
     CUDA_CALL(cudaSetDevice(x6));
     float* x36 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x36, (size_t)(81 * sizeof(float))));
-    scan_float_rank("golden/input", x6, x35, 81);
+    scan_float_array(x35, 81, "golden/input_rank_%d.data", x6);
     CUDA_CALL(cudaMemcpy(x36, x35, (size_t)(81 * sizeof(float)), cudaMemcpyHostToDevice));
-    // end initializing GPU array of size 81 and type Float at device (pre-rename) x39 from binary file input
-    // begin creating and setting tensor descriptor of shape List(2, 1, 9, 9)
+    // end initializing GPU array of size 81 and type Float
+    // begin creating and setting tensor descriptor of shape List(1, 1, 9, 9)
     cudnnTensorDescriptor_t x37;
     CUDNNCHECK(cudnnCreateTensorDescriptor(&x37));
-    CUDNNCHECK(cudnnSetTensor4dDescriptor(x37, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 1, 9, 9));
+    CUDNNCHECK(cudnnSetTensor4dDescriptor(x37, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 1, 9, 9));
     // end creating and setting tensor descriptor
     // begin creating and setting filter descriptor of shape List(2, 1, 3, 3)
     cudnnFilterDescriptor_t x38;
@@ -119,15 +119,15 @@ void Snippet(int x0) {
     CUDNNCHECK(cudnnCreateConvolutionDescriptor(&x39));
     CUDNNCHECK(cudnnSetConvolution2dDescriptor(x39, 1, 1, 1, 1, 1, 1, CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
     // end creating and setting convolution descriptor
-    // begin creating and setting tensor descriptor of shape List(2, 2, 9, 9)
+    // begin creating and setting tensor descriptor of shape List(1, 2, 9, 9)
     cudnnTensorDescriptor_t x40;
     CUDNNCHECK(cudnnCreateTensorDescriptor(&x40));
-    CUDNNCHECK(cudnnSetTensor4dDescriptor(x40, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 2, 2, 9, 9));
+    CUDNNCHECK(cudnnSetTensor4dDescriptor(x40, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 2, 9, 9));
     // end creating and setting tensor descriptor
     // begin allocating gpu array for the output of convolution
     CUDA_CALL(cudaSetDevice(x6));
     float* x41 = (float*)malloc(0 * sizeof(float));
-    CUDA_CALL(cudaMalloc(&x41, (size_t)(324 * sizeof(float))));
+    CUDA_CALL(cudaMalloc(&x41, (size_t)(162 * sizeof(float))));
     // end allocating gpu array for the output of convolution
     // begin finding convolution forward algorithm
     cudnnConvolutionFwdAlgoPerf_t x42;
@@ -149,11 +149,11 @@ void Snippet(int x0) {
     float x48 = 0.0;
     CUDNNCHECK(cudnnConvolutionForward(x7, &x47, x37, x36, x38, x9, x39, x44, x46, x45, &x48, x40, x41));
     // end convolution forward pass
-    // begin checking GPU array of size 162 and type Float at device (pre-name) x39 again binary file loss
+    // begin checking GPU array of size 162 and type Float
     float* x49 = (float*)malloc(162 * sizeof(float));
     CUDA_CALL(cudaMemcpy(x49, x41, (size_t)(162 * sizeof(float)), cudaMemcpyDeviceToHost));
-    check_float_array_rank("golden/loss", x6, x49, 162);
-    // end checking GPU array of size 162 and type Float at device (pre-name) x39 again binary file loss
+    check_float_array_with_file(x49, 162, "golden/loss_rank_%d.data", x6);
+    // end checking GPU array of size 162 and type Float
     // begin initializing fixed GPU array of size 162 and type Float and device (pre-rename) x39
     CUDA_CALL(cudaSetDevice(x6));
     float* x50 = (float*)malloc(0 * sizeof(float));
@@ -170,7 +170,7 @@ void Snippet(int x0) {
     int x53 = 0;
     CUDNNCHECK(cudnnFindConvolutionBackwardFilterAlgorithm(x7, x37, x40, x39, x38, 1, &x53, &x52));
     cudnnConvolutionBwdFilterAlgo_t x54 = x52.algo;
-    // end finding convolution backward filter algorithm
+    // end finding convolution backNCCL_ALLREDUCEward filter algorithm
     // begin finding convolution backward filter workspace size
     size_t x55 = (size_t)0;
     CUDNNCHECK(cudnnGetConvolutionBackwardFilterWorkspaceSize(x7, x37, x40, x39, x38, x54, &x55));
@@ -196,9 +196,9 @@ void Snippet(int x0) {
     x26<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x10, x17, 18);
     // end computing SGD on GPU for size 18 and type Float at device (pre-name) x39 with weight x50, grad x67, and momentum x107
     x18 = x18 + 1;
-    cudnnDestroyTensorDescriptor(x40);
     cudnnDestroyFilterDescriptor(x38);
     cudnnDestroyTensorDescriptor(x37);
+    cudnnDestroyTensorDescriptor(x40);
     cudnnDestroyConvolutionDescriptor(x39);
   }
   if (x6 == 0) {
@@ -213,9 +213,9 @@ void Snippet(int x0) {
     printf("\n");
     // end copying GPU array x50 to CPU and print for size 18 and type Float
   }
+  NCCLCHECK(ncclCommDestroy(x4));
   CUDNNCHECK(cudnnDestroy(x7));
   MPICHECK(MPI_Finalize());
-  NCCLCHECK(ncclCommDestroy(x4));
 }
 /*****************************************
 End of C Generated Code

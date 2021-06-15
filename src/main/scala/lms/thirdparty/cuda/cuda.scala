@@ -350,7 +350,7 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
 
   // This concat op kernel has lots of limitations
   // 1. it concats 2 inputs
-  // 2. the inputs are 2D, and the split axis is 1
+  // 2. the inputs are 2D, and the concat axis is 1
   // 3. the inputs is by equal sizes
   // 4. the 3rd input is size of dim 0 of input0, the 4th input is size of dim 1 of input0
   def CUDA_CONCAT2_2D1_EQUAL_KERNEL(m: Manifest[_], comment: String = "")(implicit __pos: SourceContext) = CUDA_KERNEL5({xn: List[Backend.Exp] =>
@@ -365,10 +365,10 @@ object CUDATypeLess extends Dsl with StackArrayOps with CLibs with CudaFunction 
       // actual computation
       val stride = gridDimX * blockDimX
       val tid = threadIdxX + blockIdxX * blockDimX
-      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int]((dim0*dim1).x), Wrap[Int](stride.x))) {
+      for (i <- range_until_step(Wrap[Int](tid.x), Wrap[Int]((dim0*dim1*2).x), Wrap[Int](stride.x))) {
         val index = INT(Unwrap(i))
-        val size0 = index / dim0
-        val size1 = index % dim0
+        val size0 = index / (dim1 * 2)
+        val size1 = index % (dim1 * 2)
         __ifThenElse(Wrap[Boolean]((size1 < dim1).x),
           { output(index) = input0(INT(size0 * dim1 + size1)); () },
           { output(index) = input1(INT(size0 * dim1 + size1 - dim1)); ()})
@@ -435,7 +435,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaBallotSync[T:Manifest](mask: Rep[Int], predicate: Rep[Int]) =
     libFunction[Int]("__ballot_sync", Unwrap(mask), Unwrap(predicate))(Seq[Int](), Seq[Int](), Set[Int]())
-  
+
   def cudaFfs[T:Manifest](x: Rep[Int]) =
     libFunction[Int]("__ffs", Unwrap(x))(Seq[Int](), Seq[Int](), Set[Int]())
 
@@ -754,7 +754,7 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
 
   def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D]) => Rep[E]) =
     Wrap[(A,B,C,D,Dim3,Dim3,Int)=>E](__topFun(f, 4, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)))), "__global__"))
-  
+
   def cudaGlobalDynamicFun[A:Manifest,B:Manifest,C:Manifest,D:Manifest,E:Manifest,F:Manifest,G:Manifest](f: (Rep[A], Rep[B], Rep[C], Rep[D], Rep[E], Rep[F]) => Rep[G]) =
     Wrap[(A,B,C,D,E,F,Dim3,Dim3,Int)=>G](__topFun(f, 6, xn => Unwrap(f(Wrap[A](xn(0)), Wrap[B](xn(1)), Wrap[C](xn(2)), Wrap[D](xn(3)), Wrap[E](xn(4)), Wrap[F](xn(5)))), "__global__"))
 
@@ -966,7 +966,7 @@ trait CudaLibs extends CudaOps {
           conditional_assign((src_row < n) && (feature_dim < stride) && notequals(dst_row, paddingIdx), my_s, threadIdxX, grad, src_row * stride + feature_dim)
 
           cudaSyncThreads
-          
+
           // To ensure determinism, we can't just have each warp add its grad data to its dst_row.
           // We need to check if any other warps pulled grad data targeting dst_row.
           // If so, we elect the first warp in each matching group as the leader.
@@ -977,7 +977,7 @@ trait CudaLibs extends CudaOps {
             __ifThenElse(threadIdxX >= n_this_chunk, {__assign(match_found_this_thread, 0)}, {})
 
             val matchmask = var_new(cudaBallotSync(0xffffffff, match_found_this_thread))
-            indicies(n_this_chunk) = matchmask 
+            indicies(n_this_chunk) = matchmask
             val first_remaining_peer = var_new(cudaFfs(matchmask) - 1)
 
             __ifThenElse(equals(threadIdxY, readVar(first_remaining_peer)), {
@@ -1862,7 +1862,7 @@ trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with 
 
   override def mayInline(n: Node): Boolean = n match {
     case Node(s, "NewSharedArray", _, _) => false
-    case Node(s, "CastArray", _, _) => false 
+    case Node(s, "CastArray", _, _) => false
     case _ => super.mayInline(n)
   }
 

@@ -75,7 +75,7 @@ object FixedSizeTensorTypeLess extends Base with PrimitiveOps with ArrayOps {
     def * (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
       assert(shape == y.shape)
       assert(et == y.et)
-      (new TENSOR(Adapter.g.reflect("tensor_mult", C(shape), x, y.x))).withSrcType(__pos, et)
+      (new TENSOR(Adapter.g.reflect("tensor_mul", C(shape), x, y.x))).withSrcType(__pos, et)
     }
 
     def / (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {

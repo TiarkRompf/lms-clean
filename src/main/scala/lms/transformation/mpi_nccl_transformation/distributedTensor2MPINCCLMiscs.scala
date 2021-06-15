@@ -39,6 +39,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
       val mask_tensor = get_operand(mask, anno)
+
       val size = numeral(shape)
       val output = gpu_array(size, manifest[Float], myNCCLRank)
       cudaMaskedFillWrap[Float](
@@ -62,12 +63,13 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         Wrap[Array[Int]](mask_tensor),
         shape, size)
       dinput.x
-    
+
     case Node(s, "tensor_logsoftmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
       val shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
+
       val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
       cudaLogSoftmaxWrap[Float](
         Wrap[Array[Float]](input_tensor), 
@@ -75,13 +77,14 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         numeral(shape.init),
         shape.last)
       output.x
-    
+
     case Node(s, "tensor_logsoftmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
       val shape = tensor_shape(output, useOldMetadata = true)
       val output_tensor = get_operand(output, anno)
       val doutput_tensor = get_operand(doutput, anno)
+
       val dinput = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
       cudaLogSoftmaxGradWrap[Float](
         Wrap[Array[Float]](dinput.x), 
@@ -90,7 +93,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
         numeral(shape.init),
         shape.last)
       dinput.x
-    
+
     case Node(s, "tensor_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
 

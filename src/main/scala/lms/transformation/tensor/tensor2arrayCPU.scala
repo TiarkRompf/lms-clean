@@ -56,7 +56,7 @@ abstract class TensorLoweringCPU extends Transformer {
       ARRAY_MINUS(new ARRAY(transform(x)), new ARRAY(transform(y)), res, INT(count))
       res.x
 
-    case Node(s, "tensor_mult", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+    case Node(s, "tensor_mul", Backend.Const(size:Seq[Int])::(x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val sc_ : SourceContext = Adapter.oldSourceMap(s)
       val m = Adapter.oldTypeMap(s)
       val count = numeral(size)
