@@ -933,7 +933,8 @@ trait CudaLibs extends CudaOps {
       generate_comment("arg1: embedding output gradient")
       generate_comment("arg2: embedding gradient")
       generate_comment("arg3: indicies size")
-      generate_comment("arg4: padding index (-1 if unsure)")
+      generate_comment("arg4: stride size")
+      generate_comment("arg5: padding index (-1 if unsure)")
       val buffer = NewDynSharedArray[N]
       val my_s = buffer.slice(warpSize * threadIdxY, warpSize * threadIdxY)
       val indicies_batch = CastArray[N, Int](buffer.slice(warpSize * blockDimY, warpSize * blockDimY))
@@ -998,14 +999,14 @@ trait CudaLibs extends CudaOps {
   }
 
   def cudaEmbeddingGradWrap[N:Numeric:Manifest](dout: Rep[Array[N]], din: Rep[Array[N]], indices: Rep[Array[Int]], 
-    embed_size: Rep[Int], indices_size: Rep[Int])(implicit __pos: SourceContext) = {
+    embed_size: Rep[Int], n_indices: Rep[Int])(implicit __pos: SourceContext) = {
     
     val paddingIdx = -1
     val grid_size = (embed_size + 31) / 32
-    val grid = dim3(gridSize)
+    val grid = dim3(grid_size)
     val block = dim3(32, 32)
     val kernel = cudaEmbeddingGrad[N]
-    kernel(indices, dout, din, indices_size, embed_size, paddingIdx, grid, block, 32 * 32 * sizeOf[Int] + 32 * 32 * sizeOf[Float])
+    kernel(indices, dout, din, n_indices, embed_size, paddingIdx, grid, block, 32 * 32 * sizeOf[Int] + 32 * 32 * sizeOf[Float])
   }
 
   /** Kernel Functions for ND Masked Fill
