@@ -134,20 +134,20 @@ void Snippet(int x0) {
   CUDA_CALL(cudaStreamCreateWithFlags(&x5, cudaStreamNonBlocking));
   int x6 = x2;
   // end setting up the MPI/NCCL environment
-  // begin initializing GPU array of size 16 and type Float
-  float* x7 = (float*)malloc(16 * sizeof(float));
+  // begin initializing GPU array of size 40 and type Float
+  float* x7 = (float*)malloc(40 * sizeof(float));
   CUDA_CALL(cudaSetDevice(x6));
   float* x8 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x8, (size_t)(16 * sizeof(float))));
-  scan_float_array(x7, 16, "golden/embed_rank_%d.data", x6);
-  CUDA_CALL(cudaMemcpy(x8, x7, (size_t)(16 * sizeof(float)), cudaMemcpyHostToDevice));
-  // end initializing GPU array of size 16 and type Float
-  // begin initializing fixed GPU array of size 16 and type Float and device (pre-rename) x39
+  CUDA_CALL(cudaMalloc(&x8, (size_t)(40 * sizeof(float))));
+  scan_float_array(x7, 40, "golden/embed_rank_%d.data", x6);
+  CUDA_CALL(cudaMemcpy(x8, x7, (size_t)(40 * sizeof(float)), cudaMemcpyHostToDevice));
+  // end initializing GPU array of size 40 and type Float
+  // begin initializing fixed GPU array of size 40 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x9 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x9, (size_t)(16 * sizeof(float))));
-  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, 0, 16);
-  // end initializing fixed GPU array of size 16 and type Float and device (pre-rename) x39
+  CUDA_CALL(cudaMalloc(&x9, (size_t)(40 * sizeof(float))));
+  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, 0, 40);
+  // end initializing fixed GPU array of size 40 and type Float and device (pre-rename) x39
   // begin initializing GPU array of size 2 and type Int
   int* x16 = (int*)malloc(2 * sizeof(int));
   CUDA_CALL(cudaSetDevice(x6));
@@ -156,42 +156,44 @@ void Snippet(int x0) {
   scan_int_array(x16, 2, "golden/indices_rank_%d.data", x6);
   CUDA_CALL(cudaMemcpy(x17, x16, (size_t)(2 * sizeof(int)), cudaMemcpyHostToDevice));
   // end initializing GPU array of size 2 and type Int
-  // begin allocating output array of size 4 and type Float for tensor_embedding
+  // begin allocating output array of size 10 and type Float for tensor_embedding
   CUDA_CALL(cudaSetDevice(x6));
   float* x18 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x18, (size_t)(4 * sizeof(float))));
-  // end allocating output array of size 4 and type Float for tensor_embedding
+  CUDA_CALL(cudaMalloc(&x18, (size_t)(10 * sizeof(float))));
+  // end allocating output array of size 10 and type Float for tensor_embedding
   // begin calling embedding kernel
-  x19<<<dim3(2, 1, 1), dim3(2, 1, 1)>>>(x8, x17, x18, 2);
+  x19<<<dim3(5, 1, 1), dim3(2, 1, 1)>>>(x8, x17, x18, 5);
   // end calling embedding kernel
-  // begin checking GPU array of size 4 and type Float
-  float* x28 = (float*)malloc(4 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x28, x18, (size_t)(4 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_with_file(x28, 4, "golden/loss_rank_%d.data", x6);
-  // end checking GPU array of size 4 and type Float
-  // begin initializing fixed GPU array of size 4 and type Float and device (pre-rename) x39
+  // begin checking GPU array of size 10 and type Float
+  float* x28 = (float*)malloc(10 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x28, x18, (size_t)(10 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array_with_file(x28, 10, "golden/loss_rank_%d.data", x6);
+  // end checking GPU array of size 10 and type Float
+  // begin initializing fixed GPU array of size 10 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x29 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x29, (size_t)(4 * sizeof(float))));
-  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x29, 1, 4);
-  // end initializing fixed GPU array of size 4 and type Float and device (pre-rename) x39
-  // begin allocating gradient input array of size 16 and type Float for tensor_embedding_bwd
+  CUDA_CALL(cudaMalloc(&x29, (size_t)(10 * sizeof(float))));
+  x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x29, 1, 10);
+  // end initializing fixed GPU array of size 10 and type Float and device (pre-rename) x39
+  // begin allocating gpu array of size 40 and type Float for the gradient input of embedding
   CUDA_CALL(cudaSetDevice(x6));
   float* x30 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x30, (size_t)(16 * sizeof(float))));
-  // end allocating gradient input array of size 16 and type Float for tensor_embedding_bwd
+  CUDA_CALL(cudaMalloc(&x30, (size_t)(40 * sizeof(float))));
+  // end allocating gpu array of size 40 and type Float for the gradient input of embedding
   // begin calling embedding gradient kernel
-  x31<<<dim3(1, 1, 1), dim3(32, 32, 1), 1024 * sizeof(int) + 1024 * sizeof(float)>>>(x17, x29, x30, 2, 2, -1);
+  x31<<<dim3(1, 1, 1), dim3(32, 32, 1), 1024 * sizeof(int) + 1024 * sizeof(float)>>>(x17, x29, x30, 2, 5, -1);
   // end calling embedding gradient kernel
-  // begin computing ACCUM on GPU for size 16 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x193
+  ncclAllReduce(x30, x30, (size_t)40, ncclFloat32, ncclSum, x4, x5);
+  CUDA_CALL(cudaStreamSynchronize(x5));
+  // begin computing ACCUM on GPU for size 40 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x193
   CUDA_CALL(cudaSetDevice(x6));
-  x65<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x30, 16);
-  // end computing ACCUM on GPU for size 16 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x193
-  // begin checking GPU array of size 16 and type Float
-  float* x72 = (float*)malloc(16 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x72, x9, (size_t)(16 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_with_file(x72, 16, "golden/embed_grad_rank_%d.data", x6);
-  // end checking GPU array of size 16 and type Float
+  x65<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x30, 40);
+  // end computing ACCUM on GPU for size 40 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x193
+  // begin checking GPU array of size 40 and type Float
+  float* x72 = (float*)malloc(40 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x72, x9, (size_t)(40 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array_with_file(x72, 40, "golden/embed_grad_rank_%d.data", x6);
+  // end checking GPU array of size 40 and type Float
   NCCLCHECK(ncclCommDestroy(x4));
   MPICHECK(MPI_Finalize());
 }
