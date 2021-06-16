@@ -25,7 +25,7 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
       }
     }
     val resultTypes = resultTensorShapes map { s =>
-      TensorType(s, x_resultType.et, anno)
+      TensorType(s, x_resultType.et)
     }
     new TENSORS(Adapter.g.reflectRead("tensors_split", C(resultTypes), C(anno), x.x, C(axis))(x.x)).withSrcType(__pos, x.et)
   }
@@ -46,7 +46,7 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
     val concatShape = xs(0).resultType.shape.zipWithIndex.map {
       case(s, i) => if (i == axis) Size(s.dim, concatSize) else s
     }
-    val concatType = TensorType(concatShape, xs(0).et, anno)
+    val concatType = TensorType(concatShape, xs(0).et)
     val defs = xs.map(_.x).toSeq
     val all_defs = (C(concatType)::C(anno)::C(axis)::xs.map(_.x)).toSeq
     (new TENSOR(Adapter.g.reflectRead("tensor_concat", all_defs:_*)(defs:_*))).withSrcType(__pos, xs(0).et)

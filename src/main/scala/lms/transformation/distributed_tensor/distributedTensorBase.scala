@@ -43,7 +43,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   case class Dim(x: Int) // named dimension
   def dim = Dim(next_dim_name) // fresh dim
   case class Size(dim: Dim, size: Int) // dim and length
-  case class TensorType(shape: Seq[Size], et: Manifest[_], anno: Anno = NAnno) { // tensor type
+  case class TensorType(shape: Seq[Size], et: Manifest[_]) { // tensor type
     def namedDim(x: Int) = shape(x).dim
     def contains(d: Dim) = shape.map(_.dim).contains(d)
     def shapeSize = shape.map(_.size)
@@ -52,7 +52,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     // def shapeSizeToString = shape.map(ss=> s"${ss.size}<sub>${ss.dim.x}</sub>").toList.mkString("x")
     def shapeDim = shape.map(_.dim)
     def shapeSizeAfterSplit(d: Dim, degree: Int) = shape.map(s => if (s.dim == d) s.size / degree else s.size)
-    def map(f: String => String) = TensorType(shape, et, anno)
+    def map(f: String => String) = TensorType(shape, et)
     def etToString = et match {
       case et if et == manifest[Boolean] => "b8"
       case et if et == manifest[Char] => "i8"
@@ -66,7 +66,7 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def splitBy(anno:Anno) = anno match {
       case NAnno => this
       case SAnno(dim: Dim, devices: Seq[Device], _) if contains(dim) =>
-        TensorType(shape.map(s=>if(s.dim==dim) Size(dim, s.size/devices.length) else s), et, NAnno)
+        TensorType(shape.map(s=>if(s.dim==dim) Size(dim, s.size/devices.length) else s), et)
       case SAnno(dim: Dim, devices: Seq[Device], _) if !contains(dim) => this
     }
   }
