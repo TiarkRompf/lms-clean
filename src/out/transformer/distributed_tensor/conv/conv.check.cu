@@ -103,11 +103,11 @@ void Snippet(int x0) {
   CUDNNCHECK(cudnnCreateTensorDescriptor(&x22));
   CUDNNCHECK(cudnnSetTensor4dDescriptor(x22, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 2, 9, 9));
   // end creating and setting tensor descriptor
-  // begin allocating gpu array for the output of convolution
+  // begin allocating gpu array of size 162 and type Float for the output of convolution
   CUDA_CALL(cudaSetDevice(x6));
   float* x23 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x23, (size_t)(162 * sizeof(float))));
-  // end allocating gpu array for the output of convolution
+  // end allocating gpu array of size 162 and type Float for the output of convolution
   // begin finding convolution forward algorithm
   cudnnConvolutionFwdAlgoPerf_t x24;
   int x25 = 0;
@@ -145,11 +145,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x33, (size_t)(162 * sizeof(float))));
   x11<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x33, 1, 162);
   // end initializing fixed GPU array of size 162 and type Float and device (pre-rename) x39
-  // begin allocating gpu array for the gradient of filter of convolution
+  // begin allocating gpu array of size 18 and type Float for the gradient of filter of convolution
   CUDA_CALL(cudaSetDevice(x6));
   float* x34 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x34, (size_t)(18 * sizeof(float))));
-  // end allocating gpu array for the gradient of filter of convolution
+  // end allocating gpu array of size 18 and type Float for the gradient of filter of convolution
   // begin finding convolution backward filter algorithm
   cudnnConvolutionBwdFilterAlgoPerf_t x35;
   int x36 = 0;
@@ -176,11 +176,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   x42<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x10, x34, 18);
   // end computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x235
-  // begin allocating gpu array for the gradient of weight of convolution
+  // begin allocating gpu array of size 81 and type Float for the gradient of weight of convolution
   CUDA_CALL(cudaSetDevice(x6));
   float* x49 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x49, (size_t)(81 * sizeof(float))));
-  // end allocating gpu array for the gradient of weight of convolution
+  // end allocating gpu array of size 81 and type Float for the gradient of weight of convolution
   // begin finding convolution backward data algorithm
   cudnnConvolutionBwdDataAlgoPerf_t x50;
   int x51 = 0;
