@@ -55,7 +55,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
 
   def Permute(input: TENSOR, perm: List[Int], anno: Anno, __pos: SourceContext): TENSOR = {
     require(perm.sortWith(_ < _) == List.range(0, input.shapeSize.size), "dims must be a valid permutation of input dimensions")
-    val res_tt = input.resultType
+    val res_tt = TensorType(perm.map(input.resultType.shape(_)), input.resultType.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x, C(perm))(input.x))
       .withSrcType(__pos, input.et))
   }
@@ -152,7 +152,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
     case Node(s, "tensor_logsoftmax", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
       s"$s = tensor_logsoftmax($input) (${symTensorShape(input, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(dims:List[Int])::_, _) =>
-      s"$s = tensor_permute($input) (${symTensorShape(input, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = tensor_permute($input, permutation=${dims}) (${symTensorShape(input, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case _ => super.printTensor(node, graph)
   }
 }
