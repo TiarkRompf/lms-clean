@@ -104,7 +104,7 @@ void Snippet(int x0) {
   CUDNNCHECK(cudnnCreateActivationDescriptor(&x20));
   CUDNNCHECK(cudnnSetActivationDescriptor(x20, CUDNN_ACTIVATION_SIGMOID, CUDNN_PROPAGATE_NAN, 0.0));
   // end creating and setting activation descriptor
-  // begin allocating gpu array for the output of softmax
+  // begin allocating gpu array of size 9 and type Float for the output of softmax
   CUDA_CALL(cudaSetDevice(x6));
   float* x21 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x21, (size_t)(9 * sizeof(float))));
@@ -151,11 +151,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   x37<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x33, x36, 9);
   // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x203 and addition_operand x239
-  // begin allocating gpu array for the gradient of input of activation
+  // begin allocating gpu array of size 9 and type Float for the gradient of input of activation
   CUDA_CALL(cudaSetDevice(x6));
   float* x44 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x44, (size_t)(9 * sizeof(float))));
-  // end allocating gpu array for the gradient of input of activation
+  // end allocating gpu array of size 9 and type Float for the gradient of input of activation
   // begin activation backward pass
   float x45 = 1.0;
   float x46 = 0.0;
