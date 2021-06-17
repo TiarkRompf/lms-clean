@@ -565,7 +565,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
           val embed_size = 60
           val n_indices = 10
           */
-    
+
           val n_embeddings = 8
           val embed_size = 5
           val n_indices = 4
