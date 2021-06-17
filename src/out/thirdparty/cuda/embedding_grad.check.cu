@@ -18,7 +18,8 @@ __global__ void x7(int* x8, float* x9, float* x10, int x11, int x12, int x13) {
   // arg1: embedding output gradient
   // arg2: embedding gradient
   // arg3: indicies size
-  // arg4: padding index (-1 if unsure)
+  // arg4: stride size
+  // arg5: padding index (-1 if unsure)
   extern __shared__ float x14[];
   float* x15 = x14 + NVIDIA_WARP_SIZE * threadIdx.y;
   int* x16 = (int *)(x14 + NVIDIA_WARP_SIZE * blockDim.y);
