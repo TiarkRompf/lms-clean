@@ -142,14 +142,19 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val indices_size = indices_shape(0)
       val embed_size = input_shape(1)
       val output_size = numeral(output_shape)
+      
+      generate_comment(s"begin allocating output array of size $output_size and type Float for tensor_embedding")
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
+      generate_comment(s"end allocating output array of size $output_size and type Float for tensor_embedding")
 
+      generate_comment("begin calling embedding kernel")
       cudaEmbeddingWrap[Float](
         Wrap[Array[Float]](input_tensor),
         Wrap[Array[Float]](output.x),
         Wrap[Array[Int]](indices_array),
         unit[Int](embed_size),
         unit[Int](indices_size))
+        generate_comment("end calling embedding kernel")
       output.x
 
     case Node(s, "tensor_embedding_bwd", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::(doutput:Backend.Sym)::(indices:Backend.Sym)::_, _) =>
@@ -168,13 +173,21 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val indices_size = indices_shape(0)
       val embed_size = doutput_shape(1)
       val dinput_size = numeral(dinput_shape)
+
+      generate_comment(s"begin allocating gpu array of size $dinput_size and type Float for the gradient input of embedding")
       val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
+      generate_comment(s"end allocating gpu array of size $dinput_size and type Float for the gradient input of embedding")
+
+      generate_comment("begin calling embedding gradient kernel")
       cudaEmbeddingGradWrap[Float](
         Wrap[Array[Float]](doutput_tensor),
         Wrap[Array[Float]](dinput.x),
         Wrap[Array[Int]](indices_array),
         unit[Int](embed_size),
         unit[Int](indices_size))
+      generate_comment("end calling embedding gradient kernel")
+      // System.out.println("embed_size: " + embed_size)
+      // System.out.println("indices_size: " + indices_size)
       dinput.x
 
     case _ => super.transform(n)

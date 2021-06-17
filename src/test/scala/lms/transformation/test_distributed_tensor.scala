@@ -560,9 +560,15 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val model = module {
+          /*
           val n_embeddings = 20
           val embed_size = 60
           val n_indices = 10
+          */
+    
+          val n_embeddings = 8
+          val embed_size = 5
+          val n_indices = 4
 
           val indices = Tensor.input[Int](shape=Seq(n_indices), name="indices", splitDim=0, splitTo=List(GPU(0), GPU(1)))
           implicit val anno = indices.anno
