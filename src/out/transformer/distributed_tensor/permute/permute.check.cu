@@ -120,7 +120,7 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   float* x35 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x35, (size_t)(165000 * sizeof(float))));
-  x10<<<dim3(2, 2, 60), dim3(32, 8, 1)>>>(x34, x35, 60, 55, 50);
+  x10<<<dim3(2, 2, 50), dim3(32, 8, 1)>>>(x34, x35, 50, 60, 55);
   // begin computing ACCUM on GPU for size 165000 and type Float at device (pre-rename) x39 with base_operand x192 and addition_operand x254
   CUDA_CALL(cudaSetDevice(x6));
   x36<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x26, x35, 165000);
