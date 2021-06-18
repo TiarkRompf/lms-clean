@@ -697,13 +697,13 @@ class CudaTest extends TutorialFunSuite {
         val dimZ = 40
         val size = dimZ * dimY * dimX
         */
-        
+
         val dimX = 600
         val blockDimX = 100
         val dimY = 60
         val dimZ = 40
         val size = dimZ * dimY * dimX
-        
+
 
         val input = NewArray[Int](size)
         scanFile[Int]("golden/permute_kernel_102_big/input.data", input, size)

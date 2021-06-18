@@ -41,6 +41,14 @@ def get_printer(lms_clean_root: str, test_name: str):
             slice = size // degree
             for i in range(degree):
                 print_flatten_array(name+"_rank_"+str(i)+".data", tensor[:, slice * i : slice * (i + 1)])
+        elif dim == 2:
+            shape = list(tensor.size())
+            assert len(shape) > 2, "should be at least 2D"
+            size = shape[2]
+            assert size % degree == 0, "should be divisible"
+            slice = size // degree
+            for i in range(degree):
+                print_flatten_array(name+"_rank_"+str(i)+".data", tensor[:, :, slice * i : slice * (i + 1)])
         else:
             assert False, "TODO"
 
@@ -78,6 +86,14 @@ def get_int_printer(lms_clean_root: str, test_name: str):
             slice = size // degree
             for i in range(degree):
                 print_flatten_array_int(name+"_rank_"+str(i)+".data", tensor[:, slice * i : slice * (i + 1)])
+        elif dim == 2:
+            shape = list(tensor.size())
+            assert len(shape) > 2, "should be at least 2D"
+            size = shape[2]
+            assert size % degree == 0, "should be divisible"
+            slice = size // degree
+            for i in range(degree):
+                print_flatten_array_int(name+"_rank_"+str(i)+".data", tensor[:, :, slice * i : slice * (i + 1)])
         else:
             assert False, "TODO"
 
