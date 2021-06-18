@@ -33,7 +33,7 @@ __global__ void x5(int* x6, int* x7, int x8, int x9, int x10) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int* x1 = (int*)malloc(1440000 * sizeof(int));
-  scan_int("golden/permute_kernel_102_big/input.data", x1, 1440000);
+  scan_ints("golden/permute_kernel_102_big/input.data", x1, 1440000);
   int* x2 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(1440000 * sizeof(int))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(1440000 * sizeof(int)), cudaMemcpyHostToDevice));

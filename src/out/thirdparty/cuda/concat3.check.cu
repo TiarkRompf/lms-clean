@@ -30,17 +30,17 @@ __global__ void x11(float** x12, float* x13) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(18 * sizeof(float));
-  scan_float("golden/concat3/input0.data", x1, 18);
+  scan_floats("golden/concat3/input0.data", x1, 18);
   float* x2 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(18 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(18 * sizeof(float)), cudaMemcpyHostToDevice));
   float* x3 = (float*)malloc(12 * sizeof(float));
-  scan_float("golden/concat3/input1.data", x3, 12);
+  scan_floats("golden/concat3/input1.data", x3, 12);
   float* x4 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x4, (size_t)(12 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(12 * sizeof(float)), cudaMemcpyHostToDevice));
   float* x5 = (float*)malloc(6 * sizeof(float));
-  scan_float("golden/concat3/input2.data", x5, 6);
+  scan_floats("golden/concat3/input2.data", x5, 6);
   float* x6 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x6, (size_t)(6 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x6, x5, (size_t)(6 * sizeof(float)), cudaMemcpyHostToDevice));
