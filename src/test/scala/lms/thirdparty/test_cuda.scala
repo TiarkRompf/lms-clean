@@ -367,7 +367,7 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT(embeddingGrad, cuda_embedding_grad, n_embeddings * embed_size, device2host))
         checkFile[Float]("golden/embedding/embedding_grad.data", embeddingGrad, n_embeddings * embed_size)
       }
-    }    
+    }
 
     check("embedding_grad", driver.code, "cu")
   }

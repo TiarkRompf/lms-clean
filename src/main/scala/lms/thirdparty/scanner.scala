@@ -71,9 +71,9 @@ trait ScannerOps extends Equal with ArrayOps with RangeOps with CLibs {
   // some helper functions that directly use C code implementation in scanner_header.h
   def scanFile[T:Manifest](name: Rep[String], array: Rep[Array[T]], size: Rep[Int]) = manifest[T] match {
     case m if m == manifest[Float] =>
-      libFunction[Unit]("scan_float", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0), Seq(1), Set[Int]())
+      libFunction[Unit]("scan_floats", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0), Seq(1), Set[Int]())
     case m if m == manifest[Int] =>
-      libFunction[Unit]("scan_int", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0), Seq(1), Set[Int]())
+      libFunction[Unit]("scan_ints", Unwrap(name), Unwrap(array), Unwrap(size))(Seq(0), Seq(1), Set[Int]())
     case m => throw new Exception(s"not yet supporting manifest ${m} in scanFile function")
   }
 
