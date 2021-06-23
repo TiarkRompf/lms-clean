@@ -917,7 +917,7 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cudaEmbeddingWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], indices: Rep[Array[Int]], 
+  def cudaEmbeddingWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], indices: Rep[Array[Int]],
     embed_size: Rep[Int], indices_size: Rep[Int])(implicit __pos: SourceContext) = {
 
     val grid = dim3(embed_size, 1, 1)
@@ -998,9 +998,9 @@ trait CudaLibs extends CudaOps {
     }
   }
 
-  def cudaEmbeddingGradWrap[N:Numeric:Manifest](dout: Rep[Array[N]], din: Rep[Array[N]], indices: Rep[Array[Int]], 
+  def cudaEmbeddingGradWrap[N:Numeric:Manifest](dout: Rep[Array[N]], din: Rep[Array[N]], indices: Rep[Array[Int]],
     embed_size: Rep[Int], n_indices: Rep[Int])(implicit __pos: SourceContext) = {
-    
+
     val paddingIdx = -1
     val grid_size = (embed_size + 31) / 32
     val grid = dim3(grid_size)
@@ -1106,7 +1106,7 @@ trait CudaLibs extends CudaOps {
 
     val grid = dim3((size + 511) / 512)
     val block = dim3(512)
-    
+
     val kernel = cudaMaskedFillGrad[N](false)
     kernel(dout, din, mask, dim0_shape, dim1_shape, dim0_stride, dim1_stride, size, grid, block)
   }
@@ -1333,7 +1333,7 @@ trait CudaLibs extends CudaOps {
         }
       }
   }
-  
+
   // init is the size of outer dims (outerSize)
   // last is the size of the last dim (lastDimSize)
   def cudaLogSoftmaxWrap[N:Numeric:Manifest](in: Rep[Array[N]], out: Rep[Array[N]], init: Int, last: Int)(implicit __pos: SourceContext) = {
@@ -1801,9 +1801,9 @@ trait CudaLibs extends CudaOps {
       }
       // loop all threads in each thread box for all dimX
       // note that the block indices for input and output should be transposed
-      for (i <- (0 until (dimX, blockDimX))) {
-        val value = in_offset(blockIdxX, blockIdxY, threadIdxX + i)
-        out_offset(blockIdxY, blockIdxX, threadIdxX + i, value)
+      for (i <- (threadIdxX until (dimX, blockDimX))) {
+        val value = in_offset(blockIdxX, blockIdxY, i)
+        out_offset(blockIdxY, blockIdxX, i, value)
       }
   }
 

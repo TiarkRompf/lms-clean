@@ -28,10 +28,10 @@ __global__ void x10(float* x11, float* x12, int x13, int x14, int x15) {
   // each threadblock hands one dimX in coalease size of A, then we have dimZ x dimY threadblocks
   // this kernel might be inefficient if the dimX is small. TODO
   int x16 = blockDim.x;
-  int x17 = 0;
+  int x17 = threadIdx.x;
   while (x17 < x15) {
     int x18 = x17;
-    x12[(blockIdx.y + blockIdx.x * x13) * x15 + (threadIdx.x + x18)] = x11[(blockIdx.x + blockIdx.y * x14) * x15 + (threadIdx.x + x18)];
+    x12[(blockIdx.y + blockIdx.x * x13) * x15 + x18] = x11[(blockIdx.x + blockIdx.y * x14) * x15 + x18];
     x17 = x17 + x16;
   }
 }
@@ -108,10 +108,10 @@ void Snippet(int x0) {
   float* x28 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x28, (size_t)(64 * sizeof(float))));
   x10<<<dim3(4, 2, 1), dim3(7, 1, 1)>>>(x27, x28, 2, 4, 8);
-  // begin computing ACCUM on GPU for size 64 and type Float at device (pre-rename) x39 with base_operand x119 and addition_operand x181
+  // begin computing ACCUM on GPU for size 64 and type Float at device (pre-rename) x39 with base_operand x116 and addition_operand x178
   CUDA_CALL(cudaSetDevice(x6));
   x29<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x19, x28, 64);
-  // end computing ACCUM on GPU for size 64 and type Float at device (pre-rename) x39 with base_operand x119 and addition_operand x181
+  // end computing ACCUM on GPU for size 64 and type Float at device (pre-rename) x39 with base_operand x116 and addition_operand x178
   // begin checking GPU array of size 64 and type Float
   float* x36 = (float*)malloc(64 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x36, x19, (size_t)(64 * sizeof(float)), cudaMemcpyDeviceToHost));

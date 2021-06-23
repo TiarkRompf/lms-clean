@@ -23,10 +23,10 @@ __global__ void x5(int* x6, int* x7, int x8, int x9, int x10) {
   // each threadblock hands one dimX in coalease size of A, then we have dimZ x dimY threadblocks
   // this kernel might be inefficient if the dimX is small. TODO
   int x11 = blockDim.x;
-  int x12 = 0;
+  int x12 = threadIdx.x;
   while (x12 < x10) {
     int x13 = x12;
-    x7[(blockIdx.y + blockIdx.x * x8) * x10 + (threadIdx.x + x13)] = x6[(blockIdx.x + blockIdx.y * x9) * x10 + (threadIdx.x + x13)];
+    x7[(blockIdx.y + blockIdx.x * x8) * x10 + x13] = x6[(blockIdx.x + blockIdx.y * x9) * x10 + x13];
     x12 = x12 + x11;
   }
 }
