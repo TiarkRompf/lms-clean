@@ -18,23 +18,23 @@ Emitting C Generated Code
 #include "scanner_header.h"
 /************* Functions **************/
 __global__ void x10(float* x11, float* x12, int x13, int x14, int x15) {
-  int x16 = blockIdx.z;
-  // this is the permutation kernel for List(2, 0, 1)
+  int x16 = blockIdx.y;
+  // this is the permutation kernel for List(1, 2, 0)
   // arg0: 3D input tensor (dimZ x dimY x dimX)
-  // arg1: 3D output tensor (dimX x dimZ x dimY)
+  // arg1: 3D output tensor (dimY x dimX x dimZ)
   // arg2: dimZ of input
   // arg3: dimY of input
   // arg4: dimX of input
-  // caller must use <<<dim3((dimX+31)/32, (dimY+31)/32, dimZ), dim3(32, 8, 1)>>>
+  // caller must use <<<dim3((dimX+31)/32, dimY, (dimZ+31)/32), dim3(32, 1, 8)>>>
   __shared__ float x17[1056];
   // read data from input array to shared memory
   int x18 = 0;
-  int x19 = blockIdx.y * 32;
+  int x19 = blockIdx.z * 32;
   int x20 = blockIdx.x * 32;
   while (x18 < 32) {
     int x21 = x18;
-    int x22 = x16 + threadIdx.z;
-    if (x22 < x13 && x19 + (threadIdx.y + x21) < x14 && x20 + threadIdx.x < x15) x17[1056 * threadIdx.z + 33 * (threadIdx.y + x21) + threadIdx.x] = x11[(x19 + (threadIdx.y + x21) + x22 * x14) * x15 + (x20 + threadIdx.x)];
+    int x22 = x19 + (threadIdx.z + x21);
+    if (x22 < x13 && x16 + threadIdx.y < x14 && x20 + threadIdx.x < x15) x17[33 * (threadIdx.z + x21) + 33 * threadIdx.y + threadIdx.x] = x11[(x16 + threadIdx.y + x22 * x14) * x15 + (x20 + threadIdx.x)];
     x18 = x18 + 8;
   }
   // sync threads
@@ -43,8 +43,8 @@ __global__ void x10(float* x11, float* x12, int x13, int x14, int x15) {
   int x23 = 0;
   while (x23 < 32) {
     int x24 = x23;
-    int x25 = x20 + (threadIdx.y + x24);
-    if (x25 < x15 && x16 + threadIdx.z < x13 && x19 + threadIdx.x < x14) x12[(x16 + threadIdx.z + x25 * x13) * x14 + (x19 + threadIdx.x)] = x17[1056 * threadIdx.z + 33 * threadIdx.x + (threadIdx.y + x24)];
+    int x25 = x16 + threadIdx.y;
+    if (x25 < x14 && x20 + (threadIdx.z + x24) < x15 && x19 + threadIdx.x < x13) x12[(x20 + (threadIdx.z + x24) + x25 * x15) * x13 + (x19 + threadIdx.x)] = x17[33 * threadIdx.x + 33 * threadIdx.y + (threadIdx.z + x24)];
     x23 = x23 + 8;
   }
 }
@@ -88,48 +88,48 @@ void Snippet(int x0) {
   CUDA_CALL(cudaStreamCreateWithFlags(&x5, cudaStreamNonBlocking));
   int x6 = x2;
   // end setting up the MPI/NCCL environment
-  // begin initializing GPU array of size 165000 and type Float
-  float* x7 = (float*)malloc(165000 * sizeof(float));
+  // begin initializing GPU array of size 180 and type Float
+  float* x7 = (float*)malloc(180 * sizeof(float));
   CUDA_CALL(cudaSetDevice(x6));
   float* x8 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x8, (size_t)(165000 * sizeof(float))));
-  scan_float_array(x7, 165000, "golden/input_rank_%d.data", x6);
-  CUDA_CALL(cudaMemcpy(x8, x7, (size_t)(165000 * sizeof(float)), cudaMemcpyHostToDevice));
-  // end initializing GPU array of size 165000 and type Float
+  CUDA_CALL(cudaMalloc(&x8, (size_t)(180 * sizeof(float))));
+  scan_float_array(x7, 180, "golden/input_rank_%d.data", x6);
+  CUDA_CALL(cudaMemcpy(x8, x7, (size_t)(180 * sizeof(float)), cudaMemcpyHostToDevice));
+  // end initializing GPU array of size 180 and type Float
   CUDA_CALL(cudaSetDevice(x6));
   float* x9 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x9, (size_t)(165000 * sizeof(float))));
-  x10<<<dim3(2, 2, 60), dim3(32, 8, 1)>>>(x8, x9, 60, 55, 50);
-  // begin initializing fixed GPU array of size 165000 and type Float and device (pre-rename) x39
+  CUDA_CALL(cudaMalloc(&x9, (size_t)(180 * sizeof(float))));
+  x10<<<dim3(1, 5, 1), dim3(32, 1, 8)>>>(x8, x9, 6, 5, 6);
+  // begin initializing fixed GPU array of size 180 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x26 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x26, (size_t)(165000 * sizeof(float))));
-  x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x26, 0, 165000);
-  // end initializing fixed GPU array of size 165000 and type Float and device (pre-rename) x39
-  // begin checking GPU array of size 165000 and type Float
-  float* x33 = (float*)malloc(165000 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x33, x9, (size_t)(165000 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_with_file(x33, 165000, "golden/loss_rank_%d.data", x6);
-  // end checking GPU array of size 165000 and type Float
-  // begin initializing fixed GPU array of size 165000 and type Float and device (pre-rename) x39
+  CUDA_CALL(cudaMalloc(&x26, (size_t)(180 * sizeof(float))));
+  x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x26, 0, 180);
+  // end initializing fixed GPU array of size 180 and type Float and device (pre-rename) x39
+  // begin checking GPU array of size 180 and type Float
+  float* x33 = (float*)malloc(180 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x33, x9, (size_t)(180 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array_with_file(x33, 180, "golden/loss_rank_%d.data", x6);
+  // end checking GPU array of size 180 and type Float
+  // begin initializing fixed GPU array of size 180 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x34 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x34, (size_t)(165000 * sizeof(float))));
-  x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x34, 1, 165000);
-  // end initializing fixed GPU array of size 165000 and type Float and device (pre-rename) x39
+  CUDA_CALL(cudaMalloc(&x34, (size_t)(180 * sizeof(float))));
+  x27<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x34, 1, 180);
+  // end initializing fixed GPU array of size 180 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x35 = (float*)malloc(0 * sizeof(float));
-  CUDA_CALL(cudaMalloc(&x35, (size_t)(165000 * sizeof(float))));
-  x10<<<dim3(2, 2, 50), dim3(32, 8, 1)>>>(x34, x35, 50, 60, 55);
-  // begin computing ACCUM on GPU for size 165000 and type Float at device (pre-rename) x39 with base_operand x192 and addition_operand x254
+  CUDA_CALL(cudaMalloc(&x35, (size_t)(180 * sizeof(float))));
+  x10<<<dim3(1, 6, 1), dim3(32, 1, 8)>>>(x34, x35, 5, 6, 6);
+  // begin computing ACCUM on GPU for size 180 and type Float at device (pre-rename) x39 with base_operand x192 and addition_operand x254
   CUDA_CALL(cudaSetDevice(x6));
-  x36<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x26, x35, 165000);
-  // end computing ACCUM on GPU for size 165000 and type Float at device (pre-rename) x39 with base_operand x192 and addition_operand x254
-  // begin checking GPU array of size 165000 and type Float
-  float* x43 = (float*)malloc(165000 * sizeof(float));
-  CUDA_CALL(cudaMemcpy(x43, x26, (size_t)(165000 * sizeof(float)), cudaMemcpyDeviceToHost));
-  check_float_array_with_file(x43, 165000, "golden/input_grad_rank_%d.data", x6);
-  // end checking GPU array of size 165000 and type Float
+  x36<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x26, x35, 180);
+  // end computing ACCUM on GPU for size 180 and type Float at device (pre-rename) x39 with base_operand x192 and addition_operand x254
+  // begin checking GPU array of size 180 and type Float
+  float* x43 = (float*)malloc(180 * sizeof(float));
+  CUDA_CALL(cudaMemcpy(x43, x26, (size_t)(180 * sizeof(float)), cudaMemcpyDeviceToHost));
+  check_float_array_with_file(x43, 180, "golden/input_grad_rank_%d.data", x6);
+  // end checking GPU array of size 180 and type Float
   NCCLCHECK(ncclCommDestroy(x4));
   MPICHECK(MPI_Finalize());
 }

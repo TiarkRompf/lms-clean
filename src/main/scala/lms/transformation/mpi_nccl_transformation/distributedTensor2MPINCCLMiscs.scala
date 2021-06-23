@@ -41,12 +41,17 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val mask_tensor = get_operand(mask, anno)
 
       val size = numeral(shape)
+      generate_comment(s"begin allocating output array of size $size and type Float for tensor_maskedfill")
       val output = gpu_array(size, manifest[Float], myNCCLRank)
+      generate_comment(s"end allocating output array of size $size and type Float for tensor_maskedfill")
+
+      generate_comment("begin calling masked fill kernel")
       cudaMaskedFillWrap[Float](
         Wrap[Array[Float]](input_tensor),
         Wrap[Array[Float]](output.x),
         Wrap[Array[Int]](mask_tensor),
         shape, size, value)
+      generate_comment("end calling masked fill kernel")
       output.x
 
     case Node(s, "tensor_maskedfill_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
@@ -56,12 +61,17 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val doutput_tensor = get_operand(doutput, anno)
       val mask_tensor = get_operand(mask, anno)
       val size = numeral(shape)
+      generate_comment(s"begin allocating gradient input array of size $size and type Float for tensor_maskedfill")
       val dinput = gpu_array(size, manifest[Float], myNCCLRank)
+      generate_comment(s"end allocating gradient input array array of size $size and type Float for tensor_maskedfill")
+
+      generate_comment("begin calling masked fill gradient kernel")
       cudaMaskedFillGradWrap[Float](
         Wrap[Array[Float]](doutput_tensor),
         Wrap[Array[Float]](dinput.x),
         Wrap[Array[Int]](mask_tensor),
         shape, size)
+      generate_comment("end calling masked fill gradient kernel")
       dinput.x
 
     case Node(s, "tensor_logsoftmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
@@ -70,12 +80,18 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
 
-      val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
+      val size = numeral(shape)
+      generate_comment(s"begin allocating output array of size $size and type Float for tensor_logsoftmax")
+      val output = gpu_array(size, manifest[Float], myNCCLRank)
+      generate_comment(s"end allocating output array of size $size and type Float for tensor_logsoftmax")
+
+      generate_comment("begin calling softmax kernel")
       cudaLogSoftmaxWrap[Float](
         Wrap[Array[Float]](input_tensor),
         Wrap[Array[Float]](output.x),
         numeral(shape.init),
         shape.last)
+      generate_comment("begin calling softmax kernel")
       output.x
 
     case Node(s, "tensor_logsoftmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::_, _) =>
@@ -85,13 +101,18 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val output_tensor = get_operand(output, anno)
       val doutput_tensor = get_operand(doutput, anno)
 
-      val dinput = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
+      val size = numeral(shape)
+      generate_comment(s"begin allocating gradient input array of size $size and type Float for tensor_logsoftmax")
+      val dinput = gpu_array(size, manifest[Float], myNCCLRank)
+      generate_comment(s"end allocating gradient input array of size $size and type Float for tensor_logsoftmax")
+
+      generate_comment("begin calling softmax gradient kernel")
       cudaLogSoftmaxGradWrap[Float](
         Wrap[Array[Float]](dinput.x),
         Wrap[Array[Float]](doutput_tensor),
         Wrap[Array[Float]](output_tensor),
-        numeral(shape.init),
-        shape.last)
+        numeral(shape.init), shape.last)
+      generate_comment("end calling softmax gradient kernel")
       dinput.x
 
     case Node(s, "tensor_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _) =>
@@ -102,12 +123,18 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       val shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
+      
+      val size = numeral(shape)
+      generate_comment(s"begin allocating input array of size $size and type Float for tensor_transpose")
+      val output = gpu_array(size, manifest[Float], myNCCLRank)
+      generate_comment(s"end allocating input array of size $size and type Float for tensor_transpose")
 
-      val output = gpu_array(numeral(shape), manifest[Float], myNCCLRank)
+      generate_comment("begin calling transpose kernel")
       cudaTransposeWrap[Float](
         Wrap[Array[Float]](input_tensor),
         Wrap[Array[Float]](output.x),
         shape)
+      generate_comment("end calling transpose kernel")
       output.x
 
     case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::Backend.Const(perm:List[Int])::_, _) =>

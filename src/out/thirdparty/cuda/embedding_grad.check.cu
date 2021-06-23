@@ -75,12 +75,12 @@ __global__ void x7(int* x8, float* x9, float* x10, int x11, int x12, int x13) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int* x1 = (int*)malloc(10 * sizeof(int));
-  scan_int("golden/embedding/indices.data", x1, 10);
+  scan_ints("golden/embedding/indices.data", x1, 10);
   int* x2 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(10 * sizeof(int))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(10 * sizeof(int)), cudaMemcpyHostToDevice));
   float* x3 = (float*)malloc(600 * sizeof(float));
-  scan_float("golden/embedding/output_grad.data", x3, 600);
+  scan_floats("golden/embedding/output_grad.data", x3, 600);
   float* x4 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x4, (size_t)(600 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(600 * sizeof(float)), cudaMemcpyHostToDevice));
