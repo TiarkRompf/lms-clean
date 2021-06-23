@@ -63,19 +63,12 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
   def EmbeddingForward(input: TENSOR, indices: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
     require(input.shapeSize.size == 2, "input must be a 2-D matrix")
     require(indices.shapeSize.size == 1, "indices must be an 1-D array")
-    System.out.println("fwd pass")
-    System.out.println("input: " + input.resultType.shape)
-    System.out.println("indices: " + indices.resultType.shape)
     val res_tt = TensorType(Seq(indices.resultType.shape(0), input.resultType.shape(1)), input.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_embedding", C(res_tt), C(anno), input.x, indices.x)
       (input.x, indices.x)).withSrcType(__pos, input.et))
   }
 
   def EmbeddingBackward(input: TENSOR, doutput: TENSOR, indices: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
-    System.out.println("bwd pass")
-    System.out.println("input: " + input.resultType.shape)
-    System.out.println("doutput: " + doutput.resultType.shape)
-    System.out.println("indices: " + indices.resultType.shape)
     val res_tt = TensorType(Seq(input.resultType.shape(0), doutput.resultType.shape(1)), doutput.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_embedding_bwd", C(res_tt), C(anno), input.x, doutput.x, indices.x)
       (doutput.x, indices.x)).withSrcType(__pos, doutput.et))
@@ -89,12 +82,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       (input_type.shape.reverse zip mask_type.shape.reverse).toList map { case (a:Size, b:Size) => (a.dim, b.dim)}
     case Node(s, "tensor_logsoftmax", _, _) => List()
     case Node(s, "tensor_permute", _, _) => List()
-    case Node(s, "tensor_embedding", tt::anno::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) => // todo: fixme
-      /*
-      val input_type = (new TENSOR(input, useOldMetadata=true)).resultType
-      val mask_type = (new TENSOR(mask, useOldMetadata=true)).resultType
-      (input_type.shape.reverse zip mask_type.shape.reverse).toList map { case (a:Size, b:Size) => (a.dim, b.dim)}*/
-      List()
+    case Node(s, "tensor_embedding", _, _) => List()
     case _ => super.mergable_dims(node)
   }
 
