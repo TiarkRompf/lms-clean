@@ -142,7 +142,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val indices_size = indices_shape(0)
       val embed_size = input_shape(1)
       val output_size = numeral(output_shape)
-      
+
       generate_comment(s"begin allocating output array of size $output_size and type Float for tensor_embedding")
       val output = gpu_array(output_size, manifest[Float], myNCCLRank)
       generate_comment(s"end allocating output array of size $output_size and type Float for tensor_embedding")
@@ -174,20 +174,18 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val embed_size = doutput_shape(1)
       val dinput_size = numeral(dinput_shape)
 
-      generate_comment(s"begin allocating gpu array of size $dinput_size and type Float for the gradient input of embedding")
-      val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
-      generate_comment(s"end allocating gpu array of size $dinput_size and type Float for the gradient input of embedding")
+      val dinput = withComment(s"allocating gpu array of size $dinput_size and type Float for the gradient input of embedding") {
+        gpu_fixed_array(dinput_size, myNCCLRank, NUM(Backend.Const(0), m))
+      }
 
-      generate_comment("begin calling embedding gradient kernel")
-      cudaEmbeddingGradWrap[Float](
-        Wrap[Array[Float]](doutput_tensor),
-        Wrap[Array[Float]](dinput.x),
-        Wrap[Array[Int]](indices_array),
-        unit[Int](embed_size),
-        unit[Int](indices_size))
-      generate_comment("end calling embedding gradient kernel")
-      // System.out.println("embed_size: " + embed_size)
-      // System.out.println("indices_size: " + indices_size)
+      withComment("calling embedding gradient kernel") {
+        cudaEmbeddingGradWrap[Float](
+          Wrap[Array[Float]](doutput_tensor),
+          Wrap[Array[Float]](dinput.x),
+          Wrap[Array[Int]](indices_array),
+          unit[Int](embed_size),
+          unit[Int](indices_size))
+      }
       dinput.x
 
     case _ => super.transform(n)

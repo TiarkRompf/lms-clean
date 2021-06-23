@@ -9,11 +9,11 @@ def generate_data(lms_clean_root: str):
     torch.manual_seed(0)
 
     # model
-    n_embedding = 8
-    embed_size = 5
+    n_embedding = 20
+    embed_size = 60
     embed = nn.Embedding(n_embedding, embed_size)
 
-    n_indices = 4
+    n_indices = 10
     indices = torch.randint(0, n_embedding, (n_indices,))
 
     loss = embed(indices)
