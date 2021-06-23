@@ -553,7 +553,7 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("permute", driver.code, "cu", driver.setLogPath)
   }
 
-  test("permute_102_big") { // failed
+  test("permute_102_big") { // passed
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
 
