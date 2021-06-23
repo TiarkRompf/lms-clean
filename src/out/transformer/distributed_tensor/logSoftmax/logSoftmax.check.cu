@@ -239,14 +239,14 @@ void Snippet(int x0) {
   scan_float_array(x16, 17056, "golden/input_rank_%d.data", x6);
   CUDA_CALL(cudaMemcpy(x17, x16, (size_t)(17056 * sizeof(float)), cudaMemcpyHostToDevice));
   // end initializing GPU array of size 17056 and type Float
-  // begin allocating output array of size 17056 and type Float for tensor_logsoftmax
+  // begin allocating gpu array of size 17056 and type Float for the output of logsoftmax
   CUDA_CALL(cudaSetDevice(x6));
   float* x18 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x18, (size_t)(17056 * sizeof(float))));
-  // end allocating output array of size 17056 and type Float for tensor_logsoftmax
+  // end allocating gpu array of size 17056 and type Float for the output of logsoftmax
   // begin calling softmax kernel
   x19<<<dim3(32, 1, 1), dim3(1024, 1, 1), 4096>>>(x8, x18, 533);
-  // begin calling softmax kernel
+  // end calling softmax kernel
   // begin computing ADD on GPU for size 17056 and type Float at device (pre-rename) x39 with left_operand x103 and right_operand x120
   CUDA_CALL(cudaSetDevice(x6));
   float* x58 = (float*)malloc(0 * sizeof(float));
@@ -284,11 +284,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   x71<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x67, x70, 17056);
   // end computing ACCUM on GPU for size 17056 and type Float at device (pre-rename) x39 with base_operand x404 and addition_operand x440
-  // begin allocating gradient input array of size 17056 and type Float for tensor_logsoftmax
+  // begin allocating gpu array of size 17056 and type Float for the gradient input of logsoftmax
   CUDA_CALL(cudaSetDevice(x6));
   float* x78 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x78, (size_t)(17056 * sizeof(float))));
-  // end allocating gradient input array of size 17056 and type Float for tensor_logsoftmax
+  // end allocating gpu array of size 17056 and type Float for the gradient input of logsoftmax
   // begin calling softmax gradient kernel
   x79<<<dim3(32, 1, 1), dim3(1024, 1, 1), 4096>>>(x78, x68, x18, 533);
   // end calling softmax gradient kernel

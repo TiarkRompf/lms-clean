@@ -146,11 +146,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   x36<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x32, x35, 9);
   // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x196 and addition_operand x232
-  // begin allocating gpu array of size 9 and type Float for the gradient of input of softmax
+  // begin allocating gpu array of size 9 and type Float for the gradient input of softmax
   CUDA_CALL(cudaSetDevice(x6));
   float* x43 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x43, (size_t)(9 * sizeof(float))));
-  // end allocating gpu array of size 9 and type Float for the gradient of input of softmax
+  // end allocating gpu array of size 9 and type Float for the gradient input of softmax
   // begin softmax backward pass
   float x44 = 1.0;
   float x45 = 0.0;

@@ -122,11 +122,11 @@ void Snippet(int x0) {
   CUDNNCHECK(cudnnCreateDropoutDescriptor(&x24));
   CUDNNCHECK(cudnnSetDropoutDescriptor(x24, x7, 0.0, x23, x21, 1));
   // end creating dropout descriptor
-  // begin allocating gpu array for the output of dropout
+  // begin allocating gpu array of size 9 and type Float for the output of dropout
   CUDA_CALL(cudaSetDevice(x6));
   float* x25 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x25, (size_t)(9 * sizeof(float))));
-  // end allocating gpu array for the output of dropout
+  // end allocating gpu array of size 9 and type Float for the output of dropout
   // begin dropout forward pass
   CUDNNCHECK(cudnnDropoutForward(x7, x24, x19, x9, x19, x25, x22, x20));
   // end dropout forward pass
@@ -167,11 +167,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   x39<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x35, x38, 9);
   // end computing ACCUM on GPU for size 9 and type Float at device (pre-rename) x39 with base_operand x230 and addition_operand x266
-  // begin allocating gpu array for the gradient of input of dropout
+  // begin allocating gpu array of size 9 and type Float for the gradient input of dropout
   CUDA_CALL(cudaSetDevice(x6));
   float* x46 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x46, (size_t)(9 * sizeof(float))));
-  // end allocating gpu array for the gradient of input of dropout
+  // end allocating gpu array of size 9 and type Float for the gradient input of dropout
   // begin finding dropout backward reserve bytes
   size_t x47 = (size_t)0;
   CUDNNCHECK(cudnnDropoutGetReserveSpaceSize(x19, &x47));

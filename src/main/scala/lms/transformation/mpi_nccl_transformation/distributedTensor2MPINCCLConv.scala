@@ -164,17 +164,17 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val output_descriptor = getTensorDescriptor(output_shape, "tensor")
 
       val output_size = numeral(output_shape)
-      generate_comment(s"begin allocating gpu array of size $output_size and type Float for the output of convolution")
-      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
-      generate_comment(s"end allocating gpu array of size $output_size and type Float for the output of convolution")
+      val output = withComment(s"allocating gpu array of size $output_size and type Float for the output of convolution") {
+        gpu_array(output_size, manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin finding convolution forward algorithm")
-      var res_count = 0
-      val res = new CUDNN_CONV_FWD_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_FWD_ALG_PERF], "cudnnConvolutionFwdAlgoPerf_t").x)
-      CUDNN_CHECK(CUDNN_FIND_CONV_FWD_ALG(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor, INT(1), VAR(res_count), res))
-      val convAlgoRep = readField[Manifest[CUDNN_CONV_FWD_ALG_PERF], Manifest[CUDNN_CONV_FWD_ALGO]](Wrap[Manifest[CUDNN_CONV_FWD_ALG_PERF]](res.x), "algo")
-      val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_FWD_ALGO])
-      generate_comment("end finding convolution forward algorithm")
+      val convAlgo = withComment("finding convolution forward algorithm") {
+        var res_count = 0
+        val res = new CUDNN_CONV_FWD_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_FWD_ALG_PERF], "cudnnConvolutionFwdAlgoPerf_t").x)
+        CUDNN_CHECK(CUDNN_FIND_CONV_FWD_ALG(myCUDNNComm, input_descriptor, filter_descriptor, conv_descriptor, output_descriptor, INT(1), VAR(res_count), res))
+        val convAlgoRep = readField[Manifest[CUDNN_CONV_FWD_ALG_PERF], Manifest[CUDNN_CONV_FWD_ALGO]](Wrap[Manifest[CUDNN_CONV_FWD_ALG_PERF]](res.x), "algo")
+        TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_FWD_ALGO])
+      }
 
       generate_comment("begin finding convolution forward workspace size")
       var workspace_bytes = 0
@@ -183,15 +183,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         convAlgo, workspace_bytes_v))
       generate_comment("begin finding convolution backward workspace size")
 
-      generate_comment("begin allocating gpu array for convolution forward workspace")
-      val d_workspace = GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for convolution forward workspace")
+      val d_workspace = withComment("allocating gpu array for convolution forward workspace") {
+        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin convolution forward pass")
-      CUDNN_CHECK(CUDNN_CONV_FWD(myCUDNNComm, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(weight_tensor), filter_descriptor, new ARRAY(filter_tensor),
+      withComment("convolution forward pass") {
+        CUDNN_CHECK(CUDNN_CONV_FWD(myCUDNNComm, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(weight_tensor), filter_descriptor, new ARRAY(filter_tensor),
         conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), output_descriptor, output))
-      generate_comment("end convolution forward pass")
-
+      }
       output.x
 
     case Node(s, "tensor_conv_bwd_data", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
@@ -214,17 +213,17 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
       val dweight_size = numeral(weight_shape)
-      generate_comment(s"begin allocating gpu array of size $dweight_size and type Float for the gradient of weight of convolution")
-      val dweight = gpu_array(dweight_size, manifest[Float], myNCCLRank)
-      generate_comment(s"end allocating gpu array of size $dweight_size and type Float for the gradient of weight of convolution")
+      val dweight = withComment(s"allocating gpu array of size $dweight_size and type Float for the gradient weight of convolution") {
+        gpu_array(dweight_size, manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin finding convolution backward data algorithm")
-      var res_count = 0
-      val res = new CUDNN_CONV_BWD_DATA_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], "cudnnConvolutionBwdDataAlgoPerf_t").x)
-      CUDNN_CHECK(CUDNN_FIND_CONV_BWD_DATA_ALG(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor, INT(1), VAR(res_count), res))
-      val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], Manifest[CUDNN_CONV_BWD_DATA_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF]](res.x), "algo")
-      val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_DATA_ALGO])
-      generate_comment("end finding convolution backward data algorithm")
+      val convAlgo = withComment("finding convolution backward data algorithm") {
+        var res_count = 0
+        val res = new CUDNN_CONV_BWD_DATA_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], "cudnnConvolutionBwdDataAlgoPerf_t").x)
+        CUDNN_CHECK(CUDNN_FIND_CONV_BWD_DATA_ALG(myCUDNNComm, filter_descriptor, doutput_descriptor, conv_descriptor, dweight_descriptor, INT(1), VAR(res_count), res))
+        val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF], Manifest[CUDNN_CONV_BWD_DATA_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_DATA_ALG_PERF]](res.x), "algo")
+        TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_DATA_ALGO])
+      }
 
       generate_comment("begin finding convolution backward data workspace size")
       var workspace_bytes = 0
@@ -233,15 +232,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         convAlgo, workspace_bytes_v))
       generate_comment("end finding convolution backward data workspace size")
 
-      generate_comment("begin allocating gpu array for convolution backward data workspace")
-      val d_workspace = GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for convolution backward data workspace")
+      val d_workspace = withComment("allocating gpu array for convolution backward data workspace") {
+        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin convolution backward data pass")
-      CUDNN_CHECK(CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(FLOAT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
-        conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), dweight_descriptor, dweight))
-      generate_comment("end convolution backward data pass")
-
+      withComment("convolution backward data pass") {
+        CUDNN_CHECK(CUDNN_CONV_BWD_DATA(myCUDNNComm, VAR(FLOAT(alpha)), filter_descriptor, new ARRAY(filter_tensor), doutput_descriptor, new ARRAY(output_tensor),
+          conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), dweight_descriptor, dweight))
+      }
       dweight.x
 
     case Node(s, "tensor_conv_bwd_filter", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
@@ -264,17 +262,17 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val conv_descriptor = getConvDescriptor(padding, strides, dilation)
 
       val dfilter_size = numeral(filter_shape)
-      generate_comment(s"begin allocating gpu array of size $dfilter_size and type Float for the gradient of filter of convolution")
-      val dfilter = gpu_array(dfilter_size, manifest[Float], myNCCLRank)
-      generate_comment(s"end allocating gpu array of size $dfilter_size and type Float for the gradient of filter of convolution")
+      val dfilter = withComment(s"allocating gpu array of size $dfilter_size and type Float for the gradient filter of convolution") {
+        gpu_array(dfilter_size, manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin finding convolution backward filter algorithm")
-      var res_count = 0
-      val res = new CUDNN_CONV_BWD_FILTER_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF], "cudnnConvolutionBwdFilterAlgoPerf_t").x)
-      CUDNN_CHECK(CUDNN_FIND_CONV_BWD_FILTER_ALG(myCUDNNComm, weight_descriptor, doutput_descriptor, conv_descriptor, dfilter_descriptor, INT(1), VAR(INT(res_count)), res))
-      val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF], Manifest[CUDNN_CONV_BWD_FILTER_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF]](res.x), "algo")
-      val convAlgo = TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_FILTER_ALGO])
-      generate_comment("end finding convolution backNCCL_ALLREDUCEward filter algorithm")
+      val convAlgo = withComment("finding convolution backward filter algorithm") {
+        var res_count = 0
+        val res = new CUDNN_CONV_BWD_FILTER_ALG_PERF(NEW_STRUCT(manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF], "cudnnConvolutionBwdFilterAlgoPerf_t").x)
+        CUDNN_CHECK(CUDNN_FIND_CONV_BWD_FILTER_ALG(myCUDNNComm, weight_descriptor, doutput_descriptor, conv_descriptor, dfilter_descriptor, INT(1), VAR(INT(res_count)), res))
+        val convAlgoRep = readField[Manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF], Manifest[CUDNN_CONV_BWD_FILTER_ALGO]](Wrap[Manifest[CUDNN_CONV_BWD_FILTER_ALG_PERF]](res.x), "algo")
+        TOP(Unwrap(convAlgoRep), manifest[CUDNN_CONV_BWD_FILTER_ALGO])
+      }
 
       generate_comment("begin finding convolution backward filter workspace size")
       var workspace_bytes = 0
@@ -283,15 +281,14 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
         convAlgo, workspace_bytes_v))
       generate_comment("end finding convolution backward filter workspace size")
 
-      generate_comment("begin allocating gpu array for convolution backward filter workspace")
-      val d_workspace = GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for convolution backward filter workspace")
+      val d_workspace = withComment("allocating gpu array for convolution backward filter workspace") {
+        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin convolution backward filter pass")
-      CUDNN_CHECK(CUDNN_CONV_BWD_FILTER(myCUDNNComm, VAR(FLOAT(alpha)), weight_descriptor, new ARRAY(weight_tensor), doutput_descriptor, new ARRAY(doutput_tensor),
-        conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), dfilter_descriptor, dfilter))
-      generate_comment("end convolution backward filter pass")
-
+      withComment("convolution backward filter pass") {
+        CUDNN_CHECK(CUDNN_CONV_BWD_FILTER(myCUDNNComm, VAR(FLOAT(alpha)), weight_descriptor, new ARRAY(weight_tensor), doutput_descriptor, new ARRAY(doutput_tensor),
+          conv_descriptor, convAlgo, d_workspace, workspace_bytes_v, VAR(FLOAT(beta)), dfilter_descriptor, dfilter))
+      }
       dfilter.x
 
     case Node(s, "tensor_softmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::_, _) =>
@@ -305,16 +302,15 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val input_tensor = get_operand(a, anno)
       val input_descriptor = getTensorDescriptor(input_shape, "tensor")
 
-      val output_size = numeral(input_shape)
-      generate_comment(s"begin allocating gpu array of size $output_size and type Float for the output of softmax")
-      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
-      generate_comment(s"end allocating gpu array of size $output_size and type Float for the output of softmax")
+      val size = numeral(input_shape)
+      val output = withComment(s"allocating gpu array of size $size and type Float for the output of softmax") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin softmax forward pass")
-      CUDNN_CHECK(CUDNN_SOFTMAX_FWD(myCUDNNComm, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
-        VAR(FLOAT(beta)), input_descriptor, output))
-      generate_comment("end softmax forward pass")
-
+      withComment("softmax forward pass") {
+        CUDNN_CHECK(CUDNN_SOFTMAX_FWD(myCUDNNComm, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
+          VAR(FLOAT(beta)), input_descriptor, output))
+      }
       output.x
 
     case Node(s, "tensor_softmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::
@@ -331,16 +327,15 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val output_descriptor = getTensorDescriptor(output_shape, "tensor")
 
-      val doutput_size = numeral(output_shape)
-      generate_comment(s"begin allocating gpu array of size $doutput_size and type Float for the gradient of input of softmax")
-      val dinput = gpu_array(doutput_size, manifest[Float], myNCCLRank)
-      generate_comment(s"end allocating gpu array of size $doutput_size and type Float for the gradient of input of softmax")
+      val size = numeral(output_shape)
+      val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of softmax") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin softmax backward pass")
-      CUDNN_CHECK(CUDNN_SOFTMAX_BWD(myCUDNNComm, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, VAR(FLOAT(alpha)), output_descriptor, new ARRAY(output_tensor),
-        output_descriptor, new ARRAY(doutput_tensor), VAR(FLOAT(beta)), output_descriptor, dinput))
-      generate_comment("end softmax backward pass")
-
+      withComment("softmax backward pass") {
+        CUDNN_CHECK(CUDNN_SOFTMAX_BWD(myCUDNNComm, CUDNN_SOFTMAX_FAST, CUDNN_SOFTMAX_MODE_INSTANCE, VAR(FLOAT(alpha)), output_descriptor, new ARRAY(output_tensor),
+          output_descriptor, new ARRAY(doutput_tensor), VAR(FLOAT(beta)), output_descriptor, dinput))
+      }
       dinput.x
 
     case Node(s, "tensor_activation", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params)::
@@ -357,16 +352,15 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val input_descriptor = getTensorDescriptor(input_shape, "tensor")
       val activation_descriptor = getActivationDescriptor(mode, coef)
 
-      val output_size = numeral(input_shape)
-      generate_comment(s"begin allocating gpu array of size $output_size and type Float for the output of softmax")
-      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the output of softmax")
+      val size = numeral(input_shape)
+      val output = withComment(s"allocating gpu array of size $size and type Float for the output of softmax") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin activation forward pass")
-      CUDNN_CHECK(CUDNN_ACTIVATION_FWD(myCUDNNComm, activation_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
-        VAR(FLOAT(beta)), input_descriptor, output))
-      generate_comment("end activation forward pass")
-
+      withComment("activation forward pass") {
+        CUDNN_CHECK(CUDNN_ACTIVATION_FWD(myCUDNNComm, activation_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
+          VAR(FLOAT(beta)), input_descriptor, output))
+      }
       output.x
 
     case Node(s, "tensor_activation_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
@@ -386,17 +380,16 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val input_descriptor = getTensorDescriptor(input_shape, "tensor")
       val activation_descriptor = getActivationDescriptor(mode, coef)
 
-      val dinput_size = numeral(input_shape)
-      generate_comment(s"begin allocating gpu array of size $dinput_size and type Float for the gradient of input of activation")
-      val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
-      generate_comment(s"end allocating gpu array of size $dinput_size and type Float for the gradient of input of activation")
+      val size = numeral(input_shape)
+      val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of activation") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin activation backward pass")
-      CUDNN_CHECK(CUDNN_ACTIVATION_BWD(myCUDNNComm, activation_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(output_tensor),
-        input_descriptor, new ARRAY(doutput_tensor), input_descriptor, new ARRAY(input_tensor), VAR(FLOAT(beta)), input_descriptor,
-        dinput))
-      generate_comment("begin activation backward pass")
-
+      withComment("activation backward pass") {
+        CUDNN_CHECK(CUDNN_ACTIVATION_BWD(myCUDNNComm, activation_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(output_tensor),
+          input_descriptor, new ARRAY(doutput_tensor), input_descriptor, new ARRAY(input_tensor), VAR(FLOAT(beta)), input_descriptor,
+          dinput))
+      }
       dinput.x
 
     case Node(s, "tensors_dropout", Backend.Const(tts: List[TensorType])::Backend.Const(anno:Anno)::(input:Backend.Sym)::
@@ -423,31 +416,29 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_CHECK(CUDNN_DROPOUT_GET_STATES_SZ(myCUDNNComm, states_bytes))
       generate_comment("end finding dropout forward states bytes")
 
-      generate_comment("begin allocating gpu array for the reserve space of dropout forward")
-      val d_reservespace = GPU_ARRAY_BY_BYTE(INT(reserve_bytes(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the reserve space of dropout forward")
+      val d_reservespace = withComment("allocating gpu array for the reserve space of dropout forward") {
+        GPU_ARRAY_BY_BYTE(INT(reserve_bytes(pos)), manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin allocating gpu array for the states of dropout forward")
-      val d_states = GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the states of dropout forward")
+      val d_states = withComment("allocating gpu array for the states of dropout forward") {
+        GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
+      }
 
       val dropout_descriptor = getDropoutDescriptor(d_states, states_bytes, params.asInstanceOf[DropoutParam])
 
       // allocate output tensor
-      // output tensor has the same shape as input tensor
-      generate_comment("begin allocating gpu array for the output of dropout")
-      val output_size = input_shape.fold(1) { (a, b) => a * b }
-      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the output of dropout")
+      val size = numeral(input_shape)
+      val output = withComment(s"allocating gpu array of size $size and type Float for the output of dropout") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      generate_comment("begin dropout forward pass")
-      CUDNN_CHECK(CUDNN_DROPOUT_FWD(myCUDNNComm, dropout_descriptor, input_descriptor, new ARRAY(input_tensor),
-        output_descriptor, output, d_reservespace, reserve_bytes))
-      generate_comment("end dropout forward pass")
+      withComment("dropout forward pass") {
+        CUDNN_CHECK(CUDNN_DROPOUT_FWD(myCUDNNComm, dropout_descriptor, input_descriptor, new ARRAY(input_tensor),
+          output_descriptor, output, d_reservespace, reserve_bytes))
+      }
 
       // return dropout output
       Adapter.g.reflect("tuple-view", output.x, d_reservespace.x)
-
 
     case Node(s, "tensor_dropout_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::
       (reserveSpace:Backend.Sym)::Backend.Const(params)::_, _) =>
@@ -463,10 +454,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val doutput_tensor = get_operand(doutput, anno)
       val reserveSpace_tensor = get_operand(reserveSpace, anno)
 
-      generate_comment("begin allocating gpu array for the gradient of input of dropout")
-      val dinput_size = doutput_shape.fold(1) { (a, b) => a * b }
-      val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the gradient of input of dropout")
+      val size = numeral(doutput_shape)
+
+      val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of dropout") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
       generate_comment("begin finding dropout backward reserve bytes")
       var reserve_bytes = VAR(SIZE_T(0))  // var read
@@ -478,17 +470,16 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       CUDNN_CHECK(CUDNN_DROPOUT_GET_STATES_SZ(myCUDNNComm, states_bytes))
       generate_comment("end finding dropout backward states bytes")
 
-      generate_comment("begin allocating gpu array for the states of dropout backward")
-      val d_states = GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the states of dropout backward")
+      val d_states = withComment("allocating gpu array for the states of dropout backward") {
+        GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
+      }
 
       val dropout_descriptor = getDropoutDescriptor(d_states, states_bytes, params.asInstanceOf[DropoutParam])
 
-      generate_comment("begin dropout backward pass")
-      CUDNN_CHECK(CUDNN_DROPOUT_BWD(myCUDNNComm, dropout_descriptor, doutput_descriptor, new ARRAY(doutput_tensor), dinput_descriptor,
-        dinput, new ARRAY(reserveSpace_tensor), reserve_bytes))
-      generate_comment("end dropout backward pass")
-
+      withComment("dropout backward pass") {
+        CUDNN_CHECK(CUDNN_DROPOUT_BWD(myCUDNNComm, dropout_descriptor, doutput_descriptor, new ARRAY(doutput_tensor), dinput_descriptor,
+          dinput, new ARRAY(reserveSpace_tensor), reserve_bytes))
+      }
       dinput.x
 
     case Node(s, "tensor_pooling", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::
@@ -508,16 +499,16 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val pooling_descriptor = getPoolingDescriptor(mode, window, padding, strides)
 
       // allocate output tensor
-      generate_comment("begin allocating gpu array for the output of pooling")
-      val output_size = output_shape.fold(1) { (a, b) => a * b }
-      val output = gpu_array(output_size, manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the output of pooling")
+      val size = numeral(output_shape)
 
-      generate_comment("begin pooling forward pass")
-      CUDNN_CHECK(CUDNN_POOLING_FWD(myCUDNNComm, pooling_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
-        VAR(FLOAT(beta)), output_descriptor, output))
-      generate_comment("end pooling forward pass")
+      val output = withComment(s"allocating gpu array of size $size and type Float for the output of pooling") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
+      withComment("pooling forward pass") {
+        CUDNN_CHECK(CUDNN_POOLING_FWD(myCUDNNComm, pooling_descriptor, VAR(FLOAT(alpha)), input_descriptor, new ARRAY(input_tensor),
+          VAR(FLOAT(beta)), output_descriptor, output))
+      }
       output.x
 
     case Node(s, "tensor_pooling_bwd",Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::(output:Backend.Sym)::
@@ -541,17 +532,17 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val pooling_descriptor = getPoolingDescriptor(mode, window, padding, strides)
 
-      generate_comment("begin allocating gpu array for the gradient of input of pooling")
-      val dinput_size = input_shape.fold(1) { (a, b) => a * b }
-      val dinput = gpu_array(dinput_size, manifest[Float], myNCCLRank)
-      generate_comment("end allocating gpu array for the gradient of input of pooling")
+      val size = numeral(input_shape)
 
-      generate_comment("begin pooling backward pass")
-      CUDNN_CHECK(CUDNN_POOLING_BWD(myCUDNNComm, pooling_descriptor, VAR(FLOAT(alpha)), output_descriptor, new ARRAY(output_tensor),
-        doutput_descriptor, new ARRAY(doutput_tensor), input_descriptor, new ARRAY(input_tensor), VAR(FLOAT(beta)), input_descriptor,
-        dinput))
-      generate_comment("end pooling backward pass")
+      val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of pooling") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
+      withComment("pooling backward pass") {
+        CUDNN_CHECK(CUDNN_POOLING_BWD(myCUDNNComm, pooling_descriptor, VAR(FLOAT(alpha)), output_descriptor, new ARRAY(output_tensor),
+          doutput_descriptor, new ARRAY(doutput_tensor), input_descriptor, new ARRAY(input_tensor), VAR(FLOAT(beta)), input_descriptor,
+          dinput))
+      }
       dinput.x
 
     case _ => super.transform(n)

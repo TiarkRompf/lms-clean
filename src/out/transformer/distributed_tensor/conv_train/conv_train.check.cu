@@ -160,17 +160,17 @@ void Snippet(int x0) {
     CUDA_CALL(cudaMalloc(&x50, (size_t)(162 * sizeof(float))));
     x11<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x50, 1, 162);
     // end initializing fixed GPU array of size 162 and type Float and device (pre-rename) x39
-    // begin allocating gpu array of size 18 and type Float for the gradient of filter of convolution
+    // begin allocating gpu array of size 18 and type Float for the gradient filter of convolution
     CUDA_CALL(cudaSetDevice(x6));
     float* x51 = (float*)malloc(0 * sizeof(float));
     CUDA_CALL(cudaMalloc(&x51, (size_t)(18 * sizeof(float))));
-    // end allocating gpu array of size 18 and type Float for the gradient of filter of convolution
+    // end allocating gpu array of size 18 and type Float for the gradient filter of convolution
     // begin finding convolution backward filter algorithm
     cudnnConvolutionBwdFilterAlgoPerf_t x52;
     int x53 = 0;
     CUDNNCHECK(cudnnFindConvolutionBackwardFilterAlgorithm(x7, x37, x40, x39, x38, 1, &x53, &x52));
     cudnnConvolutionBwdFilterAlgo_t x54 = x52.algo;
-    // end finding convolution backNCCL_ALLREDUCEward filter algorithm
+    // end finding convolution backward filter algorithm
     // begin finding convolution backward filter workspace size
     size_t x55 = (size_t)0;
     CUDNNCHECK(cudnnGetConvolutionBackwardFilterWorkspaceSize(x7, x37, x40, x39, x38, x54, &x55));

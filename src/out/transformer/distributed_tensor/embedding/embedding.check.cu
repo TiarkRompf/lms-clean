@@ -156,11 +156,11 @@ void Snippet(int x0) {
   scan_int_array(x16, 5, "golden/indices_rank_%d.data", x6);
   CUDA_CALL(cudaMemcpy(x17, x16, (size_t)(5 * sizeof(int)), cudaMemcpyHostToDevice));
   // end initializing GPU array of size 5 and type Int
-  // begin allocating output array of size 300 and type Float for tensor_embedding
+  // begin allocating gpu array of size 300 and type Float for the output of embedding
   CUDA_CALL(cudaSetDevice(x6));
   float* x18 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x18, (size_t)(300 * sizeof(float))));
-  // end allocating output array of size 300 and type Float for tensor_embedding
+  // end allocating gpu array of size 300 and type Float for the output of embedding
   // begin calling embedding kernel
   x19<<<dim3(60, 1, 1), dim3(5, 1, 1)>>>(x8, x17, x18, 60);
   // end calling embedding kernel

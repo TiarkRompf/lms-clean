@@ -83,10 +83,14 @@ void Snippet(int x0) {
   scan_float_array(x7, 64, "golden/input_rank_%d.data", x6);
   CUDA_CALL(cudaMemcpy(x8, x7, (size_t)(64 * sizeof(float)), cudaMemcpyHostToDevice));
   // end initializing GPU array of size 64 and type Float
+  // begin allocating gpu array of size 64 and type Float for the output of permute
   CUDA_CALL(cudaSetDevice(x6));
   float* x9 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x9, (size_t)(64 * sizeof(float))));
+  // end allocating gpu array of size 64 and type Float for the output of permute
+  // begin calling permute kernel
   x10<<<dim3(2, 4, 1), dim3(7, 1, 1)>>>(x8, x9, 4, 2, 8);
+  // end calling permute kernel
   // begin initializing fixed GPU array of size 64 and type Float and device (pre-rename) x39
   CUDA_CALL(cudaSetDevice(x6));
   float* x19 = (float*)malloc(0 * sizeof(float));
@@ -104,14 +108,18 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x27, (size_t)(64 * sizeof(float))));
   x20<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x27, 1, 64);
   // end initializing fixed GPU array of size 64 and type Float and device (pre-rename) x39
+  // begin allocating gpu array of size 64 and type Float for the output of permute
   CUDA_CALL(cudaSetDevice(x6));
   float* x28 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x28, (size_t)(64 * sizeof(float))));
+  // end allocating gpu array of size 64 and type Float for the output of permute
+  // begin calling permute kernel
   x10<<<dim3(4, 2, 1), dim3(7, 1, 1)>>>(x27, x28, 2, 4, 8);
-  // begin computing ACCUM on GPU for size 64 and type Float at device (pre-rename) x39 with base_operand x116 and addition_operand x178
+  // end calling permute kernel
+  // begin computing ACCUM on GPU for size 64 and type Float at device (pre-rename) x39 with base_operand x120 and addition_operand x183
   CUDA_CALL(cudaSetDevice(x6));
   x29<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x19, x28, 64);
-  // end computing ACCUM on GPU for size 64 and type Float at device (pre-rename) x39 with base_operand x116 and addition_operand x178
+  // end computing ACCUM on GPU for size 64 and type Float at device (pre-rename) x39 with base_operand x120 and addition_operand x183
   // begin checking GPU array of size 64 and type Float
   float* x36 = (float*)malloc(64 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x36, x19, (size_t)(64 * sizeof(float)), cudaMemcpyDeviceToHost));
