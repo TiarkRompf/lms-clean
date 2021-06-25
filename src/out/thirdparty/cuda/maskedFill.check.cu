@@ -88,12 +88,12 @@ __global__ void x42(float* x43, float* x44, int* x45, int x46, int x47, int x48,
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(64 * sizeof(float));
-  scan_float("golden/maskedFill/input.data", x1, 64);
+  scan_floats("golden/maskedFill/input.data", x1, 64);
   float* x2 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(64 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(64 * sizeof(float)), cudaMemcpyHostToDevice));
   int* x3 = (int*)malloc(64 * sizeof(int));
-  scan_int("golden/maskedFill/mask.data", x3, 64);
+  scan_ints("golden/maskedFill/mask.data", x3, 64);
   int* x4 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x4, (size_t)(64 * sizeof(int))));
   CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(64 * sizeof(int)), cudaMemcpyHostToDevice));

@@ -104,11 +104,11 @@ void Snippet(int x0) {
   CUDNNCHECK(cudnnCreatePoolingDescriptor(&x20));
   CUDNNCHECK(cudnnSetPooling2dDescriptor(x20, CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING, CUDNN_PROPAGATE_NAN, 3, 3, 1, 1, 1, 1));
   // end creating and setting pooling descriptor
-  // begin allocating gpu array for the output of pooling
+  // begin allocating gpu array of size 81 and type Float for the output of pooling
   CUDA_CALL(cudaSetDevice(x6));
   float* x21 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x21, (size_t)(81 * sizeof(float))));
-  // end allocating gpu array for the output of pooling
+  // end allocating gpu array of size 81 and type Float for the output of pooling
   // begin pooling forward pass
   float x22 = 1.0;
   float x23 = 0.0;
@@ -151,11 +151,11 @@ void Snippet(int x0) {
   CUDA_CALL(cudaSetDevice(x6));
   x37<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x33, x36, 81);
   // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x203 and addition_operand x239
-  // begin allocating gpu array for the gradient of input of pooling
+  // begin allocating gpu array of size 81 and type Float for the gradient input of pooling
   CUDA_CALL(cudaSetDevice(x6));
   float* x44 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x44, (size_t)(81 * sizeof(float))));
-  // end allocating gpu array for the gradient of input of pooling
+  // end allocating gpu array of size 81 and type Float for the gradient input of pooling
   // begin pooling backward pass
   float x45 = 1.0;
   float x46 = 0.0;

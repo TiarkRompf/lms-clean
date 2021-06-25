@@ -36,122 +36,83 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       Backend.Const(value:Float)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // get input info and transform input tensors
-      val input_shape = tensor_shape(input, useOldMetadata = true)
+      val shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
       val mask_tensor = get_operand(mask, anno)
 
-      // choose the last two dimensions as dim0 and dim1
-      val dim0_shape = input_shape(input_shape.size - 2)
-      val dim1_shape = input_shape(input_shape.size - 1)
-      val dim0_stride = dim0_shape
-      val dim1_stride = 1
+      val size = numeral(shape)
+      val output = withComment(s"allocating gpu array of size $size and type Float for the output of maskedfill") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      val input_size = input_shape.fold(1) { _ * _ }
-      val output = gpu_array(input_size, manifest[Float], myNCCLRank)
-
-      val maskedFillKernel = cudaMaskedFill[Float](false)
-      FunOps11(maskedFillKernel).apply(
-        Wrap[Array[Float]](input_tensor),
-        Wrap[Array[Float]](output.x),
-        Wrap[Array[Int]](mask_tensor),
-        unit[Float](value),
-        unit[Int](dim0_shape),
-        unit[Int](dim1_shape),
-        unit[Int](dim0_stride),
-        unit[Int](dim1_stride),
-        unit[Int](input_size),
-        dim3(unit[Int]((input_size + 511)/512)),
-        dim3(unit[Int](512))
-      )
-
+      withComment("calling masked fill kernel") {
+        cudaMaskedFillWrap[Float](
+          Wrap[Array[Float]](input_tensor),
+          Wrap[Array[Float]](output.x),
+          Wrap[Array[Int]](mask_tensor),
+          shape, size, value)
+      }
       output.x
 
     case Node(s, "tensor_maskedfill_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(doutput:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // get input info and transform input tensors
-      val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
+      val shape = tensor_shape(doutput, useOldMetadata = true)
       val doutput_tensor = get_operand(doutput, anno)
       val mask_tensor = get_operand(mask, anno)
+      val size = numeral(shape)
+      val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of masked fill") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      // choose the last two dimensions as dim0 and dim1
-      val dim0_shape = doutput_shape(doutput_shape.size - 2)
-      val dim1_shape = doutput_shape(doutput_shape.size - 1)
-      val dim0_stride = dim0_shape
-      val dim1_stride = 1
-
-      val doutput_size = doutput_shape.fold(1) { _ * _ }
-      val dinput = gpu_array(doutput_size, manifest[Float], myNCCLRank)
-
-      val maskedFillGradKernel = cudaMaskedFillGrad[Float](false)
-      FunOps10(maskedFillGradKernel).apply(
-        Wrap[Array[Float]](doutput_tensor),
-        Wrap[Array[Float]](dinput.x),
-        Wrap[Array[Int]](mask_tensor),
-        unit[Int](dim0_shape),
-        unit[Int](dim1_shape),
-        unit[Int](dim0_stride),
-        unit[Int](dim1_stride),
-        unit[Int](doutput_size),
-        dim3(unit[Int]((doutput_size + 511)/512)),
-        dim3(unit[Int](512))
-      )
-
+      withComment("calling masked fill gradient kernel") {
+        cudaMaskedFillGradWrap[Float](
+          Wrap[Array[Float]](doutput_tensor),
+          Wrap[Array[Float]](dinput.x),
+          Wrap[Array[Int]](mask_tensor),
+          shape, size)
+      }
       dinput.x
 
     case Node(s, "tensor_logsoftmax", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // get input info and transform input tensors
-      val input_shape = tensor_shape(input, useOldMetadata = true)
+      val shape = tensor_shape(input, useOldMetadata = true)
       val input_tensor = get_operand(input, anno)
 
-      val outer_size = input_shape.init.fold(1) { _ * _ }
-      val last_dim_size = input_shape.last
-      val input_size = outer_size * last_dim_size
+      val size = numeral(shape)
+      val output = withComment(s"allocating gpu array of size $size and type Float for the output of logsoftmax") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      val output = gpu_array(input_size, manifest[Float], myNCCLRank)
-
-      val softmaxKernel = cudaSoftmax[Float](true)
-
-      FunOps6(softmaxKernel).apply(
-        Wrap[Array[Float]](input_tensor),
-        Wrap[Array[Float]](output.x),
-        unit[Int](last_dim_size),
-        dim3(unit[Int](outer_size)),
-        dim3(unit[Int](1024)),
-        unit[Int](1024 * 4)
-      )
-
+      withComment("calling softmax kernel") {
+        cudaLogSoftmaxWrap[Float](
+          Wrap[Array[Float]](input_tensor),
+          Wrap[Array[Float]](output.x),
+          numeral(shape.init),
+          shape.last)
+      }
       output.x
 
     case Node(s, "tensor_logsoftmax_bwd", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::(output:Backend.Sym)::(doutput:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
 
-      // get input info and transform input tensors
-      val output_shape = tensor_shape(output, useOldMetadata = true)
+      val shape = tensor_shape(output, useOldMetadata = true)
       val output_tensor = get_operand(output, anno)
       val doutput_tensor = get_operand(doutput, anno)
 
-      val outer_size = output_shape.init.fold(1) { _ * _ }
-      val last_dim_size = output_shape.last
-      val input_size = outer_size * last_dim_size
+      val size = numeral(shape)
+      val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of logsoftmax") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
 
-      val dinput = gpu_array(input_size, manifest[Float], myNCCLRank)
-
-      val softmaxGradKernel = cudaSoftmaxGrad[Float](true) /* Default is taking log */
-
-      FunOps7(softmaxGradKernel).apply(
-        Wrap[Array[Float]](dinput.x),
-        Wrap[Array[Float]](doutput_tensor),
-        Wrap[Array[Float]](output_tensor),
-        unit[Int](last_dim_size),
-        dim3(unit[Int](outer_size)),
-        dim3(unit[Int](1024)),
-        unit[Int](1024 * 4)
-      )
-
+      withComment("calling softmax gradient kernel") {
+        cudaLogSoftmaxGradWrap[Float](
+          Wrap[Array[Float]](dinput.x),
+          Wrap[Array[Float]](doutput_tensor),
+          Wrap[Array[Float]](output_tensor),
+          numeral(shape.init), shape.last)
+      }
       dinput.x
 
     case Node(s, "tensor_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::_, _) =>
@@ -160,25 +121,104 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       implicit val sc_ : SourceContext = sourceTensor.pos
       val m = sourceTensor.et
 
-      val input_shape = tensor_shape(operand, useOldMetadata = true)
+      val shape = tensor_shape(operand, useOldMetadata = true)
+      val input_tensor = get_operand(operand, anno)
+      
+      val size = numeral(shape)
+      val output = withComment(s"allocating gpu array of size $size and type Float for the output of transpose") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
+
+      withComment("calling transpose kernel") {
+        cudaTransposeWrap[Float](
+          Wrap[Array[Float]](input_tensor),
+          Wrap[Array[Float]](output.x),
+          shape)
+      }
+      output.x
+
+    case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(operand:Backend.Sym)::Backend.Const(perm:List[Int])::_, _) =>
+      val sourceTensor = new TENSOR(s, useOldMetadata = true)
+
+      implicit val sc_ : SourceContext = sourceTensor.pos
+      val m = sourceTensor.et
+
+      val shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
 
-      val shape = tt.shapeSize
-      val count = numeral(shape)
-      val n_rows = shape(1)
-      val n_cols = shape(0)
-      val output = gpu_array(count, manifest[Float], myNCCLRank)
-      val tileDim = 32
-      val blockRows = 8
-      val transposeKernel = cudaTranspose[Float]
-      FunOps6(transposeKernel).apply(
-        Wrap[Array[Float]](input_tensor),
-        Wrap[Array[Float]](output.x),
-        unit[Int](n_rows),
-        unit[Int](n_cols),
-        dim3(unit[Int]((n_cols + tileDim - 1) / tileDim), unit[Int]((n_rows + tileDim - 1) / tileDim)),
-        dim3(unit[Int](tileDim), unit[Int](blockRows)))
+      val size = numeral(shape)
+      val output = withComment(s"allocating gpu array of size $size and type Float for the output of permute") {
+        gpu_array(size, manifest[Float], myNCCLRank)
+      }
+
+      withComment("calling permute kernel") {
+        cudaPermuteWrap[Float](
+          Wrap[Array[Float]](input_tensor),
+          Wrap[Array[Float]](output.x),
+          shape, size, perm)
+      }
       output.x
+
+    case Node(s, "tensor_embedding", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::(indices:Backend.Sym)::_, _) =>
+      val sourceTensor = new TENSOR(s, useOldMetadata = true)
+
+      implicit val sc_ : SourceContext = sourceTensor.pos
+      val m = sourceTensor.et
+      val input_tensor = get_operand(input, anno)
+      val indices_array = get_operand(indices, anno)
+
+      val input_shape = tensor_shape(input, useOldMetadata = true)
+      val indices_shape = tensor_shape(indices, useOldMetadata = true)
+      val output_shape = tensor_shape(s, useOldMetadata = true)
+
+      val indices_size = indices_shape(0)
+      val embed_size = input_shape(1)
+      val output_size = numeral(output_shape)
+
+      val output = withComment(s"allocating gpu array of size $output_size and type Float for the output of embedding") {
+        gpu_array(output_size, manifest[Float], myNCCLRank)
+      }
+
+      withComment("calling embedding kernel") {
+        cudaEmbeddingWrap[Float](
+          Wrap[Array[Float]](input_tensor),
+          Wrap[Array[Float]](output.x),
+          Wrap[Array[Int]](indices_array),
+          unit[Int](embed_size),
+          unit[Int](indices_size))
+      }
+      output.x
+
+    case Node(s, "tensor_embedding_bwd", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::(doutput:Backend.Sym)::(indices:Backend.Sym)::_, _) =>
+      val sourceTensor = new TENSOR(s, useOldMetadata = true)
+
+      implicit val sc_ : SourceContext = sourceTensor.pos
+      val m = sourceTensor.et
+      val doutput_tensor = get_operand(doutput, anno)
+      val indices_array = get_operand(indices, anno)
+
+      val doutput_shape = tensor_shape(doutput, useOldMetadata = true)
+      val indices_shape = tensor_shape(indices, useOldMetadata = true)
+      val dinput_shape = tensor_shape(s, useOldMetadata = true)
+
+
+      val indices_size = indices_shape(0)
+      val embed_size = doutput_shape(1)
+      val dinput_size = numeral(dinput_shape)
+
+      val dinput = withComment(s"allocating gpu array of size $dinput_size and type Float for the gradient input of embedding") {
+        gpu_fixed_array(dinput_size, myNCCLRank, NUM(Backend.Const(0), m))
+      }
+
+      withComment("calling embedding gradient kernel") {
+        cudaEmbeddingGradWrap[Float](
+          Wrap[Array[Float]](doutput_tensor),
+          Wrap[Array[Float]](dinput.x),
+          Wrap[Array[Int]](indices_array),
+          unit[Int](embed_size),
+          unit[Int](indices_size))
+      }
+      dinput.x
 
     case _ => super.transform(n)
   }

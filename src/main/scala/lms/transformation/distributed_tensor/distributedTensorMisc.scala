@@ -41,7 +41,6 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       (doutput.x, mask.x)).withSrcType(__pos, doutput.et))
   }
 
-
   def LogSoftmaxForward(input: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
     val res_tt = input.resultType
     (new TENSOR(Adapter.g.reflectRead("tensor_logsoftmax", C(res_tt), C(anno), input.x)(input.x))
@@ -54,7 +53,26 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       .withSrcType(__pos, output.et))
   }
 
-  def PermuteForward = ???
+  def Permute(input: TENSOR, perm: List[Int], anno: Anno, __pos: SourceContext): TENSOR = {
+    require(perm.sortWith(_ < _) == List.range(0, input.shapeSize.size), "dims must be a valid permutation of input dimensions")
+    val res_tt = TensorType(perm.map(input.resultType.shape(_)), input.resultType.et)
+    (new TENSOR(Adapter.g.reflectRead("tensor_permute", C(res_tt), C(anno), input.x, C(perm))(input.x))
+      .withSrcType(__pos, input.et))
+  }
+
+  def EmbeddingForward(input: TENSOR, indices: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
+    require(input.shapeSize.size == 2, "input must be a 2-D matrix")
+    require(indices.shapeSize.size == 1, "indices must be an 1-D array")
+    val res_tt = TensorType(Seq(indices.resultType.shape(0), input.resultType.shape(1)), input.et)
+    (new TENSOR(Adapter.g.reflectRead("tensor_embedding", C(res_tt), C(anno), input.x, indices.x)
+      (input.x, indices.x)).withSrcType(__pos, input.et))
+  }
+
+  def EmbeddingBackward(input: TENSOR, doutput: TENSOR, indices: TENSOR, anno: Anno, __pos: SourceContext): TENSOR = {
+    val res_tt = TensorType(Seq(input.resultType.shape(0), doutput.resultType.shape(1)), doutput.et)
+    (new TENSOR(Adapter.g.reflectRead("tensor_embedding_bwd", C(res_tt), C(anno), input.x, doutput.x, indices.x)
+      (doutput.x, indices.x)).withSrcType(__pos, doutput.et))
+  }
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, "tensor_softmax", _, _) => List()
@@ -63,6 +81,8 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       val mask_type = (new TENSOR(mask, useOldMetadata=true)).resultType
       (input_type.shape.reverse zip mask_type.shape.reverse).toList map { case (a:Size, b:Size) => (a.dim, b.dim)}
     case Node(s, "tensor_logsoftmax", _, _) => List()
+    case Node(s, "tensor_permute", _, _) => List()
+    case Node(s, "tensor_embedding", _, _) => List()
     case _ => super.mergable_dims(node)
   }
 
@@ -94,6 +114,20 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
             val grad = LogSoftmaxBackward(x, gradMap(s), anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
+      case Node(s, "tensor_permute", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(dims:List[Int])::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val grad = Permute(gradMap(s), dims, anno, pos)
+            Accumulate(gradMap(input), grad, anno); ()
+        }) +=: backwardNodes
+      case Node(s, "tensor_embedding", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::(indices:Backend.Sym)::_, _) =>
+        implicit val pos = Adapter.oldSourceMap(s)
+        forwardNodes += node
+        (() => {
+            val grad = EmbeddingBackward(new TENSOR(transform(input)), gradMap(s), new TENSOR(transform(indices)), anno, pos)
+            Accumulate(gradMap(input), grad, anno); ()
+        }) +=: backwardNodes
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
     }
@@ -105,6 +139,8 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       s"$s = tensor_maskedfill($input, $mask) (${symTensorShape(input, graph)}, ${symTensorShape(mask, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case Node(s, "tensor_logsoftmax", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
       s"$s = tensor_logsoftmax($input) (${symTensorShape(input, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_permute", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(input:Backend.Sym)::Backend.Const(dims:List[Int])::_, _) =>
+      s"$s = tensor_permute($input, permutation=${dims}) (${symTensorShape(input, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
     case _ => super.printTensor(node, graph)
   }
 }
@@ -139,6 +175,21 @@ trait FixedSizeDistributedTensorOpsMisc extends FixedSizeDistributedTensorOpsBas
 
     def logSoftmax(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
       val t = LogSoftmaxForward(self, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def permute(perm: List[Int])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = Permute(self, perm, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def permute(perm: List[Int], anno: Anno)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = Permute(self, perm, anno, __pos)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def embedding(indices: Rep[Tensor[Int]])(implicit __pos: SourceContext, anno: Anno): Rep[Tensor[T]] = {
+      val t = EmbeddingForward(self, tensor(indices), anno, __pos)
       Wrap[Tensor[T]](t.x)
     }
   }

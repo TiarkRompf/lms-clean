@@ -15,7 +15,6 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
   with FixedSizeDistributedTensorBinaryTypeLess with FixedSizeDistributedTensorConvTypeLess {
 
   def Transpose(tensor: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR = {
-    assert(tensor.shapeSize.size == 2, "input of transpose must be 2D")
     val res_tt = TensorType(Seq(tensor.resultType.shape(1), tensor.resultType.shape(0)), tensor.et)
     (new TENSOR(Adapter.g.reflectRead("tensor_transpose", C(res_tt), C(anno), tensor.x)(tensor.x))).withSrcType(__pos, tensor.et)
   }

@@ -87,16 +87,11 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
           gpu_array(sz, manifest[Float], myNCCLRank)
         }
 
-        val in_sz = dimZ * dimY * dimXs.reduce(_ + _)
         cuda3DSplitWrap[Float](
           Wrap[Array[Float]](operand),
           outputs map { t => Wrap[Array[Float]](t.x) },
-          dimZ,
-          dimY,
-          dimXs,
-          dim3(unit[Int]((in_sz + 511)/512)),
-          dim3(unit[Int](512))
-        )
+          dimZ, dimY, dimXs)
+
         TENSORS.tupleView(outputs.map(_.x))
       } else {
         throw new Exception(s"TODO: higher-dimension tensors are not yet handled by split")
@@ -136,12 +131,7 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         cuda3DConcatWrap[Float](
           input_operands map { t =>  Wrap[Array[Float]](t) },
           Wrap[Array[Float]](output.x),
-          dimZ,
-          dimY,
-          dimXs,
-          dim3(unit[Int]((out_sz + 511)/512)),
-          dim3(unit[Int](512))
-        )
+          dimZ, dimY, dimXs)
         output.x
 
       } else {

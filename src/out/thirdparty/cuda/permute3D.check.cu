@@ -139,7 +139,7 @@ __global__ void x64(int* x65, int* x66, int x67, int x68, int x69) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int* x1 = (int*)malloc(165000 * sizeof(int));
-  scan_int("golden/permute3D_021/input.data", x1, 165000);
+  scan_ints("golden/permute3D_021/input.data", x1, 165000);
   int* x2 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(165000 * sizeof(int))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(165000 * sizeof(int)), cudaMemcpyHostToDevice));
@@ -150,7 +150,7 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMemcpy(x20, x3, (size_t)(165000 * sizeof(int)), cudaMemcpyDeviceToHost));
   check_int_array("golden/permute3D_021/output.data", x20, 165000);
   int* x21 = (int*)malloc(165000 * sizeof(int));
-  scan_int("golden/permute3D_120/input.data", x21, 165000);
+  scan_ints("golden/permute3D_120/input.data", x21, 165000);
   int* x22 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x22, (size_t)(165000 * sizeof(int))));
   CUDA_CALL(cudaMemcpy(x22, x21, (size_t)(165000 * sizeof(int)), cudaMemcpyHostToDevice));
@@ -161,7 +161,7 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMemcpy(x40, x23, (size_t)(165000 * sizeof(int)), cudaMemcpyDeviceToHost));
   check_int_array("golden/permute3D_120/output.data", x40, 165000);
   int* x41 = (int*)malloc(165000 * sizeof(int));
-  scan_int("golden/permute3D_210/input.data", x41, 165000);
+  scan_ints("golden/permute3D_210/input.data", x41, 165000);
   int* x42 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x42, (size_t)(165000 * sizeof(int))));
   CUDA_CALL(cudaMemcpy(x42, x41, (size_t)(165000 * sizeof(int)), cudaMemcpyHostToDevice));
@@ -172,7 +172,7 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMemcpy(x60, x43, (size_t)(165000 * sizeof(int)), cudaMemcpyDeviceToHost));
   check_int_array("golden/permute3D_210/output.data", x60, 165000);
   int* x61 = (int*)malloc(165000 * sizeof(int));
-  scan_int("golden/permute3D_201/input.data", x61, 165000);
+  scan_ints("golden/permute3D_201/input.data", x61, 165000);
   int* x62 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x62, (size_t)(165000 * sizeof(int))));
   CUDA_CALL(cudaMemcpy(x62, x61, (size_t)(165000 * sizeof(int)), cudaMemcpyHostToDevice));

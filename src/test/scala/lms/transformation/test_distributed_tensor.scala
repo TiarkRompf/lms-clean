@@ -302,23 +302,6 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("tanh", driver.code, "cu", driver.setLogPath)
   }
 
-  // test("transpose") {
-  //   val driver = new CompilerCDistributedTensor[Int, Unit] {
-  //     import FixedSizeDistributedTensorTypeLess._
-
-  //     @virtualize
-  //     def snippet(arg: Rep[Int]): Rep[Unit] = {
-  //       val model = module {
-  //         val input = Tensor.input[Float](shape=Seq(32,32), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
-  //         implicit val anno = input.anno
-  //         input.trans
-  //       }
-  //       model.test("loss"); ()
-  //     }
-  //   }
-  //   checkWithLogPath("transpose", driver.code, "cu", driver.setLogPath)
-  // }
-
   test("softmax") {
     val driver = new CompilerCDistributedTensor[Int, Unit] {
       import FixedSizeDistributedTensorTypeLess._
@@ -534,6 +517,81 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
       }
     }
     checkWithLogPath("transpose", driver.code, "cu", driver.setLogPath)
+  }
+
+    test("permute_120") { // passed
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(12,5,6), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          input.permute(List(1,2,0))
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("permute_120", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("permute") { // passed
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(120,55,50), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          input.permute(List(2,0,1))
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("permute", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("permute_102_big") { // passed
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val input = Tensor.input[Float](shape=Seq(8,2,8), name="input", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = input.anno
+          input.permute(List(1,0,2))
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("permute_102_big", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("embedding") {
+    val driver = new CompilerCDistributedTensor[Int, Unit] {
+      import FixedSizeDistributedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val model = module {
+          val n_embeddings = 20
+          val embed_size = 60
+          val n_indices = 10
+
+          val indices = Tensor.input[Int](shape=Seq(n_indices), name="indices", splitDim=0, splitTo=List(GPU(0), GPU(1)))
+          implicit val anno = indices.anno
+          System.out.println(anno)
+          val embed = Tensor.weight[Float](Seq(n_embeddings, embed_size), tensorName=Some("embed"))
+
+          embed.embedding(indices)
+        }
+        model.test("loss"); ()
+      }
+    }
+    checkWithLogPath("embedding", driver.code, "cu", driver.setLogPath)
   }
 }
 

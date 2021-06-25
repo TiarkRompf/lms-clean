@@ -337,7 +337,7 @@ class CudaTest extends TutorialFunSuite {
     check("embedding", driver.code, "cu")
   }
 
-  test("embeddin_grad_kernel") {
+  test("embedding_grad_kernel") {
     val driver = new DslDriverCCudaScan[Int, Unit] {
 
       @virtualize
@@ -367,7 +367,7 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT(embeddingGrad, cuda_embedding_grad, n_embeddings * embed_size, device2host))
         checkFile[Float]("golden/embedding/embedding_grad.data", embeddingGrad, n_embeddings * embed_size)
       }
-    }    
+    }
 
     check("embedding_grad", driver.code, "cu")
   }
@@ -548,7 +548,7 @@ class CudaTest extends TutorialFunSuite {
         val cuda_output = cudaMalloc2[Int](size)
         cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
 
-        val transposeKernel = cudaTranspose[Int]
+        val transposeKernel = cuda2DTransposeCoalesced[Int]
         transposeKernel(cuda_input, cuda_output, rcount, ccount, dimGrid, dimBlock)
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
@@ -584,7 +584,7 @@ class CudaTest extends TutorialFunSuite {
         val cuda_output = cudaMalloc2[Int](size)
         cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
 
-        val transposeKernel = cudaTranspose2[Int]
+        val transposeKernel = cuda2DTranspose[Int]
         transposeKernel(cuda_input, cuda_output, ccount, rcount,
           dim3((rcount+tileDim-1)/tileDim, (ccount+tileDim-1)/tileDim), dim3(tileDim, blockRows))
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
@@ -690,11 +690,20 @@ class CudaTest extends TutorialFunSuite {
     val driver = new DslDriverCCudaScan[Int, Unit] {
       @virtualize
       def snippet(arg: Rep[Int]) = {
+        /*
         val dimX = 600
         val blockDimX = 100
         val dimY = 60
         val dimZ = 40
         val size = dimZ * dimY * dimX
+        */
+
+        val dimX = 600
+        val blockDimX = 100
+        val dimY = 60
+        val dimZ = 40
+        val size = dimZ * dimY * dimX
+
 
         val input = NewArray[Int](size)
         scanFile[Int]("golden/permute_kernel_102_big/input.data", input, size)
@@ -734,7 +743,7 @@ class CudaTest extends TutorialFunSuite {
         val cuda_output = cudaMalloc2[Int](size)
         cudaCall(cudaMemcpyOfT[Int](cuda_input, input, size, host2device))
 
-        val transposeKernel = cudaTransposeNaive[Int]
+        val transposeKernel = cuda2DTransposeNaive[Int]
         transposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
@@ -822,7 +831,7 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
         val naive_transpose_time = measurement_cuda {
-          val naiveTransposeKernel = cudaTransposeNaive[Int]
+          val naiveTransposeKernel = cuda2DTransposeNaive[Int]
           for (i <- (0 until iter_count): Rep[Range]) {
             naiveTransposeKernel(cuda_input, cuda_output, dim3(rcount/tileDim, ccount/tileDim), dim3(tileDim, blockRows))
           }
@@ -830,7 +839,7 @@ class CudaTest extends TutorialFunSuite {
         cudaCall(cudaMemcpyOfT[Int](output, cuda_output, size, device2host))
 
         val transpose_time = measurement_cuda {
-          val transposeKernel = cudaTranspose[Int]
+          val transposeKernel = cuda2DTransposeCoalesced[Int]
           for (i <- (0 until iter_count): Rep[Range]) {
             val dimGrid = dim3((ccount + tileDim - 1) / tileDim, (rcount + tileDim - 1) / tileDim)
             val dimBlock = dim3(tileDim, blockRows)
@@ -882,8 +891,7 @@ class CudaTest extends TutorialFunSuite {
 
         cuda3DSplitWrap[Float](cuda_input,
           List(cuda_output0, cuda_output1),
-          dimZ, dimY, dimXs,
-          dim3((in_sz + 511)/512), dim3(512))
+          dimZ, dimY, dimXs)
 
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
@@ -926,8 +934,7 @@ class CudaTest extends TutorialFunSuite {
 
         cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1),
           cuda_output,
-          dimZ, dimY, List(d0, d1),
-          dim3((out_sz + 511)/512), dim3(512))
+          dimZ, dimY, List(d0, d1))
 
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 
@@ -972,9 +979,7 @@ class CudaTest extends TutorialFunSuite {
 
         cuda3DSplitWrap[Float](
           cuda_input, List(cuda_output0, cuda_output1, cuda_output2),
-          dimZ, dimY, List(d0, d1, d2),
-          dim3((in_sz + 511)/512), dim3(512)
-        )
+          dimZ, dimY, List(d0, d1, d2))
 
         cudaCall(cudaMemcpyOfT[Float](output0, cuda_output0, out0_sz, device2host))
         cudaCall(cudaMemcpyOfT[Float](output1, cuda_output1, out1_sz, device2host))
@@ -1026,8 +1031,7 @@ class CudaTest extends TutorialFunSuite {
 
         cuda3DConcatWrap[Float](List(cuda_input0, cuda_input1, cuda_input2),
           cuda_output,
-          dimZ, dimY, List(d0, d1, d2),
-          dim3((out_sz + 511)/512), dim3(512))
+          dimZ, dimY, List(d0, d1, d2))
 
         cudaCall(cudaMemcpyOfT[Float](output, cuda_output, out_sz, device2host))
 

@@ -165,9 +165,9 @@ __global__ void x48(float* x49, float* x50, float* x51, int x52) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(15640 * sizeof(float));
-  scan_float("golden/softmax/input.data", x1, 15640);
+  scan_floats("golden/softmax/input.data", x1, 15640);
   float* x2 = (float*)malloc(15640 * sizeof(float));
-  scan_float("golden/softmax/output_grad.data", x2, 15640);
+  scan_floats("golden/softmax/output_grad.data", x2, 15640);
   float* x3 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x3, (size_t)(15640 * sizeof(float))));
   float* x4 = (float*)malloc(0 * sizeof(float));
