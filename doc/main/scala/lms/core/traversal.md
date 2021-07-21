@@ -1,37 +1,30 @@
 ## Traverse
 
-The `lms/core/traversal.scala` define how one can traverse the LMS IR. Travering a tree-structured
+The `lms/core/traversal.scala` defines how to traverse the LMS IR. Travering a tree-structured
 IR seems trivial, but traversing LMS IR (sea of the nodes) is not. The main challenge is to determine
 the group of nodes that should be scoped in each block. Previously in [Backend](backend.md), we
-talked about how the scope of the blocks are implicitly expressed via data dependencies and control
+talked about how the scopes of the blocks are implicitly expressed via data dependency and control
 dependencies. In `traversal.scala`, we will see how exactly we collect the nodes for each block using
 the dependency information.
 
 The basic idea is as follows:
-1. Each block has input-variables and input-effect-variables. We call them *bound variables*.
-2. A node is ready to be schedule for the current block when the bound variables the node depends on are already in path (those blocks are enclosing the current block).
+1. Each block has input-variables and input-effect-variables. We call them *bound variables* of a block (see backend.scala).
+2. A node is ready to be scheduled for the current block when the bound variables on which the node depends are already in path (those blocks are enclosing the current block).
 3. A node should be scheduled in the current block (instead of in a inner block) when the node is used often.
 
 ### A recap of dependencies
-In LMS IR, the data dependencies refer to dependencies of data (node A uses symbol B).
-There are also control dependencies, such as two print statements should be generated in the same order,
-or the read/write order of a mutable cell cannot be randomly shuffled.
+In LMS IR, we have two categories of dependencies: data dependency and control dependencies. Data dependency captures node usage (e.g. node A used symbol B). This information is already available in the definition of a node (i.e. `rhs: List[Def]`). Control dependencies are dependencies caused by effects. For example, two print statements should be generated in the original user-defined order, or the read/write order of a mutable cell cannot be randomly shuffled. We track control dependencies via Effect Systems (see details in [Backend](backend.md)).
+Control dependencies can be further categorized into *soft* and *hard* dependencies.
+If node A hard-depends on node B, then B must be scheduled before A.
+If node A soft-depends on node B, then B should never be scheduled after A, but B might not be scheduled even
+if A is scheduled.
 
-Data dependencies are explicitly presented in the LMS IR. However, control dependencies have to be tracked
-via Effect Systems (see details in [Backend](backend.md)).
-At LMS IR construction, we track the various categories of effects of the LMS nodes, and then build dependencies
-from the effects. The dependencies are captured via either *soft-dependency* or *hard-dependency*.
-If node A hard-depends on node B, then scheduling A means B must be scheduled before A.
-If node A soft-depends on node B, then B should never be scheduled after A (but B might not be scheduled even
-if A is scheduled).
-
-### Dead Code Elimination
-
-In a real scenario, we first run a dead code elimination (DCE) pass before we traverse the graph.
+### Dead Code Elimination (DCE)
+In a real scenario, we first run a DCE pass before we traverse the graph.
 The DCE pass is currently implemented in `class DeadCodeElimCG` (in file `lms/core/backend.scala`).
 
-The basic idea for DCE is like this. We track 2 categories of `Backend.Sym`s, the *live* and *reach* sets.
-1. The reach set is the set of nodes (or Syms of the nodes) that are reachable via hard-dependencies.
+The basic idea for DCE is like this. We track two categories of `Sym`s, the *live* and *reach* sets.
+1. The reach set is the set of nodes (or Syms of the nodes) that are reachable via hard dependencies.
 It includes both data dependencies and control dependencies.
 2. The live set is the set of nodes (or `Backend.Sym`s of the nodes) that are needed only via data dependencies.
 
@@ -40,29 +33,23 @@ Then we run three steps for DCE:
    on a reverse iteration of all nodes, we collect nodes that are reachable (in reach set) and fill the
    live Syms and reach Syms from the nodes. We also collect all reachable nodes in `newNodes`.
 2. Collect used Exp set, which means all Exp that are used (including `Const`).
-3. Rebuild graph with `newNodes` and old block, but with all effects/dependencies filtered to remove
-   unused Exps.
+3. Rebuild graph with `newNodes` and old block, but with all effects/dependencies filtered to remove unused Exps.
 
 ### Bound Variables
+Instead of scheduling nodes based on their dependencies directly, we first calculate the set of *bound variables* among the transitive closure of a node's dependencies.
+We decide when a node is ready to be scheduled for a block by checking its bound variables. We implement bound variable calculation as an analysis pass, as shown in `class Bound extends Phase` in lms/core/backend.scala. We use a hashmap `hm` to keep track of the bound variables of all symbols in a graph.
 
-We decide when a node is ready to be scheduled for a block by checking the bound variables. In lms/core/backend.scala `class Bound extends Phase`, we compute the bound variables of each node. This is like an
-analysis pass of the LMS IR.
-
-It is done in the following steps:
-1. Get the set of all bound variables via `g.nodes.flatMap(boundSyms).toSet ++ g.block.bound` which
-   has the bound variables from all nodes and the block.
-2. For each node, get all bound variables that it depends on and all bound variables generated in this node (if it has blocks). The diff is the bound variables it really depends on.
+As shown in the `apply` method, bound variable calculation is done by the following steps:
+1. Collect all `Block`s in the graph `g`, including those defined in the nodes of `g` and the input block of `g`. Take the union of the bound variables (input and effect input) of these blocks. We define the bound variables of these new symbol to be just themselves, since they are just inputs.
+2. For each node in `g`, get all bound variables that it depends on and all bound variables generated in this node (if it has blocks). The difference of these two sets is the bound variables it really depends on.
 3. We need to get "lambda-forward" node (the forward declaration of "lambda") to have the same bound
    variables as "lambda". This needs to be fixed in a Convergence Loop (unfortunately).
 
-### Node Frequency Computation
+### Node Frequency Estimation
+Consider we have a node of heavy computation in a block. Suppose we have determined that the node has no dependency on the inputs of the block, should we schedule it inside or outside the block? The answer is that we should consider how often the node will be executed. If the block is a function body, then it can potentially be called multiple times, so it would be beneficial to schedule it in the outer scope. If the block is a conditional block, then schedule the node outside means that the node would always be executed regardless of the condition. So we should schedule it inside the block in this case. Therefore, we can assign a number represents relatively how often a node is executed, and only schedule the nodes that have a large enough frequency. This is the intuition od frequency estimation.
 
-When a node is ready to be schedule, we can schedule it for the current block if the node is used often
-enough. The using frequency is determined by the `class Flow extends Phase` in lms/core/backend.scala.
-Note: for now the frequency computation is from the `def symsFreq` in `abstract class Traverser`.
+The `symsFreq` function in `Traverser` achieves this: Given a lambda node containing a block, we assign the hard dependencies of the effect summary of the block to a large enough number 100, representing that the body of a function is executed often. For a conditional node, we assign the results of both if and else block to 0.5, assuming each branch ia taken with equal probability. For a loop block, we assign the results of the conditional and body block to 100, assuming the loop is iterated many times. For a switch node, we treat it similar to the conditional node by assigning each branch to 0.5. Lastly, all other nodes are assigned 1.0.
 
-The basic idea is that, if a node is used in only one branch of a conditional, we don't schedule it
-in the current block.
 
 ### Traversal Abstract Class
 
@@ -94,10 +81,10 @@ Then we compute two sets of symbols, the `reach` (for nodes that are reachable f
 and the `reachInner` (for nodes that are reachable from an inner block).
 The `reach` set is initialized as `y.used`, which is the hard-dependencies and result of the block, if
 the result is a symbol rather than a constant.
-The `reachInner` is not initialized immediated, but is seeded when a reachable and available symbol has
+The `reachInner` is not initialized immediately, but is seeded when a reachable and available symbol has
 low frequency (such as should rather be scheduled in an if-true block or if-false block).
 
-The accumulation of `reach` and `reachInner` is simple: reverse traveral reachabiity
+The accumulation of `reach` and `reachInner` is simple: reverse traveral reachability
 
 ``` scala
 for (d <- g.nodes.reverseIterator) {
@@ -108,6 +95,7 @@ for (d <- g.nodes.reverseIterator) {
             if (f > 0.5) reach += e else reachInner += e
       } else {
          // if not available, never put in `reachInner`
+         // d's hard dependencies may be available
          reach ++= hardSyms(d)
       }
    }
@@ -117,14 +105,14 @@ for (d <- g.nodes.reverseIterator) {
 }
 ```
 
-Then we try to compute the `val outer1 = Seq[Node]()` (nodes scheduled for the currenta
+Then we try to compute the `val outer1 = Seq[Node]()` (nodes scheduled for the currents
 and the `val inner1 = Seq[Node]()` (nodes scheduled for inner blocks).
 The basic logic is that, nodes that are reachable and available should be in `outer1`.
 Nodes that are reachable but not available, or reachable by `reachInner` should be in
 `inner1`. We need to take care of soft dependencies too. Previously we said that
 soft dependencies do not enforce scheduling, just the order. So it might be confusing
-as to why we are considering soft dependencies too. It turns out that the dead code elemination
-pass should have removed soft dependencies that are not necessary to be schedule. The
+as to why we are considering soft dependencies too. It turns out that the dead code elimination
+pass should have removed soft dependencies that are not necessary to be scheduled. The
 remaining soft dependencies are nodes that should actually be scheduled.
 
 The code that does so is here
@@ -149,6 +137,39 @@ The code that does so is here
 
 After computing the set of nodes of the current block, we traverse the nodes one
 by one for the block.
+
+Let us go over an example of scheduling a simple program. The source program is the following:
+```scala
+def snippet(arg: Rep[Int]) = {
+  printf("hello, world1")
+  printf("hello, world2")
+  if (arg > 0) {
+    printf("hello, world3")
+    arg + 1
+  } else {
+    arg + 2
+  }
+}
+```
+Starting from the top-level block, we have the following nodes:
+```scala
+================ Block(List(x1),x10,x0,[CTRL*: _ | x10]) ==============
+x2 = (printf hello, world1)  [CTRL*: _ | x0]
+x3 = (printf hello, world2)  [CTRL*: _ | x2]
+x4 = (> x1 0)  
+x6 = (printf hello, world3)  [CTRL*: _ | x5]
+x7 = (+ x1 1)  
+x9 = (+ x1 2)  
+x10 = (? x4 Block(List(),x7,x5,[CTRL*: _ | x6]) Block(List(),x9,x8,[: _ | x8])) [CTRL*: _ | x3]
+```
+The top-level block takes `x0` as effect input, takes `x1` as data input (arg), and returns `x10` as the result. The block has a write effect to `CTRL`, and a hard dependency on `x10`.
+In the block, we have 7 nodes ordered by the same order as in the source program.
+
+Scheduling top-level block
+We first calculate `path1`. Since we are at the top block, `path` is an empty set, so `path1` just contains the input and effect input of the top-level block, i.e., `x0, x1`.
+We then determine `reach` and `reachInner` by traversing the nodes backward. We initialize `reach` to contain the result node `x10` and reachInnder as an empty set. Since `x10` is reachable and available, we call `symsFreq` on `x10`. Since `x10` is a conditional node, we assign the condition `x4` and the hdep `x3` to 1.0, and assign the results (`x7`, `x9`) and hdeps(`x6`, `x8`) of two branch blocks to 0.5. Therefore, reach = [x10, x4, x3] and reachInner = [x7, x9, x6, x8]. We then consider the next node `x9`. Since it's already in `reachInner`, we add its hardSyms `x1` into `reachInner`. Now reachInner = [x7, x9, x6, x8, x1]. Then we consider `x7`. It does the same thing as `x9`. Then we consider `x6`. Since `x6` is in `reachInner`, we add its hdep `x5` into `reachInner`. Now reachInner = [x7, x9, x6, x8, x1, x5]. We then consider `x4`. Since it's in reach and it's available, we add its ddep `x1` in `reach`. So reach = [x10, x4, x3, x1]. Then we consider x3, which adds x2 into reach. Lastly, we consider x2, which adds x0 into reach. Now reach = [x10, x4, x3, x1, x2, x0].
+Now, we traverse the nodes again to split them into either `outer1` or `inner1`. x10, x2, x3, x4 are scheduled in `outer` and x6, x7, x9 are scheduled in inner. 
+We now consider the if-block in x10. First, we add `x5` into path, and path now becomes `x5, x1, x10`. Then, we re-calculate `reach` and `reachInner`, which are `x7, x1, x6, x5` and `ø`, respectively. We schedule `x6` and `x7` to `outer1`, while `x9` is considered unreachable. `inner1` remains empty, so we exit this block and enter the else branch. Similarly, we recalculate `reach` as `x1, x9, x8` and schedule `x9` into this block. 
 
 ### Compact Traversal class
 
@@ -219,7 +240,7 @@ for (n <- ns) {
    blocks(n).foreach(hmi ++= _.used)
 }
 
-// for nodes that are known to be schedule for inner blocks,
+// for nodes that are known to be scheduled for inner blocks,
 // collect their hardSyms as inner uses.
 for (n <- inner) hmi ++= hardSyms(n)
 ```
@@ -268,6 +289,7 @@ to track (in reverse order) the nodes that should have been scheduled. This func
 def checkInline(res: Sym) = shouldInline(res) match {
    case Some(n) =>
      // want to inline, now check that all successors are already there, else disable
+     // mayInline is the user-level inline control (i.e. user has the option to override inlining)
      if (mayInline(n) && succ.getOrElse(n.n,Nil).forall(seen))
        processNodeHere(n)
      else

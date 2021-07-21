@@ -1,6 +1,5 @@
 # LMS IR
-
-In the file lms/core/backend.scala, the core LMS IR is defined in `object Backend`.
+In the file lms/core/backend.scala, the core LMS IR is defined in `object Backend`. We first introduce the basic building blocks of the IR:
 
 ``` scala
 abstract class Def // Definition: used in right-hand-side of all nodes
@@ -8,38 +7,32 @@ abstract class Exp extends Def
 case class Sym(n: Int) extends Exp   // Symbol
 case class Const(x: Any) extends Exp // Constant
 case class Block(in: List[Sym], res: Exp, ein: Sym, eff: EffectSummary) extends Def
+
 case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary)
 ```
 
-From this class hierarchy, we can see that the basic unit of the LMS IR is `Exp`,
-which can be `Const(0)`, `Const("hello")`, or `Sym(2)`, which really means `x2` in the
-generated code. We can combine basic units into `Node`, such as
+`Def` represents a definition, which is used in the RHS of all nodes. A definition can be an `Exp` or a `Block`. `Exp` can be a `Sym` or a `Const`. `Sym` represents symbols in the IR, which are identified by a unique integer. For example, `Sym(2)` represents `x2` in the generated code. `Const` represents immediate values, such as integers (e.g. `Const(0)`), strings (e.g. `Const(hello)`), etc.
 
+`Node` represents statements in the IR. The first field `n` of a node is a `Sym`, which represents the LHS of a node. The second field `op` is the operator of the statement. Using strings for the operators allows eazy extension of various kinds of nodes such as `-`, `print`, etc. The third field is the list of operands (RHS) of a node, and lastly `eff` is the effect of a node, which we will cover later. For example, the statement `val x3 = x2 + 1` would become
 ``` scala
 Node(Sym(x3), "+", List(Sym(x2), Const(1)), _)
 ```
-the semantics of which is `x3 = x2 + 1`. As you can probably see, the node `op` is just
-a string, which allows eazy extension of various kinds of nodes such as `-`, `print`, etc.
+in the IR.
 
-Using `Exp` and `Node`, we can construct program of arbitrary sizes, but there is still
-no blocks or scopes in the IR, which is necessary for constructing conditionals, loops,
-functions, etc. The `case class Block` is exactly for that purpose. However, it
+Using `Exp` and `Node`, we can construct programs of arbitrary sizes, but there are still
+no blocks or scopes in the IR, which are necessary for constructing conditionals, loops,
+functions, etc. The `Block` class is exactly for that purpose. However, it
 might be surprising that the `Block` class doesn't really contain a list of nodes that
 are in the block. Instead, it has `in: List[Sym]` as the inputs of the block, `res: Exp`
-as the output of the block, and then `ein: Sym` and `eff: EffectSummar` for effect-related
-contents (will cover later). Where are the nodes that should go into the block?
+as the output of the block, and then `ein: Sym` and `eff: EffectSummary` for effect-related contents (will cover later). Where are the nodes that should go into the block?
 
-It turned out that the nodes are in the graph, but not explicitly scoped in the block.
+It turns out that the nodes are in the graph, but not explicitly scoped in the block.
 when traversing the graph (for analysis, transformation, or code generation), the nodes
-of each block are dynamically computed from all available nodes, using the *dependencies*.
+of each block are dynamically computed from all available nodes, using the *dependencies*. We call this process *scheduling*.
 This is the feature of *sea of nodes* styled IR, which is covered in more details later.
 
-Some may wonder why going for sea of nodes IR, where dynamically computing the nodes
-of a scope seems to be an overhead for any graph traversal. It is true that dynamically
-computing the nodes of a scope adds overhead. However, the advantage is that nodes are
-not fixed to a certain scope, and scheduling the nodes (in or out-of scopes) can be
-a powerful optimization (called code motion) of the IR. For instance, the user of LMS
-might constructed a graph like this:
+One may wonder why we use a sea of nodes IR, where dynamically scheduling the nodes seems to be an overhead in compilation time. The advantage is that since nodes are
+not fixed to a certain scope, they can be easily moved in or out-of scopes, which can be a powerful optimization (called code motion). For instance, a user might construct a graph like this:
 
 ``` scala
 for (i <- 0 until 100) {
@@ -57,9 +50,11 @@ for (i <- 0 until 100) {
 }
 ```
 
-### Dependencies and Effects
+We can achieve the same optimization using an expensive dataflow analysis. But you will see in later sections that our approach is more lightweight and easier to implement.
 
-From the previous example, hopefully the reader has got a basic understanding of why
+### Effects and Dependencies
+
+From the previous example, hopefully the reader has gained a basic understanding of why
 we use sea of node IR. But we have not talked about how (in a high level) we schedule
 nodes of a scope. We briefly mentioned "dependencies" above. What are "dependencies"?
 
@@ -86,8 +81,8 @@ val x2 = x1 + x3
 Block([x3], x2, _, _)
 ```
 means that the block needs to return `x2` as the result, thus node `x2` and node `x1`
-must be scheduled in or before the block. Also since node `x2` depends on `x3`, which is
-an input symbol of the block, it must be scheduled in the block. So we have 2 possible
+must be scheduled in or before the block. Also, since node `x2` is data dependent on `x3`, which is
+an input symbol of the block, `x2` must be scheduled in the block. So we have 2 possible
 schedules for this block:
 
 ``` scala
@@ -108,7 +103,7 @@ block { x3 =>
 }
 ```
 
-and we can choose the more optimized version of them during graph traversal.
+and we can choose the more optimized version during graph traversal.
 
 What is control dependency? Instead of offering a definition, I will just enumerate some
 examples:
@@ -173,7 +168,7 @@ the `input-effect` of the `Block` (`ein: Sym`), and the `effects` of the `Block`
 
 ### Graph Dependencies
 
-But how do the effects help scoping the nodes in a block? The details are in the lms/core/travers.scala
+But how do the effects help scoping the nodes in a block? The details are in the lms/core/traversal.scala
 file but we can talk about it in the high level for now.
 
 Generally speaking, the `Node`s in the LMS IR constructs a graph that shows the *data dependencies*
@@ -185,8 +180,8 @@ write `Node`. This is not data dependency because the mutable variable already e
 write `Node`.
 
 While data dependencies are captured in the graph structure, the control dependencies have to be
-captured in other means. LMS core handles control dependencies by tracking the effects of nodes and
-blocks (printing, variable read, variable write, etc.), and then computed control dependencies based
+captured by other means. LMS core handles control dependencies by tracking the effects of nodes and
+blocks (printing, variable read, variable write, etc.), and then computing control dependencies based
 on the effects of all nodes/blocks. Effects of nodes and blockes are
 expressed via accompanying `EffectSummary`. Both dependencies contribute to code scheduling. Here are
 a few simple rules:
@@ -268,7 +263,7 @@ We chose to support the following categories of effects:
 
 #### From Effects to Dependencies
 
-After collection read and write effects, we need to compute dependencies from them. The
+After collecting read and write effects, we need to compute dependencies from them. The
 rules for computing dependencies from effects are listed below:
 
 1. Read-After-Write (RAW): there should be a hard dependency from R to W,
@@ -283,15 +278,16 @@ rules for computing dependencies from effects are listed below:
 4. Read-After-Read (RAR): there is no effect dependency between them.
 
 Note that we introduced soft dependencies in the rules.
-Soft dependencies are soft in the sense that, if node A soft-depends on node B,
+Soft dependencies are soft in the sense that, if node A is soft-dependent on node B,
 node B cannot be scheduled after A. However, scheduling A does not ensure that B is scheduled.
+But if A is hard-dependent on B, then scheduling A implies that B has to be scheduled before A.
 
 #### Const Effects
 
 The STORE and CTRL keys are also handled in our read/write system in a case-by-case manner.
 For instances, allocating heap memory can be modeled as a read on the STORE key,
 if we don’t care about the order of heap allocation.
-However, printf should be modeled as write on the CTRL key, since all prints should be
+However, printf should be modeled as a write on the CTRL key, since all prints should be
 scheduled in the same order.
 Some trickier cases include getting a random number from a pseudo-random generator.
 It really depends on the expected behavior.
@@ -376,7 +372,7 @@ IRs with explicit scopes, which we will talk about in lms/core/traversal.scala.
 Our fine-grained current EffectSummary is like below.
 It tracks soft dependencies (`sdeps: Set[Sym]`),
 hard dependencies (`hdeps: Set[Sym]`),
-read keys (`Set[Exp]`), and write keys (`Set[Exp]`).
+read keys (`rkeys: Set[Exp]`), and write keys (`wkeys: Set[Exp]`).
 
 ``` scala
 case class EffectSummary(sdeps: Set[Sym], hdeps: Set[Sym], rkeys: Set[Exp], wkeys: Set[Exp])
@@ -385,7 +381,7 @@ case class EffectSummary(sdeps: Set[Sym], hdeps: Set[Sym], rkeys: Set[Exp], wkey
 In this section, we will talk about how LMS Graph are constructed using the LMS IR components.
 It shows how the LMS IRs are used in constructing LMS Graphs, and how effects and dependencies are
 tracked and generated.
-All LMS snippets are function. As the result, all LMS Graph have a list of nodes
+All LMS snippets are functions. As a result, all LMS Graphs have a list of nodes
 (already in topological order)
 and a block describing the function. That is captured by the
 
@@ -395,8 +391,8 @@ case class Graph(val nodes: Seq[Node], val block: Block, val globalDefsCache: im
 
 at lms/core/backend.scala. The LMS Graph is constructed by `class GraphBuilder` at lms/core/backend.scala.
 
-Besides the basic functionality of storing nodes, searching nodes by symbols, and generating fresh symbols,
-GraphBuilder offers two keys functionalities
+Besides the basic functionalities of storing nodes, searching nodes by symbols, and generating fresh symbols,
+GraphBuilder offers two key functionalities:
 
 1. Building nodes by the @reflect*@ family of methods.
 2. Building blocks by the @reify*@ family of methods.
@@ -441,12 +437,12 @@ def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp
 ```
 
 This method first tries to run pre-construction optimization via `rewrite`.
-The optimized result is a pure Exp that can be returned directly. If not optimized,
+The optimized result is a pure `Exp` that can be returned directly. If not optimized,
 the method computes the latent effects via `getLatentEffect` helper method,
 and then combine the results with the user provided `readEfkeys` and `writeEfKeys`.
-If the effect keys are empty, the methods go to the else branch and try Common
+If the effect keys are empty, then we determine that the node is pure and the methods go to the else branch and try Common
 Subexpression Elimination (CSE) via `findDefinition` helper method. Otherwise,
-the method compute dependencies from the effect keys via `gatherEffectDeps` method
+the method computes dependencies from the effect keys via `gatherEffectDeps` method
 and then creates the node. The last thing to do is updating the effect environments,
 including `curEffects`, `curLocalReads`, and `curLocalWrites`. The `curEffects` is
 a map of type: `Exp -> (Sym, List[Sym])`, which tracks the *last write* and the *reads
