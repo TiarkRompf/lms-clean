@@ -534,9 +534,9 @@ abstract class Transformer extends Traverser {
     // Also pass the metadata to the new exp
     // We use `getOrElseUpdate` because the handling of each node might
     // have already filled a proper value, which we don't want to override
-    if (Adapter.oldTypeMap.contains(n.n))
+    if (Adapter.oldTypeMap != null && Adapter.oldTypeMap.contains(n.n))
       Adapter.typeMap.getOrElseUpdate(subst(n.n), Adapter.oldTypeMap(n.n))
-    if (Adapter.oldSourceMap.contains(n.n))
+    if (Adapter.oldSourceMap != null && Adapter.oldSourceMap.contains(n.n))
       Adapter.sourceMap.getOrElseUpdate(subst(n.n), Adapter.oldSourceMap(n.n))
   }
 
@@ -565,9 +565,9 @@ abstract class Transformer extends Traverser {
 
     // Handling MetaData 3. update new metadata with old metadata
     // this is not redundant because of the block arguments (function definitions)
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap.contains(k))
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap != null && Adapter.oldTypeMap.contains(k))
       Adapter.typeMap.getOrElseUpdate(v, Adapter.oldTypeMap(k))
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap.contains(k))
+    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap != null && Adapter.oldSourceMap.contains(k))
       Adapter.sourceMap.getOrElseUpdate(v, Adapter.oldSourceMap(k))
 
     Graph(g.globalDefs,block, g.globalDefsCache.toMap)
