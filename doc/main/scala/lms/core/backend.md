@@ -1,5 +1,7 @@
-# LMS IR
-In the file lms/core/backend.scala, the core LMS IR is defined in `object Backend`. We first introduce the basic building blocks of the IR:
+The `lms/core/backend.scala` file contains several important functionalities of the LMS IR. In `object Backend`, we define the basic building blocks of the IR as well as effect-related data structures (`EffectSummary`). In `class GraphBuilder`, `class GraphBuilderOpt` and `case class Graph`, we introduce how new nodes are added into a graph IR and how effects are handled and used to calculate dependencies. We also define `Phase` as a graph-to-graph transformation pass and introduce a dead code elimination phase `DeadCodeElim` and a bound variable calculation `Bound` phase.
+
+# Backend
+The core LMS IR is defined in `object Backend`. We first introduce the basic building blocks of the IR:
 
 ``` scala
 abstract class Def // Definition: used in right-hand-side of all nodes
@@ -13,26 +15,22 @@ case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary)
 
 `Def` represents a definition, which is used in the RHS of all nodes. A definition can be an `Exp` or a `Block`. `Exp` can be a `Sym` or a `Const`. `Sym` represents symbols in the IR, which are identified by a unique integer. For example, `Sym(2)` represents `x2` in the generated code. `Const` represents immediate values, such as integers (e.g. `Const(0)`), strings (e.g. `Const(hello)`), etc.
 
-`Node` represents statements in the IR. The first field `n` of a node is a `Sym`, which represents the LHS of a node. The second field `op` is the operator of the statement. Using strings for the operators allows eazy extension of various kinds of nodes such as `-`, `print`, etc. The third field is the list of operands (RHS) of a node, and lastly `eff` is the effect of a node, which we will cover later. For example, the statement `val x3 = x2 + 1` would become
+`Node` represents a statement in the IR. The first field `n` of a node is a `Sym`, which corresponds to the LHS of a statement. The second field `op` is the operator of the statement. Using strings as operators permits easy extension of various kinds of nodes such as `-`, `print`, etc. The third field is the list of operands (RHS) of a node, and lastly `eff` is the effect of a node, which we will cover later. For example, the statement `val x3 = x2 + 1` would become
 ``` scala
 Node(Sym(x3), "+", List(Sym(x2), Const(1)), _)
 ```
 in the IR.
 
-Using `Exp` and `Node`, we can construct programs of arbitrary sizes, but there are still
-no blocks or scopes in the IR, which are necessary for constructing conditionals, loops,
-functions, etc. The `Block` class is exactly for that purpose. However, it
-might be surprising that the `Block` class doesn't really contain a list of nodes that
-are in the block. Instead, it has `in: List[Sym]` as the inputs of the block, `res: Exp`
-as the output of the block, and then `ein: Sym` and `eff: EffectSummary` for effect-related contents (will cover later). Where are the nodes that should go into the block?
+Using `Exp` and `Node`, we can construct programs of arbitrary sizes, but there are still no scopes in the IR. We use the `Block` class to represent a scope enclosed by `{...}`. It might be surprising that `Block` does not really contain a list of nodes in it, which is a common feature in tree-based IRs. Instead, it has `in: List[Sym]` as the inputs of the block, `res: Exp`
+as the output of the block, and also `ein: Sym` and `eff: EffectSummary` for effect-related contents (will cover later).
 
-It turns out that the nodes are in the graph, but not explicitly scoped in the block.
-when traversing the graph (for analysis, transformation, or code generation), the nodes
-of each block are dynamically computed from all available nodes, using the *dependencies*. We call this process *scheduling*.
-This is the feature of *sea of nodes* styled IR, which is covered in more details later.
+We use `Block` in the `rhs` of `Node` to represent functions and control flow structures (conditionals, loops). Functions are declared using `"λ"` as the operator, and the `rhs` contains just a `Block` representing the function body. Conditionals are declared using `"?"` as the operator, and its `rhs` contains three items: a condition `Exp`, an if-branch `Block`, and an else-branck `Block`. While-loops are declared using `"W"` as the operator. It contains two blocks representing the loop condition and the loop body. We also have `Switch`, similar to the `switch...case` statement in C. The operands of a switch statement contains a `guard` representing the condition of the switch statement, and a list of `Block`s for each case.
 
-One may wonder why we use a sea of nodes IR, where dynamically scheduling the nodes seems to be an overhead in compilation time. The advantage is that since nodes are
-not fixed to a certain scope, they can be easily moved in or out-of scopes, which can be a powerful optimization (called code motion). For instance, a user might construct a graph like this:
+As we mentioned before, a `Block` only specifies its inputs and result. Where are the nodes that should go into the block? It turns out that the nodes are in the graph, but not explicitly scoped in the block. When we traverse the graph for analysis, transformation, or code generation, the nodes
+of each block are dynamically selected from the set of all available nodes using *dependencies*. We call this process *scheduling*.
+This is the feature of *sea-of-nodes* styled IR, which is covered in more details later.
+
+One may wonder why we use a sea-of-nodes IR, where dynamically scheduling the nodes seems to be a compilation overhead. The advantage is that since nodes are not fixed to a scope, they can be easily moved in or out-of scopes, which can be a powerful optimization (called code motion). For instance, a user might construct a graph like this:
 
 ``` scala
 for (i <- 0 until 100) {
@@ -55,32 +53,31 @@ We can achieve the same optimization using an expensive dataflow analysis. But y
 ### Effects and Dependencies
 
 From the previous example, hopefully the reader has gained a basic understanding of why
-we use sea of node IR. But we have not talked about how (in a high level) we schedule
-nodes of a scope. We briefly mentioned "dependencies" above. What are "dependencies"?
+we use sea-of-nodes IR. We briefly mentioned that the nodes are scheduled into blocks using dependencies. What are "dependencies"?
 
 There are 2 kinds of dependencies that we care about in LMS IR:
 1. the data dependency and
 2. the control dependencies.
 
 The data dependency is easier to capture. If a node uses an `Exp`, then the node
-depends on that `Exp`, and the node that generates that `Exp`. The data dependency
-is also captured explicitly by the graph. For instance, in code:
+depends on that `Exp` and the node that generates that `Exp`. Data dependency is captured explicitly by our definition of `Node`. If the `rhs` of a node A contains a node B, then A is data dependent on B. For instance, in the following code snippet:
 
 ``` scala
 val x1 = 10 + x0
 val x2 = x1 + 100
 ```
-Node `x2` depends on node `x1` because it uses `x1` for computation. Since each block
-has `in: List[Sym]` and `res: Exp`, then we know that if `res` depends on node A, A must
-be scheduled in or before the block. In addition, if node A depends on the `in: List[Sym]`,
-then it must be scheduled in the block (if it is needed by the block). For example:
+Node `x2` is data dependent on node `x1` because it uses `x1` for computation. 
+
+Data dependency also happens between nodes and blocks. Since each block
+has inputs `in: List[Sym]` and result `res: Exp`, we know that if `res` depends on node A, A must
+be scheduled inside or before the block. In addition, if node A depends on the inputs, it must be scheduled inside the block (if it is needed by the block). For example:
 
 ``` scala
 val x1 = 10 + x0
 val x2 = x1 + x3
 Block([x3], x2, _, _)
 ```
-means that the block needs to return `x2` as the result, thus node `x2` and node `x1`
+means that the block returns `x2` as the result, thus node `x2` and node `x1`
 must be scheduled in or before the block. Also, since node `x2` is data dependent on `x3`, which is
 an input symbol of the block, `x2` must be scheduled in the block. So we have 2 possible
 schedules for this block:
@@ -105,7 +102,7 @@ block { x3 =>
 
 and we can choose the more optimized version during graph traversal.
 
-What is control dependency? Instead of offering a definition, I will just enumerate some
+Now let's consider control dependencies. What is control dependencies? Instead of offering a definition, Let's enumerate some
 examples:
 
 1. If we have 2 print statements in the IR, we cannot generate the code with any one of them missing or in the wrong order.
@@ -123,14 +120,12 @@ x = 10
 print(x)
 ```
 
-In this small example, the node `x = 10` is not *data-depended* by the print statement.
+In this example, the node `x = 10` is not *data-depended* by the print statement.
 However, it is *control-depended* because the value of `x` is mutated by it. However,
 the `x = 3` node can be removed without breaking the code semantics. The order of
-graph construction (the fact that user did `x = 3` before `x = 10`) is the base of
-our control dependency analysis.
+graph construction (the fact that user did `x = 3` before `x = 10`) is the base of our control dependency analysis.
 
-Directly keeping track of all control dependencies during LMS IR construction can be
-heavy. In our implementation, we keep track of the *effects* of nodes and blocks, and
+How can we obtain data and control dependency information from the source program? It turns out that we can track of the *effects* of nodes and blocks, and
 then compute *dependencies* from *effects* when we need to analyze dependencies. The
 design of effects (and effect systems) is an important project currently under development.
 We will talk about the current effect system in details later, but for now, I just want
@@ -156,7 +151,7 @@ on the block input `x`. In this case, we let the print node depends on the `ein`
 block, so that it will be scheduled in the block, but not before.
 
 
-## Sea Of Nodes
+### Sea Of Nodes
 
 The LMS IR follows the "sea of nodes" design (citations?), where the IR is composed of
 a list of `Node`s, and the `Block`s do not explicitly scope the nodes.
