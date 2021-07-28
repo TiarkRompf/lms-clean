@@ -1,14 +1,13 @@
-## Traverse
+The `lms/core/traversal.scala` file introduces how to traverse the LMS IR. Travering a tree-structured IR seems trivial, but traversing LMS IR (sea of the nodes) is not. The main challenge is to determine the group of nodes that should be scoped in each block. The basic `Traverser` class introduces a basic version of scheduling using frequency estimation. `CompactTraverser` further inlines nodes with regard to their dependencies.
 
-The `lms/core/traversal.scala` defines how to traverse the LMS IR. Travering a tree-structured
-IR seems trivial, but traversing LMS IR (sea of the nodes) is not. The main challenge is to determine
-the group of nodes that should be scoped in each block. Previously in [Backend](backend.md), we
+## Traverser
+Previously in [Backend](backend.md), we
 talked about how the scopes of the blocks are implicitly expressed via data dependency and control
 dependencies. In `traversal.scala`, we will see how exactly we collect the nodes for each block using
 the dependency information.
 
 The basic idea is as follows:
-1. Each block has input-variables and input-effect-variables. We call them *bound variables* of a block (see backend.scala).
+1. Each block has input-variables and an input-effect-variable. We call them *bound variables* of a block (see backend.scala). (TODO: correct?)
 2. A node is ready to be scheduled for the current block when the bound variables on which the node depends are already in path (those blocks are enclosing the current block).
 3. A node should be scheduled in the current block (instead of in a inner block) when the node is used often.
 
@@ -42,8 +41,8 @@ We decide when a node is ready to be scheduled for a block by checking its bound
 As shown in the `apply` method, bound variable calculation is done by the following steps:
 1. Collect all `Block`s in the graph `g`, including those defined in the nodes of `g` and the input block of `g`. Take the union of the bound variables (input and effect input) of these blocks. We define the bound variables of these new symbol to be just themselves, since they are just inputs.
 2. For each node in `g`, get all bound variables that it depends on and all bound variables generated in this node (if it has blocks). The difference of these two sets is the bound variables it really depends on.
-3. We need to get "lambda-forward" node (the forward declaration of "lambda") to have the same bound
-   variables as "lambda". This needs to be fixed in a Convergence Loop (unfortunately).
+3. We need to get "lambda-forward" node (the forward declaration of "λ") to have the same bound
+   variables as "λ". This needs to be fixed in a Convergence Loop (unfortunately).
 
 ### Node Frequency Estimation
 Consider we have a node of heavy computation in a block. Suppose we have determined that the node has no dependency on the inputs of the block, should we schedule it inside or outside the block? The answer is that we should consider how often the node will be executed. If the block is a function body, then it can potentially be called multiple times, so it would be beneficial to schedule it in the outer scope. If the block is a conditional block, then schedule the node outside means that the node would always be executed regardless of the condition. So we should schedule it inside the block in this case. Therefore, we can assign a number represents relatively how often a node is executed, and only schedule the nodes that have a large enough frequency. This is the intuition od frequency estimation.
