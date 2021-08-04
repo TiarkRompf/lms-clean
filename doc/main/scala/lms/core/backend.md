@@ -317,6 +317,51 @@ The Rules of References:
 
 Slices are immutable views of the array.
 
+### Helper Functions
+To facilitate our implementation in the following sections, we define a few helper functions:
+
+The `blocks` function simply collects all `Blocks` in the rhs of a node:
+```scala
+def blocks(x: Node): List[Block] =
+  x.rhs.collect { case a @ Block(_,_,_,_) => a }
+```
+
+The `boundSyms` function collects all data and effect inputs (`in` and `ein`) of all blocks in the rhs of a node:
+```scala
+def boundSyms(x: Node): Seq[Sym] = blocks(x) flatMap (_.bound)
+```
+
+The `directSyms` returns direct symbol mentioning in the RHS of a node (excluding `Block`s and `Const`s):
+```scala
+def directSyms(x: Node): List[Sym] =
+  x.rhs.flatMap {
+    case s: Sym => List(s)
+    case _ => Nil
+  }
+```
+
+The `syms` returns all symbol mentioning in the RHS of a node, including `Syms`, dependencies of `Block`s in the RHS, and effect dependencies of the node:
+```scala
+def syms(x: Node): List[Sym] = {
+  x.rhs.flatMap {
+    case s: Sym => List(s)
+    case b: Block => b.deps
+    case _ => Nil
+  } ++ x.eff.deps
+}
+```
+
+The `hardSyms` excludes sdeps from the `Block`s in the RHS and effect dependencies:
+```scala
+def hardSyms(x: Node): Set[Sym] = {
+  x.rhs.foldLeft(Set[Sym]()) {
+    case (agg, s: Sym) => agg + s
+    case (agg, b: Block) => agg ++ b.used
+    case (agg, _) => agg
+  } ++ x.eff.hdeps
+}
+```
+
 
 # Constructing LMS Graph
 
