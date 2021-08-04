@@ -1,18 +1,20 @@
-The `lms/core/traversal.scala` file introduces how to traverse the LMS IR. Travering a tree-structured IR seems trivial, but traversing LMS IR (sea of the nodes) is not. The main challenge is to determine the group of nodes that should be scoped in each block. The basic `Traverser` class introduces a basic version of scheduling using frequency estimation. `CompactTraverser` further inlines nodes with regard to their dependencies.
+The `lms/core/traversal.scala` file introduces how to traverse the LMS IR. Travering a tree-structured IR seems trivial, but traversing LMS IR (sea-of-nodes) is not. The main challenge is to determine the group of nodes that should be scoped in each block. The `Traverser` class introduces a basic version of scheduling using frequency estimation. `CompactTraverser` further inlines nodes with regard to their dependencies.
 
-## Traverser
+Besides traversing the IR, we can also lower the IR into a lower-level representation. This functionality is handled by the `Transformer` class, which is built on top of a traverser.
+
+# Traverser
 Previously in [Backend](backend.md), we
 talked about how the scopes of the blocks are implicitly expressed via data dependency and control
-dependencies. In `traversal.scala`, we will see how exactly we collect the nodes for each block using
+dependencies. In `traversal.scala`, we will see how exactly we schedule the nodes for each block using
 the dependency information.
 
 The basic idea is as follows:
-1. Each block has input-variables and an input-effect-variable. We call them *bound variables* of a block (see backend.scala). (TODO: correct?)
-2. A node is ready to be scheduled for the current block when the bound variables on which the node depends are already in path (those blocks are enclosing the current block).
-3. A node should be scheduled in the current block (instead of in a inner block) when the node is used often.
+1. Each block has input-variables and an input-effect-variable. We call them bound variables of a block (see backend.scala).
+2. A node is ready to be scheduled for the current block when the bound variables on which the node depends are already available in the current block.
+3. A node should be scheduled in the current block instead of in a inner block when the node is used often.
 
 ### A recap of dependencies
-In LMS IR, we have two categories of dependencies: data dependency and control dependencies. Data dependency captures node usage (e.g. node A used symbol B). This information is already available in the definition of a node (i.e. `rhs: List[Def]`). Control dependencies are dependencies caused by effects. For example, two print statements should be generated in the original user-defined order, or the read/write order of a mutable cell cannot be randomly shuffled. We track control dependencies via Effect Systems (see details in [Backend](backend.md)).
+In LMS IR, we have two categories of dependencies: data dependency and control dependencies. Data dependency captures node usage (e.g. node A uses symbol B). This information is already available in the definition of a node (i.e. `rhs: List[Def]`). Control dependencies are dependencies caused by effects. For example, two print statements should be generated in the original user-defined order, or the read/write order of a mutable cell cannot be randomly shuffled. We track control dependencies via `EffectSummary` (see details in [Backend](backend.md)).
 Control dependencies can be further categorized into *soft* and *hard* dependencies.
 If node A hard-depends on node B, then B must be scheduled before A.
 If node A soft-depends on node B, then B should never be scheduled after A, but B might not be scheduled even
@@ -34,8 +36,10 @@ Then we run three steps for DCE:
 2. Collect used Exp set, which means all Exp that are used (including `Const`).
 3. Rebuild graph with `newNodes` and old block, but with all effects/dependencies filtered to remove unused Exps.
 
+A more detailed code walk can be found in backend.md
+
 ### Bound Variables
-Instead of scheduling nodes based on their dependencies directly, we first calculate the set of *bound variables* among the transitive closure of a node's dependencies.
+We first calculate the set of *bound variables* for each node.
 We decide when a node is ready to be scheduled for a block by checking its bound variables. We implement bound variable calculation as an analysis pass, as shown in `class Bound extends Phase` in lms/core/backend.scala. We use a hashmap `hm` to keep track of the bound variables of all symbols in a graph.
 
 As shown in the `apply` method, bound variable calculation is done by the following steps:
@@ -45,9 +49,9 @@ As shown in the `apply` method, bound variable calculation is done by the follow
    variables as "λ". This needs to be fixed in a Convergence Loop (unfortunately).
 
 ### Node Frequency Estimation
-Consider we have a node of heavy computation in a block. Suppose we have determined that the node has no dependency on the inputs of the block, should we schedule it inside or outside the block? The answer is that we should consider how often the node will be executed. If the block is a function body, then it can potentially be called multiple times, so it would be beneficial to schedule it in the outer scope. If the block is a conditional block, then schedule the node outside means that the node would always be executed regardless of the condition. So we should schedule it inside the block in this case. Therefore, we can assign a number represents relatively how often a node is executed, and only schedule the nodes that have a large enough frequency. This is the intuition od frequency estimation.
+Consider we have a node of heavy computation in a block. Suppose we have determined that the node has no dependency on the inputs of the block. Should we schedule it inside or outside the block? The answer is that we should consider how often the node will be executed. If the block is a function body, then it can be called multiple times, so it would be beneficial to schedule it in the outer scope. If the block is a conditional block, then schedule the node outside means that the node would always be executed regardless of the condition. So we should schedule it inside the block in this case. Therefore, we can assign a number representing relatively how often a node is executed, and only schedule the nodes that have a large enough frequency. This is the intuition of frequency estimation.
 
-The `symsFreq` function in `Traverser` achieves this: Given a lambda node containing a block, we assign the hard dependencies of the effect summary of the block to a large enough number 100, representing that the body of a function is executed often. For a conditional node, we assign the results of both if and else block to 0.5, assuming each branch ia taken with equal probability. For a loop block, we assign the results of the conditional and body block to 100, assuming the loop is iterated many times. For a switch node, we treat it similar to the conditional node by assigning each branch to 0.5. Lastly, all other nodes are assigned 1.0.
+The `symsFreq` function in `Traverser` achieves this: Given a lambda node containing a block, we assign the hard dependencies of the effect summary of the block to a large enough number 100, representing that the body of a function is executed often. For a conditional node, we assign the results of both if and else block to 0.5, assuming each branch is taken with equal probability. For a loop block, we assign the results of the conditional and body block to 100, assuming the loop is iterated many times. For a switch node, we treat it similar to the conditional node by assigning each branch to 0.5. Lastly, all other nodes are assigned 1.0.
 
 
 ### Traversal Abstract Class
@@ -57,8 +61,8 @@ The core functionality for scheduling the nodes for a block is the function name
 
 The function works with two mutable states: the `path` and `inner`. The `path` refers to the
 accumulated bound variables when we are in nested scopes, and the `inner` refers to the list of
-nodes that are to be selected for scheduling. The `withScope` function helps maintain the
-two mutable states when going into or exiting from a scope.
+nodes to be selected for scheduling. The `withScope` function helps maintain the
+two mutable states when entering or exiting from a scope.
 
 In the `scheduleBlock_` function, it first updates the `path` by
 
@@ -69,13 +73,14 @@ where `y.bound` returns the bound variable of the current block, `extra.toList` 
 that we see as available bound variables, and `path` is the old available bound variables before entering
 this current block.
 
-Then we set up a filter for nodes that are considered *available*:
+Then we set up a filter for nodes considered *available*:
 
 ``` scala
 def available(d: Node) = bound.hm(d.n) -- path1 - d.n == Set()
 ```
 which is to say, a node is available when the bound variables of the node are all in the `path`.
 
+#### Calculate Reachability Information
 Then we compute two sets of symbols, the `reach` (for nodes that are reachable from the current block)
 and the `reachInner` (for nodes that are reachable from an inner block).
 The `reach` set is initialized as `y.used`, which is the hard-dependencies and result of the block, if
@@ -104,9 +109,10 @@ for (d <- g.nodes.reverseIterator) {
 }
 ```
 
+#### Scheduling
 Then we try to compute the `val outer1 = Seq[Node]()` (nodes scheduled for the currents
 and the `val inner1 = Seq[Node]()` (nodes scheduled for inner blocks).
-The basic logic is that, nodes that are reachable and available should be in `outer1`.
+The basic logic is: nodes that are reachable and available should be in `outer1`.
 Nodes that are reachable but not available, or reachable by `reachInner` should be in
 `inner1`. We need to take care of soft dependencies too. Previously we said that
 soft dependencies do not enforce scheduling, just the order. So it might be confusing
@@ -114,28 +120,30 @@ as to why we are considering soft dependencies too. It turns out that the dead c
 pass should have removed soft dependencies that are not necessary to be scheduled. The
 remaining soft dependencies are nodes that should actually be scheduled.
 
-The code that does so is here
+The code that does so is here:
 
 ``` scala
- for (n <- inner.reverseIterator) {
-   if (reach(n.n) || extraThroughSoft(n.n)) {
-     if (available(n)) {
-       outer1 = n +: outer1
-       if (!reach(n.n)) // if added through soft deps, hards needs to be added as well
-         extraThroughSoft ++= syms(n)
-       else
-         extraThroughSoft ++= n.eff.sdeps
-     } else {
-       inner1 = n +: inner1
-     }
-   } else if (reachInner(n.n)) {
-     inner1 = n +: inner1
-   }
- }
+for (n <- inner.reverseIterator) {
+  if (reach(n.n) || extraThroughSoft(n.n)) {
+    if (available(n)) {
+      outer1 = n +: outer1
+      if (!reach(n.n)) // if added through soft deps, hards needs to be added as well
+        extraThroughSoft ++= syms(n)
+      else
+        extraThroughSoft ++= n.eff.sdeps
+    } else {
+      inner1 = n +: inner1
+    }
+  } else if (reachInner(n.n)) {
+    inner1 = n +: inner1
+  }
+}
 ```
 
 After computing the set of nodes of the current block, we traverse the nodes one
 by one for the block.
+
+#### Example
 
 Let us go over an example of scheduling a simple program. The source program is the following:
 ```scala
@@ -161,21 +169,54 @@ x7 = (+ x1 1)
 x9 = (+ x1 2)  
 x10 = (? x4 Block(List(),x7,x5,[CTRL*: _ | x6]) Block(List(),x9,x8,[: _ | x8])) [CTRL*: _ | x3]
 ```
-The top-level block takes `x0` as effect input, takes `x1` as data input (arg), and returns `x10` as the result. The block has a write effect to `CTRL`, and a hard dependency on `x10`.
-In the block, we have 7 nodes ordered by the same order as in the source program.
+Note that the dependency information is already calculated by the Backend (see the graph construction section of Backend.md).
 
-Scheduling top-level block
+In the graph, the top-level block takes `x0` as effect input, takes `x1` as data input (arg), and returns `x10` as the result. The block has a write effect to `CTRL`, and a hard dependency on `x10`.
+In the block, we have 7 nodes listed in the same order as in the source program.
+
 We first calculate `path1`. Since we are at the top block, `path` is an empty set, so `path1` just contains the input and effect input of the top-level block, i.e., `x0, x1`.
-We then determine `reach` and `reachInner` by traversing the nodes backward. We initialize `reach` to contain the result node `x10` and reachInnder as an empty set. Since `x10` is reachable and available, we call `symsFreq` on `x10`. Since `x10` is a conditional node, we assign the condition `x4` and the hdep `x3` to 1.0, and assign the results (`x7`, `x9`) and hdeps(`x6`, `x8`) of two branch blocks to 0.5. Therefore, reach = [x10, x4, x3] and reachInner = [x7, x9, x6, x8]. We then consider the next node `x9`. Since it's already in `reachInner`, we add its hardSyms `x1` into `reachInner`. Now reachInner = [x7, x9, x6, x8, x1]. Then we consider `x7`. It does the same thing as `x9`. Then we consider `x6`. Since `x6` is in `reachInner`, we add its hdep `x5` into `reachInner`. Now reachInner = [x7, x9, x6, x8, x1, x5]. We then consider `x4`. Since it's in reach and it's available, we add its ddep `x1` in `reach`. So reach = [x10, x4, x3, x1]. Then we consider x3, which adds x2 into reach. Lastly, we consider x2, which adds x0 into reach. Now reach = [x10, x4, x3, x1, x2, x0].
-Now, we traverse the nodes again to split them into either `outer1` or `inner1`. x10, x2, x3, x4 are scheduled in `outer` and x6, x7, x9 are scheduled in inner. 
-We now consider the if-block in x10. First, we add `x5` into path, and path now becomes `x5, x1, x10`. Then, we re-calculate `reach` and `reachInner`, which are `x7, x1, x6, x5` and `ø`, respectively. We schedule `x6` and `x7` to `outer1`, while `x9` is considered unreachable. `inner1` remains empty, so we exit this block and enter the else branch. Similarly, we recalculate `reach` as `x1, x9, x8` and schedule `x9` into this block. 
 
-### Compact Traversal class
+We then determine `reach` and `reachInner` by traversing the nodes backward. We initialize `reach` to contain the result node `x10` and reachInnder as an empty set. Since `x10` is reachable and available, we call `symsFreq` on `x10`. Since `x10` is a conditional node, we assign the condition(`x4`) and the hdep(`x3`) to 1.0, and assign the results(`x7`, `x9`) and hdeps(`x6`, `x8`) of two branch blocks to 0.5. At this point:
+```scala
+reach = [x10, x4, x3]
+reachInner = [x7, x9, x6, x8]
+```
+We then consider the next node `x9`. Since it's already in `reachInner`, we add its hardSyms `x1` into `reachInner`. Now we have:
+```scala
+reach = [x10, x4, x3]
+reachInner = [x7, x9, x6, x8, x1]
+```
+Then we consider `x7`. It also adds `x1` into `reachInner`, which doesn't change `reachInner`. Then we consider `x6`. Since `x6` is in `reachInner`, we add its hdep `x5` into `reachInner`. Now we have:
+```scala
+reach = [x10, x4, x3]
+reachInner = [x7, x9, x6, x8, x1, x5]
+```
+We then consider `x4`. Since it's in reach and it's available, we add its ddep `x1` in `reach`. So:
+```scala
+reach = [x10, x4, x3, x1]
+reachInner = [x7, x9, x6, x8, x1, x5]
+```
+Then we consider `x3`, which adds `x2` into `reach`:
+```scala
+reach = [x10, x4, x3, x1, x2]
+reachInner = [x7, x9, x6, x8, x1, x5]
+```
+Lastly, we consider `x2`, which adds `x0` into `reach`. Finally, we have:
+```scala
+reach = [x10, x4, x3, x1, x2, x0]
+reachInner = [x7, x9, x6, x8, x1, x5]
+```
+
+After having gathered the reachability information, we traverse the nodes again in backward and put them into either `outer1` or `inner1`. Following the algorithm, we have `[x10, x2, x3, x4]` scheduled in `outer` and `[x6, x7, x9]` scheduled in inner.
+
+We now consider the if-block in `x10`. First, we add `x5` into path, and path now becomes `x5, x1, x10`. Then, we re-calculate `reach` and `reachInner`, which become `[x7, x1, x6, x5]` and `[]`, respectively. We schedule `x6` and `x7` to `outer1`, while `x9` is considered unreachable. `inner1` remains empty, so we exit this block and enter the else branch. Similarly, we recalculate `reach` as `x1, x9, x8` and schedule `x9` into this block.
+
+# Compact Traverser
 
 The `Traversal` abstract class provided the basic functionalities for scheduling nodes
 of a given block. It can be used in graph transformation and code generation.
 We will discuss transformation later, but for code generation, the caveat is that
-the basic `Traveral` class will generate each node as a statment, leading to code
+the basic `Traveral` class will generate each node as a statement, leading to code
 that is not very compact, such as
 
 ``` scala
@@ -343,18 +384,27 @@ Note that traversing inlined nodes using the functions with `shallow` in the nam
 such as `def shallow` and `def traverseShallow`.
 
 
-### Transformer
+# Transformer
 
-`abstract class Transformer extends Traverser` says that `Transformer` is one kind of
-`Traverser`, the kind that builds another LMS IR when traversing. The basic `Transformer`
-class is an identical transformation, and we can define transformers on top of it
-that add in optimizations or other stuff. In this section, we will see how identical
-transformation is done in LMS (heads-up, it is more complex than you probably think).
+A transformer is a traverser that builds another LMS IR while traversing. Transformers are needed when we want to lowering the input program to a low-level language. For instance, a high-level machine learning program written in a high-level IR can be lowered multiple times until we are ready to emit C/C++ code that can be readily compiled and executed.
 
-The transformer will have a new `var g: GraphBuilder` and a map from old symbols to new symbols
-`val subst = new mutable.HashMap[Sym, Exp]`.
+In this section, we introduce the the basic `Transformer` class which is an identical transformation. This identical transformer serves as a basis and more interesting transforms (e.g. optimizations) can be implemented on top of it.(heads-up, it is more complex than you probably think).
 
-When transforming an `Exp`, either check the `subst` or return the `Const`.
+The transformer works on two key objects: 1) a new `GraphBuilder` and 2) a hashmap `subst` mapping old symbols to new expressions. A `GraphBuilder` provides multiple ways of adding nodes and blocks into a Graph IR (see backend.md).
+
+The core of `Transformer` is a family of `transform` functions:
+```scala
+def transform(s: Exp): Exp
+def transform(b: Block): Block
+def transformRHS(rhs: List[Def])
+def transform(n: Node): Exp
+def transform(graph: Graph): Graph
+```
+They maps structures (`Exp`, `Block`, etc) in the old IR into their counterparts in the new IR.
+
+### Transforming *Exp*
+
+The following code snippet shows how to transform an `Exp`. For a `Sym`, we go to the `subst` map and find its counterpart in the transformed IR. We print a warning message if the `Sym` is not found in `subst`. For a `Const`, we just return itself since `Const`s are immediate values.
 
 ``` scala
   def transform(s: Exp): Exp = s match {
@@ -364,57 +414,124 @@ When transforming an `Exp`, either check the `subst` or return the `Const`.
   }
 ```
 
+### Transforming Blocks
 When transforming a block, we need to reify the block by traversing it.
 
-``` scala
-  def transform(b: Block): Block = b match {
-    case b @ Block(Nil, res, block, eff) =>
-      g.reify {
-        //subst(block) = g.effectToExp(g.curBlock) //XXX
-        traverse(b); transform(res)
-      }
-    // other cases omitted
-  }
+We use the `reify` method of `GraphBuilder` to transform a block. The signature of `reify` is:
+```scala
+def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block
 ```
+the method takes a function `f` as argument and applies `f` with `args` number of fresh `Syms` as arguments to `f`. The returned value is the new result of the block. The method then figures out other information of the new block (see backend.md).
+
+So what should `f` be for `transform`? If a block does not have inputs, we just traverse the block and transform the `res`. Otherwise if the block has an input, we update `subst` to map it to the new input, which is the formal parameter `e`. In `reify`, `e` will be instantiated with a fresh `Sym`. We then traverse the block and transform the `res` with the updated `subst` and remove the block input after transformation is done.
+
+``` scala
+def transform(b: Block): Block = b match {
+  case b @ Block(Nil, res, block, eff) =>
+    g.reify {
+      //subst(block) = g.effectToExp(g.curBlock) //XXX
+      traverse(b); transform(res)
+    }
+  case b @ Block(arg::Nil, res, block, eff) =>
+    g.reify { e =>
+      if (subst contains arg)
+        println(s"Warning: already have a subst for $arg")
+      try {
+        subst(arg) = e
+        //subst(block) = g.effectToExp(g.curBlock) //XXX
+        traverse(b)
+        transform(res)
+      } finally subst -= arg
+    }
+  case _ => ???
+}
+```
+
+### Transforming Nodes
 
 When transforming a node, we need to transform the right-hand-side and the effects.
 
 ``` scala
-  def transform(n: Node): Exp = n match {
-    case Node(s, "λ", (b @ Block(in, y, ein, eff))::_, _) =>
-      // need to deal with recursive binding!
-      val s1 = Sym(g.fresh)
-      subst(s) = s1
-      g.reflect(s1, "λ", transform(b))()
-    case Node(s,op,rs,es) =>
-      // effect dependencies in target graph are managed by
-      // graph builder, so we drop all effects here
-      val (effects,pure) = (es.deps,rs)
-      val args = pure.map {
-        case b @ Block(_,_,_,_) =>
-          transform(b)
-        case s : Exp =>
-          transform(s)
-        case a =>
-          a
-      }
-      // NOTE: we're not transforming 'effects' here (just the keys)
-      if (effects.nonEmpty)
-        g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
-      else
-        g.reflect(op,args:_*)
-  }
+def transform(n: Node): Exp = n match {
+  case Node(s, "λ", (b @ Block(in, y, ein, eff))::_, _) =>
+    // need to deal with recursive binding!
+    val s1 = Sym(g.fresh)
+    subst(s) = s1
+    g.reflect(s1, "λ", transform(b))()
+  case Node(s,op,rs,es) =>
+    // effect dependencies in target graph are managed by
+    // graph builder, so we drop all effects here
+    val (effects,pure) = (es.deps,rs)
+    val args = pure.map {
+      case b @ Block(_,_,_,_) =>
+        transform(b)
+      case s : Exp =>
+        transform(s)
+      case a =>
+        a
+    }
+    // NOTE: we're not transforming 'effects' here (just the keys)
+    if (effects.nonEmpty)
+      g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
+    else
+      g.reflect(op,args:_*)
+}
 ```
 The handling of function is incomplete yet, because it is not taking care of recursive functions.
 
-When traversing a node, we need to transform the node, and store the returned symbol to the `subst` map:
+For other kinds of node, we first transform the RHS of the node by calling the appropriate `transform` function for each case. Then, we transform the effect keys and call `reflect`.
+
+### Traverse Nodes
+
+We override the `def traverse(n: Node): Unit` function to update the `subst` map such that the transformed node is tracked. We also update the typeMap and sourceMap accordingly.
 
 ``` scala
-  override def traverse(n: Node): Unit = {
-    subst(n.n) = transform(n)
-  }
+override def traverse(n: Node): Unit = {
+  subst(n.n) = transform(n)
+  // Also pass the metadata to the new exp
+  // We use `getOrElseUpdate` because the handling of each node might
+  // have already filled a proper value, which we don't want to override
+  if (Adapter.oldTypeMap.contains(n.n))
+    Adapter.typeMap.getOrElseUpdate(subst(n.n), Adapter.oldTypeMap(n.n))
+  if (Adapter.oldSourceMap.contains(n.n))
+    Adapter.sourceMap.getOrElseUpdate(subst(n.n), Adapter.oldSourceMap(n.n))
+}
 ```
 
-### CPS Transformation
+### Transforming Graph
 
-To be continued.
+We finally present transforming a graph. Firstly, we need to cache `globalDefsCache`, `typeMap` and `sourceMap`. Then, we reify the top-level block similar to what we do in the previous section (Transforming Blocks). In addition, we assert that the top-level block has only one input. We then call `wrapGraph(graph)`, which calls the `apply` method of the super class to traverse the graph. Lastly, we transform the `res` of the top-level block. Finally, we need to merge the old and new metadata and return the transformed graph.
+
+```scala
+def transform(graph: Graph): Graph = {
+  // XXX unfortunate code duplication, either
+  // with traverser or with transform(Block)
+
+  // Handling MetaData 1. save oldTypeMap/SourceMap first
+  Adapter.oldDefsCache = graph.globalDefsCache
+  Adapter.oldTypeMap = Adapter.typeMap
+  Adapter.oldSourceMap = Adapter.sourceMap
+
+  // Handling MetaData 2. initialize MetaData as fresh, so the transformer might add new metadata entries
+  Adapter.typeMap = new mutable.HashMap[Backend.Exp, Manifest[_]]()
+  Adapter.sourceMap = new mutable.HashMap[Backend.Exp, SourceContext]()
+
+  val block = g.reify { e =>
+    assert(graph.block.in.length == 1)
+    subst(graph.block.in(0)) = e
+    // subst(graph.block.ein) = g.curBlock.head // XXX
+    wrapGraph(graph)
+    transform(graph.block.res)
+  }
+
+  // Handling MetaData 3. update new metadata with old metadata
+  // this is not redundant because of the block arguments (function definitions)
+  for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap.contains(k))
+    Adapter.typeMap.getOrElseUpdate(v, Adapter.oldTypeMap(k))
+  for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap.contains(k))
+    Adapter.sourceMap.getOrElseUpdate(v, Adapter.oldSourceMap(k))
+
+  Graph(g.globalDefs,block, g.globalDefsCache.toMap)
+}
+```
+
