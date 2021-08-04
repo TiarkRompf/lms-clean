@@ -386,9 +386,9 @@ such as `def shallow` and `def traverseShallow`.
 
 # Transformer
 
-A transformer is a traverser that builds another LMS IR while traversing. Transformers are needed when we want to lowering the input program to a low-level language. For instance, a high-level machine learning program written in a high-level IR can be lowered multiple times until we are ready to emit C/C++ code that can be readily compiled and executed.
+A transformer is a traverser that builds another LMS IR while traversing. Transformers are needed when we want to lower the input program to a low-level language. For instance, a high-level machine learning program written in a high-level IR can be lowered multiple times until we are ready to emit C/C++ code that can be readily compiled and executed.
 
-In this section, we introduce the the basic `Transformer` class which is an identical transformation. This identical transformer serves as a basis and more interesting transforms (e.g. optimizations) can be implemented on top of it.(heads-up, it is more complex than you probably think).
+In this section, we introduce the basic `Transformer` class, which is an identical transformation. This identical transformer serves as a basis and more interesting transforms (e.g. optimizations) can be implemented on top of it.(heads-up, it is more complex than you probably think).
 
 The transformer works on two key objects: 1) a new `GraphBuilder` and 2) a hashmap `subst` mapping old symbols to new expressions. A `GraphBuilder` provides multiple ways of adding nodes and blocks into a Graph IR (see backend.md).
 
@@ -423,7 +423,7 @@ def reify(arity: Int, f: List[Exp] => Exp, here: Boolean = false): Block
 ```
 the method takes a function `f` as argument and applies `f` with `args` number of fresh `Syms` as arguments to `f`. The returned value is the new result of the block. The method then figures out other information of the new block (see backend.md).
 
-So what should `f` be for `transform`? If a block does not have inputs, we just traverse the block and transform the `res`. Otherwise if the block has an input, we update `subst` to map it to the new input, which is the formal parameter `e`. In `reify`, `e` will be instantiated with a fresh `Sym`. We then traverse the block and transform the `res` with the updated `subst` and remove the block input after transformation is done.
+So what should `f` be for `transform`? If a block does not have inputs, we just traverse the block and transform the `res`. Otherwise, if the block has an input, we update `subst` to map it to the new input, which is the formal parameter `e`. In `reify`, `e` will be instantiated with a fresh `Sym`. We then traverse the block and transform the `res` with the updated `subst` and remove the block input after the transformation is done.
 
 ``` scala
 def transform(b: Block): Block = b match {
@@ -500,7 +500,7 @@ override def traverse(n: Node): Unit = {
 
 ### Transforming Graph
 
-We finally present transforming a graph. Firstly, we need to cache `globalDefsCache`, `typeMap` and `sourceMap`. Then, we reify the top-level block similar to what we do in the previous section (Transforming Blocks). In addition, we assert that the top-level block has only one input. We then call `wrapGraph(graph)`, which calls the `apply` method of the super class to traverse the graph. Lastly, we transform the `res` of the top-level block. Finally, we need to merge the old and new metadata and return the transformed graph.
+We finally present how to transform a graph. Firstly, we need to cache `globalDefsCache`, `typeMap` and `sourceMap`. Then, we reify the top-level block similar to what we do in the previous section (Transforming Blocks). In addition, we assert that the top-level block has only one input. We then call `wrapGraph(graph)`, which calls the `apply` method of the superclass to traverse the graph. Lastly, we transform the `res` of the top-level block. Finally, we need to merge the old and new metadata and return the transformed graph.
 
 ```scala
 def transform(graph: Graph): Graph = {
