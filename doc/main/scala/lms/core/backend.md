@@ -243,7 +243,7 @@ nodes = [
 ]
 ```
 
-In this example, we first have two nodes that declare to new variables (x3 and x4).
+In this example, we first have two nodes that declare two new variables (x3 and x4).
 Then we have a while loop (x18) that has two blocks (the condition block and the
 loop body block). The condition block has input-effect x5 and result x7. So it scopes
 node x6 and x7 into the condition block. The loop body block has input-effect x8
