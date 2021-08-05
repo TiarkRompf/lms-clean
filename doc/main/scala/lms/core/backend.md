@@ -187,7 +187,7 @@ write `Node`.
 While data dependencies are captured in the graph structure, the control dependencies have to be
 captured in other means. LMS core handles control dependencies by tracking the effects of nodes and
 blocks (printing, variable read, variable write, etc.), and then computed control dependencies based
-on the effects of all nodes/blocks. Effects of nodes and blockes are
+on the effects of all nodes/blocks. Effects of nodes and blocks are
 expressed via accompanying `EffectSummary`. Both dependencies contribute to code scheduling. Here are
 a few simple rules:
 1. If node A uses node B, then scheduling A means B must be scheduled before A.
