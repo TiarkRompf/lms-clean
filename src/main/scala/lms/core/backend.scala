@@ -216,7 +216,7 @@ class GraphBuilder {
 
   def isCurrentValue(src: Exp, value: Sym) = !curEffects.get(src).filter({ case (_, lrs) => lrs contains value }).isEmpty
   // This is the main function for reflect with explicit read/write effects
-  def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
+  def reflectEffect(sm: Sym, s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
     // simple pre-construction optimization
     rewrite(s, as.toList) match {
       case Some(e) => e // found optimization (resulting in pure expressions only)
@@ -228,7 +228,6 @@ class GraphBuilder {
         val writes = if (s == "reset1") _writes filter (_ != stub.Adapter.CPS) else _writes
 
         if (reads.nonEmpty || writes.nonEmpty) {
-          val sm = Sym(fresh)
           val (prevHard, prevSoft) = gatherEffectDeps(reads, writes, s, as:_*)
           // prevSoft --= prevHard
           val summary = EffectSummary(prevSoft, prevHard, reads, writes)
@@ -248,10 +247,13 @@ class GraphBuilder {
           findDefinition(s,as) match {
             case Some(n) => n.n
             case None =>
-              reflect(Sym(fresh), s, as:_*)()
+              reflect(sm, s, as:_*)()
           }
         }
     }
+  }
+  def reflectEffect(s: String, as: Def*)(readEfKeys: Exp*)(writeEfKeys: Exp*): Exp = {
+    reflectEffect(Sym(fresh), s, as:_*)(readEfKeys:_*)(writeEfKeys:_*)
   }
 
   def gatherEffectDeps(reads: Set[Exp], writes: Set[Exp], s: String, as: Def*): (Set[Sym], Set[Sym]) = {
