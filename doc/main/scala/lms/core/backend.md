@@ -676,7 +676,7 @@ for (d <- newNodes.reverseIterator) {
 ```
 After getting all reachable nodes in `newNodes`, we continue collect used variables by traversing `newNodes` in reverse order. For each node `d`, if the symbol of `d` is in `used`, we add the `valueSym` of `d` into `used` as well. If `d` is not in `used` but has simple effects (e.g. print) or writes to a used symbol, we also add the symbol and `valueSym` of `d` into `used`.
 
-### Recreate the Graph
+### Reconstruct the Graph
 ```scala
 var newGlobalDefsCache = Map[Sym,Node]()
 newNodes = for (d <- newNodes if used(d.n)) yield {
