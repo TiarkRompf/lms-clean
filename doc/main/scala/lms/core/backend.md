@@ -58,7 +58,7 @@ The criteria we use in LMS IR are *dependencies*. Simply speaking, dependencies 
 2. the control dependencies.
 
 The data dependency is straightforward. If a node uses an `Exp`, then the node
-depends on that `Exp` and the node that generates that `Exp`. Data dependency is captured explicitly by our definition of `Node`. If the `rhs` of node A contains node B, then A is data-dependent on B. For instance, in the following code snippet:
+depends on that `Exp` and the node that generates that `Exp`. Data dependency is captured explicitly by our definition of `Node`. If the `rhs` of node A refers to node B, then A is data-dependent on B. For instance, in the following code snippet:
 
 ``` scala
 val x1 = 10 + x0
