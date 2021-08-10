@@ -15,7 +15,7 @@ case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary)
 
 `Def` represents a definition, which is used in the RHS of all nodes. A definition can be an `Exp` or a `Block`. `Exp` can be a `Sym` or a `Const`. `Sym` represents symbols in the IR identified by a unique integer. For example, `Sym(2)` represents `x2` in the generated code. `Const` represents immediate values, such as integers (e.g. `Const(0)`), strings (e.g. `Const("hello")`), etc.
 
-`Node` represents statements in the IR. The first field `n` of a node is a `Sym` corresponding to the LHS of a statement. The second field `op` is the operator of the statement. We use strings as operators since they permit easy extension of various kinds of nodes such as `-`, `print`, etc. The third field is the list of operands (RHS) of a node. Let's ignore the last field `EffectSummary` for now, which will be covered later. For example, the statement `val x3 = x2 + 1` would become
+`Node` represents statements in the IR. The first field `n` of a node is a `Sym` corresponding to the identity of a statement. The second field `op` is the operator of the statement. We use strings as operators since they permit easy extension of various kinds of nodes such as `-`, `print`, etc. The third field is the list of operands (RHS) of a node. Let's ignore the last field `EffectSummary` for now, which will be covered later. For example, the statement `val x3 = x2 + 1` would become
 ``` scala
 Node(Sym(x3), "+", List(Sym(x2), Const(1)), _)
 ```
