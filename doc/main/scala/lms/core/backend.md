@@ -165,7 +165,7 @@ rules for computing dependencies from effects are listed below:
   since the correctness of the W does not depend on the R to be scheduled, but the order of them matters.
 3. Write-After-Write (WAW): the first idea is to generate a soft dependency,
   since the second W simply overwrites the first W.
-  However, write to array is more complicated, such as arr(0) = 1; arr(1) = 2,
+  However, write to array is more complicated, such as `arr(0) = 1; arr(1) = 2`,
   where the second W doesn’t overwrite the first W, and both Ws have to be generated.
   For now, we just issue a hard dependency from the second W to the first W.
 4. Read-After-Read (RAR): there is no effect dependency between them.
