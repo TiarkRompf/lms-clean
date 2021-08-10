@@ -29,12 +29,12 @@ __global__ void x9(float** x10, float* x11) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(18 * sizeof(float));
-  scan_float("golden/concat2/input0.data", x1, 18);
+  scan_floats("golden/concat2/input0.data", x1, 18);
   float* x2 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(18 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(18 * sizeof(float)), cudaMemcpyHostToDevice));
   float* x3 = (float*)malloc(30 * sizeof(float));
-  scan_float("golden/concat2/input1.data", x3, 30);
+  scan_floats("golden/concat2/input1.data", x3, 30);
   float* x4 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x4, (size_t)(30 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(30 * sizeof(float)), cudaMemcpyHostToDevice));

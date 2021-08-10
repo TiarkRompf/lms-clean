@@ -8,8 +8,7 @@ from utils import extend, get_printer
 def generate_data(lms_clean_root: str):
     torch.manual_seed(0)
 
-    # model
-    input = torch.randn(32, 32)
+    input = torch.randn(214, 56)
     input.requires_grad = True
     loss = torch.transpose(input, 0, 1)
     loss.sum().backward()

@@ -180,7 +180,12 @@ But if A is hard-dependent on B, then scheduling A implies that B has to be sche
 
 ### Dependencies and Scheduling
 
-How do dependencies help with scoping the nodes in a block? The details are in `lms/core/traversal.scala`, but we can talk about it in the high level for now. Here are
+
+While data dependencies are captured in the graph structure, the control dependencies have to be
+captured in other means. LMS core handles control dependencies by tracking the effects of nodes and
+blocks (printing, variable read, variable write, etc.), and then computed control dependencies based
+on the effects of all nodes/blocks. Effects of nodes and blocks are
+expressed via accompanying `EffectSummary`. Both dependencies contribute to code scheduling. Here are
 a few simple rules:
 1. If node A uses node B, then scheduling A means B must be scheduled before A.
 2. If a block's results or effects depend on node A, then A must be schedule within or before this block.
@@ -235,7 +240,7 @@ nodes = [
 ]
 ```
 
-In this example, we first have two nodes that declare to new variables (x3 and x4).
+In this example, we first have two nodes that declare two new variables (x3 and x4).
 Then we have a while loop (x18) that has two blocks (the condition block and the
 loop body block). The condition block has input-effect x5 and result x7. So it scopes
 node x6 and x7 into the condition block. The loop body block has input-effect x8

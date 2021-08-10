@@ -17,7 +17,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
   import BaseTypeLess._
 
   def ConvForward(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = ConvForwardOutTensorType(input, filter, params, anno)
+    val res_tt = ConvForwardOutTensorType(input, filter, params)
     (new TENSOR(Adapter.g.reflectRead("tensor_conv", C(res_tt), C(anno),
       input.x, filter.x, C(params))(input.x, filter.x))).withSrcType(__pos, input.et)
   }
@@ -36,7 +36,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       input.x, filter.x, doutput.x, C(params))(input.x, filter.x, doutput.x)).withSrcType(__pos, input.et))
   }
 
-  def ConvForwardOutTensorType(input: TENSOR, filter: TENSOR, params: ConvParam, anno: Anno): TensorType = {
+  def ConvForwardOutTensorType(input: TENSOR, filter: TENSOR, params: ConvParam): TensorType = {
     val ConvParam(alpha, beta, padding, strides, dilation) = params
 
     require(input.shapeSize.size == CUDNN_TENSOR_DIM, "input tensor of convolution must be 4D, found: " + input.shapeSize.size)
@@ -66,7 +66,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       Size(dim, output_H),
       Size(dim, output_W))
 
-    TensorType(output_shape, input.et, anno)
+    TensorType(output_shape, input.et)
   }
 
   def DropoutForward(input: TENSOR, params: DropoutParam, anno: Anno, __pos: SourceContext): TENSORS = {
@@ -84,8 +84,9 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       doutput.x, reserveSpace.x, C(params))(doutput.x, reserveSpace.x)).withSrcType(__pos, doutput.et))
   }
 
+  // FIXME(feiw): should some mode of Pooling (such as max pooling) have 2 outputs?
   def PoolingForward(input: TENSOR, params: PoolingParam, mode: String, anno: Anno, __pos: SourceContext): TENSOR = {
-    val res_tt = PoolingForwardOutTensorType(input, params, anno)
+    val res_tt = PoolingForwardOutTensorType(input, params)
     (new TENSOR(Adapter.g.reflectRead("tensor_pooling", C(res_tt), C(anno),
       input.x, C(params), C(mode))(input.x)).withSrcType(__pos, input.et))
   }
@@ -96,7 +97,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       input.x, output.x, doutput.x, C(params), C(mode))(input.x, output.x, doutput.x)).withSrcType(__pos, input.et))
   }
 
-  def PoolingForwardOutTensorType(input: TENSOR, params: PoolingParam, anno: Anno): TensorType = {
+  def PoolingForwardOutTensorType(input: TENSOR, params: PoolingParam): TensorType = {
     val PoolingParam(alpha, beta, window, padding, strides) = params
 
     require(window.size == CUDNN_PARAM_DIM, "window must be sequence of integer of length 2, found: " + window.size)
@@ -123,7 +124,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
       Size(dim, output_H),          // new dim (fresh)
       Size(dim, output_W))          // new dim (fresh)
 
-    TensorType(output_shape, input.et, anno)
+    TensorType(output_shape, input.et)
   }
 
 
@@ -198,6 +199,19 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
 
       case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
     }
+
+  override def printTensor(node: Node, graph: Graph) = node match {
+    case Node(s, "tensor_conv", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
+      s"$s = tensor_conv($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_conv_bwd_filter", Backend.Const(tt: TensorType)::Backend.Const(anno:Anno)::
+      (weight:Backend.Sym)::(filter:Backend.Sym)::(doutput:Backend.Sym)::Backend.Const(params)::_, _) =>
+      s"$s = tensor_conv_bwd_filter($weight, $filter, $doutput) (${symTensorShape(weight, graph)}, ${symTensorShape(filter, graph)}, ${symTensorShape(doutput, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensors_dropout", Backend.Const(List(output_tt:TensorType, dummy_tt:TensorType))::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
+      s"$s:2 = tensors_dropout($a) (${symTensorShape(a, graph)})->(${output_tt.toString}, ${dummy_tt.toString})${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case Node(s, "tensor_pooling", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::params::Backend.Const(mode:String)::_, _) =>
+      s"$s = tensor_pooling($a, mode=$mode) (${symTensorShape(a, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case _ => super.printTensor(node, graph)
+  }
 }
 
 trait FixedSizeDistributedTensorOpsConv extends FixedSizeDistributedTensorOpsBase {

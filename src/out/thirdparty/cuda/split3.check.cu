@@ -30,7 +30,7 @@ __global__ void x11(float* x12, float** x13) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   float* x1 = (float*)malloc(20 * sizeof(float));
-  scan_float("golden/split3/input.data", x1, 20);
+  scan_floats("golden/split3/input.data", x1, 20);
   float* x2 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(20 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(20 * sizeof(float)), cudaMemcpyHostToDevice));

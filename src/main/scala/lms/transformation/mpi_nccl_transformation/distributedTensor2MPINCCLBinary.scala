@@ -78,7 +78,7 @@ trait DistributeTensor2MPI_NCCLBinary extends DistributeTensor2MPI_NCCLBase {
       tanh_grad_fun(new ARRAY(left_operand), new ARRAY(right_operand), array, size, DIM3(gridSize), DIM3(blockSize))
       array
     }
-  
+
   // helper function for computing element-wise relu gradient in GPUs
   val CUDA_RELU_GRAD_KERNEL_MAP = scala.collection.mutable.HashMap[Manifest[_], (TOP, TOP, TOP, TOP, DIM3, DIM3) => UNIT]()
   def CUDA_RELU_GRAD_FUN(m: Manifest[_])(implicit __pos: SourceContext) = CUDA_RELU_GRAD_KERNEL_MAP.getOrElseUpdate(m, CUDA_RELU_GRAD_KERNEL(m))
@@ -101,7 +101,7 @@ trait DistributeTensor2MPI_NCCLBinary extends DistributeTensor2MPI_NCCLBase {
       array
     }
 
-  val binaryOps = List("tensor_add", "tensor_sub", "tensor_mult", "tensor_div", "tensor_tanh_grad", "tensor_relu_grad", "tensor_invert_grad")
+  val binaryOps = List("tensor_add", "tensor_sub", "tensor_mul", "tensor_div", "tensor_tanh_grad", "tensor_relu_grad", "tensor_invert_grad")
 
   override def transform(n: Node): Backend.Exp = n match {
 
@@ -109,32 +109,19 @@ trait DistributeTensor2MPI_NCCLBinary extends DistributeTensor2MPI_NCCLBase {
       if binaryOps.contains(op) =>
 
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
-
-      implicit val sc_ : SourceContext = sourceTensor.pos
+      implicit val pos: SourceContext = sourceTensor.pos
       val m = sourceTensor.et
+      val count = numeral(tt.shapeSize)
 
-      // Load the `left` and `right`, and maybe add communication ops to resolve split annotation conflicts
-      val left_operand = get_operand(left, anno)
-      val right_operand = get_operand(right, anno)
-      // then we should run this mult op in all devices in the `anno`
-      // FIXME(feiw) for now, let's assume that `anno` is for all devices
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in mult op")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          op match {
-            case "tensor_add" => gpu_add_array(count2, m, myNCCLRank, left_operand, right_operand).x
-            case "tensor_sub" => gpu_sub_array(count2, m, myNCCLRank, left_operand, right_operand).x
-            case "tensor_mult" => gpu_mult_array(count2, m, myNCCLRank, left_operand, right_operand).x
-            case "tensor_div" => gpu_div_array(count2, m, myNCCLRank, left_operand, right_operand).x
-            case "tensor_tanh_grad" => gpu_tanh_grad_array(count2, m, myNCCLRank, left_operand, right_operand).x
-            case "tensor_relu_grad" => gpu_relu_grad_array(count2, m, myNCCLRank, left_operand, right_operand).x
-            case "tensor_invert_grad" => gpu_invert_grad_array(count2, m, myNCCLRank, left_operand, right_operand).x
-            case _ => throw new Exception(s"op $op is not binary op")
-          }
-        case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          throw new Exception(s"TODO: not yet handling SAnno with AllReduce")
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_mult")
+      op match {
+        case "tensor_add" => gpu_add_array(count, m, myNCCLRank, transform(left), transform(right)).x
+        case "tensor_sub" => gpu_sub_array(count, m, myNCCLRank, transform(left), transform(right)).x
+        case "tensor_mul" => gpu_mult_array(count, m, myNCCLRank, transform(left), transform(right)).x
+        case "tensor_div" => gpu_div_array(count, m, myNCCLRank, transform(left), transform(right)).x
+        case "tensor_tanh_grad" => gpu_tanh_grad_array(count, m, myNCCLRank, transform(left), transform(right)).x
+        case "tensor_relu_grad" => gpu_relu_grad_array(count, m, myNCCLRank, transform(left), transform(right)).x
+        case "tensor_invert_grad" => gpu_invert_grad_array(count, m, myNCCLRank, transform(left), transform(right)).x
+        case _ => throw new Exception(s"op $op is a binary op that has not been handled")
       }
 
     case _ => super.transform(n)

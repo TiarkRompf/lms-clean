@@ -26,11 +26,11 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
     ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_minus")
 
   def Mul(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
-    ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_mult")
+    ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_mul")
 
   def Div(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
     ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_div")
-  
+
   def TanhGrad(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
     ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_tanh_grad")
 
@@ -40,7 +40,7 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
   def InvertGrad(x: TENSOR, y: TENSOR, anno: Anno = NAnno)(implicit __pos: SourceContext): TENSOR =
     ElemWiseNoBroadCasting(x, y, anno, __pos)("tensor_invert_grad")
 
-  val binaryOps = List("tensor_add", "tensor_minus", "tensor_mult", "tensor_div", "tensor_tanh_grad", "tensor_relu_grad", "tensor_invert_grad")
+  val binaryOps = List("tensor_add", "tensor_minus", "tensor_mul", "tensor_div", "tensor_tanh_grad", "tensor_relu_grad", "tensor_invert_grad")
 
   override def mergable_dims(node: Node) = node match {
     case Node(s, op, tt::anno::(x:Backend.Sym)::(y:Backend.Sym)::_, _)
@@ -82,7 +82,7 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
     //     Accumulate(gradMap(b), b_grad, anno); ()
     //   }) +=: backwardNodes
 
-    case Node(s, "tensor_mult", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
+    case Node(s, "tensor_mul", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       // save forward op in forwardNodes
       forwardNodes += node
@@ -111,6 +111,12 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
       }) +=: backwardNodes
 
     case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+  }
+
+  override def printTensor(node: Node, graph: Graph): String = node match {
+    case Node(s, op, Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) if binaryOps.contains(op) =>
+      s"$s = $op($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+    case n => super.printTensor(n, graph)
   }
 }
 

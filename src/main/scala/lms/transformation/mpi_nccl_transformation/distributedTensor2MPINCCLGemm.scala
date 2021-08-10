@@ -70,26 +70,10 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
           s"shapes of tensor_dot are invalid left operand shape: $left_shape x right operand shape: $right_shape")
 
       // Load the `left` and `right`, and maybe add communication ops to resolve split annotation conflicts
-      val left_operand = get_operand(left, anno)
-      val right_operand = get_operand(right, anno)
-      // then we should run this dot op in all devices in the `anno`
-      // FIXME(feiw) for now, let's assume that `anno` is for all devices
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in dot op")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
-          val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
-          gpu_dot_array(count2, m, myNCCLRank, left_operand, right_operand, leftShape(0), rightShape(1), leftShape(1)).x
-        case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          val count = numeral(tt.shapeSize)
-          val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
-          val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
-          val dot_res = gpu_dot_array(count, m, myNCCLRank, left_operand, right_operand, leftShape(0), rightShape(1), leftShape(1))
-          NCCL_ALLREDUCE(m, dot_res, dot_res, SIZE_T(count), NCCL_SUM, myNCCLComm, myNCCLStream)
-          dot_res.x
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_dot")
-      }
+      val count2 = numeral(tt.shapeSize)
+      val leftShape = leftTensorType.shapeSize
+      val rightShape = rightTensorType.shapeSize
+      gpu_dot_array(count2, m, myNCCLRank, transform(left), transform(right), leftShape(0), rightShape(1), leftShape(1)).x
 
     case Node(s, "tensor_dot_with_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(transL:Boolean)::Backend.Const(transR:Boolean)::(left:Backend.Sym)::(right:Backend.Sym)::_,_) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
@@ -105,29 +89,11 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
       assert(left_shape.size == 2 && right_shape.size == 2, s"For now, only handles matrix matrix dot")
 
       // Load the `left` and `right`, and maybe add communication ops to resolve split annotation conflicts
-      val left_operand = get_operand(left, anno)
-      val right_operand = get_operand(right, anno)
-      // then we should run this dot op in all devices in the `anno`
-      // FIXME(feiw) for now, let's assume that `anno` is for all devices
-      anno match {
-        case NAnno => throw new Exception(s"TODO: not yet handling NAnno in dot op")
-        case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) =>
-          val count2 = numeral(tt.shapeSizeAfterSplit(dim, devices.size))
-          val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
-          val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
-          gpu_dot_array_with_transpose(count2, m, myNCCLRank, left_operand, transL, right_operand, transR,
-            if (transL) leftShape(1) else leftShape(0), if (transR) rightShape(0) else rightShape(1), if (transL) leftShape(0) else leftShape(1)).x
-        case SAnno(dim: Dim, devices: Seq[Device], _) =>
-          val count = numeral(tt.shapeSize)
-          val leftShape = leftTensorType.shapeSizeAfterSplit(dim, devices.size)
-          val rightShape = rightTensorType.shapeSizeAfterSplit(dim, devices.size)
-          val dot_res = gpu_dot_array_with_transpose(count, m, myNCCLRank, left_operand, transL, right_operand, transR,
-            if (transL) leftShape(1) else leftShape(0), if (transR) rightShape(0) else rightShape(1), if (transL) leftShape(0) else leftShape(1))
-          NCCL_ALLREDUCE(m, dot_res, dot_res, SIZE_T(count), NCCL_SUM, myNCCLComm, myNCCLStream)
-          CUDA_STREAM_SYNCHRONIZE(myNCCLStream)
-          dot_res.x
-        case a => throw new Exception(s"TODO: annotation $a is not yet handled in tensor_dot_with_transpose")
-      }
+      val count2 = numeral(tt.shapeSize)
+      val leftShape = leftTensorType.shapeSize
+      val rightShape = rightTensorType.shapeSize
+      gpu_dot_array_with_transpose(count2, m, myNCCLRank, transform(left), transL, transform(right), transR,
+        if (transL) leftShape(1) else leftShape(0), if (transR) rightShape(0) else rightShape(1), if (transL) leftShape(0) else leftShape(1)).x
 
     case _ => super.transform(n)
   }

@@ -18,7 +18,8 @@ __global__ void x7(int* x8, float* x9, float* x10, int x11, int x12, int x13) {
   // arg1: embedding output gradient
   // arg2: embedding gradient
   // arg3: indicies size
-  // arg4: padding index (-1 if unsure)
+  // arg4: stride size
+  // arg5: padding index (-1 if unsure)
   extern __shared__ float x14[];
   float* x15 = x14 + NVIDIA_WARP_SIZE * threadIdx.y;
   int* x16 = (int *)(x14 + NVIDIA_WARP_SIZE * blockDim.y);
@@ -74,12 +75,12 @@ __global__ void x7(int* x8, float* x9, float* x10, int x11, int x12, int x13) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int* x1 = (int*)malloc(10 * sizeof(int));
-  scan_int("golden/embedding/indices.data", x1, 10);
+  scan_ints("golden/embedding/indices.data", x1, 10);
   int* x2 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x2, (size_t)(10 * sizeof(int))));
   CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(10 * sizeof(int)), cudaMemcpyHostToDevice));
   float* x3 = (float*)malloc(600 * sizeof(float));
-  scan_float("golden/embedding/output_grad.data", x3, 600);
+  scan_floats("golden/embedding/output_grad.data", x3, 600);
   float* x4 = (float*)malloc(0 * sizeof(float));
   CUDA_CALL(cudaMalloc(&x4, (size_t)(600 * sizeof(float))));
   CUDA_CALL(cudaMemcpy(x4, x3, (size_t)(600 * sizeof(float)), cudaMemcpyHostToDevice));
