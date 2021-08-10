@@ -1,6 +1,6 @@
 The `lms/core/traversal.scala` file introduces how to traverse the LMS IR. Travering a tree-structured IR seems trivial, but traversing LMS IR (sea-of-nodes) is not. The main challenge is to determine the group of nodes that should be scoped in each block. The `Traverser` class introduces a basic version of scheduling using frequency estimation. `CompactTraverser` further inlines nodes with regard to their dependencies.
 
-Besides traversing the IR, we can also lower the IR into a lower-level representation. This functionality is handled by the `Transformer` class, which is built on top of a traverser.
+Besides traversing the IR, we can also lower the IR into a lower-level representation. This is handled by the `Transformer` class, which is built on top of a traverser.
 
 # Traverser
 Previously in [Backend](backend.md), we
@@ -43,13 +43,13 @@ We first calculate the set of *bound variables* for each node.
 We decide when a node is ready to be scheduled for a block by checking its bound variables. We implement bound variable calculation as an analysis pass, as shown in `class Bound extends Phase` in lms/core/backend.scala. We use a hashmap `hm` to keep track of the bound variables of all symbols in a graph.
 
 As shown in the `apply` method, bound variable calculation is done by the following steps:
-1. Collect all `Block`s in the graph `g`, including those defined in the nodes of `g` and the input block of `g`. Take the union of the bound variables (input and effect input) of these blocks. We define the bound variables of these new symbol to be just themselves, since they are just inputs.
-2. For each node in `g`, get all bound variables that it depends on and all bound variables generated in this node (if it has blocks). The difference of these two sets is the bound variables it really depends on.
+1. Collect all `Block`s in the graph `g`, including those defined in the nodes of `g` and the input block of `g`. Take the union of the bound variables (input and effect input) of these blocks. We define the bound variables of these new symbols to be just themselves, since they are just inputs.
+2. For each node in `g`, get all bound variables it depends on and all bound variables generated in this node (if it has blocks). The difference of these two sets is the bound variables it really depends on.
 3. We need to get "lambda-forward" node (the forward declaration of "λ") to have the same bound
    variables as "λ". This needs to be fixed in a Convergence Loop (unfortunately).
 
 ### Node Frequency Estimation
-Consider we have a node of heavy computation in a block. Suppose we have determined that the node has no dependency on the inputs of the block. Should we schedule it inside or outside the block? The answer is that we should consider how often the node will be executed. If the block is a function body, then it can be called multiple times, so it would be beneficial to schedule it in the outer scope. If the block is a conditional block, then schedule the node outside means that the node would always be executed regardless of the condition. So we should schedule it inside the block in this case. Therefore, we can assign a number representing relatively how often a node is executed, and only schedule the nodes that have a large enough frequency. This is the intuition of frequency estimation.
+Consider we have a node of heavy computation in a block. Suppose we have determined that the node has no dependency on the inputs of the block. Should we schedule it inside or outside the block? The answer is that we should consider how often the node will be executed. If the block is a function body, then it can be called multiple times, so it would be beneficial to schedule it in the outer scope. If the block is a conditional block, then scheduling the node outside means that the node would always be executed regardless of the condition. So we should schedule it inside the block in this case. Therefore, we can assign a number representing relatively how often a node is executed, and only schedule the nodes that have a large enough frequency. This is the intuition of frequency estimation.
 
 The `symsFreq` function in `Traverser` achieves this: Given a lambda node containing a block, we assign the hard dependencies of the effect summary of the block to a large enough number 100, representing that the body of a function is executed often. For a conditional node, we assign the results of both if and else block to 0.5, assuming each branch is taken with equal probability. For a loop block, we assign the results of the conditional and body block to 100, assuming the loop is iterated many times. For a switch node, we treat it similar to the conditional node by assigning each branch to 0.5. Lastly, all other nodes are assigned 1.0.
 
