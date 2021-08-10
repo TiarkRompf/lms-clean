@@ -5,7 +5,7 @@
 Lightweight Modular Staging (LMS) is a generative programming tool achieving the programming paradigm called multi-stage programming (staging).
 LMS_clean is a remake of the LMS project, aiming at a more flexible design and extension with better support for
 LMS IR transformation and optimization. This documentation is a code-walk of the LMS_clean repo, hoping to
-explain the implementation (in high-level or in detail) to people who are interested in learning and using LMS.
+explain the implementation (at high-level or in detail) to people who are interested in learning and using LMS.
 This is different from a tutorial since it will dive into the core implementation of LMS and offer more insights
 than simply how to use LMS.
 

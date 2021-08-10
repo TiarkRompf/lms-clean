@@ -21,7 +21,7 @@ Node(Sym(x3), "+", List(Sym(x2), Const(1)), _)
 ```
 in the IR.
 
-We can construct programs of arbitrary sizes using `Exp` and `Node`, but there are still no scopes in the IR. We use the `Block` class to represent a scope enclosed by `{...}`. It might be surprising that `Block` does not really contain a list of nodes, which is a common feature in tree-based IRs. For example, the `BasicBlock` in LLVM contains a list of instructions in the block. Instead, our `Block` class specifies only `in: List[Sym]` as the inputs of the block, and `res: Exp` as the output of the block. Let's ignore `ein` and `eff` for now, which will cover later.
+We can construct programs of arbitrary sizes using `Exp` and `Node`, but there are still no scopes in the IR. We use the `Block` class to represent a scope enclosed by `{...}`. It might be surprising that `Block` does not really contain a list of nodes, which is a common feature in tree-based IRs. For example, the `BasicBlock` in LLVM contains a list of instructions in the block. Instead, our `Block` class specifies only `in: List[Sym]` as the inputs of the block, and `res: Exp` as the output of the block (let's ignore `ein` and `eff` for now, which will cover later).
 
 We use `Block` in the `rhs` of `Node` to represent functions and control flow structures (conditionals, loops). Functions are declared using `"λ"` as the operator, and its `rhs` contains just a `Block` representing the function body. Note that recursive functions need an additional special node declared with `"λforward"`, which takes a `Sym` as function name and an integer `arity`. The node serves as a function name declaration. Conditionals are declared using `"?"` as the operator, and its `rhs` contains three items: a condition `Exp`, an if-branch `Block`, and an else-branch `Block`. While-loops are declared using `"W"` as the operator. It contains two blocks representing the loop condition and the loop body. We also have `Switch`, similar to the `switch...case` statement in C. The operands of a switch statement contain a `guard` representing the condition of the switch statement and a list of `Block`s for each case.
 
@@ -53,7 +53,7 @@ We can achieve the same optimization using an expensive dataflow analysis on a t
 
 From the previous example, hopefully the reader has gained a basic understanding of why we use sea-of-nodes IR. We briefly mentioned that the nodes are scheduled into blocks using certain criteria. What are these criteria? 
 
-The criteria we use in LMS IR are *dependencies*. Simply speaking, dependencies capture information flow in the source program that we must respect. Given the order of nodes in the source program defined by the programmer, we can see that certain nodes can be reordered or moved in/out of scopes without changing the semantics of the program, but certainly, that's not true for all nodes. Dependency information tells us the order of nodes we must keep when we schedule nodes. There are two kinds of dependencies that we care about in LMS IR:
+The criteria we use in LMS IR are *dependencies*. Simply speaking, dependencies capture information flow in the source program that we must respect. Given the order of nodes in the source program defined by the programmer, we can see that some nodes can be reordered or moved in/out of scopes without changing the semantics of the program, but certainly, that's not true for all nodes. Dependency information tells us the order of nodes we must keep when we schedule nodes. There are two kinds of dependencies that we care about in LMS IR:
 1. the data dependency and
 2. the control dependencies.
 
@@ -126,7 +126,9 @@ In LMS IR, we track *read* and *write* effects. They are categorized in the foll
 
 1. Statements that create mutable objects belong to the category keyed by `STORE`.
 2. Statements that read/write a mutable object belong to the category keyed by the symbol of this object (result of an allocation node).
-3. For all remaining effectful statements (such as `printf`), they belong to the category keyed by `CTRL` (for control flow dependent). 
+3. For all remaining effectful statements (such as `printf`), they belong to the category keyed by `CTRL` (for control flow dependent).
+
+Besides `STORE` and `CTRL`, users are also free to define other "phantom" keys using the `Const` case class and update methods in `GraphBuilder` to handle these user-defined keys properly.
 
 We track the effects for each node and block using `EffectSummary`, as shown in the definition of `Node` and `Block`. The definition of `EffectSummary` is the following:
 ```scala
@@ -676,7 +678,7 @@ for (d <- newNodes.reverseIterator) {
 ```
 After getting all reachable nodes in `newNodes`, we continue collect used variables by traversing `newNodes` in reverse order. For each node `d`, if the symbol of `d` is in `used`, we add the `valueSym` of `d` into `used` as well. If `d` is not in `used` but has simple effects (e.g. print) or writes to a used symbol, we also add the symbol and `valueSym` of `d` into `used`.
 
-### Recreate the Graph
+### Reconstruct the Graph
 ```scala
 var newGlobalDefsCache = Map[Sym,Node]()
 newNodes = for (d <- newNodes if used(d.n)) yield {
