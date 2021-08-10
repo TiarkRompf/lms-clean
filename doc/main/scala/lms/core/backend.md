@@ -697,4 +697,4 @@ else
 
 Graph(newNodes, newBlock, newGlobalDefsCache)
 ```
-Lastly, we recreate the graph based on the information we collected earlier. We only consider nodes in `newNodes` that are also in `used`. For each such node, we update `newGlobalDefsCache` to map the symbol of the node to the node itself. We then remove unused effect symbols from the RHS and `EffectSummary` of the node. We do the same thing to the top-most block and return a new `Graph` with the updated information.
+Lastly, we reconstruct the graph based on the information we collected earlier. We only consider nodes in `newNodes` that are also in `used`. For each such node, we update `newGlobalDefsCache` to map the symbol of the node to the node itself. We then remove unused effect symbols from the RHS and `EffectSummary` of the node. We do the same thing to the top-most block and return a new `Graph` with the updated information.
