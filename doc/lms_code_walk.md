@@ -5,27 +5,19 @@
 Lightweight Modular Staging (LMS) is a generative programming tool achieving the programming paradigm called multi-stage programming (staging).
 LMS_clean is a remake of the LMS project, aiming at a more flexible design and extension with better support for
 LMS IR transformation and optimization. This documentation is a code-walk of the LMS_clean repo, hoping to
-explain the implementation (in high-level or in details) to people who are interested in learning and using LMS.
-This is different from a tutorial since it will dive into the core implementation of LMS and offers more insights
+explain the implementation (at high-level or in detail) to people who are interested in learning and using LMS.
+This is different from a tutorial since it will dive into the core implementation of LMS and offer more insights
 than simply how to use LMS.
 
 ## Introduction
 
-Multi-Stage Programming (or staging) is a programming language concept that allows various parts of the programs
-to run in different stages. It allows users to code with high-level abstractions (trait, classes, higher-order functions),
-but still gain highly-efficient code after the abstractions are executed (staged away). This offers both high
-productivity and high performance of the target program, thus the slogan "abstract without regret".
+Multi-Stage Programming (or staging) is a programming language concept that allows various parts of the programs to run in different stages. It allows users to code with high-level abstractions (trait, classes, higher-order functions), but still gain highly efficient code after the abstractions are executed (staged away). This offers both high productivity and high performance of the target program. Thus the slogan "abstract without regret".
 
-Lightweight Modular Staging (LMS) is a staging tool built in Scala. In LMS, type information is used to distinguish
-the evaluation stages (i.e., All Rep[T] typed values and expressions are in code generation for the next stage).
-Simply speaking, LMS is a compiler. However, LMS does not have a lexer or a parser to transform the input program
-into intermediate representations (IR). Instead, the IR is generated via executing the input program. All the Rep[T]
-typed expressions in the input program evaluate to LMS IR. This can be considered as the LMS frontend.
-Then the LMS backend compiles the LMS IR to target programs.
+Lightweight Modular Staging (LMS) is a staging tool built in Scala. In LMS, type information is used to distinguish the evaluation stages (i.e., All Rep[T] typed values and expressions are in code generation for the next stage). Simply speaking, LMS is a compiler. However, LMS does not have a lexer or a parser to transform the input program into intermediate representations (IR). Instead, the IR is generated via executing the input program. All the Rep[T] typed expressions in the input program evaluate to LMS IR. This can be considered as the LMS frontend. Then, the LMS backend compiles the LMS IR to target programs.
 
 ## Overview
 
-The basic components of LMS support includes:
+The basic components of LMS support include:
 1. LMS IR: defining how the core LMS IR looks like.
 2. CodeGen: defining how to generate code in the target language.
 3. FrontEnd: defining how to construct the LMS IR nicely.
@@ -48,7 +40,7 @@ TODO(feiw): add a markdown file for codegen.
 
 Besides the basic LMS support mentioned above, LMS has included a number of extensions:
 1. Collections (Array, List, Tuple, ...)
-2. ThirdParty library (MPI, NCCL, ...)
+2. ThirdParty library (MPI, NCCL, CUDNN, ...)
 3. Other Types (fp16, tensor, ...)
 
 The extensions normally include implementations of:
@@ -60,7 +52,7 @@ The extensions normally include implementations of:
 
 Several examples of collections are implemented here (`lms-clean/src/main/scala/lms/collection`). Taking the ListOps.scala as example, it has four traits in total.
 
-The `trait ListOps` is the frontend trait of `Rep[List]`. It contains an `object List` for the construction of `Rep[List]`-typed values, and an `implicit class ListOps` for the methods that are available for `Rep[List]`-typed values.
+The `trait ListOps` is the frontend trait of `Rep[List]`. It contains an `object List` for the construction of `Rep[List]`-typed values and an `implicit class ListOps` for the methods that are available for `Rep[List]`-typed values
 
 The `trait ListOpsOpt` is the optimized frontend trait of `Rep[List]`, where several
 construction-time optimization are introduced.
@@ -75,7 +67,7 @@ function in this trait is `override def shallow` that generates code for each `R
 
 ### ThirdParty Library
 
-Several examples of third party libraries are implemented here (`lms-clean/src/main/scala/lms/thirdparty`). The key functionality is provide by `lms-clean/src/main/scala/lms/thirdparty/c_lib_utils.scala`.
+Several examples of third-party libraries are implemented here (`lms-clean/src/main/scala/lms/thirdparty`). The key functionalities are provided by `lms-clean/src/main/scala/lms/thirdparty/c_lib_utils.scala`.
 
 In the `c_lib_utils.scala` file, we provide the following functionalities:
 1. Create a macro by the `cmacro` function.
@@ -88,12 +80,12 @@ We only create three types of nodes for thirdparty libraries.
 3. The `libFunction` function creates nodes with `op = "lib-Function"`.
 
 The codegen supporting those nodes are in this same file.
-To mix in traits for the frontend support, just extend the `trait CLibs`.
-To mix in traits for the codegen support, just extend the `trait CCodeGenLibs`.
+To mix-in traits for the frontend support, just extend the `trait CLibs`.
+To mix-in traits for the codegen support, just extend the `trait CCodeGenLibs`.
 
 ## Put Everything Together: Driver/Compiler
 
-With the support in frontends and codegen, we want to introduce a driver or a compiler that puts all the supports together and offers the programming environment for user application, code generation, compilation, and evaluation.
+With support in frontends and codegen, we want to introduce a driver or a compiler that puts all the supports together and offers the programming environment for user application, code generation, compilation, and evaluation.
 
 The basic components of a driver or compiler include:
 1. All the needed frontend traits.
@@ -143,7 +135,7 @@ The `lazy val f` is the compilation support.
 The `def eval` is the evaluation support.
 
 To build a driver for your specific domain specific language, you might need to extend more frontend traits
-and more codegen traits. For example:
+and more codegen traits. For example, the following code snippet defines a codegen for the Cuda MPI library functions.
 
 ```scala
 abstract class DslDriverCMPI[A:Manifest, B:Manifest] extends DslDriverC[A,B] with MPIOps { q =>
