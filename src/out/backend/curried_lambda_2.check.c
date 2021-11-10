@@ -15,12 +15,11 @@ void Snippet(int x0) {
     x1 = 1;
     std::function<std::function<int(int)>(int)> x6 = [&, x5](int x7) {
       x2 = 2;
-      int x8 = x5 + x7;
-      std::function<int(int)> x9 = [&, x5, x7](int x10) {
+      std::function<int(int)> x8 = [&, x5, x7](int x9) {
         x3 = 3;
-        return x8 + x10;
+        return x5 + x9 + x7;
       };
-      return x9;
+      return x8;
     };
     return x6;
   };

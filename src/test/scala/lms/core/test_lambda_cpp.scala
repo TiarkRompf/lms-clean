@@ -200,7 +200,15 @@ class CPPLambdaTest extends TutorialFunSuite {
             y = 2
             fun(Captures.RefExcept(n, m), { (x: Rep[Int]) =>
               z = 3
-              n + m + x
+              n + x + m
+              /* Be careful: it is not safe to write `n + m + x`
+               * with g++'s `-O3` optimization.
+               * The result of `n + m + x` will be 2 (tested with g++ 11.2.0).
+               * Since the intermediate result of `n + m` will be lifted
+               * to outside of this function, and that intermediate result
+               * is only captured by reference of the inner-most function,
+               * which is optimized to 0 (instead of 4) under `-O3`.
+               */
             })
           })
         })
