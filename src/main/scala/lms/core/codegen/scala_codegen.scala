@@ -269,7 +269,7 @@ class ExtendedScalaCodeGen extends CompactScalaCodeGen with ExtendedCodeGen {
         val fst = m.typeArguments(0)
         val ret = m.typeArguments(1)
         s"Function1[${remap(fst)}, ${remap(ret)}]"
-      case "scale.Function2" =>
+      case "scala.Function2" =>
         val fst = m.typeArguments(0)
         val snd = m.typeArguments(1)
         val ret = m.typeArguments(2)
