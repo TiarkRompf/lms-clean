@@ -206,7 +206,7 @@ abstract class Traverser {
     // It is important to track softDeps too because if we don't, the soft-dependent
     //   nodes might go to `inner1` and be scheduled after the node that soft-depends on it.
     // If a node is only soft-depended by other nodes, we make sure that we can remove it
-    //   by DCE pass before traversal passes. (see DeadCodeElimCG class in codegen.scala)
+    //   by DCE pass before traversal passes. (see DeadCodeElimCG class in backend.scala)
     // the test "extraThroughSoft_is_necessary" show cases the importance of `extraThroughSoft`.
     val extraThroughSoft = new mutable.HashSet[Sym]
     for (n <- inner.reverseIterator) {
