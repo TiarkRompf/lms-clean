@@ -24,16 +24,19 @@ abstract class FusedTensorLowering extends Transformer {
   override def transform(n: Node): Backend.Exp = n match {
     case Node(s, "tensor_zeros", (Backend.Const(sz:Int))::(arr:Backend.Exp)::_, _) =>
       System.out.println(n)
+      implicit val pos = Adapter.oldSourceMap(s)
       val array = new ARRAY(arr)
       val t = TENSOR(sz, array)(i => INT(0).x)
       t.x
     case Node(s, "tensor_ones", (Backend.Const(sz:Int))::(arr:Backend.Exp)::_, _) =>
       System.out.println(n)
+      implicit val pos = Adapter.oldSourceMap(s)
       val array = new ARRAY(arr)
       val t = TENSOR(sz, array)(i => INT(1).x)
       t.x
     case Node(s, "tensor_add", (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       System.out.println(n)
+      implicit val pos = Adapter.oldSourceMap(s)
       val a = new TENSOR(x, useOldMetadata = true)
       val b = new TENSOR(y, useOldMetadata = true)
       val sz = a.size
