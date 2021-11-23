@@ -23,33 +23,31 @@ abstract class FusedTensorSimplify extends Transformer {
   val tensors = new mutable.HashMap[Backend.Sym, (Node, List[Backend.Sym], Seq[Node])]
 
   override def transform(n: Node): Backend.Exp = n match {
+    
     case Node(s, "tensor_add", (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val a = new TENSOR(transform(x), useOldMetadata = true)
       val b = new TENSOR(transform(y), useOldMetadata = true)
-      val array = ARRAY(10, manifest[Int])
-      val t = TENSOR(10, array)(i => (
+      val t = TENSOR(10)(i => (
         a.apply(INT(i).x) + b.apply(INT(i).x)).x)
       t.x
     case Node(s, "tensor_minus", (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val a = new TENSOR(transform(x), useOldMetadata = true)
       val b = new TENSOR(transform(y), useOldMetadata = true)
-      val array = ARRAY(10, manifest[Int])
-      val t = TENSOR(10, array)(i => (
+      val t = TENSOR(10)(i => (
         a.apply(INT(i).x) - b.apply(INT(i).x)).x)
       t.x
+    
     case Node(s, "tensor_tanh", (x:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = new TENSOR(transform(x), useOldMetadata = true)
-      val array = ARRAY(10, manifest[Int])
-      val res = TENSOR(10, array)(i => t.apply(INT(i).x).tanh().x)
+      val res = TENSOR(10)(i => t.apply(INT(i).x).tanh().x)
       res.x
     case Node(s, "tensor_relu", (x:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = new TENSOR(x, useOldMetadata = true)
-      val array = new ARRAY(t.arr)
-      val res = TENSOR(t.size, array)(i => {
+      val res = TENSOR(t.size)(i => {
         // IF(c: BOOL)(a: => TOP)(b: => TOP)
         (IF(INT(i) < INT(0))(INT(0))(INT(i))).x
       })

@@ -21,20 +21,20 @@ object FusedTensorTypeLess {
   def C(a: Any) = Backend.Const(a)
 
   /// typeless frontend
-  def TENSOR(size: Int, array: ARRAY)(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectRead("tensor", C(size), array.x, Adapter.g.reify(xn => f(xn)))(array.x))).withSrcType(__pos, array.et)
+  def TENSOR(size: Int)(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor", C(size), Adapter.g.reify(xn => f(xn))))).withSrcType(__pos, manifest[Int])
   }
 
-  def ZEROS(size: Int, array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(size), array.x))).withSrcType(__pos, array.et)
+  def ZEROS(size: Int)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(size)))).withSrcType(__pos, manifest[Int])
   }
 
-  def ONES(size: Int, array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_ones", C(size), array.x))).withSrcType(__pos, array.et)
+  def ONES(size: Int)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_ones", C(size)))).withSrcType(__pos, manifest[Int])
   }
 
-  def CONSTS(size: Int, num: Int, array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_consts", C(size), C(num), array.x))).withSrcType(__pos, array.et)
+  def CONSTS(size: Int, num: Int)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_consts", C(size), C(num)))).withSrcType(__pos, manifest[Int])
   }
 
   class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
@@ -52,7 +52,7 @@ object FusedTensorTypeLess {
         case a => System.out.println(a); ???
       }
     }
-
+    
     def arr: Backend.Sym = {
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(size:Int)::(arr:Backend.Sym)::_, _)) => arr
@@ -101,23 +101,23 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
   /// Typed Frontend
   class Tensor[+T]
   object Tensor {
-    def zeros[T:Manifest](size: Int, array: Rep[Array[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = ZEROS(size, new ARRAY(Unwrap(array)))
+    def zeros[T:Manifest](size: Int)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = ZEROS(size)
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def ones[T:Manifest](size: Int, array: Rep[Array[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = ONES(size, new ARRAY(Unwrap(array)))
+    def ones[T:Manifest](size: Int)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = ONES(size)
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def consts[T:Manifest](size: Int, num: Int, array: Rep[Array[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      val tensor = CONSTS(size, num, new ARRAY(Unwrap(array)))
+    def consts[T:Manifest](size: Int, num: Int)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = CONSTS(size, num)
       Wrap[Tensor[T]](tensor.x)
     }
 
-    def apply[T:Numeric:Manifest](size: Int, array: Rep[Array[T]], f: Rep[Int] => Rep[Int])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      Wrap[Tensor[T]](TENSOR(size, new ARRAY(Unwrap(array)))(unwrapFun[Int, Int](f)).x)
+    def apply[T:Numeric:Manifest](size: Int, f: Rep[Int] => Rep[Int])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      Wrap[Tensor[T]](TENSOR(size)(unwrapFun[Int, Int](f)).x)
     }
   }
 
