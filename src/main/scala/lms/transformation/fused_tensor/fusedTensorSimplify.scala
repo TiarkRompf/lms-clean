@@ -28,21 +28,21 @@ abstract class FusedTensorSimplify extends Transformer {
       implicit val pos = Adapter.oldSourceMap(s)
       val a = new TENSOR(transform(x), useOldMetadata = true)
       val b = new TENSOR(transform(y), useOldMetadata = true)
-      val t = TENSOR(10)(i => (
+      val t = TENSOR(a.size)(i => (
         a.apply(INT(i).x) + b.apply(INT(i).x)).x)
       t.x
     case Node(s, "tensor_minus", (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val a = new TENSOR(transform(x), useOldMetadata = true)
       val b = new TENSOR(transform(y), useOldMetadata = true)
-      val t = TENSOR(10)(i => (
+      val t = TENSOR(a.size)(i => (
         a.apply(INT(i).x) - b.apply(INT(i).x)).x)
       t.x
     
     case Node(s, "tensor_tanh", (x:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = new TENSOR(transform(x), useOldMetadata = true)
-      val res = TENSOR(10)(i => t.apply(INT(i).x).tanh().x)
+      val res = TENSOR(t.size)(i => t.apply(INT(i).x).tanh().x)
       res.x
     case Node(s, "tensor_relu", (x:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
