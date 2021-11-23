@@ -33,6 +33,11 @@ abstract class FusedTensorLowering extends Transformer {
       val array = new ARRAY(arr)
       val t = TENSOR(sz, array)(i => INT(1).x)
       t.x
+    case Node(s, "tensor_consts", (Backend.Const(sz:Int))::(Backend.Const(n:Int))::(arr:Backend.Exp)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+      val array = new ARRAY(arr)
+      val t = TENSOR(sz, array)(i => INT(n).x)
+      t.x
     case _ => super.transform(n)
   }
 

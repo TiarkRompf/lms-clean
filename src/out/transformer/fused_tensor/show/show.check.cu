@@ -8,6 +8,7 @@ Emitting C Generated Code
 /**************** Snippet ****************/
 void Snippet(int x0) {
   printf("%d", 0);
+  printf("%d", 5);
 }
 /*****************************************
 End of C Generated Code

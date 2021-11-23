@@ -33,6 +33,10 @@ object FusedTensorTypeLess {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_ones", C(size), array.x))).withSrcType(__pos, array.et)
   }
 
+  def CONSTS(size: Int, num: Int, array: ARRAY)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_consts", C(size), C(num), array.x))).withSrcType(__pos, array.et)
+  }
+
   class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
@@ -104,6 +108,11 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
 
     def ones[T:Manifest](size: Int, array: Rep[Array[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val tensor = ONES(size, new ARRAY(Unwrap(array)))
+      Wrap[Tensor[T]](tensor.x)
+    }
+
+    def consts[T:Manifest](size: Int, num: Int, array: Rep[Array[T]])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = CONSTS(size, num, new ARRAY(Unwrap(array)))
       Wrap[Tensor[T]](tensor.x)
     }
 

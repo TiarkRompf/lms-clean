@@ -65,7 +65,9 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val array = NewArray[Int](10)
         val a = Tensor.zeros[Int](10, array)
+        val b = Tensor.consts[Int](10, 5, array)
         printf("%d", a(0))
+        printf("%d", b(0))
       }
     }
     checkWithLogPath("show", driver.code, "cu", driver.setLogPath)
