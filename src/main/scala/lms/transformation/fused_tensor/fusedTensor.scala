@@ -52,13 +52,6 @@ object FusedTensorTypeLess {
         case a => System.out.println(a); ???
       }
     }
-    
-    def arr: Backend.Sym = {
-      gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, Backend.Const(size:Int)::(arr:Backend.Sym)::_, _)) => arr
-        case a => System.out.println(a); ???
-      }
-    }
 
     def show(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("show_tensor", x)()(Adapter.CTRL))

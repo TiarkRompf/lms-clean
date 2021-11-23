@@ -23,7 +23,6 @@ abstract class FusedTensorVertical extends Transformer {
 
   override def transform(n: Node): Backend.Exp = n match {
     case Node(s, "tensor", Backend.Const(size:Int)::_, _) =>
-      System.out.println(n)
       tensors(s) = (n, path, inner)
       super.transform(n)
     case Node(s, "tensor_apply", (a:Backend.Sym)::(b:Backend.Exp)::_, _) =>
