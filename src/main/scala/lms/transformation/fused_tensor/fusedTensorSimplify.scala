@@ -49,7 +49,7 @@ abstract class FusedTensorSimplify extends Transformer {
       val t = new TENSOR(x, useOldMetadata = true)
       val res = TENSOR(t.size)(i => {
         // IF(c: BOOL)(a: => TOP)(b: => TOP)
-        (IF(INT(i) < INT(0))(INT(0))(INT(i))).x
+        (IF(t.apply(INT(i).x) < INT(0))(INT(0))(t.apply(INT(i).x))).x
       })
       res.x
     case _ => super.transform(n)
