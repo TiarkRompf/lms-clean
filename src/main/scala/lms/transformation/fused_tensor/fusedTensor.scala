@@ -81,8 +81,8 @@ object FusedTensorTypeLess {
     }
 
     def apply(e: Backend.Exp)(implicit __pos: SourceContext): INT = {
-      // todo: change to correct effect
-      INT(Adapter.g.reflectEffect("tensor_apply", x, e)()(Adapter.CTRL)).withSrcType(__pos, et)
+      // INT(Adapter.g.reflectEffect("tensor_apply", x, e)()(Adapter.CTRL)).withSrcType(__pos, et)
+      INT(Adapter.g.reflect("tensor_apply", x, e)).withSrcType(__pos, et)
     }
   }
 }

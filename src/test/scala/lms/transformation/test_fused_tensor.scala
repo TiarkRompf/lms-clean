@@ -105,4 +105,19 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
     }
     checkWithLogPath("tanh", driver.code, "cu", driver.setLogPath)
   }
+
+  test("relu") {
+    val driver = new CompilerCFusedTensor[Int, Unit] {
+      import FusedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val array = NewArray[Int](10)
+        val a = Tensor.ones[Int](10, array)
+        val c = a.relu
+        printf("%d", c(0))
+      }
+    }
+    checkWithLogPath("relu", driver.code, "cu", driver.setLogPath)
+  }
 }
