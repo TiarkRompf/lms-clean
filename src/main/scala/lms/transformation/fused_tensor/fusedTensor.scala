@@ -49,6 +49,13 @@ object FusedTensorTypeLess {
       }
     }
 
+    def arr: Backend.Sym = {
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, s, Backend.Const(size:Int)::(arr:Backend.Sym)::_, _)) => arr
+        case a => System.out.println(a); ???
+      }
+    }
+
     def show(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("show_tensor", x)()(Adapter.CTRL))
     }
@@ -59,6 +66,14 @@ object FusedTensorTypeLess {
 
     def - (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
       (new TENSOR(Adapter.g.reflect("tensor_minus", x, y.x))).withSrcType(__pos, et)
+    }
+
+    def tanh(implicit __pos: SourceContext): TENSOR = {
+      (new TENSOR(Adapter.g.reflect("tensor_tanh", x))).withSrcType(__pos, et)
+    }
+
+    def relu(implicit __pos: SourceContext): TENSOR = {
+      (new TENSOR(Adapter.g.reflect("tensor_relu", x))).withSrcType(__pos, et)
     }
 
     def apply(e: Backend.Exp)(implicit __pos: SourceContext): INT = {
@@ -111,6 +126,16 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
 
     def - (y: Rep[Tensor[T]])(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
       val t = self - tensor(y)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def tanh(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self.tanh
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def relu(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self.relu
       Wrap[Tensor[T]](t.x)
     }
 

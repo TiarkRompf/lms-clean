@@ -13,7 +13,7 @@ import lms.thirdparty.array_computation.{CCodeGenCBLASOps, CCodeGenCudaOps}
 import Backend._
 
 class FixedSizeFusedTensorTest extends TutorialFunSuite {
-  val under = "transformer/fused_tensor"
+  val under = "transformer/fused_tensor/"
 
   abstract class CompilerCFusedTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FusedTensorOps { q =>
 
@@ -23,10 +23,11 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
 
     override val passes = List(
       new FusedTensorLowering {},
-      new FusedTensorVertical {}
+      new FusedTensorSimplify {},
+      new FusedTensorVertical {},
+      new Canonicalize {}
     )
 
-    /*
     var log_path: String = ""
     def setLogPath(path: String) { log_path = path }
 
@@ -48,11 +49,12 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
       val stream = new java.io.PrintStream(source)
       stream.println("==================")
       for (node <- graph.nodes)
-        node.toString
+        // node.toString
+        stream.println(node)
       stream.println(graph.block)
       stream.println("==================")
       source.toString
-    }*/
+    }
   }
 
   test("show") {
@@ -62,21 +64,41 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
       @virtualize
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val array = NewArray[Int](10)
-        // val a = Tensor(6, array, i => 0)
+        val a = Tensor.zeros[Int](10, array)
+        printf("%d", a(0))
+      }
+    }
+    checkWithLogPath("show", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("add") {
+    val driver = new CompilerCFusedTensor[Int, Unit] {
+      import FusedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val array = NewArray[Int](10)
         val a = Tensor.zeros[Int](10, array)
         val b = Tensor.ones[Int](10, array)
         val c = a + b
-        // c.show; ()
         printf("%d", c(0))
-        // a.show; ()
-        // val b = Tensor(6, array, i => 1)
-
-        // val c = Tensor.zeros[Int](10, array)
-        // printf("%d", a(1) + b(1))
-        //val c = Tensor(6, array, i => a(i) + b(i))
-        //c.show; ()
       }
     }
-    System.out.println(indent(driver.code))
+    checkWithLogPath("add", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("tanh") {
+    val driver = new CompilerCFusedTensor[Int, Unit] {
+      import FusedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val array = NewArray[Int](10)
+        val a = Tensor.zeros[Int](10, array)
+        val c = a.tanh
+        printf("%d", c(0))
+      }
+    }
+    checkWithLogPath("tanh", driver.code, "cu", driver.setLogPath)
   }
 }
