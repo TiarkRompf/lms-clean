@@ -83,7 +83,9 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
         val a = Tensor.zeros[Int](10, array)
         val b = Tensor.ones[Int](10, array)
         val c = a + b
+        val d = a - b
         printf("%d", c(0))
+        printf("%d", d(0))
       }
     }
     checkWithLogPath("add", driver.code, "cu", driver.setLogPath)
