@@ -545,8 +545,11 @@ def getFunctionLatentEffect(f: Exp): ((Set[Exp], Set[Exp]),(Set[Int], Set[Int]),
 }
 ```
 The method takes an `Exp`, which should be evaluated to a lambda (or lambda forward).
-It returns ((read_keys, write_keys), (read_parameters, write_parameters), result)
-             Set[Exp]   Set[Exp]      Set[Int]: index  Set[Int]: index    Option[Exp]
+It returns: 
+```scala
+((read_keys, write_keys), (read_parameters, write_parameters), result)
+  Set[Exp]   Set[Exp]      Set[Int]: index  Set[Int]: index    Option[Exp]
+```
 1. read_keys/write_keys: effect keys of the function (excluding effects to parameters)
 2. read_parameters/write_parameters: effects of the function to its parameters (just returning indices, not Exps). Using Set[Int] (index) for read_parameters and write_parameters is necessary because in the conditional case, the parameters may have different names (symbols) and cannot be Unioned. the indices can be unioned easily
 3. result: the result of the function body (useful if the result is another function that has latent effects). it is Option[Exp] because in some cases I am not sure what result to return.
@@ -614,7 +617,7 @@ We then handle `reifyHere`, which s an Effect Optimization for conditional and s
 Lastly, we handle read keys by adding the last writes of each key to `prevHard`, and return `prevHard` and `prevSoft`.
 
 ### Adding Blocks using *reify* functions
-Now we discuss how to add blocks into the Graph by the reify*` family of methods.
+Now we discuss how to add blocks into the Graph by the `reify*` family of methods.
 Note that the `reify*` family of methods not only generate the Block object, but also the nodes that are
 used in the block. However, the nodes are not explicitly scoped in the block, but rather implicitly
 scoped via effect summaries. This implicit scoping allows flexible code motion as long as effects and dependencies
