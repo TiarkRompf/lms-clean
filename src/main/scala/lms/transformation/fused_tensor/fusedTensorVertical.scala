@@ -22,11 +22,11 @@ abstract class FusedTensorVertical extends Transformer {
   val tensors = new mutable.HashMap[Backend.Sym, (Node, List[Backend.Sym], Seq[Node])]
 
   override def transform(n: Node): Backend.Exp = n match {
-    case Node(s, "tensor", Backend.Const(size:Int)::_, _) =>
+    case Node(s, "tensor", _, _) =>
       tensors(s) = (n, path, inner)
       super.transform(n)
     case Node(s, "tensor_apply", (a:Backend.Sym)::(b:Backend.Exp)::_, _) =>
-      val (Node(_, _, Backend.Const(szy:Int)::(f@Backend.Block(arg::Nil, r, block, eff))::_, _), path0, inner0) = tensors(a)
+      val (Node(_, _, Backend.Const(szy:Int)::Backend.Const(inputs:Seq[Backend.Sym])::(f@Backend.Block(arg::Nil, r, block, eff))::_, _), path0, inner0) = tensors(a)
       try {
         subst(arg) = transform(b)
         withResetScope(path0, inner0) {

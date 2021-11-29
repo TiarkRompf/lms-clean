@@ -21,8 +21,13 @@ object FusedTensorTypeLess {
   def C(a: Any) = Backend.Const(a)
 
   /// typeless frontend
+  /*
   def TENSOR(size: Int)(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor", C(size), Adapter.g.reify(xn => f(xn))))).withSrcType(__pos, manifest[Int])
+  }*/
+
+  def TENSOR(size: Int, inputs: Seq[Backend.Sym])(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor", C(size), C(inputs), Adapter.g.reify(xn => f(xn))))).withSrcType(__pos, manifest[Int])
   }
 
   def ZEROS(size: Int)(implicit __pos: SourceContext): TENSOR = {
@@ -49,6 +54,7 @@ object FusedTensorTypeLess {
     def size: Int = {
       gc.get(x.asInstanceOf[Backend.Sym]) match {
         case Some(Node(_, s, Backend.Const(size:Int)::_, _)) => size
+        case Some(Node(_, s, Backend.Const(_)::Backend.Const(size:Int)::_, _)) => size
         case a => System.out.println(a); ???
       }
     }
@@ -75,6 +81,7 @@ object FusedTensorTypeLess {
 
     def apply(e: Backend.Exp)(implicit __pos: SourceContext): INT = {
       // INT(Adapter.g.reflectEffect("tensor_apply", x, e)()(Adapter.CTRL)).withSrcType(__pos, et)
+      // read effect?
       INT(Adapter.g.reflect("tensor_apply", x, e)).withSrcType(__pos, et)
     }
   }
@@ -110,7 +117,7 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
     }
 
     def apply[T:Numeric:Manifest](size: Int, f: Rep[Int] => Rep[Int])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      Wrap[Tensor[T]](TENSOR(size)(unwrapFun[Int, Int](f)).x)
+      Wrap[Tensor[T]](TENSOR(size, Seq())(unwrapFun[Int, Int](f)).x) // is the input correct?
     }
   }
 

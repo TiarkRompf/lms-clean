@@ -28,26 +28,25 @@ abstract class FusedTensorSimplify extends Transformer {
       implicit val pos = Adapter.oldSourceMap(s)
       val a = new TENSOR(transform(x), useOldMetadata = true)
       val b = new TENSOR(transform(y), useOldMetadata = true)
-      val t = TENSOR(a.size)(i => (
+      val t = TENSOR(a.size, Seq())(i => (
         a.apply(INT(i).x) + b.apply(INT(i).x)).x)
       t.x
     case Node(s, "tensor_minus", (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val a = new TENSOR(transform(x), useOldMetadata = true)
       val b = new TENSOR(transform(y), useOldMetadata = true)
-      val t = TENSOR(a.size)(i => (
+      val t = TENSOR(a.size, Seq(x, y))(i => (
         a.apply(INT(i).x) - b.apply(INT(i).x)).x)
       t.x
-    
     case Node(s, "tensor_tanh", (x:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = new TENSOR(transform(x), useOldMetadata = true)
-      val res = TENSOR(t.size)(i => t.apply(INT(i).x).tanh().x)
+      val res = TENSOR(t.size, Seq(x))(i => t.apply(INT(i).x).tanh().x) // ad-hoc!!!
       res.x
     case Node(s, "tensor_relu", (x:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = new TENSOR(x, useOldMetadata = true)
-      val res = TENSOR(t.size)(i => {
+      val res = TENSOR(t.size, Seq(x))(i => {
         // IF(c: BOOL)(a: => TOP)(b: => TOP)
         (IF(t.apply(INT(i).x) < INT(0))(INT(0))(t.apply(INT(i).x))).x
       })

@@ -8,7 +8,7 @@ import macros.SourceContext
 import lms.core._
 import lms.core.stub._
 import lms.thirdparty.{CCodeGenLibs}
-import lms.thirdparty.array_computation.{CCodeGenCBLASOps, CCodeGenCudaOps}
+// import lms.transformation.tensor.{CCodeGenCudaCustomOps}
 
 import Backend._
 
@@ -25,7 +25,8 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
       new FusedTensorLowering {},
       new FusedTensorSimplify {},
       new FusedTensorVertical {},
-      new Canonicalize {}
+      new Canonicalize {},
+      new FusedTensorKernel {}
     )
 
     var log_path: String = ""
@@ -65,8 +66,10 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val a = Tensor.zeros[Int](10)
         val b = Tensor.consts[Int](10, 5)
-        printf("%d", a(0))
-        printf("%d", b(0))
+        // printf("%d", a(0))
+        // printf("%d", b(0))
+        a.show
+        b.show
       }
     }
     checkWithLogPath("show", driver.code, "cu", driver.setLogPath)
@@ -83,8 +86,10 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
         val b = Tensor.ones[Int](10)
         val c = a + b
         val d = a - b
-        printf("%d", c(0))
-        printf("%d", d(0))
+        // printf("%d", c(0))
+        // printf("%d", d(0))
+        c.show
+        d.show
       }
     }
     checkWithLogPath("add", driver.code, "cu", driver.setLogPath)
@@ -98,7 +103,7 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val a = Tensor.zeros[Int](10)
         val c = a.tanh
-        printf("%d", c(0))
+        c.show
       }
     }
     checkWithLogPath("tanh", driver.code, "cu", driver.setLogPath)
