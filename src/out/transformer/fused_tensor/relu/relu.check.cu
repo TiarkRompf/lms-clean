@@ -5,9 +5,21 @@ Emitting C Generated Code
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+/************* Functions **************/
+__global__ void x2(int x3, int x4, int x5) {
+  int x6 = gridDim.x * blockDim.x;
+  int x7 = threadIdx.x + blockIdx.x * blockDim.x;
+  while (x7 < x5) {
+    int x8 = x3[x7];
+    x3[x7] = x8 < 0 ? 0 : x8;
+    x7 = x7 + x6;
+  }
+}
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  printf("%d", false ? 0 : 1);
+  int* x1 = (int*)malloc(0 * sizeof(int));
+  CUDA_CALL(cudaMalloc(&x1, (lms.thirdparty.size_ttypeless$sizet)(10 * sizeof(Int))));
+  show_tensor(x2(x1, 0, 10, dim3(0, 1, 1), dim3(0, 1, 1)));
 }
 /*****************************************
 End of C Generated Code

@@ -42,6 +42,15 @@ object FusedTensorTypeLess {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_consts", C(size), C(num)))).withSrcType(__pos, manifest[Int])
   }
 
+  def INPUT(size: Int)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(size), C(Seq())))).withSrcType(__pos, manifest[Int])
+  }
+
+  // used to track input by itself
+  def INPUT1(size: Int, inputs: Seq[Backend.Sym])(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(size), C(inputs)))).withSrcType(__pos, manifest[Int])
+  }
+
   class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
@@ -56,6 +65,13 @@ object FusedTensorTypeLess {
         case Some(Node(_, s, Backend.Const(size:Int)::_, _)) => size
         case Some(Node(_, s, Backend.Const(_)::Backend.Const(size:Int)::_, _)) => size
         case a => System.out.println(a); ???
+      }
+    }
+
+    def inputs: Seq[Backend.Sym] = {
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, op, _::Backend.Const(ins:Seq[Backend.Sym])::_, _)) => ins
+        case a => Seq()
       }
     }
 
@@ -113,6 +129,11 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
 
     def consts[T:Manifest](size: Int, num: Int)(implicit __pos: SourceContext): Rep[Tensor[T]] = {
       val tensor = CONSTS(size, num)
+      Wrap[Tensor[T]](tensor.x)
+    }
+
+    def input[T:Manifest](size: Int)(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
+      val tensor = INPUT(size)
       Wrap[Tensor[T]](tensor.x)
     }
 

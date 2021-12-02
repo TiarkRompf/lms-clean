@@ -11,7 +11,9 @@ import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess, CUBLAST
 
 import Backend._
 
-abstract class FusedTensorLowering extends Transformer {
+abstract class FusedTensorFunctional extends Transformer {
+
+  override val name = "FusedTensorFunctional"
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -19,8 +21,6 @@ abstract class FusedTensorLowering extends Transformer {
   import ArrayCPUTypeLess._
   import FusedTensorTypeLess._
   import PrimitiveTypeLess._
-
-  val tensors = new mutable.HashMap[Backend.Sym, (Node, List[Backend.Sym], Seq[Node])]
 
   override def transform(n: Node): Backend.Exp = n match {
     case Node(s, "tensor_zeros", (Backend.Const(sz:Int))::_, _) =>
@@ -35,6 +35,10 @@ abstract class FusedTensorLowering extends Transformer {
       implicit val pos = Adapter.oldSourceMap(s)
       val t = TENSOR(sz, Seq())(i => INT(n).x)
       t.x
+    case Node(s, "tensor_input", (Backend.Const(sz:Int))::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+      val t1 = INPUT1(sz, Seq(s)) // necessary?
+      t1.x
     case _ => super.transform(n)
   }
 
