@@ -22,7 +22,7 @@ abstract class FusedTensorSimplify extends Transformer {
   import FusedTensorTypeLess._
   import PrimitiveTypeLess._
 
-  val tensors = new mutable.HashMap[Backend.Sym, (Node, List[Backend.Sym], Seq[Node])]
+  // val tensors = new mutable.HashMap[Backend.Sym, (Node, List[Backend.Sym], Seq[Node])]
 
   override def transform(n: Node): Backend.Exp = n match {
     

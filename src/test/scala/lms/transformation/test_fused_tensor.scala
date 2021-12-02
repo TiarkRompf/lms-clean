@@ -23,6 +23,7 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
 
     override val passes = List(
       new FusedTensorFunctional {},
+      new FusedTensorSplit {},
       new FusedTensorSimplify {},
       new FusedTensorVertical {},
       new Canonicalize {},
@@ -56,6 +57,23 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
       stream.println("==================")
       source.toString
     }
+  }
+
+  test("split") {
+    val driver = new CompilerCFusedTensor[Int, Unit] {
+      import FusedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val a = Tensor.input[Int](10)
+        val b = Tensor.ones[Int](5)
+        val c = a.split(Seq(5, 5))
+        val d = c.result(0)
+        val e = d + b
+        e.show
+      }
+    }
+    checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
   }
 
   test("add") {

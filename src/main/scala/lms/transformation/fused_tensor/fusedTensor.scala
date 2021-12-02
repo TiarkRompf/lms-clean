@@ -51,6 +51,10 @@ object FusedTensorTypeLess {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(size), C(inputs)))).withSrcType(__pos, manifest[Int])
   }
 
+  def TENSORS(inputs: Seq[Backend.Exp])(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensors", C(inputs)))).withSrcType(__pos, manifest[Int])
+  }
+
   class TENSOR(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x) {
     def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
     override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
@@ -99,6 +103,18 @@ object FusedTensorTypeLess {
       // INT(Adapter.g.reflectEffect("tensor_apply", x, e)()(Adapter.CTRL)).withSrcType(__pos, et)
       // read effect?
       INT(Adapter.g.reflect("tensor_apply", x, e)).withSrcType(__pos, et)
+    }
+
+    def split(sh: Seq[Int])(implicit __pos: SourceContext): TENSOR = {
+      (new TENSOR(Adapter.g.reflect("tensor_split", x, C(sh)))).withSrcType(__pos, et)
+    }
+
+    def result(i: Int)(implicit __pos: SourceContext): TENSOR = {
+      (new TENSOR(Adapter.g.reflect("tensor_result", x, C(i)))).withSrcType(__pos, et)
+    }
+
+    def concat(y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+      (new TENSOR(Adapter.g.reflectUnsafe("tensor_concat", x, y.x))).withSrcType(__pos, et)
     }
   }
 }
@@ -174,5 +190,19 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
       Wrap[T](t.x)
     }
 
+    def split(sh: Seq[Int])(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self.split(sh)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def result(i: Int)(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self.result(i)
+      Wrap[Tensor[T]](t.x)
+    }
+
+    def concat(y: Rep[Tensor[T]])(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
+      val t = self.concat(tensor(y))
+      Wrap[Tensor[T]](t.x)
+    }
   }
 }
