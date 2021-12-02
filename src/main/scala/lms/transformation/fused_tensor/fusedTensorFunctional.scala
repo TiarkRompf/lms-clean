@@ -23,19 +23,19 @@ abstract class FusedTensorFunctional extends Transformer {
   import PrimitiveTypeLess._
 
   override def transform(n: Node): Backend.Exp = n match {
-    case Node(s, "tensor_zeros", (Backend.Const(sz:Int))::_, _) =>
+    case Node(s, "tensor_zeros", (Backend.Const(sz:Seq[Int]))::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = TENSOR(sz, Seq())(i => INT(0).x)
       t.x
-    case Node(s, "tensor_ones", (Backend.Const(sz:Int))::_, _) =>
+    case Node(s, "tensor_ones", (Backend.Const(sz:Seq[Int]))::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = TENSOR(sz, Seq())(i => INT(1).x)
       t.x
-    case Node(s, "tensor_consts", (Backend.Const(sz:Int))::(Backend.Const(n:Int))::_, _) =>
+    case Node(s, "tensor_consts", (Backend.Const(sz:Seq[Int]))::(Backend.Const(n:Int))::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = TENSOR(sz, Seq())(i => INT(n).x)
       t.x
-    case Node(s, "tensor_input", (Backend.Const(sz:Int))::_, _) =>
+    case Node(s, "tensor_input", (Backend.Const(sz:Seq[Int]))::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t1 = INPUT1(sz, Seq(s)) // necessary?
       t1.x

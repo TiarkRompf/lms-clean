@@ -29,8 +29,9 @@ abstract class FusedTensorToCuda extends Transformer {
 
 
   override def transform(n: Node): Backend.Exp = n match {
-    case Node(s, "tensor", Backend.Const(sz:Int)::Backend.Const(inputs:Seq[Backend.Sym])::(f@Backend.Block(arg::Nil, r, block, eff))::_, _) =>
+    case Node(s, "tensor", Backend.Const(sz:Seq[Int])::Backend.Const(inputs:Seq[Backend.Sym])::(f@Backend.Block(arg::Nil, r, block, eff))::_, _) =>
       implicit val __pos = Adapter.oldSourceMap(s)
+      val sz1 = sz.sum
 
       val arr = new ARRAY(inputs.head) // for now, assume only one input
       // System.out.println("input: " + inputs.head)
@@ -67,7 +68,7 @@ abstract class FusedTensorToCuda extends Transformer {
         Backend.Const(())
       }, manifest[Array[Int]], manifest[Int], manifest[Int])
       
-      (kernel(arr, INT(0), INT(sz), DIM3(0), DIM3(0))).x
+      (kernel(arr, INT(0), INT(sz1), DIM3(0), DIM3(0))).x
 
     case Node(s, "tensor_show", Backend.Sym(x)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)

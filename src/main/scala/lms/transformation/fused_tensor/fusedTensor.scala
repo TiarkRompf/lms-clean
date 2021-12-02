@@ -26,28 +26,28 @@ object FusedTensorTypeLess {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor", C(size), Adapter.g.reify(xn => f(xn))))).withSrcType(__pos, manifest[Int])
   }*/
 
-  def TENSOR(size: Int, inputs: Seq[Backend.Sym])(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
+  def TENSOR(size: Seq[Int], inputs: Seq[Backend.Sym])(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor", C(size), C(inputs), Adapter.g.reify(xn => f(xn))))).withSrcType(__pos, manifest[Int])
   }
 
   def ZEROS(size: Int)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(size)))).withSrcType(__pos, manifest[Int])
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(Seq(0, size))))).withSrcType(__pos, manifest[Int])
   }
 
   def ONES(size: Int)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_ones", C(size)))).withSrcType(__pos, manifest[Int])
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_ones", C(Seq(0, size))))).withSrcType(__pos, manifest[Int])
   }
 
   def CONSTS(size: Int, num: Int)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_consts", C(size), C(num)))).withSrcType(__pos, manifest[Int])
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_consts", C(Seq(0, size)), C(num)))).withSrcType(__pos, manifest[Int])
   }
 
   def INPUT(size: Int)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(size), C(Seq())))).withSrcType(__pos, manifest[Int])
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(Seq(0, size)), C(Seq())))).withSrcType(__pos, manifest[Int])
   }
 
   // used to track input by itself
-  def INPUT1(size: Int, inputs: Seq[Backend.Sym])(implicit __pos: SourceContext): TENSOR = {
+  def INPUT1(size: Seq[Int], inputs: Seq[Backend.Sym])(implicit __pos: SourceContext): TENSOR = {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(size), C(inputs)))).withSrcType(__pos, manifest[Int])
   }
 
@@ -64,10 +64,10 @@ object FusedTensorTypeLess {
       if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
     }
 
-    def size: Int = {
+    def size: Seq[Int] = {
       gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, s, Backend.Const(size:Int)::_, _)) => size
-        case Some(Node(_, s, Backend.Const(_)::Backend.Const(size:Int)::_, _)) => size
+        case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) => size
+        case Some(Node(_, s, Backend.Const(_)::Backend.Const(size:Seq[Int])::_, _)) => size
         case a => System.out.println(a); ???
       }
     }
@@ -154,7 +154,7 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
     }
 
     def apply[T:Numeric:Manifest](size: Int, f: Rep[Int] => Rep[Int])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      Wrap[Tensor[T]](TENSOR(size, Seq())(unwrapFun[Int, Int](f)).x) // is the input correct?
+      Wrap[Tensor[T]](TENSOR(Seq(size), Seq())(unwrapFun[Int, Int](f)).x) // is the input correct?
     }
   }
 

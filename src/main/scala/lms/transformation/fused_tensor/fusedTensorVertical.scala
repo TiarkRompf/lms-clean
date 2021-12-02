@@ -27,9 +27,10 @@ abstract class FusedTensorVertical extends Transformer {
   val tensor2arr = new mutable.HashMap[Backend.Sym, Backend.Exp]
 
   override def transform(n: Node): Backend.Exp = n match {
-    case Node(s, "tensor_input", Backend.Const(sz:Int)::_, _) =>
+    case Node(s, "tensor_input", Backend.Const(sz:Seq[Int])::_, _) =>
       implicit val __pos = Adapter.oldSourceMap(s)
-      val arr = CUDA_MALLOC(sz, manifest[Int]) // allocate CUDA array for input tensors
+      val size = sz.sum
+      val arr = CUDA_MALLOC(size, manifest[Int]) // allocate CUDA array for input tensors
       tensor2arr(s) = arr.x
       arr.x
     case Node(s, "tensor_apply", (a:Backend.Sym)::(b:Backend.Exp)::_, _) if tensor2arr.contains(a) =>
@@ -41,7 +42,7 @@ abstract class FusedTensorVertical extends Transformer {
       tensors(s) = (n, path, inner)
       super.transform(n)
     case Node(s, "tensor_apply", (a:Backend.Sym)::(b:Backend.Exp)::_, _) if tensors.contains(a) =>
-      val (Node(_, _, Backend.Const(szy:Int)::Backend.Const(inputs:Seq[Backend.Sym])::(f@Backend.Block(arg::Nil, r, block, eff))::_, _), path0, inner0) = tensors(a)
+      val (Node(_, _, _::Backend.Const(inputs:Seq[Backend.Sym])::(f@Backend.Block(arg::Nil, r, block, eff))::_, _), path0, inner0) = tensors(a)
       try {
         subst(arg) = transform(b)
         withResetScope(path0, inner0) {
