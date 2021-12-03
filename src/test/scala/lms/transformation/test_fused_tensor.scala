@@ -23,11 +23,13 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
 
     override val passes = List(
       new FusedTensorFunctional {},
-      new FusedTensorSplit {},
-      new FusedTensorSimplify {},
+      // new FusedTensorSplit {},
+      // new FusedTensorSimplify {},
+      // new FusedTensorConcat {},
+      // new Canonicalize {},
       new FusedTensorVertical {},
       new Canonicalize {},
-      new FusedTensorToCuda {}
+      new FusedTensorToCuda {},
     )
 
     var log_path: String = ""
@@ -67,10 +69,14 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
       def snippet(arg: Rep[Int]): Rep[Unit] = {
         val a = Tensor.input[Int](10)
         val b = Tensor.ones[Int](5)
+
         val c = a.split(Seq(5, 5))
         val d = c.result(0)
-        val e = d + b
-        e.show
+        val e = c.result(1)
+
+        val f = d + b
+        val g = f.concat(e)
+        g.show
       }
     }
     checkWithLogPath("split", driver.code, "cu", driver.setLogPath)

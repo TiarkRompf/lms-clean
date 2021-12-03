@@ -10,7 +10,8 @@ __global__ void x2(int x3, int x4, int x5) {
   int x6 = gridDim.x * blockDim.x;
   int x7 = threadIdx.x + blockIdx.x * blockDim.x;
   while (x7 < x5) {
-    x3[x7] = x3[x7] + 1;
+    int x8 = x7;
+    x3[x7] = x8 < 5 ? x3[x8] + 1 : x3[x8];
     x7 = x7 + x6;
   }
 }
@@ -18,7 +19,7 @@ __global__ void x2(int x3, int x4, int x5) {
 void Snippet(int x0) {
   int* x1 = (int*)malloc(0 * sizeof(int));
   CUDA_CALL(cudaMalloc(&x1, (lms.thirdparty.size_ttypeless$sizet)(10 * sizeof(Int))));
-  show_tensor(x2(x1, 0, 10, dim3(0, 1, 1), dim3(0, 1, 1)));
+  show_tensor(x2(x1, 0, 20, dim3(0, 1, 1), dim3(0, 1, 1)));
 }
 /*****************************************
 End of C Generated Code

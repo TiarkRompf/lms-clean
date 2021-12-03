@@ -55,7 +55,8 @@ abstract class FusedTensorToCuda extends Transformer {
           // replace input to function argument, tensor lambda to loop index
           try {
             subst(inputs.head) = array.x
-            subst(arg) = UnwrapV(i)
+            // subst(arg) = UnwrapV(i)
+            subst(arg) = Unwrap(readVar(i))
             traverse(f)
           } finally {
             subst -= inputs.head

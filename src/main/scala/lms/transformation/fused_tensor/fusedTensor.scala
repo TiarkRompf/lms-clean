@@ -79,6 +79,13 @@ object FusedTensorTypeLess {
       }
     }
 
+    def body: Backend.Block = {
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, "tensor", _::_::(f:Backend.Block)::_, _)) => f
+        case a => ???
+      }
+    }
+
     def show(implicit __pos: SourceContext): UNIT = {
       UNIT(Adapter.g.reflectEffect("show_tensor", x)()(Adapter.CTRL))
     }

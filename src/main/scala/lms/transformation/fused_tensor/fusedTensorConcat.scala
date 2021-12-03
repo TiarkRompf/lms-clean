@@ -11,9 +11,9 @@ import lms.thirdparty.array_computation.{ArrayCPUTypeLess, CUDATypeLess, CUBLAST
 
 import Backend._
 
-abstract class FusedTensorSplit extends Transformer {
+abstract class FusedTensorConcat extends Transformer {
 
-  override val name = "FusedTensorSplit"
+  override val name = "FusedTensorConcat"
 
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -26,21 +26,25 @@ abstract class FusedTensorSplit extends Transformer {
   val results = new mutable.HashMap[Backend.Sym, TENSOR]
 
   override def transform(n: Node): Backend.Exp = n match {
-    case Node(s, "tensor_split", (x:Backend.Sym)::(Backend.Const(sz:Seq[Int]))::_, _) =>
+    case Node(s, "tensor_concat", (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
-      val t = new TENSOR(x, useOldMetadata = true)
-      require(sz.sum == t.size.sum, "invalid split pattern")
+      val a = new TENSOR(transform(x), useOldMetadata = true)
+      val b = new TENSOR(transform(y), useOldMetadata = true)
 
-      val t1 = TENSOR(Seq(0, sz(0)), t.inputs){ i => t.apply(INT(i).x).x } // fixme: sizes are ad-hoc
-      val t2 = TENSOR(Seq(sz(0), t.size.sum), t.inputs){ i => t.apply(INT(i).x).x }
-      splits((s, 0)) = t1
-      splits((s, 1)) = t2
-      TENSORS(Seq(t1.x, t2.x)).x
+      require(a.size.last == b.size.head && a.inputs == b.inputs, "cannot concat")
+
+      System.out.println("a: " + a.body)
+      System.out.println("b: " + b.body)
+
+      val Backend.Block(a_arg::Nil, a_r, _, _) = a.body
+      val Backend.Block(b_arg::Nil, b_r, _, _) = b.body
+
+      val sz = a.size.sum + b.size.sum
+      val res = TENSOR(Seq(0, sz), a.inputs){ i =>
+        (IF(INT(i) < INT(a.size.sum))(a.apply(i))(b.apply(i))).x
+      }
+      res.x
     
-    case Node(s, "tensor_result",(x:Backend.Sym)::(Backend.Const(i:Int))::_, _) =>
-      implicit val pos = Adapter.oldSourceMap(s)
-      val t = splits((x, i))
-      t.x
     case _ => super.transform(n)
   }
 
