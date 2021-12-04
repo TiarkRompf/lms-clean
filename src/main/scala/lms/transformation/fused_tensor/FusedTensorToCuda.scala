@@ -27,34 +27,32 @@ abstract class FusedTensorToCuda extends Transformer {
     CUDA_MALLOC(size, m)
   }
 
-
   override def transform(n: Node): Backend.Exp = n match {
     case Node(s, "tensor", Backend.Const(sz:Seq[Int])::Backend.Const(inputs:Seq[Backend.Sym])::(f@Backend.Block(arg::Nil, r, block, eff))::_, _) =>
       implicit val __pos = Adapter.oldSourceMap(s)
       val sz1 = sz.sum
 
-      val arr = new ARRAY(inputs.head) // for now, assume only one input
-      // System.out.println("input: " + inputs.head)
-      // System.out.println("arr: " + arr)
-      // System.out.println("res:" + r)
+      // input array. for now, assume only one input
+      val in_arr = new ARRAY(inputs.head)
+      // allocate output array. assume only one output
+      val out_arr = CUDA_MALLOC(sz1, manifest[Int])
+      // System.out.println("in_arr:" + in_arr)
+      // System.out.println("out_arr:" + out_arr)
 
       val kernel = CUDA_KERNEL3({ xn: List[Backend.Exp] => 
-        val array = (new ARRAY(xn(0))).withSrcType(__pos, manifest[Int])
-        val value = (new NUM(xn(1))).withSrcType(__pos, manifest[Int]) // not used
+        val in_array = (new ARRAY(xn(0))).withSrcType(__pos, manifest[Int])
+        val out_array = (new ARRAY(xn(1))).withSrcType(__pos, manifest[Int])
         val size  = (new INT(xn(2))).withSrcType(__pos, manifest[Int])
 
         val stride = gridDimX * blockDimX
         val tid = threadIdxX + blockIdxX * blockDimX
 
         val i = var_new(Wrap[Int](tid.x))
-
-        // System.out.println("i: " + UnwrapV(i))
-        // PRINTF("%d", INT(Unwrap(readVar(i))))
         
         __whileDo(ordering_lt(readVar(i), Wrap[Int](size.x)), {
           // replace input to function argument, tensor lambda to loop index
           try {
-            subst(inputs.head) = array.x
+            subst(inputs.head) = in_array.x
             // subst(arg) = UnwrapV(i)
             subst(arg) = Unwrap(readVar(i))
             traverse(f)
@@ -62,14 +60,14 @@ abstract class FusedTensorToCuda extends Transformer {
             subst -= inputs.head
             subst -= arg
           }
-          array(INT(Unwrap(readVar(i)))) = INT(transform(r))
+          out_array(INT(Unwrap(readVar(i)))) = INT(transform(r))
           i += Wrap[Int](stride.x)
         })
 
         Backend.Const(())
-      }, manifest[Array[Int]], manifest[Int], manifest[Int])
+      }, manifest[Array[Int]], manifest[Array[Int]], manifest[Int])
       
-      (kernel(arr, INT(0), INT(sz1), DIM3(0), DIM3(0))).x
+      (kernel(in_arr, out_arr, INT(sz1), DIM3(0), DIM3(0))).x
 
     case Node(s, "tensor_show", Backend.Sym(x)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)

@@ -95,8 +95,8 @@ abstract class FusedTensorFunctional extends Transformer {
 
       require(a.size.last == b.size.head && a.inputs == b.inputs, "cannot concat")
 
-      System.out.println("a: " + a.body)
-      System.out.println("b: " + b.body)
+      // System.out.println("a: " + a.body)
+      // System.out.println("b: " + b.body)
 
       val Backend.Block(a_arg::Nil, a_r, _, _) = a.body
       val Backend.Block(b_arg::Nil, b_r, _, _) = b.body

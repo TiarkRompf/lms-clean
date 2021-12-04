@@ -9,19 +9,25 @@ Emitting C Generated Code
 #include <stdbool.h>
 #include <math.h>
 /************* Functions **************/
-__global__ void x2(int x3, int x4, int x5) {
-  int x6 = gridDim.x * blockDim.x;
-  int x7 = threadIdx.x + blockIdx.x * blockDim.x;
-  while (x7 < x5) {
-    x3[x7] = tanh(x3[x7]);
-    x7 = x7 + x6;
+__global__ void x4(int x5, int x6, int x7) {
+  int x8 = gridDim.x * blockDim.x;
+  int x9 = threadIdx.x + blockIdx.x * blockDim.x;
+  while (x9 < x7) {
+    x6[x9] = tanh(x2[x9]);
+    x9 = x9 + x8;
   }
 }
 /**************** Snippet ****************/
 void Snippet(int x0) {
-  int* x1 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x1, (size_t)(10 * sizeof(int))));
-  show_tensor(x2<<<dim3(0, 1, 1), dim3(0, 1, 1)>>>(x1, 0, 10));
+  int* x1 = (int*)malloc(10 * sizeof(int));
+  scan_int_array(x1, 10, "input");
+  CUDA_CALL(cudaSetDevice(0));
+  int* x2 = (int*)malloc(0 * sizeof(int));
+  CUDA_CALL(cudaMalloc(&x2, (size_t)(10 * sizeof(int))));
+  CUDA_CALL(cudaMemcpy(x2, x1, (size_t)(10 * sizeof(int)), cudaMemcpyHostToDevice));
+  int* x3 = (int*)malloc(0 * sizeof(int));
+  CUDA_CALL(cudaMalloc(&x3, (size_t)(10 * sizeof(int))));
+  show_tensor(x4<<<dim3(0, 1, 1), dim3(0, 1, 1)>>>(x1, x3, 10));
 }
 /*****************************************
 End of C Generated Code

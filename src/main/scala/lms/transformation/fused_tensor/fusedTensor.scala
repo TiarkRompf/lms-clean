@@ -87,7 +87,7 @@ object FusedTensorTypeLess {
     }
 
     def show(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("show_tensor", x)()(Adapter.CTRL))
+      UNIT(Adapter.g.reflectEffect("show_tensor", x)(x)(Adapter.CTRL))
     }
 
     def + (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
