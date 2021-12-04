@@ -1,7 +1,9 @@
 /*****************************************
 Emitting C Generated Code
 *******************************************/
+#include <string.h>
 #include <stdlib.h>
+#include "cuda_header.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -18,8 +20,8 @@ __global__ void x2(int x3, int x4, int x5) {
 /**************** Snippet ****************/
 void Snippet(int x0) {
   int* x1 = (int*)malloc(0 * sizeof(int));
-  CUDA_CALL(cudaMalloc(&x1, (lms.thirdparty.size_ttypeless$sizet)(10 * sizeof(Int))));
-  show_tensor(x2(x1, 0, 20, dim3(0, 1, 1), dim3(0, 1, 1)));
+  CUDA_CALL(cudaMalloc(&x1, (size_t)(10 * sizeof(int))));
+  show_tensor(x2<<<dim3(0, 1, 1), dim3(0, 1, 1)>>>(x1, 0, 20));
 }
 /*****************************************
 End of C Generated Code

@@ -8,7 +8,7 @@ import macros.SourceContext
 import lms.core._
 import lms.core.stub._
 import lms.thirdparty.{CCodeGenLibs}
-// import lms.transformation.tensor.{CCodeGenCudaCustomOps}
+import lms.thirdparty.array_computation.{CCodeGenCBLASOps, CCodeGenCudaOps, CCodeGenCuBLAS}
 
 import Backend._
 
@@ -17,7 +17,7 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
 
   abstract class CompilerCFusedTensor[A: Manifest, B: Manifest] extends CompilerC[A,B] with FusedTensorOps { q =>
 
-    override val codegen = new DslGenC with CCodeGenLibs {
+    override val codegen = new DslGenCPP with CCodeGenCudaOps with CCodeGenLibs {
       val IR: q.type = q
     }
 
