@@ -74,17 +74,21 @@ abstract class FusedTensorFunctional extends Transformer {
       val input = t.inputs(0).t
       require(sz.sum == t.size, "invalid split pattern")
 
-      val t1 = TENSOR(Seq(View(input, 0, sz(0)))){ i => t.apply(INT(i).x).x } // fixme: sizes are ad-hoc
-      val t2 = TENSOR(Seq(View(input, sz(0), t.size))){ i => t.apply(INT(i).x).x }
-      splits((s, 0)) = t1
-      splits((s, 1)) = t2
+      val froms = sz.init.scanLeft(0) { _ + _ }
+      val tos = sz.scanLeft(0) { _ + _ }.tail
+      val indices = Range(0, sz.length, 1).toList
+
+      froms zip tos zip indices foreach {
+        case ((from, to), i) =>
+          splits((s, i)) = TENSOR(Seq(View(input, from, to))){ i => t.apply(INT(i).x).x }
+      }
       Backend.Const(())
     
     case Node(s, "tensor_result",(x:Backend.Sym)::(Backend.Const(i:Int))::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val t = splits((x, i))
       t.x
-    case Node(s, "tensor_concat", (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+    /*case Node(s, "tensor_concat", (x:Backend.Sym)::(y:Backend.Sym)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
       val a = new TENSOR(transform(x))
       val b = new TENSOR(transform(y))
@@ -92,15 +96,62 @@ abstract class FusedTensorFunctional extends Transformer {
       require(a.inputs(0).t == b.inputs(0).t, "cannot concat from different sources")
       require(a.inputs(0).to == b.inputs(0).from, "cannot concat unmatched shapes")
 
-      // System.out.println("a: " + a.body)
-      // System.out.println("b: " + b.body)
-
       val Backend.Block(a_arg::Nil, a_r, _, _) = a.body
       val Backend.Block(b_arg::Nil, b_r, _, _) = b.body
 
       val sz = a.size + b.size
       val res = TENSOR(Seq(View(a.inputs(0).t, 0, sz))){ i =>
         (IF(INT(i) < INT(a.size))(a.apply(i))(b.apply(i))).x
+      }
+      res.x*/
+    case Node(s, "tensor_concat", (xs:List[Backend.Sym]), _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+
+      val tensors = xs map { t => new TENSOR(transform(t)) }
+      val inputs = tensors map { t =>
+        val real_inputs = t.inputs.filter { i => i.t != null }
+        require(real_inputs.size == 1, "need only 1 input for concat")
+        real_inputs(0)
+      }
+      val sorted = (tensors zip inputs).sortWith(_._2.from < _._2.from)
+      // System.out.println(sorted)
+
+      val s_tensors = sorted map { _._1 }
+      val s_inputs = sorted map { _._2 }
+
+      // System.out.println(s_tensors)
+      // System.out.println(s_inputs)
+
+      val input = s_inputs(0).t
+      s_inputs foreach { v => require(v.t == input, "cannot concat from different sources") }
+
+      // TODO: rewrite me
+      var end = s_inputs.head.to
+      for (v <- s_inputs.tail) {
+        if (v.from != end) {
+          require(false, "cannot merge range")
+        } else {
+          end = v.to
+        }
+      }
+      // System.out.println(end)
+
+      // val gaps = sorted.init map { _._2.to }
+      val gaps = s_inputs.init map { _.to }
+      // System.out.println(gaps)
+
+      val res = TENSOR(Seq(View(input, 0, end))){ i =>
+        /*
+        val inner1 = sorted(2)._1.apply(i)
+        val inner = IF(INT(i) < INT(gaps(1)))(sorted(1)._1.apply(i))(inner1)
+        (IF(INT(i) < INT(gaps(0)))(sorted(0)._1.apply(i))(inner)).x*/
+        var inner = s_tensors(gaps.size).apply(i)
+        var j = gaps.size - 1
+        while (j >= 0) {
+          inner = INT(IF(INT(i) < INT(gaps(j)))(s_tensors(j).apply(i))(inner))
+          j = j - 1
+        }
+        inner.x
       }
       res.x
     case _ => super.transform(n)

@@ -131,8 +131,13 @@ object FusedTensorTypeLess {
       (new TENSOR(Adapter.g.reflect("tensor_result", x, C(i)))).withSrcType(__pos, et)
     }
 
-    def concat(y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
+    /*def concat(y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
       (new TENSOR(Adapter.g.reflectUnsafe("tensor_concat", x, y.x))).withSrcType(__pos, et)
+    }*/
+
+    def concat(y: Seq[TENSOR])(implicit __pos: SourceContext): TENSOR = {
+      val tmp = x +: (y map { _.x })
+      (new TENSOR(Adapter.g.reflectUnsafe("tensor_concat", tmp:_*))).withSrcType(__pos, et)
     }
   }
 }
@@ -218,8 +223,9 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
       Wrap[Tensor[T]](t.x)
     }
 
-    def concat(y: Rep[Tensor[T]])(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
-      val t = self.concat(tensor(y))
+    def concat(ys: Seq[Rep[Tensor[T]]])(implicit  __pos: SourceContext): Rep[Tensor[T]] = {
+      val y = ys map { tensor(_) }
+      val t = self.concat(y)
       Wrap[Tensor[T]](t.x)
     }
   }

@@ -56,7 +56,6 @@ abstract class FusedTensorToCuda extends Transformer {
       CUDA_MEMCPY(gpuArray, cpuArray, size, HOST2DEVICE, m)
 
       tensor2arr(s) = gpuArray.x
-      System.out.println("xxx:" + gpuArray.x)
       gpuArray.x
 
     case Node(s, "tensor_apply", (a:Backend.Sym)::(b:Backend.Exp)::_, _) if tensor2arr.contains(a) =>
@@ -70,11 +69,8 @@ abstract class FusedTensorToCuda extends Transformer {
       val sz1 = t.size
 
       // input array. for now, assume only one input
-      System.out.println("hd:" + inputs)
-      val xxx = tensor2arr(inputs.head.t)
-      System.out.println("xxx:" + xxx)
-      val in_arr = new ARRAY(xxx)
-      System.out.println("in_arr:" + in_arr)
+      val in_arr = new ARRAY(tensor2arr(inputs.head.t))
+      // System.out.println("in_arr:" + in_arr)
       // allocate output array. assume only one output
       val out_arr = CUDA_MALLOC(sz1, manifest[Int])
       // System.out.println("in_arr:" + in_arr)

@@ -75,11 +75,31 @@ class FixedSizeFusedTensorTest extends TutorialFunSuite {
         val e = c.result(1)
 
         val f = d + b
-        val g = f.concat(e)
+        val g = f.concat(Seq(e))
         g.show
       }
     }
     checkWithLogPath("split", driver.code, "cu", driver.setLogPath)
+  }
+
+  test("split3") {
+    val driver = new CompilerCFusedTensor[Int, Unit] {
+      import FusedTensorTypeLess._
+
+      @virtualize
+      def snippet(arg: Rep[Int]): Rep[Unit] = {
+        val a = Tensor.input[Int](15)
+
+        val b = a.split(Seq(5, 5, 5))
+        val c = b.result(0)
+        val d = b.result(1)
+        val e = b.result(2)
+
+        val g = c.concat(Seq(e, d))
+        g.show
+      }
+    }
+    checkWithLogPath("split3", driver.code, "cu", driver.setLogPath)
   }
 
   test("add") {
