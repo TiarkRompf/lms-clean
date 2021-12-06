@@ -20,35 +20,38 @@ object FusedTensorTypeLess {
   type E = Backend.Exp
   def C(a: Any) = Backend.Const(a)
 
-  /// typeless frontend
-  /*
-  def TENSOR(size: Int)(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor", C(size), Adapter.g.reify(xn => f(xn))))).withSrcType(__pos, manifest[Int])
-  }*/
+  case class View(t: Backend.Sym, from: Int, to: Int)
 
+  /// typeless frontend
+
+  /*
   def TENSOR(size: Seq[Int], inputs: Seq[Backend.Sym])(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor", C(size), C(inputs), Adapter.g.reify(xn => f(xn))))).withSrcType(__pos, manifest[Int])
+  }*/
+
+  def TENSOR(inputs: Seq[View])(f: Backend.Exp => Backend.Exp)(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor", C(inputs), Adapter.g.reify(xn => f(xn))))).withSrcType(__pos, manifest[Int])
   }
 
   def ZEROS(size: Int)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(Seq(0, size))))).withSrcType(__pos, manifest[Int])
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(size)))).withSrcType(__pos, manifest[Int])
   }
 
   def ONES(size: Int)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_ones", C(Seq(0, size))))).withSrcType(__pos, manifest[Int])
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_ones", C(size)))).withSrcType(__pos, manifest[Int])
   }
 
   def CONSTS(size: Int, num: Int)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_consts", C(Seq(0, size)), C(num)))).withSrcType(__pos, manifest[Int])
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_consts", C(size), C(num)))).withSrcType(__pos, manifest[Int])
   }
 
   def INPUT(size: Int)(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(Seq(0, size)), C(Seq())))).withSrcType(__pos, manifest[Int])
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(size)))).withSrcType(__pos, manifest[Int])
   }
 
   // used to track input by itself
-  def INPUT1(size: Seq[Int], inputs: Seq[Backend.Sym])(implicit __pos: SourceContext): TENSOR = {
-    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(size), C(inputs)))).withSrcType(__pos, manifest[Int])
+  def INPUT1(inputs: Seq[View])(implicit __pos: SourceContext): TENSOR = {
+    (new TENSOR(Adapter.g.reflectUnsafe("tensor_input", C(inputs)))).withSrcType(__pos, manifest[Int])
   }
 
   def TENSORS(inputs: Seq[Backend.Exp])(implicit __pos: SourceContext): TENSOR = {
@@ -64,30 +67,38 @@ object FusedTensorTypeLess {
       if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
     }
 
-    def size: Seq[Int] = {
+    def size: Int = {
       gc.get(x.asInstanceOf[Backend.Sym]) match {
+        /*
         case Some(Node(_, s, Backend.Const(size:Seq[Int])::_, _)) => size
-        case Some(Node(_, s, Backend.Const(_)::Backend.Const(size:Seq[Int])::_, _)) => size
+        case Some(Node(_, s, Backend.Const(_)::Backend.Const(size:Seq[Int])::_, _)) => size*/
+        case Some(Node(_, s, Backend.Const(inputs:Seq[View])::_, _)) =>
+          val sz = inputs(0).to - inputs(0).from
+          inputs foreach {
+            case View(_, from, to) => assert(to - from == sz, "operation shape mismatch")
+          }; sz
         case a => System.out.println(a); ???
       }
     }
 
-    def inputs: Seq[Backend.Sym] = {
+    def inputs: Seq[View] = {
       gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, op, _::Backend.Const(ins:Seq[Backend.Sym])::_, _)) => ins
+        // case Some(Node(_, op, _::Backend.Const(ins:Seq[Backend.Sym])::_, _)) => ins
+        case Some(Node(_, s, Backend.Const(inputs:Seq[View])::_, _)) => inputs
         case a => Seq()
       }
     }
 
     def body: Backend.Block = {
       gc.get(x.asInstanceOf[Backend.Sym]) match {
-        case Some(Node(_, "tensor", _::_::(f:Backend.Block)::_, _)) => f
+        // case Some(Node(_, "tensor", _::_::(f:Backend.Block)::_, _)) => f
+        case Some(Node(_, "tensor", _::(f:Backend.Block)::_, _)) => f
         case a => ???
       }
     }
 
     def show(implicit __pos: SourceContext): UNIT = {
-      UNIT(Adapter.g.reflectEffect("show_tensor", x)(x)(Adapter.CTRL))
+      UNIT(Adapter.g.reflectWrite("show_tensor", x)(Adapter.CTRL))
     }
 
     def + (y: TENSOR)(implicit __pos: SourceContext): TENSOR = {
@@ -161,7 +172,7 @@ trait FusedTensorOps extends Dsl with ArrayOps with CudaOps {
     }
 
     def apply[T:Numeric:Manifest](size: Int, f: Rep[Int] => Rep[Int])(implicit __pos: SourceContext): Rep[Tensor[T]] = {
-      Wrap[Tensor[T]](TENSOR(Seq(size), Seq())(unwrapFun[Int, Int](f)).x) // is the input correct?
+      Wrap[Tensor[T]](TENSOR(Seq(View(null, 0, size)))(unwrapFun[Int, Int](f)).x) // is the input correct?
     }
   }
 
