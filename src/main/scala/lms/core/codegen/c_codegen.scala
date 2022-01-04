@@ -294,15 +294,20 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   protected val ongoingFun = new mutable.HashSet[String]()
   def registerTopLevelFunction(id: String, streamId: String = "general")(f: => Unit) =
     if (!registeredFunctions(id)) {
-      if (ongoingFun(streamId)) ???
-      ongoingFun += streamId
+      var stream = streamId
+      if (ongoingFun(stream)) {
+        // create a new stream for the other function
+        // this happens when another top-level function is called while generating a top level function
+        stream += "-other"
+      }
+      ongoingFun += stream
       registeredFunctions += id
-      withStream(functionsStreams.getOrElseUpdate(streamId, {
+      withStream(functionsStreams.getOrElseUpdate(stream, {
         val functionsStream = new ByteArrayOutputStream()
         val functionsWriter = new PrintStream(functionsStream)
         (functionsWriter, functionsStream)
       })._1)(f)
-      ongoingFun -= streamId
+      ongoingFun -= stream
     }
   protected val functionDeclsStreams = new mutable.LinkedHashMap[String, (PrintStream, ByteArrayOutputStream)]()
   def registerTopLevelFunctionDecl(id: String, streamId: String = "general")(f: => Unit) = {
