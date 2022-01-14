@@ -55,7 +55,7 @@ trait Base extends EmbeddedControls with OverloadHack with ClosureCompare {
 }
 ```
 
-Generally speaking, all `lms.core.Backend.Exp` are wrapped in `case clas Wrap[T]`
+Generally speaking, all `lms.core.Backend.Exp` are wrapped in `case class Wrap[T]`
 that is of type `Exp[T]` (aliased as `Rep[T]`). The type mapping from `lms.core.Backend.Exp`
 to type manifest is maintained in `typeMap`.
 
