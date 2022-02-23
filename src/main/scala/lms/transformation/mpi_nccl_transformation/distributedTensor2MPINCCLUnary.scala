@@ -92,11 +92,11 @@ trait DistributedTensor2MPI_NCCLUnary extends DistributeTensor2MPI_NCCLBase {
       val count = numeral(tt.shapeSize)
 
       op match {
-        case "tensor_negate" => gpu_neg_array(count, m, myNCCLRank, transform(operand)).x
-        case "tensor_invert" => gpu_inv_array(count, m, myNCCLRank, transform(operand)).x
-        case "tensor_tanh" => gpu_tanh_array(count, m, myNCCLRank, transform(operand)).x
-        case "tensor_relu" => gpu_relu_array(count, m, myNCCLRank, transform(operand)).x
-        case "tensor_transpose" => gpu_transpose_array(count, m, myNCCLRank, transform(operand)).x
+        case "tensor_negate" => gpu_neg_array(count, m, myCUDADevice, transform(operand)).x
+        case "tensor_invert" => gpu_inv_array(count, m, myCUDADevice, transform(operand)).x
+        case "tensor_tanh" => gpu_tanh_array(count, m, myCUDADevice, transform(operand)).x
+        case "tensor_relu" => gpu_relu_array(count, m, myCUDADevice, transform(operand)).x
+        case "tensor_transpose" => gpu_transpose_array(count, m, myCUDADevice, transform(operand)).x
         case _ => throw new Exception(s"op $op is not unary op")
       }
 

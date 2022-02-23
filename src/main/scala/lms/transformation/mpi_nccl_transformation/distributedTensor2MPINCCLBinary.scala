@@ -114,13 +114,13 @@ trait DistributeTensor2MPI_NCCLBinary extends DistributeTensor2MPI_NCCLBase {
       val count = numeral(tt.shapeSize)
 
       op match {
-        case "tensor_add" => gpu_add_array(count, m, myNCCLRank, transform(left), transform(right)).x
-        case "tensor_sub" => gpu_sub_array(count, m, myNCCLRank, transform(left), transform(right)).x
-        case "tensor_mul" => gpu_mult_array(count, m, myNCCLRank, transform(left), transform(right)).x
-        case "tensor_div" => gpu_div_array(count, m, myNCCLRank, transform(left), transform(right)).x
-        case "tensor_tanh_grad" => gpu_tanh_grad_array(count, m, myNCCLRank, transform(left), transform(right)).x
-        case "tensor_relu_grad" => gpu_relu_grad_array(count, m, myNCCLRank, transform(left), transform(right)).x
-        case "tensor_invert_grad" => gpu_invert_grad_array(count, m, myNCCLRank, transform(left), transform(right)).x
+        case "tensor_add" => gpu_add_array(count, m, myCUDADevice, transform(left), transform(right)).x
+        case "tensor_sub" => gpu_sub_array(count, m, myCUDADevice, transform(left), transform(right)).x
+        case "tensor_mul" => gpu_mult_array(count, m, myCUDADevice, transform(left), transform(right)).x
+        case "tensor_div" => gpu_div_array(count, m, myCUDADevice, transform(left), transform(right)).x
+        case "tensor_tanh_grad" => gpu_tanh_grad_array(count, m, myCUDADevice, transform(left), transform(right)).x
+        case "tensor_relu_grad" => gpu_relu_grad_array(count, m, myCUDADevice, transform(left), transform(right)).x
+        case "tensor_invert_grad" => gpu_invert_grad_array(count, m, myCUDADevice, transform(left), transform(right)).x
         case _ => throw new Exception(s"op $op is a binary op that has not been handled")
       }
 

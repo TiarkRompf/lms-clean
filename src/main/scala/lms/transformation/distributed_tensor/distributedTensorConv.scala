@@ -151,7 +151,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
   }
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
-    weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+    weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit], liftNodes: mutable.Set[Backend.Sym],
     gradMap: GradMapWrapper,
     momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
     transform: Backend.Exp => Backend.Exp) = node match {
@@ -159,6 +159,8 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes
         forwardNodes += node
+        liftNodes += a
+        liftNodes += b
         // save backward op in backwardNodes
         (() => {
           val x = new TENSOR(transform(a))      // weight
@@ -177,6 +179,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes
         forwardNodes += node
+        liftNodes += s
         // save backward op in backwardNodes
         (() => {
           val x = new TENSORS(transform(s))
@@ -189,6 +192,8 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
         implicit val pos = Adapter.oldSourceMap(s)
         // save forward op in forwardNodes
         forwardNodes += node
+        liftNodes += a
+        liftNodes += s
         // save backward op in backwardNodes
         (() => {
             val x = new TENSOR(transform(a))
@@ -197,7 +202,7 @@ trait FixedSizeDistributedTensorConvTypeLess extends FixedSizeDistributedTensorM
             Accumulate(gradMap(a), grad, anno); ()
         }) +=: backwardNodes
 
-      case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+      case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, liftNodes, gradMap, momentumMap, transform)
     }
 
   override def printTensor(node: Node, graph: Graph) = node match {

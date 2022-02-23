@@ -63,7 +63,7 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
   }
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
-      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit], liftNodes: mutable.Set[Backend.Sym],
       gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
@@ -81,7 +81,7 @@ trait FixedSizeDistributedTensorSplitConcatTypeLess extends FixedSizeDistributed
       }) +=: backwardNodes
 
     case _ =>
-      super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+      super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, liftNodes, gradMap, momentumMap, transform)
   }
 
   override def printTensor(node: Node, graph: Graph): String = node match {
@@ -110,4 +110,3 @@ trait FixedSizeDistributedTensorOpsSplitConcat extends FixedSizeDistributedTenso
     }
   }
 }
-

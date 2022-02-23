@@ -79,8 +79,15 @@ trait FixedSizeDistributedTensorBaseTypeLess {
   case class SAnno(dim: Dim, devices: Seq[Device], stable: Boolean = true) extends Anno {
     override def toString = s"Split d${dim.x} at devices=[${devices.mkString(", ")}]"
   }
-  case class KAnno(pipeline: Int) extends Anno // stacked pipelines
-  case class QAnno(pipeline: Int) extends Anno // queued pipelines
+  case class MAnno(devices: Seq[Device], islastmodule: Boolean = false) extends Anno {
+    override def toString = s"Non-pipeline module at devices=[${devices.mkString(", ")}]"
+  } // non pipeline multiple modules
+  case class KAnno(pipeline: Int, devices: Seq[Device], islastmodule: Boolean = false) extends Anno {
+    override def toString = s"Stacked pipeline at ${pipeline} at devices=[${devices.mkString(", ")}]"
+  } // stacked pipelines
+  case class QAnno(pipeline: Int, devices: Seq[Device], islastmodule: Boolean = false) extends Anno {
+    override def toString = s"Queued pipeline at ${pipeline} at devices=[${devices.mkString(", ")}]"
+  } // queued pipelines
 
   def INPUT(shape: Seq[Int], et: Manifest[_], index: Int, devices: Seq[Device])(implicit __pos: SourceContext): TENSOR = {
     val tensorType = TensorType(shape.map(s => Size(dim, s)), et) // this is using default NAnno
@@ -116,6 +123,77 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
   def ZEROS(tt: TensorType, anno: Anno)(implicit __pos: SourceContext): TENSOR = {
     (new TENSOR(Adapter.g.reflectUnsafe("tensor_zeros", C(tt), C(anno)))).withSrcType(__pos, tt.et)
+  }
+
+  def MODULE(anno:Anno, f: => TENSOR)(implicit __pos: SourceContext): MODULE = {
+    new MODULE(Adapter.g.reflectWrite("module", C(anno), Adapter.g.reify(f.x))(Adapter.CTRL)).withSource(__pos)
+  }
+
+  val moduleTensorMap = new mutable.HashMap[Sym, Exp]
+
+  // Typeless MOUDULE Definition
+  class MODULE(override val x: Backend.Exp, override val useOldMetadata: Boolean = false) extends TOP(x, useOldMetadata) {
+    def withEleType(m: Manifest[_]): this.type = { Adapter.typeMap(x) = m; this }
+    override def withSrcType(pos: SourceContext, m: Manifest[_]): this.type =
+      withSource(pos).withEleType(m)
+
+    def pos: SourceContext = if (useOldMetadata) Adapter.oldSourceMap(x) else Adapter.sourceMap(x)
+
+    def et: Manifest[_] = if (useOldMetadata) Adapter.oldTypeMap(x) else Adapter.typeMap(x)
+
+    val (pipeline, annotation, devices, islastmodule) = gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(_, "module", Backend.Const(manno:Anno)::(b:Block)::_, _)) => manno match {
+          case a @ NAnno => throw new Exception(s"Annotation $a is not an Module Annotation")
+          case a @ SAnno(_,_,_) => throw new Exception(s"Annotation $a is not an Module Annotation")
+          case a @ MAnno(devices, islastmodule) => (1, a, devices, islastmodule)
+          case a @ KAnno(pipeline, devices, islastmodule) => (pipeline, a, devices, islastmodule)
+          case a @ QAnno(pipeline, devices, islastmodule) => throw new Exception(s"Queued pipeline currently not supported")
+          case a => throw new Exception(s"Annotation $a is not supported")
+        }
+        case m => throw new Exception(s"Node $m is not a Module node")
+    }
+
+    def train(iter: Int)(implicit __pos: SourceContext) = {
+      UNIT(Adapter.g.reflectWrite("@", x, Backend.Const(iter))(Adapter.CTRL))
+    }
+
+    def test(lossName: String = "loss")(implicit __pos: SourceContext) = {
+      UNIT(Adapter.g.reflectWrite("@", x, Backend.Const(lossName))(Adapter.CTRL))
+    }
+
+    val result = {
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(m, "module", Backend.Const(manno:Anno)::(b@Block(in,res,ein,eff))::_, _)) =>
+          gc.get(res.asInstanceOf[Backend.Sym]) match {
+            case Some(Node(res, s, Backend.Const(ott:TensorType)::Backend.Const(oanno:Anno)::_, _)) if s.startsWith("tensor_") => new TENSOR(res, useOldMetadata)
+            case a => throw new Exception(s"Node $a is not an Tensor node")
+          }
+        case a => throw new Exception(s"Node $a is not an Module node")
+      }
+    }
+
+    def getTensor(anno: Anno)(implicit __pos: SourceContext) = {
+      val rt = result.resultType
+      new TENSOR(moduleTensorMap.getOrElseUpdate(x.asInstanceOf[Backend.Sym], Adapter.g.reflectRead("tensor_module", C(rt), C(anno), x)(x))).withSrcType(__pos, rt.et)
+    }
+  }
+
+  object MODULE {
+    def TENSORMODULE(m:Backend.Exp, anno: Anno)(implicit __pos: SourceContext): TENSOR = {
+      // Fixme: need to create new tensortype with new dims?
+       new MODULE(m).getTensor(anno)
+      // val rt: TensorType = TensorType(resTensor.resultType.shape.map(s => Size(dim, s.size)), resTensor.resultType.et)
+    }
+
+    def getModuleTensor(x: Backend.Exp, useOldMetadata: Boolean = false) = {
+      val gc = if (useOldMetadata) Adapter.oldDefsCache else Adapter.g.globalDefsCache
+      gc.get(x.asInstanceOf[Backend.Sym]) match {
+        case Some(Node(x, "tensor_module", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(m:Backend.Sym)::_, _)) => {
+          new MODULE(m, useOldMetadata).result
+        }
+        case a => throw new Exception(s"Node $a is not an tensor_module node")
+      }
+    }
   }
 
   object TENSOR {
@@ -201,23 +279,17 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     }
   }
 
-  abstract class myModule {
-    def train(iter: Int): UNIT
-    // def inference: TENSOR
-    def test(lossName: String): UNIT
-  }
-
-  def MODULE(f: => TENSOR)(implicit __pos: SourceContext): myModule = {
-    val m = Adapter.g.reflectWrite("module", Adapter.g.reify(f.x))(Adapter.CTRL)
-    new myModule {
-      def train(iter: Int) = UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(iter))(Adapter.CTRL))
-      // def inference:
-      def test(lossName: String = "loss") = UNIT(Adapter.g.reflectWrite("@", m, Backend.Const(lossName))(Adapter.CTRL))
-    }
-  }
-
   def mergable_dims(node: Node): List[(Dim, Dim)] = node match {
     case Node(s, op, _, _) if (op == "tensor_input" || op == "tensor_weight" || op == "tensor_result") => List()
+    case Node(s, "tensor_module", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::_, _) => {
+      val oldt = MODULE.getModuleTensor(s, true)
+      val newt = new TENSOR(s, true)
+      val old_type = oldt.resultType
+      val new_type = newt.resultType
+      assert(oldt.shapeSize == newt.shapeSize)
+      assert(oldt.et == newt.et)
+      (old_type.shape zip new_type.shape).toList map { case (a:Size, b:Size) => (a.dim, b.dim) }
+    }
     case Node(s, op, _, _) =>
       assert(!op.startsWith("tensor_"), s"node $node is not yet handled in mergable_dims")
       List()
@@ -246,11 +318,13 @@ trait FixedSizeDistributedTensorBaseTypeLess {
     def update(x: Backend.Exp, grad: TENSOR): Unit = update(x, grad.x)
   }
 
+  // There will be no mutation to versioned variable in backward operation
   def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
-      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit], liftNodes: mutable.Set[Backend.Sym],
       gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp): Unit = node match {
+    // Fixme: not dealing with tensors
 
     case Node(s, "tensor_input", _, _) => forwardNodes += node
     case Node(s, "tensor_weight", _, _) => weightNodes += node
@@ -260,19 +334,21 @@ trait FixedSizeDistributedTensorBaseTypeLess {
 
   def printTensor(node: Node, graph: Graph): String = node match {
     case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
-      s"$s = tensor_input(filenameFormat=${filenameFormat}, filenameArgs=[${filenameArgs.mkString(", ")}]) -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = tensor_input(filenameFormat=${filenameFormat}, filenameArgs=[${filenameArgs.mkString(", ")}]) -> ${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
     case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-      s"$s = tensor_input() -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = tensor_input() -> ${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
     case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
-      s"$s = tensor_weight(filenameFormat=${filenameFormat}, filenameArgs=[${filenameArgs.mkString(", ")}]) -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = tensor_weight(filenameFormat=${filenameFormat}, filenameArgs=[${filenameArgs.mkString(", ")}]) -> ${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
     case Node(s, "tensor_weight", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-      s"$s = tensor_weight() -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = tensor_weight() -> ${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
     case Node(s, "tensor_result", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::Backend.Const(i:Int)::_, _) =>
-      s"$s = ${x}#${i} -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = ${x}#${i} -> ${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
+    case Node(s, "tensor_module", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::_, _) =>
+      s"$s = tensor_module() -> ${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
     case Node(s, "tensor_zeros", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-      s"$s = tensor_zeros() -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = tensor_zeros() -> ${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
     case Node(s, "tensor_ones", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::_, _) =>
-      s"$s = tensor_ones() -> ${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = tensor_ones() -> ${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
     case Node(s, "check_tensor", (x:Backend.Sym)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
       s"$s = check_tensor($x, filenameFormat=$filenameFormat, filenameArgs=[${filenameArgs.mkString(", ")}]) ${symTensorShape(x, graph)}"
     case n => n.toString
@@ -291,8 +367,27 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
 
   def showTensor(node: Node, graph: Graph): String = printTensor(node, graph)
 
-  def module[T](f: => Rep[Tensor[T]])(implicit __pos: SourceContext) = {
-    MODULE(new TENSOR(Unwrap(f)))
+  /// Typed Module Frontend
+  class Module[+T]
+  def module[T:Manifest](f: => Rep[Tensor[T]])(implicit __pos: SourceContext) = {
+    Wrap[Module[T]](MODULE(MAnno(List(), islastmodule = true), new TENSOR(Unwrap(f))).x)
+  }
+
+  def module[T:Manifest](anno: Anno)(f: => Rep[Tensor[T]])(implicit __pos: SourceContext) = {
+    Wrap[Module[T]](MODULE(anno, new TENSOR(Unwrap(f))).x)
+  }
+
+  implicit def myModule2res[T:Manifest](x: Rep[Module[T]])(implicit anno: Anno, __pos: SourceContext) : Rep[Tensor[T]] = {
+    Wrap[Tensor[T]](module(x).getTensor(anno).x)
+  }
+
+  def module[T:Manifest](x: Rep[Module[T]]): MODULE = new MODULE(Unwrap(x))
+
+  implicit class ModuleOps[T:Manifest](x: Rep[Module[T]]) {
+    val self = module(x)
+    val anno: Anno = self.annotation
+    def train(iter: Int)(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.train(iter).x)
+    def test(lossName: String = "loss")(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.test(lossName).x)
   }
 
   /// Typed Frontend
@@ -356,4 +451,3 @@ trait FixedSizeDistributedTensorOpsBase extends Dsl {
     def show(implicit __pos: SourceContext): Rep[Unit] = Wrap[Unit](self.show.x)
   }
 }
-

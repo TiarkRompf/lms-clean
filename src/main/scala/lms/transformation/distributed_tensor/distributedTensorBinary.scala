@@ -52,7 +52,7 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
   }
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
-      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit], liftNodes: mutable.Set[Backend.Sym],
       gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
@@ -86,6 +86,8 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
       implicit val pos = Adapter.oldSourceMap(s)
       // save forward op in forwardNodes
       forwardNodes += node
+      liftNodes += a
+      liftNodes += b
       // save backward op in backwardNodes
       (() => {
         val a_tensor = new TENSOR(transform(a))
@@ -102,6 +104,7 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
       implicit val pos = Adapter.oldSourceMap(s)
       // save forward op in forwardNodes
       forwardNodes += node
+      liftNodes += ???
       // save backward op in backwardNodes
       (() => {
         ???
@@ -110,12 +113,12 @@ trait FixedSizeDistributedTensorBinaryTypeLess extends FixedSizeDistributedTenso
         ???
       }) +=: backwardNodes
 
-    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, liftNodes, gradMap, momentumMap, transform)
   }
 
   override def printTensor(node: Node, graph: Graph): String = node match {
     case Node(s, op, Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(a:Backend.Sym)::(b:Backend.Sym)::_, _) if binaryOps.contains(op) =>
-      s"$s = $op($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}${if (anno != NAnno) s"\nAnno: $anno" else ""}"
+      s"$s = $op($a, $b) (${symTensorShape(a, graph)}, ${symTensorShape(b, graph)})->${tt.toString}${if (anno != NAnno) s"  Anno: $anno" else ""}"
     case n => super.printTensor(n, graph)
   }
 }
@@ -164,4 +167,3 @@ trait FixedSizeDistributedTensorOpsBinary extends FixedSizeDistributedTensorOpsB
     }
   }
 }
-

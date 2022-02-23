@@ -60,7 +60,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
   }
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
-      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+      weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit], liftNodes: mutable.Set[Backend.Sym],
       gradMap: GradMapWrapper,
       momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
       transform: Backend.Exp => Backend.Exp) = node match {
@@ -84,6 +84,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     case Node(s, "tensor_invert", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
+        liftNodes += a
 
         (() => {
           Accumulate(gradMap(a), InvertGrad(new TENSOR(transform(a)), gradMap(s), anno), anno); ()
@@ -92,6 +93,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     case Node(s, "tensor_tanh", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
+        liftNodes += s
 
         (() => {
           Accumulate(gradMap(a), TanhGrad(gradMap(s), new TENSOR(transform(s)), anno), anno); ()
@@ -100,6 +102,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     case Node(s, "tensor_relu", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
+        liftNodes += a
 
         (() => {
           Accumulate(gradMap(a), ReluGrad(gradMap(s), new TENSOR(transform(a)), anno), anno); ()
@@ -108,6 +111,8 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
     case Node(s, "tensor_activation", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:ActivationParam)::Backend.Const(mode:String)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
+        liftNodes += a
+        liftNodes += s
         (() => {
             val x = new TENSOR(transform(a))
             val y = new TENSOR(transform(s))
@@ -115,7 +120,7 @@ trait FixedSizeDistributedTensorUnaryTypeLess extends FixedSizeDistributedTensor
             Accumulate(gradMap(a), grad, anno); ()
         }) +=: backwardNodes
 
-    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+    case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, liftNodes, gradMap, momentumMap, transform)
   }
 
   override def printTensor(node: Node, graph: Graph): String = node match {

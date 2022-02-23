@@ -87,13 +87,14 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
   }
 
   override def aircopCollect(node: Node, forwardNodes: mutable.ArrayBuffer[Node],
-    weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit],
+    weightNodes: mutable.ArrayBuffer[Node], backwardNodes: mutable.ArrayBuffer[()=>Unit], liftNodes: mutable.Set[Backend.Sym],
     gradMap: GradMapWrapper,
     momentumMap: mutable.HashMap[Backend.Sym, TENSOR],
     transform: Backend.Exp => Backend.Exp) = node match {
       case Node(s, "tensor_softmax", tt::Backend.Const(anno:Anno)::(a:Backend.Sym)::Backend.Const(params:SoftmaxParam)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
+        liftNodes += s
         (() => {
             val x = new TENSOR(transform(s))
             val grad = SoftmaxBackward(x, gradMap(s), params, anno, pos)
@@ -102,6 +103,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       case Node(s, "tensor_maskedfill", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::(mask:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
+        liftNodes += mask
         (() => {
             val grad = MaskedFillBackward(gradMap(s), new TENSOR(transform(mask)), anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
@@ -109,6 +111,7 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       case Node(s, "tensor_logsoftmax", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
+        liftNodes += s
         (() => {
             val x = new TENSOR(transform(s))
             val grad = LogSoftmaxBackward(x, gradMap(s), anno, pos)
@@ -124,12 +127,14 @@ trait FixedSizeDistributedTensorMiscTypeLess extends FixedSizeDistributedTensorM
       case Node(s, "tensor_embedding", tt::Backend.Const(anno:Anno)::(input:Backend.Sym)::(indices:Backend.Sym)::_, _) =>
         implicit val pos = Adapter.oldSourceMap(s)
         forwardNodes += node
+        liftNodes += input
+        liftNodes += indices
         (() => {
             val grad = EmbeddingBackward(new TENSOR(transform(input)), gradMap(s), new TENSOR(transform(indices)), anno, pos)
             Accumulate(gradMap(input), grad, anno); ()
         }) +=: backwardNodes
 
-      case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, gradMap, momentumMap, transform)
+      case _ => super.aircopCollect(node, forwardNodes, weightNodes, backwardNodes, liftNodes, gradMap, momentumMap, transform)
     }
 
   override def printTensor(node: Node, graph: Graph): String = node match {

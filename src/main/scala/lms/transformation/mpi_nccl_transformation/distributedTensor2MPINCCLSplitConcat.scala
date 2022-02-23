@@ -72,7 +72,7 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         require(tts(0).shape(1).size == tts(1).shape(1).size, "2D split can only handle equal-sized split")
 
         val shape = tts(0).shapeSize
-        val arrays = gpu_split2_2d1_equal_array(shape(0), shape(1), m, myNCCLRank, operand)
+        val arrays = gpu_split2_2d1_equal_array(shape(0), shape(1), m, myCUDADevice, operand)
         TENSORS.tupleView(arrays.map(_.x))
 
       } else if (in_dims == 3) {
@@ -84,7 +84,7 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         val dimZ = tts(0).shape(0).size
         val output_sizes = dimXs map { _ * dimY * dimZ }
         val outputs = output_sizes map { sz =>
-          gpu_array(sz, manifest[Float], myNCCLRank)
+          gpu_array(sz, manifest[Float], myCUDADevice)
         }
 
         cuda3DSplitWrap[Float](
@@ -116,7 +116,7 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         require(input_tensors(0).shapeSize(1) == input_tensors(1).shapeSize(1))
         val count2 = numeral(tt.shapeSize)
           gpu_concat2_2d1_equal_array(input_tensors(0).shapeSize(0), input_tensors(0).shapeSize(1),
-            m, myNCCLRank, input_operands(0), input_operands(1)).x
+            m, myCUDADevice, input_operands(0), input_operands(1)).x
 
       } else if (in_dims == 3) {
         val input_shapes = inputs.map(tensor_shape(_, useOldMetadata = true))
@@ -126,7 +126,7 @@ trait DistributeTensor2MPI_NCCLSplitConcat extends DistributeTensor2MPI_NCCLBase
         val dimZ = input_shapes(0)(0)
         val out_sz = dimXs.reduce(_ + _) * dimY * dimZ
 
-        val output = gpu_array(out_sz, manifest[Float], myNCCLRank)
+        val output = gpu_array(out_sz, manifest[Float], myCUDADevice)
 
         cuda3DConcatWrap[Float](
           input_operands map { t =>  Wrap[Array[Float]](t) },

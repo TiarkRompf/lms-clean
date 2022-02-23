@@ -4,6 +4,7 @@ import scala.annotation.implicitNotFound
 import scala.collection._
 import scala.collection.mutable.HashMap
 import scala.collection.immutable.Set
+import scala.collection.immutable.Map
 
 import lms.core._
 import lms.core.stub._
@@ -16,7 +17,7 @@ import lms.transformation.util.DataStructure
 import Backend._
 
 
-abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps with CudaOps with NCCLOps with CUDNNOps {
+abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps with CudaOps with NCCLOps with CUDNNOps with PrimitiveOps with OrderingOps {
   override val name = "DistributeTensor2MPI_NCCL"
 
   import BaseTypeLess._
@@ -118,7 +119,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   def gpu_scanner_array(name: String, size: Int, m: Manifest[_], device: INT)(implicit __pos: SourceContext): ARRAY =
     withComment(s"initializing GPU array of size $size and type $m at device (pre-rename) ${device.x} from binary file ${name}") {
       val cpuArray = cpu_array(size, m)
-      val gpuArray = gpu_array(size, m, myNCCLRank)
+      val gpuArray = gpu_array(size, m, myCUDADevice)
       ScanFileRank(unit("golden/" + name), device, cpuArray, size)
       CUDA_MEMCPY(gpuArray, cpuArray, size, HOST2DEVICE, m)
       gpuArray
@@ -127,7 +128,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
   def gpu_scanner_array(size: Int, m: Manifest[_], device: INT, filenameFormat: String, filenameArgs: TOP*)(implicit __pos: SourceContext): ARRAY = {
     withComment(s"initializing GPU array of size $size and type $m") {
       val cpuArray = cpu_array(size, m)
-      val gpuArray = gpu_array(size, m, myNCCLRank)
+      val gpuArray = gpu_array(size, m, myCUDADevice)
       ScanFile(cpuArray, size, unit(filenameFormat), filenameArgs.map(arg=>Wrap[Any](arg.x)):_*)
       CUDA_MEMCPY(gpuArray, cpuArray, size, HOST2DEVICE, m)
       gpuArray
@@ -169,7 +170,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     }
 
   // lazy local functions that initialize the MPI and NCCL
-  lazy val (myNCCLSizeRep, myNCCLRankRep, myNCCLCommRep, myNCCLStreamRep) = withComment("setting up the MPI/NCCL environment") {
+  lazy val (myNCCLSizeRep, myNCCLRankRep, globalNCCLSizeRep, globalNCCLRankRep, myNCCLCommRep, globalNCCLCommRep, myNCCLStreamRep) = withComment("setting up the MPI/NCCL environment") {
 
     val size = var_new(unit(0))
     val rank = var_new(unit(0))
@@ -189,26 +190,80 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     val stream = cudaStream
     cudaCall(cudaStreamCreateWithFlags(stream, cudaStreamNonBlocking))
 
-    (readVar(size), readVar(rank), comm, stream)
+    if (modulemap != null) withComment("setting up the local MPI/NCCL environment") {
+      val new_comm = mpi_comm
+      val values = modulemap.map{ case (key, (v1, v2)) => v2}.toList.toSet
+        if (values.size != 1) {
+          throw new Exception(s"All module must have equal number of devices")
+      }
+      //implicit val pos:SourceContext = SourceContext._sc
+      //implicit val overloaded80 = new Overloaded80
+      val msize:Int = values.head
+      val read_rank = readVar(rank)
+      // split the global communicator
+      val color = Wrap[Int](Adapter.g.reflect("/", Unwrap(read_rank), Backend.Const(msize)))
+      MPI_CHECK(mpi_comm_split(mpi_comm_world, color, read_rank, new_comm))
+      // get the local size and rank
+      val local_size = var_new(unit(0))
+      val local_rank = var_new(unit(0))
+      MPI_CHECK(mpi_comm_rank(new_comm, local_rank))
+      MPI_CHECK(mpi_comm_size(new_comm, local_size))
+
+      val local_commId = ncclUniqueId
+      ncclCheck(ncclGetUniqueId(local_commId))
+      MPI_CHECK(mpi_bcast_one(local_commId, ncclUniqueIdBytes, mpi_char, unit(0), new_comm))
+
+      val local_ncclcomm = ncclComm
+      ncclCheck(ncclCommInitRank(local_ncclcomm, readVar(local_size), local_commId, readVar(local_rank)))
+      (readVar(local_size), readVar(local_rank), readVar(size), readVar(rank), local_ncclcomm, comm, stream)
+    } else {
+      val mySize = readVar(size)
+      val myRank = readVar(rank)
+      (mySize, myRank, mySize, myRank, comm, comm, stream)
+    }
   }
 
+  // Local NCCL Size and Rank (for each module).
   def myNCCLSize(implicit __pos: SourceContext) = INT(Unwrap(myNCCLSizeRep))
   def myNCCLRank(implicit __pos: SourceContext) = INT(Unwrap(myNCCLRankRep))
+  // Global NCCL Size and Rank.
+  def globalNCCLSize(implicit __pos: SourceContext) = INT(Unwrap(globalNCCLSizeRep))
+  def globalNCCLRank(implicit __pos: SourceContext) = INT(Unwrap(globalNCCLRankRep))
   def myNCCLComm(implicit __pos: SourceContext) = TOP(Unwrap(myNCCLCommRep), manifest[ncclCommT])
+  def globalNCCLComm(implicit __pos: SourceContext) = TOP(Unwrap(globalNCCLCommRep), manifest[ncclCommT])
   def myNCCLStream(implicit __pos: SourceContext) = TOP(Unwrap(myNCCLStreamRep), manifest[cudaStreamT])
+  def myCUDADevice(implicit __pos: SourceContext) = INT(Unwrap(globalNCCLRankRep))
 
   def set_up_mpi_nccl(implicit pos: SourceContext) = {
     val dummy = myNCCLSize
     setupCublasCudnn(pos)
+    //setup_profiler(pos)
   }
   def finalize_mpi_nccl(implicit pos: SourceContext) = {
+    //finalize_profiler(pos)
     ncclCheck(ncclCommDestroy(myNCCLCommRep))
+    if (modulemap != null)
+      ncclCheck(ncclCommDestroy(globalNCCLCommRep))
     finalizeCublasCudnn(pos)
     MPI_CHECK(mpi_finalize())
   }
 
   var hasCublas = false
   var hasCudnn = false
+  var curModule:Backend.Sym = null
+  var modulemap:immutable.Map[Backend.Sym, (Int, Int)] = null
+  var sendmap:immutable.Map[String, Backend.Sym] = null
+  var recvmap:immutable.Map[String, Backend.Sym] = null
+  lazy val (start_event, stop_event) = {
+    val start = cudaEvent
+    val stop = cudaEvent
+    MPI_CHECK(mpi_barrier(mpi_comm_world))
+    cudaCall(cudaEventCreate(start))
+    cudaCall(cudaEventCreate(stop))
+    cudaCall(cudaEventRecord(start))
+    cudaProfilerStart()
+    (start, stop)
+  }
 
   def setupCublasCudnn(implicit pos: SourceContext): Unit = {
     if (hasCublas) set_up_cublas
@@ -219,6 +274,18 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
     if (hasCudnn) finalize_cudnn
   }
 
+  def setup_profiler(implicit pos: SourceContext):Unit = {
+    (start_event, stop_event)
+    ()
+  }
+  def finalize_profiler(implicit pos: SourceContext):Unit = {
+    cudaCall(cudaEventRecord(stop_event))
+    cudaCall(cudaEventSynchronize(stop_event))
+    cudaProfilerStop();
+    val time = var_new[Float](unit(0.0f))
+    cudaCall(cudaEventElapsedTime(time, start_event, stop_event))
+    printf("cuda event duration: %f\n", readVar(time));
+  }
   // lazy local function that initializes CUDNN
   lazy val (myCUDNNCommRep) = withComment("setting up the CUDNN environment") {
     val cudnn = cudnnHandle
@@ -287,47 +354,74 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       set_up_mpi_nccl
       myNCCLSize.x
 
+    // track the global_rank to set up MPI_NCCL
+    case Node(s, "global_rank", _, _) =>
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
+      set_up_mpi_nccl
+      globalNCCLRank.x
+
+    // track the global_size to set up MPI_NCCL
+    case Node(s, "global_size", _, _) =>
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
+      set_up_mpi_nccl
+      globalNCCLSize.x
+
     // track the world_finalize to finalize the MPI_NCCL
     case Node(s, "world_finalize", _, _) =>
       implicit val pos: SourceContext = Adapter.oldSourceMap(s)
       finalize_mpi_nccl
       Backend.Const(())
 
+    case Node(s, "module", Backend.Const(manno: Anno)::(b @ Block(in, y, ein, eff))::_, _) => {
+      implicit val pos: SourceContext = Adapter.oldSourceMap(s)
+      if (modulemap == null) {
+        traverse(b)
+        UNIT(Backend.Const(())).x
+      } else {
+        curModule = s
+        // module NCCLRank start and end
+        IF (globalNCCLRank >= modulemap(s)._1 && (globalNCCLRank < modulemap(s)._1 + modulemap(s)._2)) {
+          traverse(b)
+          UNIT(Backend.Const(()))
+        } { UNIT(Backend.Const(())) }.x
+      }
+    }
+
     case Node(s, "tensor_weight", Backend.Const(tt: TensorType)::Backend.Const(anno: Anno)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
       val count = numeral(sourceTensor.shapeSize)
-      gpu_scanner_array(count, sourceTensor.et, myNCCLRank, filenameFormat, filenameArgs.map(arg=>new TOP(transform(arg))):_*).x
+      gpu_scanner_array(count, sourceTensor.et, myCUDADevice, filenameFormat, filenameArgs.map(arg=>new TOP(transform(arg))):_*).x
 
     case Node(s, "tensor_weight", Backend.Const(tt: TensorType)::Backend.Const(anno: Anno)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
       val count = numeral(sourceTensor.shapeSize)
-      gpu_random_array(count, sourceTensor.et, myNCCLRank).x
+      gpu_random_array(count, sourceTensor.et, myCUDADevice).x
 
     case Node(s, "tensor_input", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(filenameFormat:String)::(filenameArgs:List[Backend.Exp]), _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
       val count = numeral(sourceTensor.shapeSize)
-      gpu_scanner_array(count, sourceTensor.et, myNCCLRank, filenameFormat, filenameArgs.map(arg=>new TOP(transform(arg))):_*).x
+      gpu_scanner_array(count, sourceTensor.et, myCUDADevice, filenameFormat, filenameArgs.map(arg=>new TOP(transform(arg))):_*).x
 
     case Node(s, "tensor_input", Backend.Const(tt: TensorType)::Backend.Const(anno: Anno)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
       val count = numeral(sourceTensor.shapeSize)
-      gpu_random_array(count, sourceTensor.et, myNCCLRank).x
+      gpu_random_array(count, sourceTensor.et, myCUDADevice).x
 
     case Node(s, "tensor_zeros", Backend.Const(tt: TensorType)::Backend.Const(anno: Anno)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
       val count = numeral(sourceTensor.shapeSize)
-      gpu_fixed_array(count, myNCCLRank, NUM(Backend.Const(0), sourceTensor.et)).x
+      gpu_fixed_array(count, myCUDADevice, NUM(Backend.Const(0), sourceTensor.et)).x
 
     case Node(s, "tensor_ones", Backend.Const(tt: TensorType)::Backend.Const(anno: Anno)::_, _) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
       implicit val pos: SourceContext = sourceTensor.pos
       val count = numeral(sourceTensor.shapeSize)
-      gpu_fixed_array(count, myNCCLRank, NUM(Backend.Const(1), sourceTensor.et)).x
+      gpu_fixed_array(count, myCUDADevice, NUM(Backend.Const(1), sourceTensor.et)).x
 
     case Node(s, "save_tensor", (tensor:Backend.Exp)::_, _) =>
       implicit val pos = Adapter.oldSourceMap(s)
@@ -345,7 +439,7 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       implicit val pos = Adapter.oldSourceMap(s)
       val sourceTensor = new TENSOR(tensor, useOldMetadata = true)
       val count = numeral(sourceTensor.resultType.shapeSize)
-      check_gpu_array(new ARRAY(transform(tensor)), count, sourceTensor.et, myNCCLRank, name, xs.map(transform):_*)
+      check_gpu_array(new ARRAY(transform(tensor)), count, sourceTensor.et, myCUDADevice, name, xs.map(transform):_*)
       Backend.Const(())
 
     case Node(s, "tensor_result", tt::anno::(x:Backend.Sym)::Backend.Const(i:Int)::_, _) => // subst(s)
@@ -385,6 +479,15 @@ abstract class DistributeTensor2MPI_NCCLBase extends Transformer with MPIOps wit
       analysis.apply(graph)
       hasCublas = analysis.hasCublas
       hasCudnn = analysis.hasCudnn
+      modulemap = if (analysis.modulemap.size > 1) analysis.modulemap.toMap else null
+      sendmap = if (!analysis.sendmap.isEmpty) analysis.sendmap.toMap else null
+      recvmap = if (!analysis.recvmap.isEmpty) analysis.recvmap.toMap else null
+      if (modulemap != null) {
+        val values = modulemap.map{ case (key, (v1, v2)) => v2}.toList.toSet
+        if (values.size != 1) {
+          throw new Exception(s"All module must have equal number of devices")
+        }
+      }
 
       super.transform(graph)
     } finally {

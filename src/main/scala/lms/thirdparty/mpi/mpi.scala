@@ -17,6 +17,7 @@ trait MPIOps extends CMacro with LibStruct with LibFunction {
   class MPIComm
   def mpi_comm_world: Rep[MPIComm] = cmacro[MPIComm]("MPI_COMM_WORLD")
   def mpi_max_processor_name: Rep[Int] = cmacro[Int]("MPI_MAX_PROCESSOR_NAME")
+  def mpi_comm: Rep[MPIComm] = newStruct[MPIComm]("MPI_Comm")
 
   class CNull
   def cNull: Rep[CNull] = cmacro[CNull]("NULL")
@@ -39,6 +40,9 @@ trait MPIOps extends CMacro with LibStruct with LibFunction {
 
   def mpi_barrier(world: Rep[MPIComm]) =
     libFunction[Int]("MPI_Barrier", Unwrap(world))(Seq(0), Seq[Int](), Set[Int](), Adapter.CTRL)
+
+  def mpi_comm_split(comm: Rep[MPIComm], color: Rep[Int], key: Rep[Int], newcomm: Rep[MPIComm]) =
+    libFunction[Int]("MPI_Comm_split", Unwrap(comm), Unwrap(color), Unwrap(key), Unwrap(newcomm))(Seq(0,1,2), Seq(3), Set(3), Adapter.CTRL)
 
   class MPIDataType
   def mpi_datatype_null: Rep[MPIDataType] = cmacro[MPIDataType]("MPI_DATATYPE_NULL")

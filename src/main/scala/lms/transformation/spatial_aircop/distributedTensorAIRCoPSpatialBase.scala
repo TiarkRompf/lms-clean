@@ -25,15 +25,21 @@ abstract class DistributeTensorAIRCoPSpatialBase extends Transformer with MPIOps
 
   def numeral(size: Seq[Int]) = size.foldLeft(1)(_ * _)
 
-  lazy val (worldSize, worldRank) = {
+  lazy val (worldSize, worldRank, globalSize, globalRank) = {
     val (s, r) = (Wrap[Int](g.reflectEffect("world_size")()(Adapter.CTRL)), Wrap[Int](g.reflectEffect("world_rank")()(Adapter.CTRL)))
+    val (m, n) = (Wrap[Int](g.reflectEffect("global_size")()(Adapter.CTRL)), Wrap[Int](g.reflectEffect("global_rank")()(Adapter.CTRL)))
     Adapter.sourceMap(Unwrap(s)) = SourceContext("", "", 0, 0, "", Some("")) // FIXME(feiw): pos??
     Adapter.sourceMap(Unwrap(r)) = SourceContext("", "", 0, 0, "", Some(""))
-    (s, r)
+    Adapter.sourceMap(Unwrap(m)) = SourceContext("", "", 0, 0, "", Some(""))
+    Adapter.sourceMap(Unwrap(n)) = SourceContext("", "", 0, 0, "", Some(""))
+    (s, r, m, n)
   }
 
   def myMPISize(implicit pos: SourceContext) = INT(Unwrap(worldSize))
   def myMPIRank(implicit pos: SourceContext) = INT(Unwrap(worldRank))
+
+  def globalMPISize(implicit pos: SourceContext) = INT(Unwrap(globalSize))
+  def globalMPIRank(implicit pos: SourceContext) = INT(Unwrap(globalRank))
 
   def setup_mpi(implicit pos: SourceContext) = { val dummy = worldSize }
   def finalize_mpi(implicit pos: SourceContext) = {
@@ -152,6 +158,7 @@ abstract class DistributeTensorAIRCoPSpatialBase extends Transformer with MPIOps
 
       anno match {
         case NAnno => throw new Exception(s"TODO: not yet handling NAnno in save_tensor")
+        // Fixme: gather to GPU0
         case SAnno(dim: Dim, devices: Seq[Device], _) if tt.contains(dim) => throw new Exception(s"todo, gather tensor to GPU0")
         case SAnno(dim: Dim, devices: Seq[Device], _) =>
           IF (EQUAL(myMPIRank, INT(0))) {

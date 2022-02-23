@@ -126,6 +126,8 @@ object BaseTypeLess {
   class BOOL(override val x: Backend.Exp) extends TOP(x) {
     Adapter.typeMap(x) = manifest[Boolean]
     def unary_!(implicit __pos: SourceContext) = BOOL(Adapter.g.reflect("!",x))
+    def &&(y: BOOL)(implicit pos: SourceContext): BOOL =
+      BOOL(Adapter.g.reflect("&&", x, y.x))
   }
   def BOOL(x: Backend.Exp)(implicit __pos: SourceContext): BOOL = (new BOOL(x)).withSource(__pos)
 
@@ -926,6 +928,11 @@ object PrimitiveTypeLess {
     def >(y: NUM)(implicit pos: SourceContext): BOOL = {
       assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
       BOOL(Adapter.g.reflect(">", x, y.x))
+    }
+
+    def >=(y: NUM)(implicit pos: SourceContext): BOOL = {
+      assert(t == y.t, s"t ${t} is not the same as y.t ${y.t}")
+      BOOL(Adapter.g.reflect(">=", x, y.x))
     }
 
     def tanh()(implicit pos: SourceContext): NUM = {

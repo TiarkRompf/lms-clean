@@ -185,6 +185,7 @@ void Snippet(int x0) {
     float x58 = 0.0;
     CUDNNCHECK(cudnnConvolutionBackwardFilter(x7, &x57, x37, x36, x40, x50, x39, x54, x56, x55, &x58, x38, x51));
     // end convolution backward filter pass
+    CUDA_CALL(cudaStreamSynchronize(0));
     ncclAllReduce(x51, x51, (size_t)18, ncclFloat32, ncclSum, x4, x5);
     CUDA_CALL(cudaStreamSynchronize(x5));
     // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x240

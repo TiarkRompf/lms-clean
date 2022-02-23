@@ -52,6 +52,36 @@ trait DistributeTensorAIRCoPSpatialMutation extends DistributeTensorAIRCoPSpatia
       val x_operand = new TENSOR(transform(x))
       AllReduceInPlace(x_operand, devices, mode).x
 
+    case Node(s, "tensorarray_zeros", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(length:Int)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+      anno match {
+        case NAnno => if (myMPIRank == 0) ZEROS(tt, NAnno).x else Backend.Const(())
+        case SAnno(dim: Dim, devices: Seq[Device], _) =>
+          ZEROSARRAY(tt.splitBy(anno), NAnno, length).x
+          // no need to all reduce, all 0s.
+        case a => throw new Exception(s"annotation $a is not yet handled in tensorarray_zeros")
+      }
+    case Node(s, "tensor_array_get", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::(i:Backend.Sym)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+      val operand_array = new TENSORARRAY(x, useOldMetadata = true)
+      val operand_anno = operand_array.annotation
+      if (anno != operand_anno) {
+        throw new Exception(s"Annotation ${anno} and ${operand_anno} mismatch!");
+      }
+      val array = new TENSORARRAY(transform(x))
+      val index = new INT(transform(i))
+      TENSORARRAY.get(array, index).x
+    case Node(s, "tensor_array_set", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::(i:Backend.Sym)::(y:Backend.Sym)::_, _) =>
+      implicit val pos = Adapter.oldSourceMap(s)
+      val operand_array = new TENSORARRAY(x, useOldMetadata = true)
+      val operand_anno = operand_array.annotation
+      if (anno != operand_anno) {
+        throw new Exception(s"Annotation ${anno} and ${operand_anno} mismatch!");
+      }
+      val array = new TENSORARRAY(transform(x))
+      val index = new INT(transform(i))
+      val value = get_operand(y, anno)
+      TENSORARRAY.set(array, index, value).x
     case _ => super.transform(n)
   }
 }

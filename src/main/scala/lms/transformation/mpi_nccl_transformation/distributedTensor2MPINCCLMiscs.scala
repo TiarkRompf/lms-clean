@@ -42,7 +42,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       val size = numeral(shape)
       val output = withComment(s"allocating gpu array of size $size and type Float for the output of maskedfill") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("calling masked fill kernel") {
@@ -62,7 +62,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val mask_tensor = get_operand(mask, anno)
       val size = numeral(shape)
       val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of masked fill") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("calling masked fill gradient kernel") {
@@ -82,7 +82,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       val size = numeral(shape)
       val output = withComment(s"allocating gpu array of size $size and type Float for the output of logsoftmax") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("calling softmax kernel") {
@@ -103,7 +103,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       val size = numeral(shape)
       val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of logsoftmax") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("calling softmax gradient kernel") {
@@ -123,10 +123,10 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       val shape = tensor_shape(operand, useOldMetadata = true)
       val input_tensor = get_operand(operand, anno)
-      
+
       val size = numeral(shape)
       val output = withComment(s"allocating gpu array of size $size and type Float for the output of transpose") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("calling transpose kernel") {
@@ -148,7 +148,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
 
       val size = numeral(shape)
       val output = withComment(s"allocating gpu array of size $size and type Float for the output of permute") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("calling permute kernel") {
@@ -176,7 +176,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val output_size = numeral(output_shape)
 
       val output = withComment(s"allocating gpu array of size $output_size and type Float for the output of embedding") {
-        gpu_array(output_size, manifest[Float], myNCCLRank)
+        gpu_array(output_size, manifest[Float], myCUDADevice)
       }
 
       withComment("calling embedding kernel") {
@@ -207,7 +207,7 @@ trait DistributeTensor2MPI_NCCLMiscs extends DistributeTensor2MPI_NCCLBase with 
       val dinput_size = numeral(dinput_shape)
 
       val dinput = withComment(s"allocating gpu array of size $dinput_size and type Float for the gradient input of embedding") {
-        gpu_fixed_array(dinput_size, myNCCLRank, NUM(Backend.Const(0), m))
+        gpu_fixed_array(dinput_size, myCUDADevice, NUM(Backend.Const(0), m))
       }
 
       withComment("calling embedding gradient kernel") {

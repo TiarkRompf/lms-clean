@@ -13,26 +13,21 @@ import lms.transformation.util.DataStructure
 import Backend._
 
 
-// lower Tensor computations to Array computations
-// respect device allocation (simple distinction of GPU and CPU)
-abstract class DistributeTensorDimName extends Transformer with DataStructure {
-  override val name = "DistributedTensorDimName"
-
-  import PrimitiveTypeLess._
-  import ArrayTypeLess._
-  import ArrayCPUTypeLess._
+class DimNameAnalysis extends Traverser {
   import FixedSizeDistributedTensorTypeLess._
-  import CUDATypeLess._
-  import CUBLASTypeLess._
+  import DataStructure._
 
-  // set up a Dim name USets
   var dim_names: USets[Dim] = null
 
-  override def traverse(ns: Seq[Node], res: Block): Unit = {
-    // add some analysis here before traversing each node
-    // Step 1: collect all dim names in this block
+  override def apply(g: Graph): Unit = {
+    val oldDefsCache = Adapter.oldDefsCache
+    val oldTypeMap = Adapter.oldTypeMap
+    val oldSourceMap = Adapter.oldSourceMap
+    Adapter.oldDefsCache = g.globalDefsCache
+    Adapter.oldTypeMap = Adapter.typeMap
+    Adapter.oldSourceMap = Adapter.sourceMap
     val all_dims = scala.collection.mutable.ArrayBuffer[Dim]()
-    ns.foreach(n => n match {
+    g.nodes.foreach(n => n match {
       case Node(s, op, _, _) if op.startsWith("tensor_") =>
         val resultType = (new TENSOR(s, useOldMetadata = true)).resultType
         all_dims ++= resultType.shape.map(_.dim)
@@ -44,13 +39,31 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     })
     dim_names = new USets[Dim](all_dims.toList)
 
-    // Step 2: analyze the dim name relations here (i.e. operation enforces dims
-    //         to have the same size)
-    ns.foreach(n => mergable_dims(n).foreach { case (d0, d1) => dim_names.merge(d0, d1) })
-
-    // Step 3: traversing each node to update dim names
-    ns.foreach(traverse)
+    super.apply(g)
+    Adapter.oldDefsCache = oldDefsCache
+    Adapter.oldTypeMap = oldTypeMap
+    Adapter.oldSourceMap = oldSourceMap
   }
+
+  override def traverse(n: Node): Unit = {
+    mergable_dims(n).foreach { case (d0, d1) => dim_names.merge(d0, d1) }
+    super.traverse(n)
+  }
+}
+
+abstract class DistributeTensorDimName extends Transformer {
+  import DataStructure._
+  override val name = "DistributedTensorDimName"
+
+  import PrimitiveTypeLess._
+  import ArrayTypeLess._
+  import ArrayCPUTypeLess._
+  import FixedSizeDistributedTensorTypeLess._
+  import CUDATypeLess._
+  import CUBLASTypeLess._
+
+  // set up a Dim name USets
+  var dim_names: USets[Dim] = null
 
   def update_dim_name(tt: TensorType): TensorType = TensorType(tt.shape.map{case Size(d, s) =>
         Size(dim_names.union_map.getOrElse(d, d), s)}, tt.et)
@@ -67,7 +80,7 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
         case b @ Block(_,_,_,_) => transform(b)
         case s: Backend.Sym => transform(s)
         case Backend.Const(a: TensorType) => Backend.Const(update_dim_name(a))
-        case Backend.Const(a: List[TensorType]) => 
+        case Backend.Const(a: List[TensorType]) =>
           if (a(0).isInstanceOf[TensorType]) Backend.Const(a.map(update_dim_name)) else Backend.Const(a)
         case Backend.Const(a: Anno) => Backend.Const(update_dim_name(a))
         case a => a
@@ -88,6 +101,11 @@ abstract class DistributeTensorDimName extends Transformer with DataStructure {
     Adapter.g = g
 
     try {
+      val analysis = new DimNameAnalysis
+      analysis.apply(graph)
+      assert(dim_names == null)
+      dim_names = analysis.dim_names
+
       super.transform(graph)
     } finally {
       g = null; Adapter.g = null

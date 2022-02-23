@@ -284,7 +284,7 @@ class NCCLTest extends TutorialFunSuite {
         ncclCheck(ncclCommInitRank(comm, nRanks, id, myRank))
 
         // communicating using NCCL (send-recv)
-        
+
         val peer = if (myRank == 0) { 1 } else { 0 }
         ncclSendRecv(sendbuff, recvbuff, size, ncclFloat, peer, comm, s)
 
@@ -582,4 +582,3 @@ class NCCLTest extends TutorialFunSuite {
     check("p2p-all2all", driver.code, "cu")
   }
 }
-
