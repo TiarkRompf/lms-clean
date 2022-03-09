@@ -517,7 +517,10 @@ abstract class Transformer extends Traverser {
   def transform(n: Node): Exp = n match {
     case Node(s, "λ", (b @ Block(in, y, ein, eff))::rest, _) =>
       // need to deal with recursive binding! yes!
-      g.reflect(subst(s).asInstanceOf[Sym], "λ", (transform(b)+:transformRHS(rest)):_*)()
+      val s1 = subst(s).asInstanceOf[Sym]
+      if (!g.globalDefsCache.contains(s1))
+        g.reflect(s1, "λ", (transform(b)+:transformRHS(rest)):_*)()
+      else s1
     case Node(s,op,rs,es) =>
       // effect dependencies in target graph are managed by
       // graph builder, so we drop all effects here
@@ -553,6 +556,7 @@ abstract class Transformer extends Traverser {
         case _ =>
       }
     }
+
     // Handling MetaData 1. save oldTypeMap/SourceMap first
     Adapter.oldDefsCache = graph.globalDefsCache
     Adapter.oldTypeMap = Adapter.typeMap
