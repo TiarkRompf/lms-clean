@@ -17,6 +17,9 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
     case Const(scala.Int.MinValue) => "0x" + scala.Int.MinValue.toHexString
     case Const(scala.Long.MinValue) => "0x" + scala.Long.MinValue.toHexString + "L"
     case Const(x: Double) if x.isNaN => "NAN"
+    case Const(x: Double) if x.isInfinity => "INFINITY"
+    case Const(x: Float) if x.isNaN => "NAN"
+    case Const(x: Float) if x.isInfinity => "INFINITY"
     case Const(null) => "NULL"
     case Const(c: Char) if c.toInt < 0x20 || c.toInt > 0x7F =>
       val res = super.quote(x) // if escaped
