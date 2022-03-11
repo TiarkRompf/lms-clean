@@ -772,36 +772,45 @@ class DeadCodeElimCG extends Phase {
 
   def apply(g: Graph): Graph = utils.time("DeadCodeElimCG") {
 
-    live = new mutable.HashSet[Sym]
-    reach = new mutable.HashSet[Sym]
+    val s_live = new mutable.BitSet
+    val s_reach = new mutable.BitSet
     statics = new mutable.HashSet[Node]
     var newNodes: List[Node] = Nil
-    val used = new mutable.HashSet[Exp]
+    val used = new mutable.BitSet
     var size = 0
 
     // First pass liveness and reachability
     // Only a single pass that reduce input size and first step of the next loop
     utils.time("A_First_Path") {
-      reach ++= g.block.used
+      s_reach ++= g.block.used.map(_.n)
       if (g.block.res.isInstanceOf[Sym]) {
-        live += g.block.res.asInstanceOf[Sym]
-        used += g.block.res.asInstanceOf[Sym]
+        s_live += g.block.res.asInstanceOf[Sym].n
+        used += g.block.res.asInstanceOf[Sym].n
       }
-      used ++= g.block.bound
+      used ++= g.block.bound.map(_.n)
       for (d <- g.nodes.reverseIterator) {
-        if (reach(d.n)) {
+        if (s_reach(d.n.n)) {
           val nn = d match {
-            case n @ Node(s, "?", c::(a:Block)::(b:Block)::t, eff) if !live(s) =>
+            case n @ Node(s, "?", c::(a:Block)::(b:Block)::t, eff) if !s_live(s.n) =>
               n.copy(rhs = c::a.copy(res = Const(()))::b.copy(res = Const(()))::t) // remove result deps if dead
             case _ => d
           }
-          live ++= valueSyms(nn)
-          reach ++= hardSyms(nn)
+          s_live ++= valueSyms(nn).map(_.n)
+          s_reach ++= hardSyms(nn).map(_.n)
 
           newNodes = nn::newNodes
         }
       }
     }
+
+    live = s_live.toList.map(Sym(_)).toSet
+    reach = s_reach.toList.map(Sym(_)).toSet
+
+    val filterSym : Exp => Boolean =
+      exp => exp match {
+       case(Sym(_)) => true
+       case _ => false
+      }
 
     // Second pass remove unused variables
     var idx: Int = 1
@@ -809,32 +818,38 @@ class DeadCodeElimCG extends Phase {
       utils.time(s"Extra_Path_$idx") {
         size = used.size
         for (d <- newNodes.reverseIterator) {
-          if (used(d.n)) {
-            used ++= valueSyms(d)
-          } else if (d.eff.hasSimpleEffect || d.eff.wkeys.exists(used)) {
-            used += d.n
-            used ++= valueSyms(d)
+          if (used(d.n.n)) {
+            used ++= valueSyms(d).map(_.n)
+          } else if (d.eff.hasSimpleEffect || d.eff.wkeys.filter(filterSym).map(_.asInstanceOf[Sym].n).exists(used)) {
+            used += d.n.n
+            used ++= valueSyms(d).map(_.n)
           }
         }
       }
       idx += 1
     }
 
+    val filterkey : Exp => Boolean =
+      key => key match {
+        case Sym(n) => used(n)
+        case _ => true
+      }
+
     utils.time(s"Recreate_the_graph") {
       var newGlobalDefsCache = Map[Sym,Node]()
-      newNodes = for (d <- newNodes if used(d.n)) yield {
+      newNodes = for (d <- newNodes if used(d.n.n)) yield {
         newGlobalDefsCache += d.n -> d
         if (d.op == "staticData") statics += d
         if (fixDeps)
           d.copy(rhs = d.rhs.map {
-            case b: Block => b.copy(eff = b.eff.filter(used))
+            case b: Block => b.copy(eff = b.eff.filter(filterkey))
             case o => o
-          }, eff = d.eff.filter(used))
+          }, eff = d.eff.filter(filterkey))
         else
           d
       }
       val newBlock = if (fixDeps)
-        g.block.copy(eff = g.block.eff.filter(used))
+        g.block.copy(eff = g.block.eff.filter(filterkey))
       else
         g.block
 
