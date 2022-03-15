@@ -8,6 +8,8 @@ import lms.collection.mutable._
 import lms.macros.SourceContext
 import lms.thirdparty.{RandomDataTypeLess, NCCLTypeLess, MPIOps, NCCLOps, SIZE_TTypeLess, CUDNNOps,CUDNNTypeLess,CLibTypeLess}
 
+object DataStructure extends DataStructure
+
 trait DataStructure {
 
   /**

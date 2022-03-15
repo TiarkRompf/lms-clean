@@ -170,6 +170,7 @@ void Snippet(int x0) {
   float x41 = 0.0;
   CUDNNCHECK(cudnnConvolutionBackwardFilter(x7, &x40, x19, x18, x22, x33, x21, x37, x39, x38, &x41, x20, x34));
   // end convolution backward filter pass
+  CUDA_CALL(cudaStreamSynchronize(0));
   ncclAllReduce(x34, x34, (size_t)18, ncclFloat32, ncclSum, x4, x5);
   CUDA_CALL(cudaStreamSynchronize(x5));
   // begin computing ACCUM on GPU for size 18 and type Float at device (pre-rename) x39 with base_operand x67 and addition_operand x235
@@ -201,10 +202,10 @@ void Snippet(int x0) {
   float x56 = 0.0;
   CUDNNCHECK(cudnnConvolutionBackwardData(x7, &x55, x20, x9, x22, x33, x21, x52, x54, x53, &x56, x19, x49));
   // end convolution backward data pass
-  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x199 and addition_operand x316
+  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x199 and addition_operand x318
   CUDA_CALL(cudaSetDevice(x6));
   x42<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x31, x49, 81);
-  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x199 and addition_operand x316
+  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x199 and addition_operand x318
   // begin checking GPU array of size 18 and type Float
   float* x57 = (float*)malloc(18 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x57, x10, (size_t)(18 * sizeof(float)), cudaMemcpyDeviceToHost));

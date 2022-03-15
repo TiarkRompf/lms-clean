@@ -39,8 +39,10 @@ object CUBLASTypeLess extends Dsl with CLibs {
 
     def CUBLAS_CREATE(handle: CUBLAS_HANDLE)(implicit __pos: SourceContext) =
     CUBLAS_CALL(Unwrap(libFunction[Any]("cublasCreate", handle.x)(Seq[Int](), Seq(0), Set(0))))
-    def CUBLAS_DESTROY(handle: CUBLAS_HANDLE)(implicit __pos: SourceContext) =
+    def CUBLAS_DESTROY(handle: CUBLAS_HANDLE)(implicit __pos: SourceContext) = {
+    cache = None
     CUBLAS_CALL(Unwrap(libFunction[Any]("cublasDestroy", handle.x)(Seq[Int](), Seq(0), Set[Int]())))
+    }
 
     class CUBLAS_OPERATION(override val x: Backend.Exp) extends TOP(x)
     def CUBLAS_OPERATION(x: TOP) = new CUBLAS_OPERATION(x.x)

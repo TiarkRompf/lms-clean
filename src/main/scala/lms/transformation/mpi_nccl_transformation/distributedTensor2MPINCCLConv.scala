@@ -165,7 +165,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val output_size = numeral(output_shape)
       val output = withComment(s"allocating gpu array of size $output_size and type Float for the output of convolution") {
-        gpu_array(output_size, manifest[Float], myNCCLRank)
+        gpu_array(output_size, manifest[Float], myCUDADevice)
       }
 
       val convAlgo = withComment("finding convolution forward algorithm") {
@@ -184,7 +184,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("begin finding convolution backward workspace size")
 
       val d_workspace = withComment("allocating gpu array for convolution forward workspace") {
-        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myCUDADevice)
       }
 
       withComment("convolution forward pass") {
@@ -214,7 +214,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val dweight_size = numeral(weight_shape)
       val dweight = withComment(s"allocating gpu array of size $dweight_size and type Float for the gradient weight of convolution") {
-        gpu_array(dweight_size, manifest[Float], myNCCLRank)
+        gpu_array(dweight_size, manifest[Float], myCUDADevice)
       }
 
       val convAlgo = withComment("finding convolution backward data algorithm") {
@@ -233,7 +233,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding convolution backward data workspace size")
 
       val d_workspace = withComment("allocating gpu array for convolution backward data workspace") {
-        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myCUDADevice)
       }
 
       withComment("convolution backward data pass") {
@@ -263,7 +263,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val dfilter_size = numeral(filter_shape)
       val dfilter = withComment(s"allocating gpu array of size $dfilter_size and type Float for the gradient filter of convolution") {
-        gpu_array(dfilter_size, manifest[Float], myNCCLRank)
+        gpu_array(dfilter_size, manifest[Float], myCUDADevice)
       }
 
       val convAlgo = withComment("finding convolution backward filter algorithm") {
@@ -282,7 +282,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding convolution backward filter workspace size")
 
       val d_workspace = withComment("allocating gpu array for convolution backward filter workspace") {
-        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myNCCLRank)
+        GPU_ARRAY_BY_BYTE(INT(workspace_bytes_v(pos)), manifest[Float], myCUDADevice)
       }
 
       withComment("convolution backward filter pass") {
@@ -304,7 +304,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val size = numeral(input_shape)
       val output = withComment(s"allocating gpu array of size $size and type Float for the output of softmax") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("softmax forward pass") {
@@ -329,7 +329,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val size = numeral(output_shape)
       val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of softmax") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("softmax backward pass") {
@@ -354,7 +354,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val size = numeral(input_shape)
       val output = withComment(s"allocating gpu array of size $size and type Float for the output of softmax") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("activation forward pass") {
@@ -382,7 +382,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
 
       val size = numeral(input_shape)
       val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of activation") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("activation backward pass") {
@@ -417,11 +417,11 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding dropout forward states bytes")
 
       val d_reservespace = withComment("allocating gpu array for the reserve space of dropout forward") {
-        GPU_ARRAY_BY_BYTE(INT(reserve_bytes(pos)), manifest[Float], myNCCLRank)
+        GPU_ARRAY_BY_BYTE(INT(reserve_bytes(pos)), manifest[Float], myCUDADevice)
       }
 
       val d_states = withComment("allocating gpu array for the states of dropout forward") {
-        GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
+        GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myCUDADevice)
       }
 
       val dropout_descriptor = getDropoutDescriptor(d_states, states_bytes, params.asInstanceOf[DropoutParam])
@@ -429,7 +429,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       // allocate output tensor
       val size = numeral(input_shape)
       val output = withComment(s"allocating gpu array of size $size and type Float for the output of dropout") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("dropout forward pass") {
@@ -457,7 +457,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val size = numeral(doutput_shape)
 
       val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of dropout") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       generate_comment("begin finding dropout backward reserve bytes")
@@ -471,7 +471,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       generate_comment("end finding dropout backward states bytes")
 
       val d_states = withComment("allocating gpu array for the states of dropout backward") {
-        GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myNCCLRank)
+        GPU_ARRAY_BY_BYTE(INT(states_bytes(pos)), manifest[Float], myCUDADevice)
       }
 
       val dropout_descriptor = getDropoutDescriptor(d_states, states_bytes, params.asInstanceOf[DropoutParam])
@@ -502,7 +502,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val size = numeral(output_shape)
 
       val output = withComment(s"allocating gpu array of size $size and type Float for the output of pooling") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("pooling forward pass") {
@@ -535,7 +535,7 @@ trait DistributeTensor2MPI_NCCLConv extends DistributeTensor2MPI_NCCLBase with C
       val size = numeral(input_shape)
 
       val dinput = withComment(s"allocating gpu array of size $size and type Float for the gradient input of pooling") {
-        gpu_array(size, manifest[Float], myNCCLRank)
+        gpu_array(size, manifest[Float], myCUDADevice)
       }
 
       withComment("pooling backward pass") {

@@ -509,6 +509,12 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   def cudaSetDevice(device: Rep[Int]) =
     libFunction[CudaErrorT]("cudaSetDevice", Unwrap(device))(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
 
+  def cudaProfilerStart() =
+    libFunction[Unit]("cudaProfilerStart")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+
+  def cudaProfilerStop() =
+    libFunction[Unit]("cudaProfilerStop")(Seq[Int](), Seq[Int](), Set[Int](), Adapter.CTRL)
+
   class cudaStreamT
   def cudaStream: Rep[cudaStreamT] = newStruct[cudaStreamT]("cudaStream_t")
 
@@ -526,6 +532,8 @@ trait CudaOps extends Dsl with StackArrayOps with SizeTOps with CLibs with CudaF
   // __host__ ​cudaError_t cudaStreamSynchronize ( cudaStream_t stream ) // Waits for stream tasks to complete.
   def cudaStreamSynchronize(stream: Rep[cudaStreamT]) =
     libFunction[CudaErrorT]("cudaStreamSynchronize", Unwrap(stream))(Seq(0), Seq(0), Set[Int]())
+  def cudaStreamSynchronizeDefaultStream() =
+    libFunction[CudaErrorT]("cudaStreamSynchronize", Backend.Const(0))(Seq(0), Seq(0), Set[Int]())
 
 
   // cudaGetDeviceCount(&deviceCount)
@@ -1860,6 +1868,7 @@ trait CudaLibs extends CudaOps {
 trait CCodeGenCudaOps extends CCodeGenSizeTOps with CudaCodeGenLibFunction with CCodeGenLibs {
   // need to register the headers
   registerHeader("\"cuda_header.h\"")
+  //registerHeader("\"cuda_profiler_api.h\"")
 
   override def mayInline(n: Node): Boolean = n match {
     case Node(s, "NewSharedArray", _, _) => false

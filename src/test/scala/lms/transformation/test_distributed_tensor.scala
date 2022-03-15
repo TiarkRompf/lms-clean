@@ -594,4 +594,3 @@ class FixedSizeDistributedTensorTest extends TutorialFunSuite {
     checkWithLogPath("embedding", driver.code, "cu", driver.setLogPath)
   }
 }
-

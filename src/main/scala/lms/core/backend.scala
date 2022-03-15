@@ -381,7 +381,7 @@ class GraphBuilder {
         val ((rk, wk), (prk, pwk), _) = getFunctionLatentEffect(out)
         val ((rk2, wk2), (prk2, pwk2), _) = getFunctionLatentEffect(out2)
         ((rk ++ rk2, wk ++ wk2), (prk ++ prk2, pwk ++ pwk2), None) // FIXME(feiw)
-      case Some(Node(_, "module", (b:Block)::_, _)) =>
+      case Some(Node(_, "module", Const(manno)::(b:Block)::_, _)) =>
         getEffKeysWithParam(b)
       case Some(e) => throw new Exception(s"not yet handling node $e in getFunctionLatentEffect")
         // FIXME what about @, ?, array_apply => conservative write on all args?

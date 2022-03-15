@@ -73,7 +73,7 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
       val count2 = numeral(tt.shapeSize)
       val leftShape = leftTensorType.shapeSize
       val rightShape = rightTensorType.shapeSize
-      gpu_dot_array(count2, m, myNCCLRank, transform(left), transform(right), leftShape(0), rightShape(1), leftShape(1)).x
+      gpu_dot_array(count2, m, myCUDADevice, transform(left), transform(right), leftShape(0), rightShape(1), leftShape(1)).x
 
     case Node(s, "tensor_dot_with_transpose", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(transL:Boolean)::Backend.Const(transR:Boolean)::(left:Backend.Sym)::(right:Backend.Sym)::_,_) =>
       val sourceTensor = new TENSOR(s, useOldMetadata = true)
@@ -92,7 +92,7 @@ trait DistributeTensor2MPI_NCCLGemm extends DistributeTensor2MPI_NCCLBase {
       val count2 = numeral(tt.shapeSize)
       val leftShape = leftTensorType.shapeSize
       val rightShape = rightTensorType.shapeSize
-      gpu_dot_array_with_transpose(count2, m, myNCCLRank, transform(left), transL, transform(right), transR,
+      gpu_dot_array_with_transpose(count2, m, myCUDADevice, transform(left), transL, transform(right), transR,
         if (transL) leftShape(1) else leftShape(0), if (transR) rightShape(0) else rightShape(1), if (transL) leftShape(0) else leftShape(1)).x
 
     case _ => super.transform(n)

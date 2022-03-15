@@ -114,6 +114,7 @@ void Snippet(int x0) {
   float x27 = 0.0;
   CUBLAS_CALL(cublasSgemm(x7, CUBLAS_OP_N, CUBLAS_OP_T, 16, 13, 16, &x26, x24, 16, x18, 13, &x27, x25, 16));
   // end computing DOT on GPU for size 208 and type Float at device (pre-rename) x39 with left_operand x106 and right_operand x162 with transpose options
+  CUDA_CALL(cudaStreamSynchronize(0));
   ncclAllReduce(x25, x25, (size_t)208, ncclFloat32, ncclSum, x4, x5);
   CUDA_CALL(cudaStreamSynchronize(x5));
   // begin computing ACCUM on GPU for size 208 and type Float at device (pre-rename) x39 with base_operand x65 and addition_operand x175
@@ -128,10 +129,10 @@ void Snippet(int x0) {
   float x37 = 0.0;
   CUBLAS_CALL(cublasSgemm(x7, CUBLAS_OP_T, CUBLAS_OP_N, 13, 16, 16, &x36, x9, 16, x24, 16, &x37, x35, 13));
   // end computing DOT on GPU for size 208 and type Float at device (pre-rename) x39 with left_operand x162 and right_operand x48 with transpose options
-  // begin computing ACCUM on GPU for size 208 and type Float at device (pre-rename) x39 with base_operand x139 and addition_operand x234
+  // begin computing ACCUM on GPU for size 208 and type Float at device (pre-rename) x39 with base_operand x139 and addition_operand x236
   CUDA_CALL(cudaSetDevice(x6));
   x28<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x22, x35, 208);
-  // end computing ACCUM on GPU for size 208 and type Float at device (pre-rename) x39 with base_operand x139 and addition_operand x234
+  // end computing ACCUM on GPU for size 208 and type Float at device (pre-rename) x39 with base_operand x139 and addition_operand x236
   // begin checking GPU array of size 208 and type Float
   float* x38 = (float*)malloc(208 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x38, x10, (size_t)(208 * sizeof(float)), cudaMemcpyDeviceToHost));

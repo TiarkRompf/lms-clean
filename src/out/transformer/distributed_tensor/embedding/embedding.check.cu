@@ -186,6 +186,7 @@ void Snippet(int x0) {
   // begin calling embedding gradient kernel
   x31<<<dim3(2, 1, 1), dim3(32, 32, 1), 1024 * sizeof(int) + 1024 * sizeof(float)>>>(x17, x29, x30, 5, 60, -1);
   // end calling embedding gradient kernel
+  CUDA_CALL(cudaStreamSynchronize(0));
   ncclAllReduce(x30, x30, (size_t)1200, ncclFloat32, ncclSum, x4, x5);
   CUDA_CALL(cudaStreamSynchronize(x5));
   // begin computing ACCUM on GPU for size 1200 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x194

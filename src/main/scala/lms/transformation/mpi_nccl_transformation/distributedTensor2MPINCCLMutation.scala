@@ -55,7 +55,7 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
       val sourceTensor = new TENSOR(base, useOldMetadata = true)
       implicit val pos = Adapter.oldSourceMap(s)
       val count = numeral(sourceTensor.resultType.shapeSize)
-      gpu_accum_array(count, sourceTensor.et, myNCCLRank, transform(base), transform(addition))
+      gpu_accum_array(count, sourceTensor.et, myCUDADevice, transform(base), transform(addition))
       Backend.Const(())
 
     case Node(s, "optimize_tensor", Backend.Const(anno:Anno)::(weight:Backend.Exp)::(grad:Backend.Exp)::(momentum:Backend.Exp)::_, _) =>
@@ -72,7 +72,7 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
       val momentum_operand = get_operand(momentum, anno, assertSame=true)
 
       val count2 = numeral(tt.shapeSize)
-      gpu_sgd_array(count2, m, myNCCLRank, weight_operand, grad_operand, momentum_operand)
+      gpu_sgd_array(count2, m, myCUDADevice, weight_operand, grad_operand, momentum_operand)
       Backend.Const(())
 
     case Node(s, "all_reduce_tensor", Backend.Const(devices:Seq[Device])::(x:Backend.Sym)::Backend.Const(mode:String)::_, _) =>
@@ -85,9 +85,37 @@ trait DistributeTensor2MPI_NCCLMutation extends DistributeTensor2MPI_NCCLBase {
         case "sum" => NCCL_SUM
         case a => throw new Exception(s"nccl mode $a is not yet handled")
       }
+      CUDA_STREAM_SYNCHRONIZE(INT(0))
       NCCL_ALLREDUCE(sourceTensor.et, inputArray, inputArray, SIZE_T(count), nccl_mode, myNCCLComm, myNCCLStream)
       CUDA_STREAM_SYNCHRONIZE(myNCCLStream)
       Backend.Const(())
+
+    case Node(s, "tensorarray_zeros", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::Backend.Const(length:Int)::_, _) =>
+      val sourceTensor = new TENSORARRAY(s, useOldMetadata = true)
+      implicit val pos: SourceContext = sourceTensor.pos
+      val count = numeral(sourceTensor.shapeSize) * sourceTensor.length
+      gpu_fixed_array(count, myCUDADevice, NUM(Backend.Const(0), sourceTensor.et)).x
+
+    case Node(s, "tensor_array_get", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::(i:Backend.Sym)::_, _) => {
+      val addr = new ARRAY(transform(x))
+      implicit val __pos: SourceContext = new TENSOR(s, true).pos
+      val count = numeral(new TENSORARRAY(x, true).shapeSize)
+      val offset = count * INT(transform(i))
+      new TOP(Adapter.g.reflectRead("+", addr.x, offset.x)(addr.x, offset.x)).withSrcType(__pos, addr.t).x
+    }
+
+    case Node(s, "tensor_array_set", Backend.Const(tt:TensorType)::Backend.Const(anno:Anno)::(x:Backend.Sym)::(i:Backend.Sym)::(y:Backend.Sym)::_, _) => {
+      val addr = new ARRAY(transform(x))
+      val src = new ARRAY(transform(y))
+      assert(addr.et == src.et)
+      val sourceTensor = new TENSOR(s, true)
+      implicit val __pos: SourceContext = sourceTensor.pos
+      val count = numeral(new TENSOR(y, true).shapeSize)
+      val offset = count * INT(transform(i))
+      val dst = new TOP(Adapter.g.reflectRead("+", addr.x, offset.x)(addr.x, offset.x)).withSrcType(__pos, addr.t)
+      CUDA_CALL(Unwrap(libFunction[Any]("cudaMemcpy", dst.x, src.x, SIZE_T(count * SIZE_OF(src.et)).x, DEVICE2DEVICE.x)(Seq(1,2,3), Seq(0), scala.collection.immutable.Set[Int](), addr.x)))
+      Backend.Const(())
+    }
 
     case _ => super.transform(n)
   }
