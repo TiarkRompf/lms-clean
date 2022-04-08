@@ -480,7 +480,8 @@ abstract class Transformer extends Traverser {
 
   def transform(s: Exp): Exp = s match {
     case s @ Sym(_) if subst contains s => subst(s)
-    case s @ Sym(_) => throw new Exception("not found in subst: "+s)
+    case s @ Sym(_) =>
+      throw new Exception("not found in subst: "+s)
     case s @ Const(_) =>
       if (Adapter.oldTypeMap.contains(s)) Adapter.typeMap(s) = Adapter.oldTypeMap(s)
       s
@@ -503,7 +504,7 @@ abstract class Transformer extends Traverser {
         traverse(b)
         transform(res)
       } finally {
-        subst --= args
+        //subst --= args
       }
     })
   }
@@ -527,8 +528,9 @@ abstract class Transformer extends Traverser {
       val (effects,pure) = (es.deps,rs)
       val args = transformRHS(pure)
       // NOTE: we're not transforming 'effects' here (just the keys)
-      if (effects.nonEmpty)
+      if (effects.nonEmpty) {
         g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
+      }
       else
         g.reflect(op,args:_*)
   }

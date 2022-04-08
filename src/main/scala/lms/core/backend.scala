@@ -138,9 +138,13 @@ object Backend {
   }
 
   case class BlockEffect(var map: Map[Exp,(Sym, List[Sym])], prev: BlockEffect) {
+    var allEff: Map[Exp, Set[(Sym, List[Sym])]] = Map()
     def get(key: Exp): Option[(Sym, List[Sym])] = if (prev != null) map.get(key) orElse prev.get(key) else map.get(key)
     def getOrElse(key: Exp, default: (Sym, List[Sym])) = get(key).getOrElse(default)
-    def +=(kv: (Exp, (Sym, List[Sym]))) = map += kv
+    def +=(kv: (Exp, (Sym, List[Sym]))) = {
+      allEff = allEff + (kv._1 -> (allEff.getOrElse(kv._1, Set()) ++ Set(kv._2)))
+      map += kv
+    }
   }
 
 }
@@ -169,7 +173,15 @@ class GraphBuilder {
   }
   def findDefinition(op: String, as: Seq[Def]): Option[Node] = globalDefsReverseCache.get((op,as))
 
-  def rewrite(s: String, as: List[Def]): Option[Exp] = None
+  var rewrites: (String => Any => Option[Exp]) = (s => x => None)
+
+  def rewrite(s: String, as: List[Def]): Option[Exp] = rewrites("")((s, as))
+
+  def addRewrite(f: PartialFunction[Any, Option[Exp]]) = {
+    val old = rewrites
+    val f1 = ((x: Any) => if (f.isDefinedAt(x)) f(x) else None)
+    rewrites = (s =>x => f1(x).orElse(old(s)(x)))
+  }
 
   def reflect(s: String, as: Def*): Exp = {
     reflectEffect(s, as:_*)()()
@@ -514,16 +526,16 @@ class GraphBuilderOpt extends GraphBuilder {
 
   // fine grained dependency computation for array
   override def gatherEffectDepsWrite(s: String, as: Seq[Def], lw: Sym, lr: Seq[Sym]): (Set[Sym], Set[Sym]) =
-  findDefinition(latest(lw)) match {
-    case Some(Node(_, "array_set", as2, deps)) if (s == "array_set" && as.init == as2.init) =>
-      // If latest(lw) is setting the same array at the same index, we do not add hard dependence but soft dependence
-      // In addition, we need to inherite the soft and hard deps of latest(lw)
-      (deps.sdeps + latest(lw), deps.hdeps)
-    case _ => super.gatherEffectDepsWrite(s, as, lw, lr)
-  }
+    findDefinition(latest(lw)) match {
+      case Some(Node(_, "array_set", as2, deps)) if (s == "array_set" && as.init == as2.init) =>
+        // If latest(lw) is setting the same array at the same index, we do not add hard dependence but soft dependence
+        // In addition, we need to inherite the soft and hard deps of latest(lw)
+        (deps.sdeps + latest(lw), deps.hdeps)
+      case _ => super.gatherEffectDepsWrite(s, as, lw, lr)
+    }
 
   // graph pre-node-construction optimization
-  override def rewrite(s: String, as: List[Def]): Option[Exp] = (s,as) match {
+  addRewrite {
     // staticData(as)(i) => staticData(as(i))
     case ("array_get", List(Def("staticData", List(Const(as: Array[_]))), Const(i:Int))) =>
       as(i) match {
@@ -644,9 +656,8 @@ class GraphBuilderOpt extends GraphBuilder {
       case (Const(t: Boolean), Const(e: Boolean)) /* if t != e */ => Some(if (t) c else reflect("!", c))
       case _ => None
     }
-
-    case _  =>
-      super.rewrite(s,as)
+    //case _  =>
+    //  super.rewrite(s,as)
   }
 
   // From miniscala CPSOptimizer.scala
