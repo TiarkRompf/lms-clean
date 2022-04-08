@@ -138,11 +138,11 @@ object Backend {
   }
 
   case class BlockEffect(var map: Map[Exp,(Sym, List[Sym])], prev: BlockEffect) {
-    var allEff: Map[Exp, Set[(Sym, List[Sym])]] = Map()
+    var allEff: Map[Exp, List[(Sym, List[Sym])]] = Map()
     def get(key: Exp): Option[(Sym, List[Sym])] = if (prev != null) map.get(key) orElse prev.get(key) else map.get(key)
     def getOrElse(key: Exp, default: (Sym, List[Sym])) = get(key).getOrElse(default)
     def +=(kv: (Exp, (Sym, List[Sym]))) = {
-      allEff = allEff + (kv._1 -> (allEff.getOrElse(kv._1, Set()) ++ Set(kv._2)))
+      allEff = allEff + (kv._1 -> (kv._2::(allEff.getOrElse(kv._1, List()))))
       map += kv
     }
   }
