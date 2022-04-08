@@ -111,5 +111,4 @@ class FrontEnd {
     } finally {g = null}
   }
 
-
 }
