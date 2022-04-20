@@ -340,7 +340,7 @@ class GraphBuilder {
       (Set[Exp](), Set[Exp]())
   }
 
-  // getLaternEffect(xs: Def*) wrappers getLatentEffect(x: Def) and accumulate effects of multiple Defs
+  // getLatentEffect(xs: Def*) wrappers getLatentEffect(x: Def) and accumulate effects of multiple Defs
   def getLatentEffect(xs: Def*): (Set[Exp], Set[Exp]) =
     xs.foldLeft((Set[Exp](), Set[Exp]())) { case ((r, w), x) =>
       val (ref, wef) = getLatentEffect(x)
@@ -583,7 +583,7 @@ class GraphBuilderOpt extends GraphBuilder {
         case Node(_, "var_set", List(_, value: Exp), _) => value
       }})
 
-    // x[i] = y; ....; x => x[i] = y; ....; y    side condition: no write in-between!
+    // x[i] = y; ....; x[i] => x[i] = y; ....; y    side condition: no write in-between!
     case ("array_get", List(as:Exp,i:Exp)) =>
       curEffects.get(as).flatMap({ case (lw, _) => findDefinition(lw) collect {
         case Node(_, "array_set", List(_, i2: Exp, value: Exp), _) if i == i2 => value
