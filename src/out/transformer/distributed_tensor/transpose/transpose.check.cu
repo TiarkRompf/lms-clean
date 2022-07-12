@@ -127,10 +127,10 @@ void Snippet(int x0) {
   // begin calling transpose kernel
   x10<<<dim3(4, 2, 1), dim3(32, 8, 1)>>>(x30, x31, 56, 107);
   // end calling transpose kernel
-  // begin computing ACCUM on GPU for size 5992 and type Float at device (pre-rename) x39 with base_operand x181 and addition_operand x244
+  // begin computing ACCUM on GPU for size 5992 and type Float at device (pre-rename) x39 with base_operand x182 and addition_operand x245
   CUDA_CALL(cudaSetDevice(x6));
   x32<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x22, x31, 5992);
-  // end computing ACCUM on GPU for size 5992 and type Float at device (pre-rename) x39 with base_operand x181 and addition_operand x244
+  // end computing ACCUM on GPU for size 5992 and type Float at device (pre-rename) x39 with base_operand x182 and addition_operand x245
   // begin checking GPU array of size 5992 and type Float
   float* x39 = (float*)malloc(5992 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x39, x22, (size_t)(5992 * sizeof(float)), cudaMemcpyDeviceToHost));
