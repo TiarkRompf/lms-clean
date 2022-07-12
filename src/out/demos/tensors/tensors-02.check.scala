@@ -24,6 +24,9 @@ def tensors_02(x0: Int): Int = {
   }) / 100 - x7 * x7)
   0
 }
+Warning: already have a subst for x3
+Warning: already have a subst for x6
+Warning: already have a subst for x11
 // After Tensor fusion V:
 def tensors_02(x0: Int): Int = {
   val x1 = sum(List(100), x2 => 1 + 2 * seq_apply(x2, 0)) / 100
