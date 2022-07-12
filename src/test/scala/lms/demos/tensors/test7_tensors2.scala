@@ -89,7 +89,6 @@ class TensorFrontEnd2 extends FrontEnd {
     }
   }
 
-
   var name: String = ""
 
   var rewrites: (String => Any => Option[Exp]) = (s => x => None)
@@ -309,7 +308,6 @@ class TensorFrontEnd2 extends FrontEnd {
       rewrites(name)((s,as))
     }
 
-
     override def reflect(s: String, as: Def*): Exp = (s,as.toList) match {
       case ("+", List(Const(a:Int),Const(b:Int))) => Const(a+b)
       case ("-", List(Const(a:Int),Const(b:Int))) => Const(a-b)
@@ -326,11 +324,7 @@ class TensorFrontEnd2 extends FrontEnd {
         super.reflect(s, as:_*)
     }
   }
-
-
 }
-
-
 
 class TensorTransformer(name: String) extends Transformer {
   val frontEnd: TensorFrontEnd2 = new TensorFrontEnd2
@@ -338,8 +332,6 @@ class TensorTransformer(name: String) extends Transformer {
   frontEnd.name = name
   g = frontEnd.g
 }
-
-
 
 class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
   import frontEnd._
@@ -413,17 +405,11 @@ class TensorFusionH2 extends TensorTransformer("TensorFusionH2") {
           val summary = this.g.getEffKeys(newBody)
           val fusedLoopSym = this.g.reflectEffectSummary("forloops", shape, this.g.reflect("λ",newBody))(summary)
       }
-
     } else {
       super.traverse(ns,y)
     }
   }
-
-
 }
-
-
-
 
 class TensorTest2 extends TutorialFunSuite {
   val under = "demos/tensors/tensors-"
@@ -577,7 +563,6 @@ class TensorTest2 extends TutorialFunSuite {
   }
 */
   testBE("03") { x =>
-
     val m = foobar(7)
     val n = foobar(m)
 
@@ -587,7 +572,6 @@ class TensorTest2 extends TutorialFunSuite {
 
 
   testBE("04") { x =>
-
     val m = Tensor1(SEQ(3,4,5), x => x(0) + x(1) + x(2))
     val n = tensor_add1(m,m)
     PRINT(n)
@@ -595,7 +579,6 @@ class TensorTest2 extends TutorialFunSuite {
   }
 
   testBE("05", eff=true) { x =>
-
     val m = Tensor1(SEQ(3,4,5), x => x(0) + x(1) + x(2))
     val a = tensor_add1(m,m)
     PRINT(a)
@@ -628,6 +611,5 @@ class TensorTest2 extends TutorialFunSuite {
     PRINT(v)
     0
   }
-
 
 }

@@ -173,14 +173,14 @@ class GraphBuilder {
   }
   def findDefinition(op: String, as: Seq[Def]): Option[Node] = globalDefsReverseCache.get((op,as))
 
-  var rewrites: (String => Any => Option[Exp]) = (s => x => None)
+  var __rewrites: (String => Any => Option[Exp]) = (s => x => None)
 
-  def rewrite(s: String, as: List[Def]): Option[Exp] = rewrites("")((s, as))
+  def rewrite(s: String, as: List[Def]): Option[Exp] = __rewrites("")((s, as))
 
   def addRewrite(f: PartialFunction[Any, Option[Exp]]) = {
-    val old = rewrites
+    val old = __rewrites
     val f1 = ((x: Any) => if (f.isDefinedAt(x)) f(x) else None)
-    rewrites = (s =>x => f1(x).orElse(old(s)(x)))
+    __rewrites = (s =>x => f1(x).orElse(old(s)(x)))
   }
 
   def reflect(s: String, as: Def*): Exp = {
