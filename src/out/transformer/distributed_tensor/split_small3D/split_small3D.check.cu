@@ -139,10 +139,10 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x31, (size_t)(2 * sizeof(float*))));
   CUDA_CALL(cudaMemcpy(x31, x30, (size_t)(2 * sizeof(float*)), cudaMemcpyHostToDevice));
   x32<<<dim3(32, 1, 1), dim3(512, 1, 1)>>>(x31, x29);
-  // begin computing ACCUM on GPU for size 16384 and type Float at device (pre-rename) x39 with base_operand x130 and addition_operand x205
+  // begin computing ACCUM on GPU for size 16384 and type Float at device (pre-rename) x39 with base_operand x131 and addition_operand x206
   CUDA_CALL(cudaSetDevice(x6));
   x37<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x19, x29, 16384);
-  // end computing ACCUM on GPU for size 16384 and type Float at device (pre-rename) x39 with base_operand x130 and addition_operand x205
+  // end computing ACCUM on GPU for size 16384 and type Float at device (pre-rename) x39 with base_operand x131 and addition_operand x206
   // begin checking GPU array of size 16384 and type Float
   float* x44 = (float*)malloc(16384 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x44, x19, (size_t)(16384 * sizeof(float)), cudaMemcpyDeviceToHost));
