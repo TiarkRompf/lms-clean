@@ -129,10 +129,10 @@ void Snippet(int x0) {
   // begin calling permute kernel
   x10<<<dim3(1, 6, 1), dim3(32, 1, 8)>>>(x34, x35, 5, 6, 6);
   // end calling permute kernel
-  // begin computing ACCUM on GPU for size 180 and type Float at device (pre-rename) x39 with base_operand x196 and addition_operand x259
+  // begin computing ACCUM on GPU for size 180 and type Float at device (pre-rename) x39 with base_operand x199 and addition_operand x262
   CUDA_CALL(cudaSetDevice(x6));
   x36<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x26, x35, 180);
-  // end computing ACCUM on GPU for size 180 and type Float at device (pre-rename) x39 with base_operand x196 and addition_operand x259
+  // end computing ACCUM on GPU for size 180 and type Float at device (pre-rename) x39 with base_operand x199 and addition_operand x262
   // begin checking GPU array of size 180 and type Float
   float* x43 = (float*)malloc(180 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x43, x26, (size_t)(180 * sizeof(float)), cudaMemcpyDeviceToHost));

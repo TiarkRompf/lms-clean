@@ -200,14 +200,14 @@ void Snippet(int x0) {
   CUDA_CALL(cudaMalloc(&x60, (size_t)(81 * sizeof(float))));
   x10<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x60, 1, 81);
   // end initializing fixed GPU array of size 81 and type Float and device (pre-rename) x39
-  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x286 and addition_operand x309
+  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x312 and addition_operand x335
   CUDA_CALL(cudaSetDevice(x6));
   x61<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x58, x60, 81);
-  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x286 and addition_operand x309
-  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x273 and addition_operand x309
+  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x312 and addition_operand x335
+  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x299 and addition_operand x335
   CUDA_CALL(cudaSetDevice(x6));
   x61<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x57, x60, 81);
-  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x273 and addition_operand x309
+  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x299 and addition_operand x335
   // begin allocating gpu array of size 81 and type Float for the gradient input of masked fill
   CUDA_CALL(cudaSetDevice(x6));
   float* x68 = (float*)malloc(0 * sizeof(float));
@@ -216,10 +216,10 @@ void Snippet(int x0) {
   // begin calling masked fill gradient kernel
   x69<<<dim3(1, 1, 1), dim3(512, 1, 1)>>>(x58, x68, x19, 9, 9, 9, 1, 81);
   // end calling masked fill gradient kernel
-  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x366
+  // begin computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x392
   CUDA_CALL(cudaSetDevice(x6));
   x61<<<dim3(28, 1, 1), dim3(512, 1, 1)>>>(x9, x68, 81);
-  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x366
+  // end computing ACCUM on GPU for size 81 and type Float at device (pre-rename) x39 with base_operand x62 and addition_operand x392
   // begin checking GPU array of size 81 and type Float
   float* x95 = (float*)malloc(81 * sizeof(float));
   CUDA_CALL(cudaMemcpy(x95, x9, (size_t)(81 * sizeof(float)), cudaMemcpyDeviceToHost));
