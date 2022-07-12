@@ -17,6 +17,8 @@ def tensors_01(x0: Int): Int = {
   println(tensor(List(3, 4, 5), x6 => tensor_apply(x3, x6) + tensor_apply(x1, x6)))
   0
 }
+Warning: already have a subst for x3
+Warning: already have a subst for x6
 // After Tensor fusion V:
 def tensors_01(x0: Int): Int = {
   println(tensor(List(3, 4, 5), x1 => 2))

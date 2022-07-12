@@ -479,8 +479,7 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // MiscOps
   def exit(res: Rep[Int]): Unit = Adapter.g.reflectWrite("exit", Unwrap(res))(Adapter.CTRL)
-  def println(x: Rep[Any]): Unit =
-    Adapter.g.reflectWrite("P",Unwrap(x))(Adapter.CTRL)
+  def println(x: Rep[Any]): Unit = Adapter.g.reflectWrite("P",Unwrap(x))(Adapter.CTRL)
   def printf(f: String, x: Rep[Any]*): Unit = {
     // for (a <- f.split('%'))
     //   System.out.println(s"a:$a")

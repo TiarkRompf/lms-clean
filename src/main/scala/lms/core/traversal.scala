@@ -483,7 +483,9 @@ abstract class Transformer extends Traverser {
     case s @ Sym(_) =>
       throw new Exception("not found in subst: "+s)
     case s @ Const(_) =>
-      if (Adapter.oldTypeMap.contains(s)) Adapter.typeMap(s) = Adapter.oldTypeMap(s)
+      if (Adapter.oldTypeMap != null && Adapter.oldTypeMap.contains(s)) {
+        Adapter.typeMap(s) = Adapter.oldTypeMap(s)
+      }
       s
   }
 
@@ -578,10 +580,14 @@ abstract class Transformer extends Traverser {
 
     // Handling MetaData 3. update new metadata with old metadata
     // this is not redundant because of the block arguments (function definitions)
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap != null && Adapter.oldTypeMap.contains(k))
-      Adapter.typeMap.getOrElseUpdate(v, Adapter.oldTypeMap(k))
-    for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap != null && Adapter.oldSourceMap.contains(k))
-      Adapter.sourceMap.getOrElseUpdate(v, Adapter.oldSourceMap(k))
+    if (Adapter.oldTypeMap != null) {
+      for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldTypeMap.contains(k))
+        Adapter.typeMap.getOrElseUpdate(v, Adapter.oldTypeMap(k))
+    }
+    if (Adapter.oldSourceMap != null) {
+      for ((k, v) <- subst if v.isInstanceOf[Sym] && Adapter.oldSourceMap.contains(k))
+        Adapter.sourceMap.getOrElseUpdate(v, Adapter.oldSourceMap(k))
+    }
 
     Graph(g.globalDefs, block, g.globalDefsCache.toMap)
   }
