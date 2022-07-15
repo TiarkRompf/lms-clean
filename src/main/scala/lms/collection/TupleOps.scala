@@ -12,9 +12,9 @@ trait TupleOps { b: Base =>
   // Tuple2
 
   object Tuple2 {
-    def apply[A: Manifest, B: Manifest](a: Rep[A], b: Rep[B]) = {
+    def apply[A: Manifest, B: Manifest](a: Rep[A], b: Rep[B]) =
       Wrap[Tuple2[A, B]](Adapter.g.reflect("tuple2-new", Unwrap(a), Unwrap(b)))
-    }
+      //Wrap[Tuple2[A, B]](Adapter.g.reflectRead("tuple2-new", Unwrap(a), Unwrap(b))(Unwrap(a), Unwrap(b)))
   }
 
   implicit def __liftTuple2Rep[A: Manifest, B: Manifest](t: (Rep[A], Rep[B])) =
