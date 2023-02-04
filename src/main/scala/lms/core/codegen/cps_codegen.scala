@@ -156,8 +156,9 @@ class CPSScalaCodeGen extends CPSTraverser {
 
   override def apply(g: Graph): Unit = {
     bound(g)
-    path = Nil; inner = g.nodes
-    traverse(g.block){ e => emit(s"${quote(e)} /*exit ${quote(e)}*/") }
+    withScope(Nil, g.nodes) {
+      traverse(g.block){ e => emit(s"${quote(e)} /*exit ${quote(e)}*/") }
+    }
   }
 
   def emitAll(g: Graph)(m1:Manifest[_],m2:Manifest[_]): Unit = {
