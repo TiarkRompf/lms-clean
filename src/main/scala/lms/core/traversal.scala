@@ -109,9 +109,9 @@ abstract class Traverser {
   // we have to pass the "old" environment to the `b`.
   // Checkout the `CPSTraverser` and `CPSTransformer` below for more details.
   def withScopeCPS[T](p: List[Sym], ns: Seq[Node])(b: (List[Sym], Seq[Node]) => T): T = {
-    val (path0, inner0) = (path, inner)
-    path = p; inner = ns;
-    try b(path0, inner0) finally { path = path0; inner = inner0 }
+    val (path0, inner0, lookup0) = (path, inner, lookupInner)
+    path = p; inner = ns; lookupInner = RepNode.buildLookup(inner)
+    try b(path0, inner0) finally { path = path0; inner = inner0; lookupInner = lookup0 }
   }
 
   // This `withResetScope` function maintains the old `inner` when entering a new block
@@ -120,8 +120,10 @@ abstract class Traverser {
   def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     assert(path.takeRight(p.length) == p, s"$path -- $p")
     val inner0 = inner
+    val lookup0 = lookupInner
     inner = ns
-    try b finally { inner = inner0 }
+    lookupInner = RepNode.buildLookup(inner)
+    try b finally { inner = inner0; lookupInner = lookup0 }
   }
 
   // This `scheduleBlock` function wraps on the `scheduleBlock_` function, while
