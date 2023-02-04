@@ -1,6 +1,6 @@
 package lms.core
 
-import scala.collection.mutable
+import scala.collection.{mutable,immutable}
 
 import lms.core.stub.Adapter
 import lms.macros.SourceContext
@@ -117,33 +117,51 @@ abstract class Traverser {
 
     // find out which nodes are reachable on a
     // warm path (not only via if/else branches)
-    val g = new Graph(inner, y, null)
+
+    class RepNode(val prio: Int, val node: Node) {
+      var inQueue: Boolean = false
+      var scheHere: Boolean = false
+      var reachHard: Boolean = false
+    }
+    class Queue(lookup: immutable.HashMap[Sym, RepNode]) {
+      private val queue = mutable.PriorityQueue[RepNode]()(Ordering.by(_.prio))
+      private var cap = Int.MaxValue
+      def add(sym: Sym, scheHere: Boolean, reachHard: Boolean): Unit = {
+        lookup.get(sym) match {
+          case Some(rp) if rp.prio < cap =>
+            if (rp.inQueue) {
+              rp.scheHere |= scheHere
+              rp.reachHard |= reachHard
+            }
+            else {
+              rp.inQueue = true
+              rp.scheHere = scheHere
+              rp.reachHard = reachHard
+              queue.enqueue(rp)
+            }
+          case _ => ()
+        }
+      }
+      val reach = add(_, true, true)
+      val reachInner = add(_, false, true)
+      val reachSoft = add(_, true, false)
+      def pop: RepNode = {
+        val ret = queue.dequeue
+        cap = ret.prio
+        ret.inQueue = false
+        ret
+      }
+      def isEmpty: Boolean = queue.isEmpty
+    }
+    val queue = new Queue(immutable.HashMap(
+      inner.zipWithIndex.map { case (n, i) => (n.n, new RepNode(i, n)) }:_*))
 
     // Step 1: compute `reach` and `reachInner`
     // These are nodes that are reachable from for the current block and for an inner block
     // We start from `y.used`, where `y` is the current block as seeds, and back track all
     // nodes that are hard-depended from the seeds.
     // The `reachInner` is seeded by reachable Syms that have low frequency.
-    val reach = new mutable.HashSet[Sym]
-    val reachInner = new mutable.HashSet[Sym]
-    reach ++= y.used
-
-    for (d <- g.nodes.reverseIterator) {
-      if (reach contains d.n) {
-        if (available(d)) {
-          // node will be sched here, don't follow if branches!
-          // other statement will be scheduled in an inner block
-          for ((e:Sym,f) <- symsFreq(d))
-            if (f > 0.5) reach += e else reachInner += e
-        } else {
-          // QUESTION(feiw): why we don't split via frequency here?
-          reach ++= hardSyms(d)
-        }
-      }
-      if (reachInner.contains(d.n)) {
-        reachInner ++= hardSyms(d)
-      }
-    }
+    y.used foreach queue.reach
 
     /*
     NOTES ON RECURSIVE SCHEDULES
@@ -193,9 +211,6 @@ abstract class Traverser {
     // (1) available: not dependent on other bound vars
     // (2) used at least as often as the block result
 
-    def scheduleHere(d: Node) =
-      available(d) && reach(d.n)
-
     // Step 2: with the computed `reach` and `reachInner`, we can split the nodes
     // to `outer1` (for current block) and `inner1` (for inner blocks)
     // The logic is simply: `outer1` has nodes that are reachable and available.
@@ -208,19 +223,27 @@ abstract class Traverser {
     // If a node is only soft-depended by other nodes, we make sure that we can remove it
     //   by DCE pass before traversal passes. (see DeadCodeElimCG class in backend.scala)
     // the test "extraThroughSoft_is_necessary" show cases the importance of `extraThroughSoft`.
-    val extraThroughSoft = new mutable.HashSet[Sym]
-    for (n <- inner.reverseIterator) {
-      if (reach(n.n) || extraThroughSoft(n.n)) {
+    while (!queue.isEmpty) {
+      val rp = queue.pop
+      val n = rp.node
+      if (rp.scheHere) {
         if (available(n)) {
+          // node will be sched here, don't follow if branches!
+          // other statement will be scheduled in an inner block
+          for ((e:Sym,f) <- symsFreq(n))
+            if (f > 0.5) queue.reach(e) else queue.reachInner(e)
+          n.eff.sdeps foreach queue.reachSoft
           outer1 = n +: outer1
-          if (!reach(n.n)) // if added through soft deps, hards needs to be added as well
-            extraThroughSoft ++= syms(n)
-          else
-            extraThroughSoft ++= n.eff.sdeps
-        } else {
+        }
+        else {
+          // QUESTION(feiw): why we don't split via frequency here?
+          if (rp.reachHard)
+            hardSyms(n) foreach queue.reach
           inner1 = n +: inner1
         }
-      } else if (reachInner(n.n)) {
+      }
+      else {
+        hardSyms(n) foreach queue.reachInner
         inner1 = n +: inner1
       }
     }
