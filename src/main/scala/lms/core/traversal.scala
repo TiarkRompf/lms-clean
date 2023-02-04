@@ -45,6 +45,47 @@ abstract class Traverser {
   // This splitting is done via the `scheduleBlock_` function.
   // Just as the `path`, the content of `inner` is maintained via the `withScope` family of functions.
   var inner: Seq[Node] = _
+  class RepNode(val prio: Int, val node: Node) {
+    var inQueue: Boolean = false
+    var scheHere: Boolean = false
+    var reachHard: Boolean = false
+  }
+  object RepNode {
+    def buildLookup(ns: Seq[Node]) = immutable.HashMap(
+      ns.zipWithIndex.map { case (n, i) => (n.n, new RepNode(i, n)) }:_*)
+  }
+  var lookupInner: immutable.HashMap[Sym, RepNode] = _
+
+  class ScheduleQueue(lookup: immutable.HashMap[Sym, RepNode]) {
+    private val queue = mutable.PriorityQueue[RepNode]()(Ordering.by(_.prio))
+    private var cap = Int.MaxValue
+    def add(sym: Sym, scheHere: Boolean, reachHard: Boolean): Unit = {
+      lookup.get(sym) match {
+        case Some(rp) if rp.prio < cap =>
+          if (rp.inQueue) {
+            rp.scheHere |= scheHere
+            rp.reachHard |= reachHard
+          }
+          else {
+            rp.inQueue = true
+            rp.scheHere = scheHere
+            rp.reachHard = reachHard
+            queue.enqueue(rp)
+          }
+        case _ => ()
+      }
+    }
+    val reach = add(_, true, true)
+    val reachInner = add(_, false, true)
+    val reachSoft = add(_, true, false)
+    def pop: RepNode = {
+      val ret = queue.dequeue
+      cap = ret.prio
+      ret.inQueue = false
+      ret
+    }
+    def isEmpty: Boolean = queue.isEmpty
+  }
 
   // This `blockEffectPath` is currently unused.
   val blockEffectPath = new mutable.HashMap[Block, Set[Exp]]
@@ -53,9 +94,9 @@ abstract class Traverser {
   // with new `path` (as parameter `p`) and new `inner` (as parameter `ns`).
   // The block function `b` takes no parameters
   def withScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
-    val (path0, inner0) = (path, inner)
-    path = p; inner = ns;
-    try b finally { path = path0; inner = inner0 }
+    val (path0, inner0, lookup0) = (path, inner, lookupInner)
+    path = p; inner = ns; lookupInner = RepNode.buildLookup(inner)
+    try b finally { path = path0; inner = inner0; lookupInner = lookup0 }
   }
 
   // This `withScopeCPS` function maintains the old `path` and `inner` when entering a new block
@@ -118,43 +159,7 @@ abstract class Traverser {
     // find out which nodes are reachable on a
     // warm path (not only via if/else branches)
 
-    class RepNode(val prio: Int, val node: Node) {
-      var inQueue: Boolean = false
-      var scheHere: Boolean = false
-      var reachHard: Boolean = false
-    }
-    class Queue(lookup: immutable.HashMap[Sym, RepNode]) {
-      private val queue = mutable.PriorityQueue[RepNode]()(Ordering.by(_.prio))
-      private var cap = Int.MaxValue
-      def add(sym: Sym, scheHere: Boolean, reachHard: Boolean): Unit = {
-        lookup.get(sym) match {
-          case Some(rp) if rp.prio < cap =>
-            if (rp.inQueue) {
-              rp.scheHere |= scheHere
-              rp.reachHard |= reachHard
-            }
-            else {
-              rp.inQueue = true
-              rp.scheHere = scheHere
-              rp.reachHard = reachHard
-              queue.enqueue(rp)
-            }
-          case _ => ()
-        }
-      }
-      val reach = add(_, true, true)
-      val reachInner = add(_, false, true)
-      val reachSoft = add(_, true, false)
-      def pop: RepNode = {
-        val ret = queue.dequeue
-        cap = ret.prio
-        ret.inQueue = false
-        ret
-      }
-      def isEmpty: Boolean = queue.isEmpty
-    }
-    val queue = new Queue(immutable.HashMap(
-      inner.zipWithIndex.map { case (n, i) => (n.n, new RepNode(i, n)) }:_*))
+    val queue = new ScheduleQueue(lookupInner)
 
     // Step 1: compute `reach` and `reachInner`
     // These are nodes that are reachable from for the current block and for an inner block
