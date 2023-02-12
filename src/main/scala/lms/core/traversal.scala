@@ -45,47 +45,6 @@ abstract class Traverser {
   // This splitting is done via the `scheduleBlock_` function.
   // Just as the `path`, the content of `inner` is maintained via the `withScope` family of functions.
   var inner: Seq[Node] = _
-  class RepNode(val prio: Int, val node: Node) {
-    var inQueue: Boolean = false
-    var scheHere: Boolean = false
-    var reachHard: Boolean = false
-  }
-  object RepNode {
-    def buildLookup(ns: Seq[Node]) = immutable.HashMap(
-      ns.zipWithIndex.map { case (n, i) => (n.n, new RepNode(i, n)) }:_*)
-  }
-  var lookupInner: immutable.HashMap[Sym, RepNode] = _
-
-  class ScheduleQueue(lookup: immutable.HashMap[Sym, RepNode]) {
-    private val queue = mutable.PriorityQueue[RepNode]()(Ordering.by(_.prio))
-    private var cap = Int.MaxValue
-    def add(sym: Sym, scheHere: Boolean, reachHard: Boolean): Unit = {
-      lookup.get(sym) match {
-        case Some(rp) if rp.prio < cap =>
-          if (rp.inQueue) {
-            rp.scheHere |= scheHere
-            rp.reachHard |= reachHard
-          }
-          else {
-            rp.inQueue = true
-            rp.scheHere = scheHere
-            rp.reachHard = reachHard
-            queue.enqueue(rp)
-          }
-        case _ => ()
-      }
-    }
-    val reach = add(_, true, true)
-    val reachInner = add(_, false, true)
-    val reachSoft = add(_, true, false)
-    def pop: RepNode = {
-      val ret = queue.dequeue
-      cap = ret.prio
-      ret.inQueue = false
-      ret
-    }
-    def isEmpty: Boolean = queue.isEmpty
-  }
 
   // This `blockEffectPath` is currently unused.
   val blockEffectPath = new mutable.HashMap[Block, Set[Exp]]
@@ -94,9 +53,9 @@ abstract class Traverser {
   // with new `path` (as parameter `p`) and new `inner` (as parameter `ns`).
   // The block function `b` takes no parameters
   def withScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
-    val (path0, inner0, lookup0) = (path, inner, lookupInner)
-    path = p; inner = ns; lookupInner = RepNode.buildLookup(inner)
-    try b finally { path = path0; inner = inner0; lookupInner = lookup0 }
+    val (path0, inner0) = (path, inner)
+    path = p; inner = ns;
+    try b finally { path = path0; inner = inner0 }
   }
 
   // This `withScopeCPS` function maintains the old `path` and `inner` when entering a new block
@@ -109,9 +68,9 @@ abstract class Traverser {
   // we have to pass the "old" environment to the `b`.
   // Checkout the `CPSTraverser` and `CPSTransformer` below for more details.
   def withScopeCPS[T](p: List[Sym], ns: Seq[Node])(b: (List[Sym], Seq[Node]) => T): T = {
-    val (path0, inner0, lookup0) = (path, inner, lookupInner)
-    path = p; inner = ns; lookupInner = RepNode.buildLookup(inner)
-    try b(path0, inner0) finally { path = path0; inner = inner0; lookupInner = lookup0 }
+    val (path0, inner0) = (path, inner)
+    path = p; inner = ns;
+    try b(path0, inner0) finally { path = path0; inner = inner0 }
   }
 
   // This `withResetScope` function maintains the old `inner` when entering a new block
@@ -120,10 +79,8 @@ abstract class Traverser {
   def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     assert(path.takeRight(p.length) == p, s"$path -- $p")
     val inner0 = inner
-    val lookup0 = lookupInner
     inner = ns
-    lookupInner = RepNode.buildLookup(inner)
-    try b finally { inner = inner0; lookupInner = lookup0 }
+    try b finally { inner = inner0 }
   }
 
   // This `scheduleBlock` function wraps on the `scheduleBlock_` function, while
@@ -160,15 +117,33 @@ abstract class Traverser {
 
     // find out which nodes are reachable on a
     // warm path (not only via if/else branches)
-
-    val queue = new ScheduleQueue(lookupInner)
+    val g = new Graph(inner, y, null)
 
     // Step 1: compute `reach` and `reachInner`
     // These are nodes that are reachable from for the current block and for an inner block
     // We start from `y.used`, where `y` is the current block as seeds, and back track all
     // nodes that are hard-depended from the seeds.
     // The `reachInner` is seeded by reachable Syms that have low frequency.
-    y.used foreach queue.reach
+    val reach = new mutable.HashSet[Sym]
+    val reachInner = new mutable.HashSet[Sym]
+    reach ++= y.used
+
+    for (d <- g.nodes.reverseIterator) {
+      if (reach contains d.n) {
+        if (available(d)) {
+          // node will be sched here, don't follow if branches!
+          // other statement will be scheduled in an inner block
+          for ((e:Sym,f) <- symsFreq(d))
+            if (f > 0.5) reach += e else reachInner += e
+        } else {
+          // QUESTION(feiw): why we don't split via frequency here?
+          reach ++= hardSyms(d)
+        }
+      }
+      if (reachInner.contains(d.n)) {
+        reachInner ++= hardSyms(d)
+      }
+    }
 
     /*
     NOTES ON RECURSIVE SCHEDULES
@@ -218,6 +193,9 @@ abstract class Traverser {
     // (1) available: not dependent on other bound vars
     // (2) used at least as often as the block result
 
+    def scheduleHere(d: Node) =
+      available(d) && reach(d.n)
+
     // Step 2: with the computed `reach` and `reachInner`, we can split the nodes
     // to `outer1` (for current block) and `inner1` (for inner blocks)
     // The logic is simply: `outer1` has nodes that are reachable and available.
@@ -230,27 +208,19 @@ abstract class Traverser {
     // If a node is only soft-depended by other nodes, we make sure that we can remove it
     //   by DCE pass before traversal passes. (see DeadCodeElimCG class in backend.scala)
     // the test "extraThroughSoft_is_necessary" show cases the importance of `extraThroughSoft`.
-    while (!queue.isEmpty) {
-      val rp = queue.pop
-      val n = rp.node
-      if (rp.scheHere) {
+    val extraThroughSoft = new mutable.HashSet[Sym]
+    for (n <- inner.reverseIterator) {
+      if (reach(n.n) || extraThroughSoft(n.n)) {
         if (available(n)) {
-          // node will be sched here, don't follow if branches!
-          // other statement will be scheduled in an inner block
-          for ((e:Sym,f) <- symsFreq(n))
-            if (f > 0.5) queue.reach(e) else queue.reachInner(e)
-          n.eff.sdeps foreach queue.reachSoft
           outer1 = n +: outer1
-        }
-        else {
-          // QUESTION(feiw): why we don't split via frequency here?
-          if (rp.reachHard)
-            hardSyms(n) foreach queue.reach
+          if (!reach(n.n)) // if added through soft deps, hards needs to be added as well
+            extraThroughSoft ++= syms(n)
+          else
+            extraThroughSoft ++= n.eff.sdeps
+        } else {
           inner1 = n +: inner1
         }
-      }
-      else {
-        hardSyms(n) foreach queue.reachInner
+      } else if (reachInner(n.n)) {
         inner1 = n +: inner1
       }
     }
@@ -308,6 +278,114 @@ abstract class Traverser {
     }
   }
 
+}
+
+trait GraphTraversal extends Traverser {
+  class RepNode(val prio: Int, val node: Node) {
+    var inQueue: Boolean = false
+    var scheHere: Boolean = false
+    var reachHard: Boolean = false
+  }
+
+  object RepNode {
+    def buildLookup(ns: Seq[Node]) = immutable.HashMap(
+      ns.zipWithIndex.map { case (n, i) => (n.n, new RepNode(i, n)) }:_*)
+  }
+
+  var lookupInner: immutable.HashMap[Sym, RepNode] = _
+
+  class ScheduleQueue(lookup: immutable.HashMap[Sym, RepNode]) {
+    private val queue = mutable.PriorityQueue[RepNode]()(Ordering.by(_.prio))
+    private var cap = Int.MaxValue
+
+    def add(sym: Sym, scheHere: Boolean, reachHard: Boolean): Unit = {
+      lookup.get(sym) match {
+        case Some(rp) if rp.prio < cap =>
+          if (rp.inQueue) {
+            rp.scheHere |= scheHere
+            rp.reachHard |= reachHard
+          }
+          else {
+            rp.inQueue = true
+            rp.scheHere = scheHere
+            rp.reachHard = reachHard
+            queue.enqueue(rp)
+          }
+        case _ => ()
+      }
+    }
+
+    val reach = add(_, true, true)
+    val reachInner = add(_, false, true)
+    val reachSoft = add(_, true, false)
+
+    def pop: RepNode = {
+      val ret = queue.dequeue
+      cap = ret.prio
+      ret.inQueue = false
+      ret
+    }
+
+    def isEmpty: Boolean = queue.isEmpty
+  }
+
+  override def withScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
+    val lookup0 = lookupInner
+    lookupInner = RepNode.buildLookup(ns)
+    try super.withScope(p, ns)(b) finally { lookupInner = lookup0 }
+  }
+
+  override def withScopeCPS[T](p: List[Sym], ns: Seq[Node])(b: (List[Sym], Seq[Node]) => T): T = {
+    val lookup0 = lookupInner
+    lookupInner = RepNode.buildLookup(ns)
+    try super.withScopeCPS(p, ns)(b) finally { lookupInner = lookup0 }
+  }
+
+  override def withResetScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
+    val lookup0 = lookupInner
+    lookupInner = RepNode.buildLookup(ns)
+    try super.withResetScope(p, ns)(b) finally { lookupInner = lookup0 }
+  }
+
+  override def scheduleBlock_[T](y: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
+    val path1 = y.bound ++ extra.toList ++ path
+
+    def available(d: Node) =
+      bound.hm(d.n) -- path1 - d.n == Set()
+
+    val queue = new ScheduleQueue(lookupInner)
+    y.used foreach queue.reach
+
+    var outer1 = Seq[Node]()
+    var inner1 = Seq[Node]()
+
+    while (!queue.isEmpty) {
+      val rp = queue.pop
+      val n = rp.node
+      if (rp.scheHere) {
+        if (available(n)) {
+          // node will be sched here, don't follow if branches!
+          // other statement will be scheduled in an inner block
+          for ((e:Sym,f) <- symsFreq(n))
+            if (f > 0.5) queue.reach(e) else queue.reachInner(e)
+          n.eff.sdeps foreach queue.reachSoft
+          outer1 = n +: outer1
+        }
+        else {
+          // QUESTION(feiw): why we don't split via frequency here?
+          if (rp.reachHard)
+            hardSyms(n) foreach queue.reach
+          inner1 = n +: inner1
+        }
+      }
+      else {
+        hardSyms(n) foreach queue.reachInner
+        inner1 = n +: inner1
+      }
+    }
+
+    f(path1, inner1, outer1, y)
+  }
 }
 
 /**
