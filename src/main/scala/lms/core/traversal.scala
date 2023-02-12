@@ -283,8 +283,8 @@ abstract class Traverser {
 trait GraphTraversal extends Traverser {
   class RepNode(val prio: Int, val node: Node) {
     var inQueue: Boolean = false
-    var scheHere: Boolean = false
-    var reachHard: Boolean = false
+    var reachableHot: Boolean = false
+    var reachableHard: Boolean = false
   }
 
   object RepNode {
@@ -293,41 +293,6 @@ trait GraphTraversal extends Traverser {
   }
 
   var lookupInner: immutable.HashMap[Sym, RepNode] = _
-
-  class ScheduleQueue(lookup: immutable.HashMap[Sym, RepNode]) {
-    private val queue = mutable.PriorityQueue[RepNode]()(Ordering.by(_.prio))
-    private var cap = Int.MaxValue
-
-    def add(sym: Sym, scheHere: Boolean, reachHard: Boolean): Unit = {
-      lookup.get(sym) match {
-        case Some(rp) if rp.prio < cap =>
-          if (rp.inQueue) {
-            rp.scheHere |= scheHere
-            rp.reachHard |= reachHard
-          }
-          else {
-            rp.inQueue = true
-            rp.scheHere = scheHere
-            rp.reachHard = reachHard
-            queue.enqueue(rp)
-          }
-        case _ => ()
-      }
-    }
-
-    val reach = add(_, true, true)
-    val reachInner = add(_, false, true)
-    val reachSoft = add(_, true, false)
-
-    def pop: RepNode = {
-      val ret = queue.dequeue
-      cap = ret.prio
-      ret.inQueue = false
-      ret
-    }
-
-    def isEmpty: Boolean = queue.isEmpty
-  }
 
   override def withScope[T](p: List[Sym], ns: Seq[Node])(b: => T): T = {
     val lookup0 = lookupInner
@@ -347,40 +312,76 @@ trait GraphTraversal extends Traverser {
     try super.withResetScope(p, ns)(b) finally { lookupInner = lookup0 }
   }
 
+  class ScheduleQueue(lookup: immutable.HashMap[Sym, RepNode]) {
+    private val queue = mutable.PriorityQueue[RepNode]()(Ordering.by(_.prio))
+    private var cap = Int.MaxValue
+
+    private def add(sym: Sym, reachHot: Boolean, reachHard: Boolean): Unit = {
+      lookup.get(sym) match {
+        case Some(rp) if rp.prio < cap =>
+          if (rp.inQueue) {
+            rp.reachableHot |= reachHot
+            rp.reachableHard |= reachHard
+          }
+          else {
+            rp.inQueue = true
+            rp.reachableHot = reachHot
+            rp.reachableHard = reachHard
+            queue.enqueue(rp)
+          }
+        case _ => ()
+      }
+    }
+
+    val reach = add(_, true, true)
+    val reachCold = add(_, false, true)
+    val reachSoft = add(_, true, false)
+
+    def toSchedule = {
+      new Iterator[RepNode] {
+        override def hasNext = !queue.isEmpty
+        override def next() = {
+          val ret = queue.dequeue
+          cap = ret.prio
+          ret.inQueue = false
+          ret
+        }
+      }
+    }
+  }
+
   override def scheduleBlock_[T](y: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
     val path1 = y.bound ++ extra.toList ++ path
 
     def available(d: Node) =
       bound.hm(d.n) -- path1 - d.n == Set()
 
-    val queue = new ScheduleQueue(lookupInner)
-    y.used foreach queue.reach
+    val g = new ScheduleQueue(lookupInner)
+    y.used foreach g.reach
 
     var outer1 = Seq[Node]()
     var inner1 = Seq[Node]()
 
-    while (!queue.isEmpty) {
-      val rp = queue.pop
-      val n = rp.node
-      if (rp.scheHere) {
-        if (available(n)) {
+    for (n <- g.toSchedule) {
+      if (n.reachableHot) {
+        if (available(n.node)) {
           // node will be sched here, don't follow if branches!
           // other statement will be scheduled in an inner block
-          for ((e:Sym,f) <- symsFreq(n))
-            if (f > 0.5) queue.reach(e) else queue.reachInner(e)
-          n.eff.sdeps foreach queue.reachSoft
-          outer1 = n +: outer1
+          for ((e:Sym,f) <- symsFreq(n.node))
+            if (f > 0.5) g.reach(e) else g.reachCold(e)
+          n.node.eff.sdeps foreach g.reachSoft
+          outer1 = n.node +: outer1
         }
         else {
           // QUESTION(feiw): why we don't split via frequency here?
-          if (rp.reachHard)
-            hardSyms(n) foreach queue.reach
-          inner1 = n +: inner1
+          if (n.reachableHard)
+            hardSyms(n.node) foreach g.reach
+          inner1 = n.node +: inner1
         }
       }
       else {
-        hardSyms(n) foreach queue.reachInner
-        inner1 = n +: inner1
+        hardSyms(n.node) foreach g.reachCold
+        inner1 = n.node +: inner1
       }
     }
 
