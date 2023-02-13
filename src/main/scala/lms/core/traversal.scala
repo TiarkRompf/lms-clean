@@ -337,7 +337,7 @@ trait GraphTraversal extends Traverser {
     val reachCold = add(_, false, true)
     val reachSoft = add(_, true, false)
 
-    def toSchedule = {
+    def toSchedule =
       new Iterator[RepNode] {
         override def hasNext = !queue.isEmpty
         override def next() = {
@@ -347,7 +347,6 @@ trait GraphTraversal extends Traverser {
           ret
         }
       }
-    }
   }
 
   override def scheduleBlock_[T](y: Block, extra: Sym*)(f: (List[Sym], Seq[Node], Seq[Node], Block) => T): T = {
