@@ -322,8 +322,7 @@ trait GraphTraversal extends Traverser {
           if (rp.inQueue) {
             rp.reachableHot |= reachHot
             rp.reachableHard |= reachHard
-          }
-          else {
+          } else {
             rp.inQueue = true
             rp.reachableHot = reachHot
             rp.reachableHard = reachHard
@@ -370,15 +369,13 @@ trait GraphTraversal extends Traverser {
             if (f > 0.5) g.reach(e) else g.reachCold(e)
           n.node.eff.sdeps foreach g.reachSoft
           outer1 = n.node +: outer1
-        }
-        else {
+        } else {
           // QUESTION(feiw): why we don't split via frequency here?
           if (n.reachableHard)
             hardSyms(n.node) foreach g.reach
           inner1 = n.node +: inner1
         }
-      }
-      else {
+      } else {
         hardSyms(n.node) foreach g.reachCold
         inner1 = n.node +: inner1
       }
@@ -640,8 +637,7 @@ abstract class Transformer extends Traverser {
       // NOTE: we're not transforming 'effects' here (just the keys)
       if (effects.nonEmpty) {
         g.reflectEffect(op,args:_*)(es.rkeys.map(transform).toSeq:_*)(es.wkeys.map(transform).toSeq:_*)
-      }
-      else
+      } else
         g.reflect(op,args:_*)
   }
 
