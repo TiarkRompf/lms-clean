@@ -14,7 +14,7 @@ class Unknown // HACK: Sentinel for typeMap
  * This `GenericCodeGen` class demonstrates a minimal code generator from Traverser.
  * It is not used in production.
  */
-class GenericCodeGen extends Traverser {
+class GenericCodeGen extends Traverser with GraphTraversal {
 
   def emit(s: String) = println(s)
 

@@ -13,7 +13,7 @@ import lms.transformation.util.DataStructure
 import Backend._
 
 
-class DimNameAnalysis extends Traverser {
+class DimNameAnalysis extends Traverser with GraphTraversal {
   import FixedSizeDistributedTensorTypeLess._
   import DataStructure._
 

@@ -25,7 +25,7 @@ abstract class DistributeTensor2MPI_NCCL extends DistributeTensor2MPI_NCCLBase
     with DistributeTensor2MPI_NCCLMiscs
     with DistributedTensor2MPI_NCCLComm
 
-class DistributeTensor2MPI_NCCLAnalysis extends Traverser {
+class DistributeTensor2MPI_NCCLAnalysis extends Traverser with GraphTraversal {
     var hasCublas = false
     var hasCudnn = false
     var modulecount = 0
