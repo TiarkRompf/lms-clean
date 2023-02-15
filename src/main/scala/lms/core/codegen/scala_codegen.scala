@@ -12,7 +12,7 @@ import Backend._
  * The `ScalaCodeGen` is a simple code generation class built on Traverser.
  * It is not used in production.
  */
-class ScalaCodeGen extends Traverser {
+class ScalaCodeGen extends Traverser with GraphTraversal {
 
   def emit(s: String) = println(s)
 

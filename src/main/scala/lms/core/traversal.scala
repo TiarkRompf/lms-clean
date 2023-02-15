@@ -393,7 +393,7 @@ trait GraphTraversal extends Traverser {
  * what needs to happen after are captured in the `continuation`, such that when
  * a `traverse` function returns, the traverse of all the nodes are done already.
  */
-abstract class CPSTraverser extends Traverser {
+abstract class CPSTraverser extends Traverser with GraphTraversal {
 
   // Note that the continuation of `traverse(block)` need to use the original
   // `path0` and `inner0`, as shown in the `(v => withScope(path0, inner0)(k(v)))`
@@ -428,7 +428,7 @@ abstract class CPSTraverser extends Traverser {
 }
 
 
-class CompactTraverser extends Traverser {
+class CompactTraverser extends Traverser with GraphTraversal {
 
   def mayInline(n: Node): Boolean = n match {
     case Node(s, "var_new", _, _) => false
@@ -576,7 +576,7 @@ class CompactTraverser extends Traverser {
   }
 }
 
-abstract class Transformer extends Traverser {
+abstract class Transformer extends Traverser with GraphTraversal {
   val name: String = "Transformer"
 
   var g: GraphBuilder = null
