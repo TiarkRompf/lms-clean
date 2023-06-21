@@ -29,7 +29,11 @@ class StructTest extends TutorialFunSuite {
         val s = Pointer.local[Complex]
         s.writeField("real", 1.23)
         s.writeField("image", 2.34)
-        s.readField[Double]("real") + s.readField[Double]("image")
+        val s2 = Pointer(s.deref)
+        s2.writeField("real", 5.0)
+        val s3 = Pointer(s2.deref)
+        s3.writeField("real", 10.0)
+        s3.readField[Double]("real") + s.readField[Double]("image")
       }
     }
     check("basic_struct", driver.code, "c")

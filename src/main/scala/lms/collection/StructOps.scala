@@ -17,9 +17,12 @@ trait StructOps extends Base with ArrayOps {
       Wrap[U](Adapter.g.reflectRead("reffield_get", Unwrap(ptr), Unwrap(field))(Unwrap(base)))
     def writeField[U: Manifest](field: String, v: Rep[U]): Unit =
       Adapter.g.reflectWrite("reffield_set", Unwrap(ptr), Unwrap(field), Unwrap(v))(Unwrap(base))
+    def deref: Rep[T] =
+      Wrap[T](Adapter.g.reflectWrite("deref", Unwrap(ptr))(Adapter.CTRL))
   }
 
   object Pointer {
+    def apply[T <: Struct:RefinedManifest](v: Rep[T]): Pointer[T] = Pointer(LongArray[T](v))
     def apply[T <: Struct:RefinedManifest](arr: Rep[LongArray[T]], idx: Rep[Long] = 0L) = arr match {
       case Wrap(_) => new Pointer(arr.slice(idx), arr)
       case EffectView(_, base) => new Pointer(arr.slice(idx), base)
@@ -27,15 +30,13 @@ trait StructOps extends Base with ArrayOps {
     def local[T <: Struct:RefinedManifest] = {
       val struct = Wrap[T](Adapter.g.reflectMutable("local_struct"))
       val ptr = Wrap[LongArray[T]](Adapter.g.reflectEffect("ref_new", Unwrap(struct))(Unwrap(struct), Adapter.STORE)()) // FIXME: Write? Or different?
-      new Pointer(ptr, ptr)
+      new Pointer[T](ptr, ptr)
     }
   }
 }
 
 trait CCodeGenStruct extends ExtendedCCodeGen {
   override def traverse(n: Node): Unit = n match {
-    case n @ Node(s, "field_set", List(st, Const(field: String), v), _) =>
-      esln"$st.$field = $v;"
     case n @ Node(s, "reffield_set", List(ptr, Const(field: String), v), _) =>
       shallowP(ptr, precedence("reffield_get"))
       esln"->$field = $v;"
@@ -50,8 +51,8 @@ trait CCodeGenStruct extends ExtendedCCodeGen {
       emit("&"); shallowP(v, precedence("ref_new"))
     case n @ Node(s, "reffield_get", List(ptr, Const(field: String)), _) =>
       shallowP(ptr, precedence("reffield_get")); emit("->"); emit(field)
-    case n @ Node(s, "field_get", List(st, Const(field: String)), _) =>
-      es"$st.$field"
+    case n @ Node(s, "deref", List(ptr), _) =>
+      es"*$ptr"
     case _ => super.shallow(n)
   }
 
