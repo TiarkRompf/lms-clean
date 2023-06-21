@@ -67,6 +67,7 @@ object CStruct_Impl {
           implicit val $manifestName = new RefinedManifest[$name] {
             def fields: List[(String, Manifest[_])] = List(..$fieldDecls)
             def runtimeClass = classOf[$name]
+            override def name = Some(${name.toString})
           }
           implicit class $opsClassName(p: Pointer[$name]) {
             ..$getters
