@@ -9,6 +9,12 @@ import lms.core.utils.time
 import lms.macros.SourceContext
 import lms.macros.RefinedManifest
 
+
+import language.experimental.macros
+import scala.annotation.StaticAnnotation
+import scala.reflect.macros.whitebox.Context
+import scala.util.matching.Regex
+
 trait StructOps extends Base with ArrayOps {
   abstract class Struct
 
@@ -35,6 +41,47 @@ trait StructOps extends Base with ArrayOps {
   }
 }
 
+object CStruct_Impl {
+  def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+    import c.universe._
+
+    println("CStruct_Impl")
+    val List(a) = annottees
+    //println(a)
+    a.tree match {
+      case q"case class $name(..${fields: Seq[ValDef]})" =>
+        val manifestName = internal.reificationSupport.freshTermName(name.toString+"Manifest")
+        val fieldDecls = fields.map { f => q"""(${f.name.toString}, manifest[${f.tpt}])""" }
+        val opsClassName = internal.reificationSupport.freshTypeName(name.toString+"Ops")
+        //println(fieldDecls)
+        //List(("real", manifest[Double]), ("image", manifest[Double]))
+        val getters = fields.map { f =>
+          q"""def ${f.name}: Rep[${f.tpt}] = p.readField[${f.tpt}](${f.name.toString})"""
+        }
+        val setters = fields.map { f =>
+          val setter = TermName(f.name + "_$eq")
+          q"""def $setter(v: Rep[${f.tpt}]): Unit = p.writeField[${f.tpt}](${f.name.toString}, v)"""
+        }
+        val res = c.Expr(q"""
+          abstract class $name extends Struct
+          implicit val $manifestName = new RefinedManifest[$name] {
+            def fields: List[(String, Manifest[_])] = List(..$fieldDecls)
+            def runtimeClass = classOf[$name]
+          }
+          implicit class $opsClassName(p: Pointer[$name]) {
+            ..$getters
+            ..$setters
+          }
+        """)
+        res
+    }
+  }
+}
+
+class CStruct extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro CStruct_Impl.impl
+}
+
 trait CCodeGenStruct extends ExtendedCCodeGen {
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s, "reffield_set", List(ptr, Const(field: String), v), _) =>
@@ -54,9 +101,5 @@ trait CCodeGenStruct extends ExtendedCCodeGen {
     case n @ Node(s, "deref", List(ptr), _) =>
       es"*$ptr"
     case _ => super.shallow(n)
-  }
-
-  override def mayInline(n: Node): Boolean = n match {
-    case _ => super.mayInline(n)
   }
 }

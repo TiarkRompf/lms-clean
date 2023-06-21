@@ -6,17 +6,20 @@ Emitting C Generated Code
 #include <stdint.h>
 #include <stdbool.h>
 /*********** Datastructures ***********/
-struct Anon573948033 {
+struct Anon874383923 {
   double real;
   double image;
 };
 /**************** Snippet ****************/
 double Snippet(int x0) {
-  struct Anon573948033 x1 = { 0 };
-  struct Anon573948033* x2 = &x1;
+  struct Anon874383923 x1 = { 0 };
+  struct Anon874383923* x2 = &x1;
   x2->real = 1.23;
   x2->image = 2.34;
-  return x2->real + x2->image;
+  struct Anon874383923 x3[1] = { *x2 };
+  struct Anon874383923 x4[1] = { *x3 };
+  x4->real = 10.0;
+  return x4->real + x2->image;
 }
 /*****************************************
 End of C Generated Code
