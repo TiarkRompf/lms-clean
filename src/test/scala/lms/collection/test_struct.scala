@@ -14,26 +14,22 @@ class StructTest extends TutorialFunSuite {
   test("basic_struct_is_OK") {
     val driver = new DslDriverC[Int, Double] with StructOps { q =>
       override val codegen = new DslGenC with CCodeGenStruct {
+        val x = 1
         val IR: q.type = q
       }
 
-      abstract class Complex extends Struct
-
-      implicit val complex = new RefinedManifest[Complex] {
-        def fields: List[(String, Manifest[_])] = List(("real", manifest[Double]), ("image", manifest[Double]))
-        def runtimeClass = classOf[Complex]
-      }
+      @CStruct case class Complex(real: Double, image: Double)
 
       @virtualize
       def snippet(arg: Rep[Int]) = {
         val s = Pointer.local[Complex]
-        s.writeField("real", 1.23)
-        s.writeField("image", 2.34)
+        s.real = 1.23 // that is s.writeField("real", 1.23)
+        s.image = 2.34
         val s2 = Pointer(s.deref)
-        s2.writeField("real", 5.0)
+        s2.real = 5.0
         val s3 = Pointer(s2.deref)
-        s3.writeField("real", 10.0)
-        s3.readField[Double]("real") + s.readField[Double]("image")
+        s3.real = 10.0
+        s3.real + s.image // that is s.readField("real") ...
       }
     }
     check("basic_struct", driver.code, "c")
