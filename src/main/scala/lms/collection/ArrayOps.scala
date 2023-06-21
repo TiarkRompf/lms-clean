@@ -8,7 +8,6 @@ import lms.core.virtualize
 import lms.core.utils.time
 import lms.macros.SourceContext
 
-
 object ArrayTypeLess {
   import BaseTypeLess._
   import PrimitiveTypeLess._
@@ -51,7 +50,6 @@ object ArrayTypeLess {
     }
   }
 }
-
 
 trait ArrayOps extends PrimitiveOps {
 
