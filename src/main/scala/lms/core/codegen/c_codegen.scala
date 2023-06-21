@@ -440,10 +440,6 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
         emitFunction(quote(s), block, decorator)
       }
       emit(quote(s))
-    case n @ Node(s, "reffield_get", List(ptr, Const(field: String)), _) =>
-      shallowP(ptr, precedence("reffield_get")); emit("->"); emit(field)
-    case n @ Node(s, "ref_new", List(v), _) =>
-      emit("&"); shallowP(v, precedence("ref_new"))
     case n @ Node(s, "NewArray" ,List(x), _) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
       emit(s"($tpe*)malloc("); shallowP(x, precedence("*")); emit(s" * sizeof($tpe))")
@@ -507,14 +503,8 @@ class ExtendedCCodeGen extends CompactCodeGen with ExtendedCodeGen {
   override def traverse(n: Node): Unit = n match {
     case n @ Node(s,"var_new",List(x),_) =>
       emitVarDef(n)
-    case n @ Node(s, "local_struct", Nil, _) =>
-      val tpe = remap(typeMap.getOrElse(s, manifest[Unknown]))
-      emitln(s"$tpe ${quote(s)} = { 0 };") // FIXME: uninitialized? or add it as argument?
     case n @ Node(s,"var_set",List(x,y),_) =>
       esln"${quote(x)} = $y;"
-    case n @ Node(s, "reffield_set", List(ptr, Const(field: String), v), _) =>
-      shallowP(ptr, precedence("reffield_get"))
-      esln"->$field = $v;"
     // static array
     case n @ Node(s, "Array" , xs,_) =>
       val tpe = remap(typeMap.get(s).map(_.typeArguments.head).getOrElse(manifest[Unknown]))
