@@ -14,7 +14,6 @@ class StructTest extends TutorialFunSuite {
   test("basic_struct_is_OK") {
     val driver = new DslDriverC[Int, Double] with StructOps { q =>
       override val codegen = new DslGenC with CCodeGenStruct {
-        val x = 1
         val IR: q.type = q
       }
 

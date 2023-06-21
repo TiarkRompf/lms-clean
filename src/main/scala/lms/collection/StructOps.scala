@@ -47,14 +47,11 @@ object CStruct_Impl {
 
     println("CStruct_Impl")
     val List(a) = annottees
-    //println(a)
     a.tree match {
       case q"case class $name(..${fields: Seq[ValDef]})" =>
         val manifestName = internal.reificationSupport.freshTermName(name.toString+"Manifest")
         val fieldDecls = fields.map { f => q"""(${f.name.toString}, manifest[${f.tpt}])""" }
         val opsClassName = internal.reificationSupport.freshTypeName(name.toString+"Ops")
-        //println(fieldDecls)
-        //List(("real", manifest[Double]), ("image", manifest[Double]))
         val getters = fields.map { f =>
           q"""def ${f.name}: Rep[${f.tpt}] = p.readField[${f.tpt}](${f.name.toString})"""
         }
