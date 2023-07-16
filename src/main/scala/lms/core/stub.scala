@@ -186,7 +186,7 @@ object BaseTypeLess {
  * 3. handing of recursive function definition via Adapter.funTable
  * 4. control flows such as conditional, loop (with @virtualize macro)
  * 5. other basics: misc, print, unchecked, timer, et al.
- * 6. other extentions are at later part of this file or can be extended by DSL writer
+ * 6. other extensions are at later part of this file or can be extended by DSL writer
  *    including UtilOps, RangeOps, Equal, OrderingOps, PrimitiveOps, LiftPrimitiveOps, et al.
  */
 trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompare {
