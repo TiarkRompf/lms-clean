@@ -199,6 +199,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   case class Const[T](x: T) extends Exp[T]
   case class Sym[T](x: Int) extends Exp[T]
+
+  // TODO(cwong): This should track provenance as well
   case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Exp[A]
 
   case class Wrap[+A:Manifest](x: lms.core.Backend.Exp, provenance: List[lms.core.Backend.Exp] = List()) extends Exp[A] {
