@@ -52,7 +52,6 @@ object ArrayTypeLess {
 }
 
 trait ArrayOps extends PrimitiveOps {
-
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
   }
@@ -65,11 +64,11 @@ trait ArrayOps extends PrimitiveOps {
 
   class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = x match {
-      case Wrap(_) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+      case Wrap(_, provenance) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)), Unwrap(x)::provenance)
       case EffectView(x, base) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(base)))
     }
     def update(i: Rep[Int], y: Rep[A]): Unit = x match {
-      case Wrap(_) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
+      case Wrap(_, provenance) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))((Unwrap(x)::provenance):_*)
       case EffectView(x, base) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(base))
     }
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("array_length", Unwrap(x)))
@@ -96,11 +95,11 @@ trait ArrayOps extends PrimitiveOps {
   }
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
     def apply(i: Rep[Long]): Rep[A] = x match {
-      case Wrap(_) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
+      case Wrap(_, provenance) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)), Unwrap(x)::provenance)
       case EffectView(x, base) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(base)))
     }
     def update(i: Rep[Long], y: Rep[A]): Unit = x match {
-      case Wrap(_) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
+      case Wrap(_, provenance) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))((Unwrap(x)::provenance):_*)
       case EffectView(x, base) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(base))
     }
     def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("array_length", Unwrap(x)))

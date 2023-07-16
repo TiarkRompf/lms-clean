@@ -30,7 +30,8 @@ trait StructOps extends Base with ArrayOps {
   object Pointer {
     def apply[T <: Struct:RefinedManifest](v: Rep[T]): Pointer[T] = Pointer(LongArray[T](v))
     def apply[T <: Struct:RefinedManifest](arr: Rep[LongArray[T]], idx: Rep[Long] = 0L) = arr match {
-      case Wrap(_) => new Pointer(arr.slice(idx), arr)
+      // TODO(cwong): How to handle provenance?
+      case Wrap(_, _) => new Pointer(arr.slice(idx), arr)
       case EffectView(_, base) => new Pointer(arr.slice(idx), base)
     }
     def local[T <: Struct:RefinedManifest] = {
