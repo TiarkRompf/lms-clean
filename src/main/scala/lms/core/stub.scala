@@ -200,9 +200,6 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   case class Const[T](x: T) extends Exp[T]
   case class Sym[T](x: Int) extends Exp[T]
 
-  // TODO(cwong): This should track provenance as well
-  case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Exp[A]
-
   case class Wrap[+A:Manifest](x: lms.core.Backend.Exp, provenance: List[lms.core.Backend.Exp] = List()) extends Exp[A] {
     Adapter.typeMap.getOrElseUpdate(x, manifest[A])
   }
@@ -213,7 +210,6 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
   def Unwrap(x: Exp[Any]) = x match {
     case Wrap(x, _) => x
     case Const(x) => Backend.Const(x)
-    case EffectView(Wrap(x, _), _) => x // TODO: fix!
   }
 
   case class WrapV[A:Manifest](x: lms.core.Backend.Exp) extends Var[A] {

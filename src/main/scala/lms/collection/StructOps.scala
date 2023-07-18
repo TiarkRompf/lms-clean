@@ -32,7 +32,6 @@ trait StructOps extends Base with ArrayOps {
     def apply[T <: Struct:RefinedManifest](arr: Rep[LongArray[T]], idx: Rep[Long] = 0L) = arr match {
       // TODO(cwong): How to handle provenance?
       case Wrap(_, _) => new Pointer(arr.slice(idx), arr)
-      case EffectView(_, base) => new Pointer(arr.slice(idx), base)
     }
     def local[T <: Struct:RefinedManifest] = {
       val struct = Wrap[T](Adapter.g.reflectMutable("local_struct"))
