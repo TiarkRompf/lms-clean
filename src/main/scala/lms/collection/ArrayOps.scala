@@ -52,7 +52,6 @@ object ArrayTypeLess {
 }
 
 trait ArrayOps extends PrimitiveOps {
-
   def NewArray[T:Manifest](x: Rep[Int]): Rep[Array[T]] = {
     Wrap[Array[T]](Adapter.g.reflectMutable("NewArray", Unwrap(x)))
   }
@@ -65,15 +64,16 @@ trait ArrayOps extends PrimitiveOps {
 
   class ArrayOps[A:Manifest](x: Rep[Array[A]]) {
     def apply(i: Rep[Int]): Rep[A] = x match {
-      case Wrap(_) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-      case EffectView(x, base) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(base)))
+      case Wrap(_, provenance) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)), Unwrap(x)::provenance)
     }
     def update(i: Rep[Int], y: Rep[A]): Unit = x match {
-      case Wrap(_) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
-      case EffectView(x, base) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(base))
+      case Wrap(_, provenance) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))((Unwrap(x)::provenance):_*)
     }
     def length: Rep[Int] = Wrap[Int](Adapter.g.reflect("array_length", Unwrap(x)))
-    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = EffectView[Array[A]](Wrap[Array[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))), x) // (Unwrap(x), Adapter.STORE)())
+    def slice(s: Rep[Int], e: Rep[Int]): Rep[Array[A]] = x match {
+      case Wrap(_, provenance) =>
+        Wrap[Array[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e)), Unwrap(x)::provenance) // (Unwrap(x), Adapter.STORE)())
+    }
     def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
     def copyToArray(arr: Rep[Array[A]], start: Rep[Int], len: Rep[Int]) = Adapter.g.reflectEffect("array_copyTo", Unwrap(x), Unwrap(arr), Unwrap(start), Unwrap(len))(Unwrap(x))(Unwrap(arr))
     def copyToLongArray(arr: Rep[LongArray[A]], start: Rep[Long], len: Rep[Int]) = Adapter.g.reflectEffect("array_copyTo", Unwrap(x), Unwrap(arr), Unwrap(start), Unwrap(len))(Unwrap(x))(Unwrap(arr))
@@ -96,15 +96,15 @@ trait ArrayOps extends PrimitiveOps {
   }
   implicit class LongArrayOps[A:Manifest](x: Rep[LongArray[A]]) {
     def apply(i: Rep[Long]): Rep[A] = x match {
-      case Wrap(_) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)))
-      case EffectView(x, base) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(base)))
+      case Wrap(_, provenance) => Wrap[A](Adapter.g.reflectRead("array_get", Unwrap(x), Unwrap(i))(Unwrap(x)), Unwrap(x)::provenance)
     }
     def update(i: Rep[Long], y: Rep[A]): Unit = x match {
-      case Wrap(_) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(x))
-      case EffectView(x, base) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))(Unwrap(base))
+      case Wrap(_, provenance) => Adapter.g.reflectWrite("array_set", Unwrap(x), Unwrap(i), Unwrap(y))((Unwrap(x)::provenance):_*)
     }
     def length: Rep[Long] = Wrap[Long](Adapter.g.reflect("array_length", Unwrap(x)))
-    def slice(s: Rep[Long], e: Rep[Long] = unit(-1L)): Rep[LongArray[A]] = EffectView[LongArray[A]](Wrap[LongArray[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e))), x) // FIXME: borrowing effect?
+    def slice(s: Rep[Long], e: Rep[Long] = unit(-1L)): Rep[LongArray[A]] = x match {
+      case Wrap(_, provenance) => Wrap[LongArray[A]](Adapter.g.reflect("array_slice", Unwrap(x), Unwrap(s), Unwrap(e)), Unwrap(x)::provenance)
+    }
     def resize(s: Rep[Long]): Rep[LongArray[A]] = Wrap[LongArray[A]](Adapter.g.reflectRealloc("array_resize", Unwrap(x), Unwrap(s))(Unwrap(x)))
     def free: Unit = Adapter.g.reflectFree("array_free", Unwrap(x))(Unwrap(x))
   }

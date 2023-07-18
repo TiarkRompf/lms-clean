@@ -186,7 +186,7 @@ object BaseTypeLess {
  * 3. handing of recursive function definition via Adapter.funTable
  * 4. control flows such as conditional, loop (with @virtualize macro)
  * 5. other basics: misc, print, unchecked, timer, et al.
- * 6. other extentions are at later part of this file or can be extended by DSL writer
+ * 6. other extensions are at later part of this file or can be extended by DSL writer
  *    including UtilOps, RangeOps, Equal, OrderingOps, PrimitiveOps, LiftPrimitiveOps, et al.
  */
 trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompare {
@@ -199,19 +199,17 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   case class Const[T](x: T) extends Exp[T]
   case class Sym[T](x: Int) extends Exp[T]
-  case class EffectView[A:Manifest](x: Rep[A], base: Rep[A]) extends Exp[A]
 
-  case class Wrap[+A:Manifest](x: lms.core.Backend.Exp) extends Exp[A] {
+  case class Wrap[+A:Manifest](x: lms.core.Backend.Exp, provenance: List[lms.core.Backend.Exp] = List()) extends Exp[A] {
     Adapter.typeMap.getOrElseUpdate(x, manifest[A])
   }
-  def Wrap[A:Manifest](x: lms.core.Backend.Exp): Exp[A] = {
+  def Wrap[A:Manifest](x: lms.core.Backend.Exp, provenance: List[lms.core.Backend.Exp] = List()): Exp[A] = {
     if (manifest[A] == manifest[Unit]) Const(()).asInstanceOf[Exp[A]]
-    else new Wrap[A](x)
+    else new Wrap[A](x, provenance)
   }
   def Unwrap(x: Exp[Any]) = x match {
-    case Wrap(x) => x
+    case Wrap(x, _) => x
     case Const(x) => Backend.Const(x)
-    case EffectView(Wrap(x), _) => x // TODO: fix!
   }
 
   case class WrapV[A:Manifest](x: lms.core.Backend.Exp) extends Var[A] {
@@ -410,8 +408,8 @@ trait Base extends EmbeddedControls with OverloadHack with lms.util.ClosureCompa
 
   // IfThenElse
   def __ifThenElse[T:Manifest](c: Rep[Boolean], a: => Rep[T], b: => Rep[T])(implicit pos: SourceContext): Rep[T] = c match {
-    case Wrap(Backend.Const(true))  => a
-    case Wrap(Backend.Const(false)) => b
+    case Wrap(Backend.Const(true), _)  => a
+    case Wrap(Backend.Const(false), _) => b
     case _ =>
       Wrap[T](Adapter.IF(Adapter.BOOL(Unwrap(c)))
                      (Adapter.INT(Unwrap(a)))
@@ -1072,7 +1070,7 @@ trait PrimitiveOps extends Base with OverloadHack {
   implicit def intToChar(x: Int) = x.toChar
 
   def cast_helper[X,Y](x: Rep[X])(implicit c: X => Y, mX: Manifest[X], mY: Manifest[Y], pos: SourceContext) : Rep[Y] = x match {
-    case Wrap(Backend.Const(x: X)) => Wrap[Y](Backend.Const(c(x)))
+    case Wrap(Backend.Const(x: X), _) => Wrap[Y](Backend.Const(c(x)))
     case _ => Wrap[Y](Adapter.g.reflect("cast", Unwrap(x), Backend.Const(manifest[Y])))
   }
 
