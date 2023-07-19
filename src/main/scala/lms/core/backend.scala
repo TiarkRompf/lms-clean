@@ -58,6 +58,9 @@ object Backend {
     lazy val isPure = sdeps.isEmpty && hdeps.isEmpty && rkeys.isEmpty && wkeys.isEmpty
     lazy val hasSimpleEffect = wkeys.exists(key => key.isInstanceOf[Const] && key != STORE)
 
+    def ++(ef: EffectSummary): EffectSummary =
+      EffectSummary(sdeps ++ ef.sdeps, hdeps ++ ef.hdeps, rkeys ++ ef.rkeys, wkeys ++ ef.wkeys)
+
     def filter(f: Sym => Boolean) = {
       val nf = (e: Exp) => e match {
         case s: Sym => f(s)
@@ -77,7 +80,7 @@ object Backend {
   // arguments, as well as an effect summary.
 
   case class Node(n: Sym, op: String, rhs: List[Def], eff: EffectSummary) {
-    override def toString = s"$n = ($op ${rhs.mkString(" ")})  $eff"
+    override def toString = s"$n = ($op ${rhs.mkString(" ")}) $eff"
   }
 
   /* YYY TODO
@@ -172,6 +175,21 @@ class GraphBuilder {
     case _ => None
   }
   def findDefinition(op: String, as: Seq[Def]): Option[Node] = globalDefsReverseCache.get((op,as))
+
+  def getReadKeys(s: Exp): Set[Exp] = findDefinition(s) match {
+    case Some(n) => n.eff.rkeys
+    case _ => Set()
+  }
+
+  def getWriteKeys(s: Exp): Set[Exp] = findDefinition(s) match {
+    case Some(n) => n.eff.wkeys
+    case _ => Set()
+  }
+
+  def getEffectSummary(s: Exp): EffectSummary = findDefinition(s) match {
+    case Some(n) => n.eff
+    case _ => emptySummary
+  }
 
   var __rewrites: (String => Any => Option[Exp]) = (s => x => None)
 
@@ -556,7 +574,8 @@ class GraphBuilderOpt extends GraphBuilder {
         case Some(Node(_, "array_set", List(as2, idx2, value2), _)) if (as == as2 && i == idx2 && value2 == rs) => true
         case _ => false
       }
-    }) => Some(Const(()))
+    }) =>
+      Some(Const(()))
 
     // TODO: should be handle by the case below. However it doesn't because of aliasing issues!
     // (x + idx)->i = (x + idx)->i => ()    side condition: no write in-between! (on x)

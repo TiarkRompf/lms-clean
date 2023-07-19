@@ -2,11 +2,11 @@
 x5 = (!= x4 0)
 x7 = (- 2 1)
 x8 = (- x4 x7)
-x9 = (@ x2 x8)  [CTRL*: _ | x6]
+x9 = (@ x2 x8) [CTRL*: _ | x6]
 x10 = (* x4 x9)
-x12 = (? x5 Block(List(),x10,x6,[CTRL*: _ | x9]) Block(List(),1,x11,[: _ | x11]))  [CTRL*: _ | x3]
+x12 = (? x5 Block(List(),x10,x6,[CTRL*: _ | x9]) Block(List(),1,x11,[: _ | x11])) [CTRL*: _ | x3]
 x2 = (λ Block(List(x4),x12,x3,[CTRL*: _ | x12]))
-x13 = (@ x2 x1)  [CTRL*: _ | x0]
+x13 = (@ x2 x1) [CTRL*: _ | x0]
 // Generic Codegen:
 // in: x1 effect: x0
 x7 = (- 2 1)
