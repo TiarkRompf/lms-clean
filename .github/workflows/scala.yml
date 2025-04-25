@@ -18,5 +18,7 @@ jobs:
       with:
         distribution: 'adopt'
         java-version: '17'
+    - name: Setup sbt launcher
+      uses: sbt/setup-sbt@v1
     - name: Run tests
       run: sbt test
