@@ -4,9 +4,9 @@ organization := "org.scala-lang.virtualized"
 
 version := "0.0.1-SNAPSHOT"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.12.15"
 
-val paradiseVersion = "2.1.0"
+val paradiseVersion = "2.1.1"
 
 //crossScalaVersions := Seq("2.12.1")
 
