@@ -15,7 +15,7 @@ trait ScalaCompile {
 
   var compiler: Global = _
   var reporter: ConsoleReporter = _
-  //var output: ByteArrayOutputStream = _ 
+  //var output: ByteArrayOutputStream = _
 
   def setupCompiler() = {
     /*
@@ -44,7 +44,7 @@ trait ScalaCompile {
   }
 
   var compileCount = 0
-  
+
   var dumpGeneratedCode = false
 
   def nextClassName = "staged$" + compileCount
@@ -55,9 +55,9 @@ trait ScalaCompile {
   def compile[A,B](className: String, source: String, staticData: List[(Class[_],Any)]): A=>B = {
     if (this.compiler eq null)
       setupCompiler()
-    
+
     compileCount += 1
-    
+
     // val source = new StringWriter()
     // val writer = new PrintWriter(source)
     // val staticData = codegen.emitSource(f, className, writer)
@@ -76,7 +76,7 @@ trait ScalaCompile {
     //compiler.genJVM.outputDir = fileSystem
 
     run.compileSources(List(new util.BatchSourceFile("<stdin>", source.toString)))
-    reporter.printSummary()
+    reporter.finish()
 
     if (!reporter.hasErrors)
       println("compilation: ok")
@@ -91,7 +91,7 @@ trait ScalaCompile {
 
     val cls: Class[_] = loader.loadClass(className)
     val cons = cls.getConstructor(staticData.map(_._1):_*)
-    
+
     val obj: A=>B = cons.newInstance(staticData.map(_._2.asInstanceOf[AnyRef]):_*).asInstanceOf[A=>B]
     obj
   }
